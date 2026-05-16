@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Carte interactive des métiers du livre à Douai, de 1550 à 2026.">
+    <title>Histoire des métiers du Livre à Douai</title>
+
+    <!-- Préconnexions CDN pour réduire la latence -->
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+
+    <!-- MapLibre GL — version épinglée pour un cache navigateur stable -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+    <!-- PapaParse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <section class="page-hero">
+  <div class="container">
+    <h1 class="page-title">La Réserve <em>patrimoniale</em></h1>
+  </div>
+          <h1><i class="fa-solid fa-book-open"></i> 500 ans d'Histoire du Livre à Douai (1550 - 2026)</h1>
+        <div class="search-wrapper">
+            <div id="search-mode-selector">
+                <button id="mode-person" class="active-mode" onclick="setSearchMode('person')" title="Chercher une personne">
+                    <i class="fa-solid fa-user"></i>
+                </button>
+                <button id="mode-book" onclick="setSearchMode('book')" title="Chercher un livre">
+                    <i class="fa-solid fa-book"></i>
+                </button>
+            </div>
+            <div class="search-input-wrapper">
+                <input type="text" id="search-input" placeholder="Rechercher une personne...">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <div id="search-results"></div>
+            </div>
+        </div>
+</section>
+
+    <div id="main-container">
+        <div id="year-pills">
+            <i class="fa-solid fa-calendar-day"></i>
+            <span id="year-val">1862</span>
+        </div>
+        <div id="map"></div>
+		<svg id="lines-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2;"></svg>
+        <div id="book-panel" style="display:none;"></div>
+        <div id="info-panel"><div id="info-content"></div></div>
+    </div>
+
+    <div id="bottom-panel">
+        <div id="timeline-container">
+            <div id="timeline-wrapper">
+                <div id="current-year-line">
+                    <div id="timeline-handle"><i class="fa-solid fa-caret-down"></i></div>
+                </div>
+                <div class="timeline-header" id="timeline-years"></div>
+                <div id="timeline-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/geojson/douai-ville.js"></script>
+    <script src="js/geojson/douai-arrondissement.js"></script>
+    <script src="js/geojson/douai-bibliothèques.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

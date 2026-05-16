@@ -1,0 +1,198 @@
+{
+  "version": 8,
+  "name": "Douai Histoire du Livre",
+  "metadata": {},
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "url": "https://api.maptiler.com/tiles/v3-openmaptiles/tiles.json?key=cePrzRGgbOkOEOM4geYV"
+    }
+  },
+  "sprite": "",
+  "glyphs": "https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=cePrzRGgbOkOEOM4geYV",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "rgba(209, 209, 197, 1)"
+      }
+    },
+    {
+      "id": "landuse-residential",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": [
+        "all",
+        ["==", "class", "residential"]
+      ],
+      "paint": {
+        "fill-color": "rgba(196, 196, 196, 1)",
+        "fill-antialias": false
+      }
+    },
+    {
+      "id": "landuse-green",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "filter": [
+        "none",
+        ["==", "class", "farmland"],
+        ["==", "name", ""]
+      ],
+      "paint": {
+        "fill-color": "rgba(176, 194, 176, 1)",
+        "fill-antialias": true
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "filter": ["all"],
+      "paint": {
+        "fill-color": "#2c3e50",
+        "fill-antialias": true
+      }
+    },
+    {
+      "id": "buildings",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "paint": {
+        "fill-antialias": true,
+        "fill-color": "rgba(165, 157, 157, 1)"
+      }
+    },
+    {
+      "id": "buildings-line",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "paint": {
+        "line-width": 0.5,
+        "line-color": "rgba(120, 114, 114, 1)"
+      },
+      "maxzoom": 24,
+      "minzoom": 15
+    },
+    {
+      "id": "transportation-rail",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "any",
+        ["==", "class", "rail"],
+        ["==", "name", ""]
+      ],
+      "paint": {
+        "line-color": "rgba(68, 68, 68, 0.68)"
+      }
+    },
+    {
+      "id": "transportation-car-secondary",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "any",
+        ["==", "class", "tertiary"],
+        ["==", "class", "minor"]
+      ],
+      "paint": {
+        "line-color": "rgba(255, 255, 255, 1)",
+        "line-width": {
+          "stops": [[12, 1], [17, 3]],
+          "type": "exponential"
+        }
+      },
+      "minzoom": 0
+    },
+    {
+      "id": "transportation-car-main-copy-copy",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "any",
+        ["==", "class", "primary"],
+        ["==", "class", "secondary"],
+        ["==", "class", "trunk"]
+      ],
+      "paint": {
+        "line-color": "rgba(255, 255, 159, 1)",
+        "line-width": {
+          "stops": [
+            [12, 1],
+            [17, 5],
+            [20, 9]
+          ]
+        }
+      },
+      "maxzoom": 24
+    },
+    {
+      "id": "transportation-car-highway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "any",
+        ["==", "class", "motorway"]
+      ],
+      "paint": {
+        "line-color": "rgba(255, 159, 159, 1)",
+        "line-width": 2
+      },
+      "minzoom": 0,
+      "maxzoom": 15
+    },
+    {
+      "id": "départements",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "boundary",
+      "filter": [
+        "any",
+        ["==", "admin_level", 6]
+      ],
+      "paint": {"line-width": 2}
+    },
+    {
+      "id": "pays",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "boundary",
+      "filter": [
+        "any",
+        ["==", "admin_level", 2]
+      ],
+      "paint": {"line-width": 3}
+    },
+    {
+      "id": "places",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "filter": [
+        "all",
+        ["==", "name", "Douai"]
+      ],
+      "layout": {
+        "text-field": "{name}",
+        "text-size": 24
+      },
+      "paint": {
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 3,
+        "text-halo-blur": 10
+      }
+    }
+  ],
+  "id": "w83ayzk"
+}

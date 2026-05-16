@@ -1,0 +1,771 @@
+/* ========================================================
+   VARIABLES GLOBALES
+   Centralise les couleurs pour faciliter la maintenance
+   ======================================================== */
+:root {
+    --color-primary:   #2c3e50;
+    --color-accent:    #ee1e23;
+    --color-blue:      #3498db;
+    --color-bg:        #f4f4f4;
+    --font-main:       'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ========================================================
+   BASE
+   ======================================================== */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-main);
+    background: var(--color-bg);
+}
+
+/* ========================================================
+   NAVBAR
+   ======================================================== */
+.navbar {
+    background-color: var(--color-primary);
+    color: white;
+    padding: 12px 25px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    border-bottom: 2px solid var(--color-accent);
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar h1 {
+    margin: 0;
+    font-size: 1.3em;
+    font-weight: 300;
+}
+
+/* Conteneur de la barre de recherche */
+.search-wrapper {
+    position: relative;
+    width: 60%;
+    display: flex;
+    align-items: center;
+}
+
+#search-mode-selector {
+    display: flex;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px 0 0 20px;
+    padding: 2px;
+}
+
+#search-mode-selector button {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+    opacity: 0.6;
+}
+
+#search-mode-selector button.active-mode {
+    background: var(--color-accent);
+    opacity: 1;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.search-input-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+#search-input {
+    padding: 10px 15px;
+    border-radius: 0 20px 20px 0;
+    border: none;
+    width: 100%;
+    outline: none;
+    box-sizing: border-box;
+    font-size: 0.95em;
+}
+
+.search-icon {
+    position: absolute;
+    right: 15px;
+    top: 12px;
+    color: #7f8c8d;
+}
+
+#search-results {
+    position: absolute;
+    top: 45px;
+    left: 0;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 2000;
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+}
+
+/* ========================================================
+   LAYOUT PRINCIPAL
+   ======================================================== */
+#main-container {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+
+#map {
+    flex: 1;
+    height: 100%;
+}
+
+/* ========================================================
+   PANNEAU INFO (droite)
+   ======================================================== */
+#info-panel {
+    width: 380px;
+    background-image:
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E"),
+        linear-gradient(to bottom right, #2c3e50, #2c3e50);
+    background-size: auto, cover;
+    background-repeat: repeat, no-repeat;
+    border-left: 1px solid #ccc; /* CORRIGÉ : était "order-left" (typo) */
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    z-index: 500;
+    overflow-y: auto;
+    padding: 20px;
+    display: block;
+}
+
+.info-header {
+    border: 2px solid var(--color-accent);
+    border-radius: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    position: sticky;
+    top: 0;
+    background: #d3dae0;
+    z-index: 10;
+    min-height: 35px;
+}
+
+.info-header h2 {
+    margin: 3px 0 0 0;
+    color: var(--color-primary);
+    font-size: 1.2em;
+}
+
+.back-btn {
+    background: #ecf0f1;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    margin-bottom: 15px;
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: absolute;
+    right: 10px;
+}
+
+.back-btn:hover {
+    background: #bdc3c7;
+}
+
+/* ========================================================
+   GROUPES / ENSEIGNES
+   ======================================================== */
+.enseigne-group {
+    margin-bottom: 15px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.box-header {
+    background: #f8f9fa;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background 0.2s;
+}
+
+.box-header:hover {
+    background: #f0f2f4;
+}
+
+.box-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+}
+
+.box-title {
+    font-weight: bold;
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.employe-item {
+    margin-left: 10px;
+    padding: 10px 15px;
+    border-left: 2px solid var(--color-primary);
+    border-bottom: 1px solid #f1f1f1;
+    font-size: 0.9em;
+    cursor: pointer;
+    background: white;
+}
+
+.employe-item:hover {
+    background: #fffcfc;
+}
+
+/* ========================================================
+   MARQUEURS CARTE
+   ======================================================== */
+.marker-main {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 6px;
+    border: 2px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.marker-main i {
+    color: white;
+    font-size: 14px;
+}
+
+.marker-small {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.marker-small i {
+    color: white;
+    font-size: 11px;
+}
+
+/* ========================================================
+   PANNEAU BAS (timeline)
+   ======================================================== */
+#bottom-panel {
+    background: white;
+    border-top: 3px solid var(--color-primary);
+    z-index: 1000;
+}
+
+#timeline-container {
+    height: 180px;
+    overflow-y: auto;
+}
+
+#timeline-wrapper {
+    position: relative;
+    width: 100%;
+    min-height: 100%;
+    user-select: none;
+}
+
+.timeline-header {
+    position: sticky;
+    top: 0;
+    background: #eee;
+    height: 30px;
+    z-index: 50;
+    border-bottom: 1px solid #ccc;
+}
+
+.year-text {
+    position: absolute;
+    top: 5px;
+    font-size: 10px;
+    transform: translateX(-50%);
+    color: #666;
+}
+
+#current-year-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-accent);
+    z-index: 100;
+    pointer-events: none;
+}
+
+#timeline-handle {
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 30px;
+    background: var(--color-accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    pointer-events: auto;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 110;
+    touch-action: none; /* Nécessaire pour les événements tactiles */
+}
+
+/* ========================================================
+   BADGE ANNÉE
+   ======================================================== */
+#year-pills {
+    position: absolute;
+    left: 20px;
+    background: var(--color-primary);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 0 0 20px 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    border-bottom: 2px solid var(--color-accent);
+    border-left: 2px solid var(--color-accent);
+    border-right: 2px solid var(--color-accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#year-pills i {
+    color: var(--color-accent);
+}
+
+/* ========================================================
+   BARRES TIMELINE
+   ======================================================== */
+.imprimerie-row {
+    height: 26px;
+    border-bottom: 1px solid #f0f0f0;
+    position: relative;
+    width: 100%;
+}
+
+.imprimerie-bar {
+    position: absolute;
+    height: 18px;
+    top: 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    color: white;
+    padding: 0 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    background-color: #bdc3c7;
+}
+
+.imprimerie-bar.active-year {
+    background-color: #ee1e23 !important;
+    font-weight: bold;
+    box-shadow: 0 0 8px rgba(238, 30, 35, 0.6);
+}
+
+/* ========================================================
+   BADGES MÉTIERS
+   ======================================================== */
+.brevet-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 11px;
+    color: white;
+}
+
+.bg-imprimeur   { background-color: #ee1e23; }
+.bg-libraire    { background-color: #3498db; }
+.bg-litho       { background-color: #f1c40f !important; color: #333; }
+.bg-relieur     { background-color: #479167; }
+.bg-typographe  { background-color: #34495e; }
+.bg-graveur     { background-color: #6f4b7d; }
+.bg-journaliste { background-color: #8f6127; }
+.bg-photographe { background-color: #6f4b7d; }
+.bg-unknown     { background-color: #8c8c8c; }
+.bg-litho i     { color: #2c3e50; }
+
+/* ========================================================
+   RÉSULTATS DE RECHERCHE
+   ======================================================== */
+#search-results div {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: var(--color-primary);
+    background: white;
+}
+
+#search-results div:hover {
+    background-color: #f8f9fa;
+    color: var(--color-accent);
+}
+
+.search-subtext {
+    display: block;
+    font-size: 0.8em;
+    color: #7f8c8d;
+    margin-top: 2px;
+}
+
+.search-result-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.search-result-item:hover {
+    background-color: #f8f9fa;
+}
+
+.search-result-item strong {
+    display: block;
+    color: var(--color-primary);
+}
+
+/* ========================================================
+   PANNEAU LIVRE
+   ======================================================== */
+#book-panel {
+    width: 450px;
+    background: #fdfdfd;
+    border-left: 1px solid #ccc;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    z-index: 600;
+    overflow-y: auto;
+    padding: 20px;
+    position: relative;
+    border-right: 2px solid var(--color-primary);
+}
+
+#book-panel a:hover {
+    background-color: var(--color-accent) !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.book-detail-header {
+    border-bottom: 3px solid var(--color-accent);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+}
+
+.book-field {
+    margin-bottom: 12px;
+    font-size: 0.9em;
+}
+
+.book-label {
+    font-weight: bold;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    font-size: 0.75em;
+    display: block;
+}
+
+.book-value {
+    color: var(--color-primary);
+    line-height: 1.4;
+}
+
+.close-book-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    color: #bdc3c7;
+}
+
+.close-book-btn:hover {
+    color: var(--color-accent);
+}
+
+.close-person-btn {
+    background: #FFFFFF;
+    border-radius: 10px;
+    border: solid 1px;
+    font-size: 1em;
+    cursor: pointer;
+    color: #bdc3c7;
+    margin-bottom: 10px;
+}
+
+.close-person-btn:hover {
+    color: var(--color-accent);
+}
+
+/* ========================================================
+   TYPOGRAPHIE TITRES
+   ======================================================== */
+.book-title-styled {
+    font-size: 1.2em;
+    line-height: 1.4;
+    color: var(--color-primary);
+    margin: 0;
+    font-variant: none;
+}
+
+.doc-item-title .custom-sc {
+    font-variant: small-caps;
+    letter-spacing: 0.2px;
+    font-size: 1.05em;
+}
+
+.doc-item-title .custom-sc span {
+    text-transform: lowercase;
+}
+
+.custom-sc {
+    font-variant: small-caps;
+    letter-spacing: 0.2px;
+}
+
+.custom-sc span {
+    text-transform: lowercase;
+}
+
+/* ========================================================
+   EXEMPLAIRES
+   ======================================================== */
+.exemplaire-box {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.exemplaire-loc {
+    flex: 1;
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: 0.9em;
+    line-height: 1.2;
+}
+
+.exemplaire-pills {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    color: white;
+    font-size: 0.75em;
+    font-weight: bold;
+    white-space: nowrap;
+    width: fit-content;
+}
+
+.pill-barcode { background-color: #1a2a3a; }
+.pill-cote    { background-color: var(--color-accent); }
+
+/* ========================================================
+   PILLS CONTRIBUTEURS
+   ======================================================== */
+.contributeur-pill {
+    display: inline-flex;
+    align-items: center;
+    background-color: #ecf0f1;
+    color: var(--color-primary);
+    padding: 5px 12px;
+    border-radius: 15px;
+    margin: 3px;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid #bdc3c7;
+    text-decoration: none;
+}
+
+.contributeur-pill:hover {
+    background-color: var(--color-blue);
+    color: white;
+    border-color: #2980b9;
+}
+
+.contributeur-role {
+    font-style: italic;
+    font-size: 0.9em;
+    color: #7f8c8d;
+    margin-left: 5px;
+}
+
+.contributeur-pill:hover .contributeur-role {
+    color: #d1d1d1;
+}
+
+/* ========================================================
+   CARTE D'IDENTITÉ
+   ======================================================== */
+.id-card-container {
+    background: white;
+    border: 2px solid var(--color-primary);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    font-family: var(--font-main);
+}
+
+.id-card-top {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.id-photo-placeholder {
+    width: 80px;
+    height: 90px;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 50px;
+    color: #7f8c8d;
+    margin-right: 15px;
+}
+
+.id-main-title {
+    flex: 1;
+}
+
+.id-name-birth {
+    font-size: 1.3em;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: var(--color-primary);
+}
+
+.id-details {
+    font-size: 0.95em;
+    line-height: 1.6;
+}
+
+.id-label {
+    font-weight: bold;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    font-size: 0.8em;
+    margin-right: 5px;
+}
+
+.id-section-sep {
+    margin: 8px 0;
+    border-top: 1px dashed #ddd;
+}
+
+/* ========================================================
+   BADGES MATÉRIELS
+   ======================================================== */
+.mat-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 6px 0;
+}
+
+.mat-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 10px 12px 7px 12px;
+    min-width: 58px;
+    max-width: 90px;
+    text-align: center;
+    gap: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s;
+}
+
+.mat-badge:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.mat-badge-label {
+    font-size: 0.68em;
+    color: #555;
+    font-weight: 700;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    line-height: 1.2;
+}
+
+.mat-badge-sub {
+    font-size: 0.6em;
+    color: #999;
+    font-style: italic;
+    white-space: nowrap;
+}
+
+.marker-selected {
+    outline: 3px solid white;
+    outline-offset: 2px;
+    filter: brightness(1.3) drop-shadow(0 0 6px rgba(255,255,255,0.8));
+}
