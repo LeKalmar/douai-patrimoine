@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Réserve patrimoniale — Réseau des Bibliothèques Douai Cuincy</title>
+  <meta name="description" content="La Réserve patrimoniale des Bibliothèques de Douai conserve manuscrits enluminés, incunables et fonds historiques classés.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a href="#main" class="skip-nav">Aller au contenu</a>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <div class="header-top">
+    <a href="index.html" class="site-brand">
+      <div class="site-brand-icon">B</div>
+      <h1>
+        Bibliothèques Douai Cuincy
+        <small>Réseau des bibliothèques</small>
+      </h1>
+    </a>
+    <div class="header-actions">
+      <a href="https://www.bm-douai.fr/Default/horaires.aspx" class="hide-mobile">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Horaires
+      </a>
+      <a href="https://www.bm-douai.fr/Default/contact.aspx" class="hide-mobile">Contact</a>
+      <a href="https://www.bm-douai.fr/account.aspx#/profile" class="btn-account" title="Mon compte">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Mon compte
+      </a>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.main-nav').classList.toggle('open')" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </div>
+  <nav class="main-nav" aria-label="Menu principal">
+    <div class="nav-inner">
+      <a href="index.html">Accueil</a>
+      <div class="nav-dropdown">
+        <a href="#" tabindex="0">Bibliothèques ▾</a>
+        <div class="nav-dropdown-menu">
+          <span class="nav-dropdown-sub">Douai — 5 bibliothèques</span>
+          <a href="https://www.bm-douai.fr/Default/service-adultes.aspx">Marceline Desbordes-Valmore</a>
+          <a href="https://www.bm-douai.fr/Default/bibliotheque-la-micheline.aspx">La Micheline</a>
+          <a href="https://www.bm-douai.fr/Default/bibliotheque-la-peniche.aspx">La Péniche</a>
+          <a href="https://www.bm-douai.fr/Default/laberline.aspx">La Berline</a>
+          <a href="https://www.bm-douai.fr/Default/bibliotheque-coeur-de-bellain.aspx">Cœur de Bellain</a>
+          <span class="nav-dropdown-sub">Services</span>
+          <a href="https://www.bm-douai.fr/Default/multimedia-wifi.aspx">Services numériques</a>
+          <a href="https://www.bm-douai.fr/Default/sur-le-territoire.aspx">Territoire</a>
+          <span class="nav-dropdown-sub">Cuincy</span>
+          <a href="https://www.bm-douai.fr/Default/cuincy.aspx">Médiathèque Louis-Aragon</a>
+        </div>
+      </div>
+      <a href="patrimoine.html" class="active">Patrimoine</a>
+      <div class="nav-dropdown">
+        <a href="#" tabindex="0">Infos pratiques ▾</a>
+        <div class="nav-dropdown-menu">
+          <a href="https://www.bm-douai.fr/Default/inscire-et-emprunter.aspx">S'inscrire</a>
+          <a href="https://www.bm-douai.fr/Default/horaires.aspx">Horaires</a>
+          <a href="https://www.bm-douai.fr/Default/acces.aspx">Accès</a>
+          <a href="https://www.bm-douai.fr/Default/contact.aspx">Contact</a>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <a href="#" tabindex="0">Sélections ▾</a>
+        <div class="nav-dropdown-menu">
+          <a href="https://www.bm-douai.fr/Default/nouveautes.aspx">Nouveautés</a>
+          <a href="https://www.bm-douai.fr/Default/coup-de-coeur.aspx">Coups de cœur</a>
+          <a href="https://www.bm-douai.fr/Default/thematiques.aspx">Thématiques</a>
+          <a href="https://www.bm-douai.fr/Default/suggestions-dachats.aspx">Vos suggestions d'achats</a>
+        </div>
+      </div>
+      <a href="https://www.bm-douai.fr/Default/ressources.aspx">En ligne</a>
+    </div>
+  </nav>
+</header>
+
+<!-- ============ HERO PATRIMOINE ============ -->
+<section class="page-hero">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Fil d'Ariane">
+      <a href="index.html">Accueil</a>
+      <span>/</span>
+      <span>La Réserve patrimoniale</span>
+    </nav>
+    <h1 class="page-title">La Réserve <em>patrimoniale</em></h1>
+    <p class="page-lead">Un fonds exceptionnel parmi les 54 Bibliothèques Municipales Classées de France.</p>
+  </div>
+</section>
+
+<!-- ============ SEARCH ============ -->
+<div class="page-search-wrap">
+  <div class="container">
+    <form class="search-form search-form-compact" action="https://www.bm-douai.fr/search.aspx" role="search" aria-label="Recherche dans le catalogue">
+      <select class="search-scope" name="SC" aria-label="Périmètre de recherche">
+        <option value="DEFAULT">Partout</option>
+        <option value="CALENDAR_AGENDA">Agenda du réseau</option>
+        <option value="BLOG">Billets</option>
+      </select>
+      <input type="text" class="search-input" name="QUERY" placeholder="Rechercher dans le catalogue…" autocomplete="off" aria-label="Recherche">
+      <button type="submit" class="search-btn" aria-label="Lancer la recherche">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ MAIN ============ -->
+<main id="main" tabindex="-1">
+
+  <!-- INTRO -->
+  <section class="section">
+    <div class="container">
+      <div class="patrimoine-intro">
+        <div class="patrimoine-intro-text">
+          <p class="lead-paragraph">
+            Les bibliothèques de Douai font partie des <strong>54 Bibliothèques Municipales Classées</strong> en France, qui gèrent un fonds patrimonial appartenant à l'État et provenant notamment de confiscations opérées dans les couvents et abbayes durant la Révolution française.
+          </p>
+        </div>
+        <aside class="patrimoine-stats">
+          <img src="images/patrimoine-3.png" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- LES COLLECTIONS -->
+  <section class="section section-alt">
+    <div class="container">
+      <h2 class="section-title section-title-centered">Les collections</h2>
+      <p class="section-intro">Nous conservons un ensemble patrimonial riche et varié, témoin de plusieurs siècles d'histoire littéraire et imprimée.</p>
+
+      <div class="collections-grid">
+
+        <article class="collection-card">
+          <div class="collection-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20V2H6.5A2.5 2.5 0 004 4.5v15z"/>
+              <path d="M4 19.5A2.5 2.5 0 016.5 22H20v-5"/>
+            </svg>
+          </div>
+          <h3>Manuscrits enluminés</h3>
+          <p>Plus de 2 500 manuscrits, du 9<sup>e</sup> au 19<sup>e</sup> siècle, dont un grand nombre est enluminé.</p>
+        </article>
+
+        <article class="collection-card">
+          <div class="collection-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M4 4h16v16H4z"/>
+              <path d="M4 8h16M9 4v16"/>
+            </svg>
+          </div>
+          <h3>Fonds Marceline Desbordes-Valmore</h3>
+          <p>Plus de 5 000 lettres autographes de la grande poétesse douaisienne, figure majeure du romantisme français.</p>
+        </article>
+
+        <article class="collection-card">
+          <div class="collection-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="1"/>
+              <path d="M7 7h10M7 11h10M7 15h6"/>
+            </svg>
+          </div>
+          <h3>Incunables</h3>
+          <p>Une collection de près de 300 incunables, représentative des débuts de l'imprimerie en Europe.</p>
+        </article>
+
+        <article class="collection-card">
+          <div class="collection-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+            </svg>
+          </div>
+          <h3>Impressions douaisiennes</h3>
+          <p>L'ensemble des impressions douaisiennes de 1563 au milieu du 19<sup>e</sup> siècle, témoin de l'intense activité des presses douaisiennes nées de l'Université.</p>
+        </article>
+
+        <article class="collection-card">
+          <div class="collection-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>
+            </svg>
+          </div>
+          <h3>Livres singuliers</h3>
+          <p>Un fonds rassemblant des productions originales : ouvrages de bibliophilie, livres d'artistes, livres-objets…</p>
+        </article>
+
+        <article class="collection-card">
+          <div class="collection-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <h3>Édition locale contemporaine</h3>
+          <p>Toutes les publications récentes d'auteurs et autrices et de maisons d'éditions de Douai et du Douaisis.</p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Collections numérisées</h2>
+        <a href="visionneuse.html" class="section-link">Accéder à la visionneuse →</a>
+      </div>
+      <div class="collections-grid">
+
+        <a class="collection-card" href="visionneuse.html">
+          <div class="collection-img">
+            <!-- Remplacer par une vignette représentative du fonds -->
+            <div class="collection-img-placeholder">
+              <img src="images/fonds-robaut.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+            </div>
+          </div>
+          <div class="collection-body">
+            <span class="collection-tag">Dessins & études</span>
+            <h3>Fonds Robaut</h3>
+            <p class="collection-desc">Carnet de relevés et études graphiques d'Alfred Robaut (1830-1909), critique d'art et collectionneur, intime de Corot. Boîtes numérisées disponibles en haute résolution.</p>
+            <span class="collection-cta">Parcourir la collection →</span>
+          </div>
+        </a>
+
+        <a class="collection-card" href="visionneuse.html">
+          <div class="collection-img">
+            <div class="collection-img-placeholder">
+              <img src="images/fonds-bra.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+            </div>
+          </div>
+          <div class="collection-body">
+            <span class="collection-tag">Sculpture & modelages</span>
+            <h3>Fonds Bra</h3>
+            <p class="collection-desc">Archives du sculpteur Théophile Bra (1797-1863), natif de Douai. Dessins préparatoires, correspondances et documents iconographiques numérisés par les Bibliothèques.</p>
+            <span class="collection-cta">Parcourir la collection →</span>
+          </div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+  <!-- CONSULTATION -->
+  <section class="consultation-section">
+    <div class="container">
+      <div class="consultation-card">
+        <div class="consultation-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+        </div>
+        <div class="consultation-text">
+          <h2>Consulter la Réserve</h2>
+          <p>La consultation des documents de la réserve patrimoniale s'effectue <strong>sur place, sur rendez-vous préalable</strong>. Pour préparer votre visite, contactez l'équipe :</p>
+          <div class="contact-row">
+            <a href="tel:0327978851" class="contact-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+              03 27 97 88 51
+            </a>
+            <a href="mailto:bibliotheque@ville-douai.fr" class="contact-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+              bibliotheque@ville-douai.fr
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <h3>Marceline Desbordes-Valmore</h3>
+        <p>61, parvis Georges Prêtre<br>59500 Douai<br>Tél. : 03 27 97 88 51</p>
+      </div>
+      <div class="footer-col">
+        <h3>Médiathèque Louis-Aragon</h3>
+        <p>137, rue Louis Pasteur<br>59553 Cuincy<br>Tél. : 03 27 93 03 24</p>
+      </div>
+    </div>
+    <div class="footer-grid">
+      <div class="footer-col">
+        <h3>La Péniche</h3>
+        <p>259, rue de l'Église<br>59500 Douai<br>Tél. : 03 27 88 53 48</p>
+      </div>
+      <div class="footer-col">
+        <h3>La Micheline</h3>
+        <p>115, rue des Éclichettes<br>59500 Douai<br>Tél. : 06 75 28 37 70</p>
+      </div>
+      <div class="footer-col">
+        <h3>La Berline</h3>
+        <p>9, rue de Fontainebleau<br>59500 Douai<br>Tél. : 07 88 26 46 52</p>
+      </div>
+      <div class="footer-col">
+        <h3>Cœur de Bellain</h3>
+        <p>130, rue de Bellain<br>59500 Douai<br>Tél. : 03 27 93 58 42</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 Réseau des Bibliothèques Douai Cuincy</p>
+      <p>Propulsé par <a href="https://www.archimed.fr/" target="_blank" rel="noopener">Archimed</a></p>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
