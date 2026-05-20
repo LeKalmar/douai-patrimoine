@@ -657,9 +657,6 @@ ul { list-style: none; }
 .page-hero .container { position: relative; }
 
 /* === BREADCRUMB === */
-.breadcrumb {
-  padding: 0 1.5rem;
-}
 .breadcrumb a {
   color: var(--warm-dark);
   font-weight: 500;
@@ -675,7 +672,6 @@ ul { list-style: none; }
   margin-bottom: 0.75rem;
 }
 .page-title em {
-  font
   font-style: italic;
   color: var(--warm-light);
 }
