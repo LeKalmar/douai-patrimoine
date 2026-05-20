@@ -963,7 +963,7 @@
 
   // Met à jour la surbrillance de l'item actif et défile vers lui dans l'arbre
   function updateActiveItem() {
-    tree.querySelectorAll('.tree-item.active, .tree-book.active').forEach(el => el.classList.remove('active'));
+    tree.querySelectorAll('.tree-item.active, .tree-book.active, .tree-book-page.active').forEach(el => el.classList.remove('active'));
     if (currentIdx < 0) return;
     const f = flatFiles[currentIdx];
     let item;
@@ -972,9 +972,6 @@
       const pageItem = tree.querySelector(`.tree-book-page[data-bookname="${CSS.escape(f.name)}"][data-pageidx="${currentPageIdx}"]`);
       if (pageItem) {
         pageItem.classList.add('active');
-        // S'assurer que le wrapper est déplié
-        const wrapper = pageItem.closest('.tree-book-wrapper');
-        if (wrapper) wrapper.classList.add('expanded');
         item = pageItem;
       } else {
         item = tree.querySelector(`.tree-book[data-bookname="${CSS.escape(f.name)}"]`);
