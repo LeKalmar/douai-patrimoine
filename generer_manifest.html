@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Générateur de manifeste — Visionneuse patrimoniale</title>
+  <style>
+    :root {
+      --bg: #f5f2ec; --surface: #fff; --border: #ddd8ce;
+      --text: #1a1714; --muted: #6b6560;
+      --accent: #8b3a1e; --accent-light: #f0e8e3;
+      --green: #2d6a4f; --green-light: #e8f5ee;
+      --radius: 6px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 3rem 1rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 2rem; max-width: 640px; width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    h1 { font-size: 1.3rem; color: var(--accent); margin-bottom: .35rem; }
+    .subtitle { font-size: .82rem; color: var(--muted); margin-bottom: 1.75rem; line-height: 1.5; }
+
+    .drop-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      color: var(--muted);
+      font-size: .85rem;
+      position: relative;
+    }
+    .drop-area:hover, .drop-area.drag { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+    .drop-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .drop-area svg { display: block; margin: 0 auto .75rem; opacity: .4; }
+    .drop-area strong { display: block; font-size: .95rem; margin-bottom: .25rem; color: var(--text); }
+
+    .options { margin: 1.25rem 0; display: flex; flex-direction: column; gap: .75rem; }
+    label.opt { font-size: .82rem; display: flex; flex-direction: column; gap: .3rem; color: var(--muted); }
+    label.opt strong { color: var(--text); font-size: .85rem; }
+    input[type="text"] {
+      padding: .4rem .65rem; border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: inherit; font-size: .82rem; background: var(--bg); color: var(--text); outline: none;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .55rem 1.1rem; border-radius: var(--radius); border: none;
+      font-family: inherit; font-size: .85rem; font-weight: 500; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .4; cursor: default; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: .85; }
+    .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+    .actions { display: flex; gap: .65rem; margin-top: 1.25rem; flex-wrap: wrap; }
+
+    .result {
+      margin-top: 1.5rem; padding: 1rem 1.25rem;
+      border-radius: var(--radius); font-size: .8rem; line-height: 1.7;
+      display: none;
+    }
+    .result.ok { background: var(--green-light); border: 1px solid #a8d5be; color: var(--green); }
+    .result.err { background: var(--accent-light); border: 1px solid #d4a090; color: var(--accent); }
+    .result strong { font-size: .9rem; }
+
+    .tree-preview {
+      margin-top: 1.25rem; display: none;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      max-height: 280px; overflow-y: auto;
+      font-size: .75rem; font-family: 'Cascadia Code', 'Fira Mono', monospace;
+      background: #1a1714; color: #d4cfc8; padding: .75rem 1rem;
+      line-height: 1.7;
+    }
+    .tree-preview .folder { color: #e8a87c; }
+    .tree-preview .img    { color: #9ec8a0; }
+    .tree-preview .count  { color: #6b8f71; }
+
+    .note {
+      margin-top: 1.5rem; padding: .8rem 1rem;
+      background: var(--accent-light); border-radius: var(--radius);
+      font-size: .75rem; line-height: 1.6; color: var(--muted);
+    }
+    .note strong { color: var(--accent); }
+
+    /* ── Qualification des dossiers ── */
+    .qualify-panel {
+      margin-top: 1.5rem; display: none;
+    }
+    .qualify-panel h3 {
+      font-size: .88rem; font-weight: 600; margin-bottom: .25rem; color: var(--text);
+    }
+    .qualify-panel .hint {
+      font-size: .75rem; color: var(--muted); margin-bottom: .9rem; line-height: 1.5;
+    }
+    .qualify-table {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .qualify-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: .5rem;
+      padding: .45rem .65rem;
+      border-radius: var(--radius);
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .qualify-row .folder-label {
+      font-size: .8rem; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: flex; align-items: center; gap: .4rem;
+    }
+    .qualify-row .folder-label .sub-count {
+      font-size: .7rem; font-weight: 400; color: var(--muted);
+    }
+    .qualify-row .radio-group {
+      display: flex; gap: 4px; flex-shrink: 0;
+    }
+    .radio-group label {
+      display: flex; align-items: center; gap: 3px;
+      font-size: .72rem; cursor: pointer;
+      padding: .2rem .5rem;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: #fff;
+      transition: all .15s;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .radio-group input[type=radio] { display: none; }
+    .radio-group input[type=radio]:checked + span { font-weight: 600; }
+    .radio-group label:has(input[value=folder]:checked)  { border-color: #a0a0a0; background: #f0f0f0; }
+    .radio-group label:has(input[value=book]:checked)    { border-color: #8b3a1e; background: #f0e8e3; color: #8b3a1e; }
+    .radio-group label:has(input[value=isolated]:checked){ border-color: #2d6a4f; background: #e8f5ee; color: #2d6a4f; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Générateur de manifeste</h1>
+  <p class="subtitle">
+    Sélectionnez le dossier racine de vos images numérisées.<br>
+    Le script construit l'arborescence et télécharge le <code>manifest.json</code> prêt à l'emploi.
+  </p>
+
+  <div class="drop-area" id="dropArea">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+    </svg>
+    <strong>Cliquez pour choisir un dossier</strong>
+    ou glissez-le ici
+    <!-- webkitdirectory permet de sélectionner un dossier entier -->
+    <input type="file" id="folderInput" webkitdirectory multiple accept="image/*,.jpg,.jpeg,.png,.tif,.tiff,.webp">
+  </div>
+
+  <div class="options">
+    <label class="opt">
+      <strong>Nom affiché pour la racine dans l'arbre</strong>
+      <input type="text" id="rootName" value="Documents numérisés" placeholder="ex : Fonds numérisés">
+    </label>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="btnGenerate" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      Générer et télécharger manifest.json
+    </button>
+    <button class="btn btn-secondary" id="btnPreview" disabled>Aperçu de l'arbre</button>
+  </div>
+
+  <!-- ── Qualification des sous-dossiers ── -->
+  <div class="qualify-panel" id="qualifyPanel">
+    <h3>Qualifier les dossiers</h3>
+    <p class="hint">
+      Pour chaque sous-dossier direct, indiquez s'il contient un <strong style="color:#8b3a1e">Livre</strong> (pages séquentielles → 1 item),
+      des <strong style="color:#2d6a4f">Pièces isolées</strong> (chaque image = 1 item),
+      ou laissez en <strong>Dossier</strong> (comportement par défaut, peut contenir d'autres sous-dossiers).
+    </p>
+    <div class="qualify-table" id="qualifyTable"></div>
+  </div>
+
+  <div class="result" id="result"></div>
+  <div class="tree-preview" id="treePreview"></div>
+
+  <div class="note">
+    <strong>Comment l'utiliser&nbsp;?</strong><br>
+    1. Choisissez le dossier racine (ex : <em>3-Travail Interne</em>).<br>
+    2. Cliquez sur <em>Générer</em> — le fichier se télécharge automatiquement.<br>
+    3. Déplacez-le dans <code>site_web/js/manifest.json</code>.<br>
+    4. À relancer à chaque ajout d'images.
+  </div>
+</div>
+
+<script>
+  const IMG_EXTS = new Set(['jpg','jpeg','png','tif','tiff','webp','gif']);
+
+  const folderInput  = document.getElementById('folderInput');
+  const btnGenerate  = document.getElementById('btnGenerate');
+  const btnPreview   = document.getElementById('btnPreview');
+  const resultBox    = document.getElementById('result');
+  const treePreview  = document.getElementById('treePreview');
+  const dropArea     = document.getElementById('dropArea');
+  const qualifyPanel = document.getElementById('qualifyPanel');
+  const qualifyTable = document.getElementById('qualifyTable');
+
+  let manifest = null;
+  // Map : chemin relatif du dossier (ex "num-bra/Ms1721") → 'folder' | 'book' | 'isolated'
+  let folderTypes = {};
+  // Arbre intermédiaire brut (avant qualification)
+  let rawTree = null;
+
+  // ── Drag & drop visuel ──
+  dropArea.addEventListener('dragover',  e => { e.preventDefault(); dropArea.classList.add('drag'); });
+  dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag'));
+  dropArea.addEventListener('drop', e => { e.preventDefault(); dropArea.classList.remove('drag'); });
+
+  folderInput.addEventListener('change', () => {
+    const files = folderInput.files;
+    if (!files || files.length === 0) return;
+    const images = Array.from(files).filter(f => isImage(f.name));
+    const folderName = getFolderName(files);
+    dropArea.querySelector('strong').textContent = `📁 ${folderName}`;
+    dropArea.querySelector('strong').nextSibling.textContent =
+      ` — ${images.length} image${images.length > 1 ? 's' : ''} trouvée${images.length > 1 ? 's' : ''}`;
+    btnGenerate.disabled = false;
+    btnPreview.disabled  = false;
+    manifest = null;
+    folderTypes = {};
+    rawTree = buildRawTree(files);
+    renderQualifyPanel();
+  });
+
+  function getFolderName(files) {
+    const first = files[0].webkitRelativePath || '';
+    return first.split('/')[0] || 'dossier';
+  }
+
+  function isImage(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    return IMG_EXTS.has(ext);
+  }
+
+  function naturalCompare(a, b) {
+    const re = /(\d+)/g;
+    const partsA = a.split(re), partsB = b.split(re);
+    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+      const pa = partsA[i] || '', pb = partsB[i] || '';
+      const na = parseInt(pa, 10), nb = parseInt(pb, 10);
+      if (!isNaN(na) && !isNaN(nb)) { if (na !== nb) return na - nb; }
+      else { const c = pa.localeCompare(pb, 'fr'); if (c !== 0) return c; }
+    }
+    return 0;
+  }
+
+  // ── Construction de l'arbre intermédiaire brut ──
+  // Chaque nœud : { __type:'folder'|'image', __name, __children:{}, __path, __relPath }
+  function buildRawTree(files) {
+    const tree = {};
+    Array.from(files).filter(f => isImage(f.name)).forEach(f => {
+      const parts = f.webkitRelativePath.split('/');
+      parts.shift(); // retirer la racine OS
+      if (parts.length === 0) return;
+      let current = tree;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!current[part]) {
+          current[part] = { __type: 'folder', __name: part, __children: {} };
+        }
+        current = current[part].__children;
+      }
+      const filename = parts[parts.length - 1];
+      current[filename] = { __type: 'image', __name: filename, __path: parts.join('/') };
+    });
+    return tree;
+  }
+
+  // ── Panneau de qualification ──
+  // On liste tous les sous-dossiers directs du niveau 1 (et niveau 2 si nécessaire)
+  // pour permettre de qualifier chacun.
+  function renderQualifyPanel() {
+    qualifyTable.innerHTML = '';
+    folderTypes = {};
+
+    // Collecter tous les dossiers qui contiennent directement des images
+    // (ou d'autres dossiers). On affiche jusqu'à 2 niveaux.
+    const rows = [];
+    collectQualifiableNodes(rawTree, '', 0, rows);
+
+    if (rows.length === 0) { qualifyPanel.style.display = 'none'; return; }
+
+    rows.forEach(({ relPath, name, depth, imageCount, subFolderCount }) => {
+      folderTypes[relPath] = 'folder'; // défaut
+
+      const row = document.createElement('div');
+      row.className = 'qualify-row';
+      row.style.marginLeft = (depth * 16) + 'px';
+
+      const uid = 'q_' + relPath.replace(/[^a-zA-Z0-9]/g, '_');
+      const desc = subFolderCount > 0
+        ? `${subFolderCount} sous-dossier${subFolderCount > 1 ? 's' : ''}`
+        : `${imageCount} image${imageCount > 1 ? 's' : ''}`;
+
+      row.innerHTML = `
+        <div class="folder-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+          </svg>
+          ${escHtml(name)}
+          <span class="sub-count">(${desc})</span>
+        </div>
+        <div class="radio-group">
+          <label><input type="radio" name="${uid}" value="folder" checked><span>📁 Dossier</span></label>
+          <label><input type="radio" name="${uid}" value="book"><span>📖 Livre</span></label>
+          <label><input type="radio" name="${uid}" value="isolated"><span>🗂 Pièces isolées</span></label>
+        </div>
+      `;
+
+      // Mettre à jour folderTypes à chaque changement
+      row.querySelectorAll('input[type=radio]').forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (radio.checked) folderTypes[relPath] = radio.value;
+        });
+      });
+
+      qualifyTable.appendChild(row);
+    });
+
+    qualifyPanel.style.display = 'block';
+  }
+
+  function collectQualifiableNodes(node, basePath, depth, out) {
+    if (depth > 2) return; // on limite à 3 niveaux de qualification
+    const entries = Object.entries(node).filter(([, v]) => v.__type === 'folder');
+    entries.sort(([a], [b]) => naturalCompare(a, b));
+    entries.forEach(([name, child]) => {
+      const relPath = basePath ? basePath + '/' + name : name;
+      const imageCount = countRawImages(child.__children);
+      const subFolderCount = Object.values(child.__children).filter(v => v.__type === 'folder').length;
+      out.push({ relPath, name, depth, imageCount, subFolderCount });
+      // Récurser seulement si ce dossier contient lui-même des sous-dossiers
+      if (subFolderCount > 0) {
+        collectQualifiableNodes(child.__children, relPath, depth + 1, out);
+      }
+    });
+  }
+
+  function countRawImages(node) {
+    return Object.values(node).reduce((s, v) => {
+      if (v.__type === 'image') return s + 1;
+      if (v.__type === 'folder') return s + countRawImages(v.__children);
+      return s;
+    }, 0);
+  }
+
+  // ── Conversion arbre brut → JSON final avec qualification ──
+  function buildTree() {
+    function convert(node, relPath) {
+      const entries = Object.entries(node);
+      entries.sort(([nameA, a], [nameB, b]) => {
+        const aIsDir = a.__type === 'folder';
+        const bIsDir = b.__type === 'folder';
+        if (aIsDir !== bIsDir) return aIsDir ? -1 : 1;
+        return naturalCompare(nameA, nameB);
+      });
+
+      return entries.map(([, v]) => {
+        if (v.__type === 'image') {
+          return { type: 'image', name: v.__name, path: v.__path };
+        }
+        // C'est un dossier — regarder sa qualification
+        const childPath = relPath ? relPath + '/' + v.__name : v.__name;
+        const qual = folderTypes[childPath] || 'folder';
+
+        if (qual === 'book') {
+          // Collecter toutes les images (à plat, triées) comme pages
+          const pages = collectPages(v.__children);
+          return { type: 'book', name: v.__name, pages };
+        } else if (qual === 'isolated') {
+          // Comme un dossier normal mais les sous-dossiers éventuels
+          // sont ignorés — on remonte toutes les images à plat
+          const pages = collectPages(v.__children);
+          return {
+            type: 'folder',
+            name: v.__name,
+            children: pages.map(p => ({ type: 'image', name: p.name, path: p.path }))
+          };
+        } else {
+          // Dossier standard : récursion normale
+          return {
+            type: 'folder',
+            name: v.__name,
+            children: convert(v.__children, childPath)
+          };
+        }
+      });
+    }
+
+    return {
+      type: 'folder',
+      name: document.getElementById('rootName').value.trim() || 'Documents numérisés',
+      children: convert(rawTree, '')
+    };
+  }
+
+  // Collecte toutes les images d'un nœud à plat, triées naturellement
+  function collectPages(node) {
+    const pages = [];
+    function walk(n) {
+      const entries = Object.entries(n);
+      entries.sort(([a], [b]) => naturalCompare(a, b));
+      entries.forEach(([, v]) => {
+        if (v.__type === 'image') pages.push({ name: v.__name, path: v.__path });
+        else if (v.__type === 'folder') walk(v.__children);
+      });
+    }
+    walk(node);
+    return pages;
+  }
+
+  // ── Comptage pour le résumé ──
+  function countFinalImages(node) {
+    if (node.type === 'image') return 1;
+    if (node.type === 'book') return (node.pages || []).length;
+    return (node.children || []).reduce((s, c) => s + countFinalImages(c), 0);
+  }
+  function countFinalDocs(node) {
+    if (node.type === 'image') return 1;
+    if (node.type === 'book') return 1;
+    return (node.children || []).reduce((s, c) => s + countFinalDocs(c), 0);
+  }
+  function countFolders(node) {
+    if (node.type === 'image' || node.type === 'book') return 0;
+    return (node.children || []).reduce((s, c) => s + countFolders(c), 0) +
+      (node.children || []).filter(c => c.type === 'folder').length;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ── Générer et télécharger ──
+  btnGenerate.addEventListener('click', () => {
+    manifest = buildTree();
+    const totalImages = countFinalImages(manifest);
+    const totalDocs   = countFinalDocs(manifest);
+    const nbDir       = countFolders(manifest);
+    const json        = JSON.stringify(manifest, null, 2);
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'manifest.json'; a.click();
+    URL.revokeObjectURL(url);
+
+    resultBox.className = 'result ok';
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = `
+      <strong>✓ manifest.json téléchargé</strong><br>
+      ${totalDocs} document${totalDocs > 1 ? 's' : ''} (${totalImages} image${totalImages > 1 ? 's' : ''})
+      dans ${nbDir} dossier${nbDir > 1 ? 's' : ''}.<br>
+      Déplacez-le dans <code>site_web/js/manifest.json</code> puis rechargez la visionneuse.
+    `;
+    treePreview.style.display = 'none';
+  });
+
+  // ── Aperçu ──
+  btnPreview.addEventListener('click', () => {
+    manifest = buildTree();
+    treePreview.style.display = 'block';
+    treePreview.innerHTML = renderPreview(manifest, 0);
+  });
+
+  function renderPreview(node, depth) {
+    const indent = '  '.repeat(depth);
+    if (node.type === 'image') {
+      return `<span class="img">${indent}🖼 ${node.name}</span>\n`;
+    }
+    if (node.type === 'book') {
+      return `<span class="folder">${indent}📖 ${node.name} <span class="count">(${node.pages.length} pages)</span></span>\n`;
+    }
+    const nb = countFinalDocs(node);
+    let html = `<span class="folder">${indent}📁 ${node.name} <span class="count">(${nb} doc${nb>1?'s':''})</span></span>\n`;
+    (node.children || []).forEach(child => { html += renderPreview(child, depth + 1); });
+    return html;
+  }
+</script>
+</body>
+</html>
