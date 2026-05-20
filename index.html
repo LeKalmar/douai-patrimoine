@@ -7,6 +7,7 @@
   <meta name="description" content="La Réserve patrimoniale des Bibliothèques de Douai conserve manuscrits enluminés, incunables et fonds historiques classés.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marck+Script&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -16,6 +17,9 @@
 
 <!-- ============ HERO PATRIMOINE ============ -->
 <section class="page-hero">
+  <nav class="breadcrumb" aria-label="Fil d'Ariane">
+    Patrimoine
+  </nav>
   <div class="container">
     <h1 class="page-title">La Réserve <em>patrimoniale</em></h1>
     <p class="page-lead">Un fonds exceptionnel parmi les 54 Bibliothèques Municipales Classées de France.</p>
@@ -46,10 +50,10 @@
     <div class="container">
       <h2 class="section-title section-title-centered">Les collections</h2>
       <p class="section-intro">La ville de Douai a accueilli son premier imprimeur en 1543. Parcourez ces 500 ans d'Histoire du livre à travers nos collections.</p>
-
+      <a class="collection-tag" href="inventaire.html">Consulter l'inventaire complet des collections</a>
       <div class="collections-grid">
 
-        <article class="collection-card">
+        <a class="collection-card" href="inventaire.html?fonds=Manuscrits">
           <div class="collection-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M4 19.5A2.5 2.5 0 016.5 17H20V2H6.5A2.5 2.5 0 004 4.5v15z"/>
@@ -58,9 +62,13 @@
           </div>
           <h3>Manuscrits enluminés</h3>
           <p>Plus de 2 500 manuscrits, du 9<sup>e</sup> au 19<sup>e</sup> siècle, dont un grand nombre est enluminé.</p>
-        </article>
+          <div class="page-corner"></div>
+          <div class="corner-image">
+            <img src="images/fonds-robaut.jpg" alt="">
+          </div>
+        </a>
 
-        <article class="collection-card">
+        <a class="collection-card" href="inventaire.html?fonds=Marceline Desbordes-Valmore">
           <div class="collection-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M4 4h16v16H4z"/>
@@ -69,7 +77,11 @@
           </div>
           <h3>Fonds Marceline Desbordes-Valmore</h3>
           <p>Plus de 5 000 lettres autographes de la grande poétesse douaisienne, figure majeure du romantisme français.</p>
-        </article>
+          <div class="page-corner"></div>
+          <div class="corner-image">
+            <img src="images/marceline.jpg" alt="">
+          </div>
+        </a>
 
         <article class="collection-card">
           <div class="collection-icon">
@@ -157,8 +169,103 @@
       </div>
     </div>
   </section>
-  <!-- Expositions -->
   <section class="section section-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Thématiques</h2>
+        <a href="expositions.html" class="section-link">Accéder aux expositions →</a>
+      </div>
+      <div class="collections-grid">
+        <a class="collection-card">
+          <div class="collection-img">
+            <!-- Remplacer par une vignette représentative du fonds -->
+            <div class="collection-img-placeholder">
+              <img src="images/vues_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+            </div>
+          </div>
+          <div class="collection-body">
+            <h3>Vues de Douai</h3>
+            <p class="collection-desc">Représentations de Douai à travers les âges par divers graveurs, cartographes et artistes.</p>
+            <span class="collection-cta">Explorer la thématique →</span>
+          </div>
+        </a>
+        <a class="collection-card">
+          <div class="collection-img">
+            <div class="collection-img-placeholder">
+              <img src="images/enfants_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+            </div>
+          </div>
+          <div class="collection-body">
+            <h3>Enfants de Douai</h3>
+            <p class="collection-desc">Les grandes figures Douaisiennes ayant marqué l'Histoire.</p>
+            <span class="collection-cta">Explorer la thématique →</span>
+          </div>
+        </a>
+        <a class="collection-card">
+          <div class="collection-img">
+            <div class="collection-img-placeholder">
+              <img src="images/marceline.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+            </div>
+          </div>
+          <div class="collection-body">
+            <h3>Plumes de Douai</h3>
+            <p class="collection-desc">Auteurs connus et moins connus</p>
+            <span class="collection-cta">Explorer la thématique →</span>
+          </div>
+        </a>
+        <a class="collection-card">
+          <div class="collection-img">
+            <div class="collection-img-placeholder">
+              
+            </div>
+          </div>
+          <div class="collection-body">
+            <h3>Trésors de Douai</h3>
+            <p class="collection-desc">Pièces exceptionnelles des collections patrimoniales</p>
+            <span class="collection-cta">Explorer la thématique →</span>
+          </div>
+        </a>
+        <a class="collection-card">
+          <div class="collection-img">
+            <div class="collection-img-placeholder">
+              
+            </div>
+          </div>
+          <div class="collection-body">
+            <h3>Lettres de Douai</h3>
+            <p class="collection-desc"></p>
+            <span class="collection-cta">Explorer la thématique →</span>
+          </div>
+        </a>
+        <a class="collection-card">
+          <div class="collection-img">
+            <div class="collection-img-placeholder">
+              <img src="images/presses_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+            </div>
+          </div>
+          <div class="collection-body">
+            <h3>Presses de Douai</h3>
+            <p class="collection-desc">Presse locale ancienne</p>
+            <span class="collection-cta">Explorer la thématique →</span>
+          </div>
+        </a>
+        <a class="collection-card">
+          <div class="collection-img">
+            <div class="collection-img-placeholder">
+              <img src="images/ecrit_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+            </div>
+          </div>
+          <div class="collection-body">
+            <h3>L'Écrit et Douai</h3>
+            <p class="collection-desc">Étapes importantes de l’histoire du livre</p>
+            <span class="collection-cta">Explorer la thématique →</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+  <!-- Expositions -->
+  <section class="section">
     <div class="container">
       <div class="section-header">
         <h2 class="section-title">Expositions numériques</h2>

@@ -656,16 +656,16 @@ ul { list-style: none; }
 }
 .page-hero .container { position: relative; }
 
+/* === BREADCRUMB === */
 .breadcrumb {
-  display: flex; align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  opacity: 0.75;
-  margin-bottom: 1.25rem;
+  padding: 0 1.5rem;
 }
-.breadcrumb a { transition: opacity var(--transition); }
-.breadcrumb a:hover { opacity: 1; text-decoration: underline; }
-.breadcrumb span:nth-child(2) { opacity: 0.4; }
+.breadcrumb a {
+  color: var(--warm-dark);
+  font-weight: 500;
+  transition: color var(--transition);
+}
+.breadcrumb a:hover { color: var(--ink); }
 
 .page-title {
   font-family: var(--font-display);
@@ -675,6 +675,7 @@ ul { list-style: none; }
   margin-bottom: 0.75rem;
 }
 .page-title em {
+  font
   font-style: italic;
   color: var(--warm-light);
 }
@@ -764,6 +765,60 @@ ul { list-style: none; }
 .collection-card:hover::before {
   transform: scaleX(1);
 }
+.collection-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.collection-card .page-corner {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.collection-card .page-corner::before {
+  content: '';
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 0 0 60px 60px;
+  border-color: transparent transparent var(--bg-page, #f5f3ee) transparent;
+  transition: border-width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+
+.collection-card:hover .page-corner::before {
+  border-width: 0 0 90px 90px;
+}
+
+.collection-card .corner-image {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 0; height: 0;
+  overflow: hidden;
+  transition: width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 0;
+  border-bottom-right-radius: inherit;
+}
+
+.collection-card:hover .corner-image {
+  width: 88px;
+  height: 88px;
+}
+
+.collection-card .corner-image img {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 88px; height: 88px;
+  object-fit: cover;
+}
+
 .collection-icon {
   width: 48px; height: 48px;
   background: var(--accent-light);

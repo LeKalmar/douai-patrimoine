@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventaire des collections — Réserve patrimoniale de Douai</title>
+  <meta name="description" content="Inventaire complet des collections patrimoniales des Bibliothèques de Douai, classées par fonds.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    /* ── Barre de recherche & filtres ── */
+    .section {
+      padding: 0 !important;
+    }
+    .inventory-toolbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .inventory-toolbar .container {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .toolbar-search {
+      flex: 1 1 260px;
+      position: relative;
+    }
+    .toolbar-search input {
+      width: 100%;
+      padding: .55rem .9rem .55rem 2.4rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: .88rem;
+      color: var(--ink);
+      background: var(--paper);
+      outline: none;
+      transition: border-color var(--transition);
+    }
+    .toolbar-search input:focus { border-color: var(--warm); }
+    .toolbar-search svg {
+      position: absolute;
+      left: .7rem; top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      color: var(--text-light);
+      pointer-events: none;
+    }
+    .toolbar-select {
+      padding: .55rem .9rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: .82rem;
+      color: var(--text);
+      background: var(--paper);
+      cursor: pointer;
+      outline: none;
+    }
+    .toolbar-count {
+      font-size: .8rem;
+      color: var(--text-light);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .toolbar-count strong { color: var(--ink); }
+
+    /* ── Accordéon par fonds ── */
+    .fonds-list {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+      padding: 2rem 0;
+    }
+
+    .fonds-block {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: box-shadow var(--transition);
+    }
+    .fonds-block:hover { box-shadow: var(--shadow); }
+
+    .fonds-header {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      border: none;
+      font-family: inherit;
+    }
+    .fonds-header:hover { background: var(--cream); }
+
+    .fonds-header-text {
+      display: flex;
+      padding: 1rem 1.25rem;  
+      gap: 1rem; 
+    }
+    .fonds-color-icon {
+      width: 56px; height: 56px;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    }
+    .fonds-color-icon svg {
+      width: 100%; height: 100%;
+      display: block;
+    }
+    .fonds-name {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--ink);
+      flex: 1;
+    }
+    .fonds-badge {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--text-light);
+      background: var(--cream);
+      border: 1px solid var(--border);
+      padding: .15rem .55rem;
+      border-radius: 50px;
+      white-space: nowrap;
+    }
+    .fonds-chevron {
+      width: 18px; height: 18px;
+      color: var(--text-light);
+      transition: transform .25s ease;
+      flex-shrink: 0;
+    }
+    .fonds-block.open .fonds-chevron { transform: rotate(180deg); }
+
+    /* ── Panneau d'information du fonds (affiché au clic) ── */
+    .fonds-info-panel {
+      display: none;
+      padding: .85rem 1.25rem .85rem 4.25rem;
+      background: linear-gradient(to right, var(--cream), #fff);
+      border-top: 1px solid var(--border);
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+    .fonds-block.info-open .fonds-info-panel { display: flex; }
+    .fonds-info-desc {
+      flex: 1;
+      font-size: .83rem;
+      color: var(--text);
+      line-height: 1.65;
+    }
+    .fonds-info-desc strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: .95rem;
+      color: var(--ink);
+      margin-bottom: .3rem;
+    }
+    .fonds-info-meta {
+      display: flex;
+      flex-direction: column;
+      gap: .4rem;
+      min-width: 180px;
+    }
+    .fonds-meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .fonds-meta-label {
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-light);
+    }
+    .fonds-meta-value {
+      font-size: .82rem;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .fonds-info-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      margin-left: auto;
+      padding: .3rem .6rem;
+      font-size: .75rem;
+      font-family: inherit;
+      font-weight: 600;
+      color: var(--text-light);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all var(--transition);
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+    .fonds-info-btn:hover { border-color: var(--warm); color: var(--warm-dark); }
+    .fonds-block.info-open .fonds-info-btn svg { transform: rotate(180deg); }
+
+
+    .fonds-body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+    .fonds-block.open .fonds-body { display: block; }
+    /* ── Sous-fonds ── */
+    .sous-fonds-list {
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+      padding: .75rem;
+      background: var(--cream);
+      border-top: 1px solid var(--border);
+    }
+    .sous-fonds-block {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .sous-fonds-header {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .6rem 1rem;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .sous-fonds-header:hover { background: #f5f0e8; }
+    .sous-fonds-name {
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--ink-soft);
+      flex: 1;
+    }
+    .sous-fonds-badge {
+      font-size: .7rem;
+      color: var(--text-light);
+      background: var(--cream);
+      border: 1px solid var(--border);
+      padding: .1rem .45rem;
+      border-radius: 50px;
+    }
+    .sous-fonds-chevron {
+      width: 14px; height: 14px;
+      color: var(--text-light);
+      transition: transform .2s ease;
+      flex-shrink: 0;
+    }
+    .sous-fonds-block.open .sous-fonds-chevron { transform: rotate(180deg); }
+    .sous-fonds-body { display: none; border-top: 1px solid var(--border); }
+    .sous-fonds-block.open .sous-fonds-body { display: block; }
+    .fonds-table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+    }
+    thead tr {
+      background: var(--cream);
+    }
+    th {
+      padding: .6rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-light);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { color: var(--ink); }
+    th .sort-icon { margin-left: .25rem; opacity: .4; }
+    th.sorted .sort-icon { opacity: 1; color: var(--warm-dark); }
+
+    tbody tr {
+      border-top: 1px solid var(--border);
+      transition: background var(--transition);
+    }
+    tbody tr:hover { background: #fdf9f4; }
+    tbody tr.expanded { background: #fdf5e8; }
+
+    td {
+      padding: .6rem 1rem;
+      vertical-align: top;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    td.td-titre {
+      font-weight: 500;
+      color: var(--ink);
+      max-width: 320px;
+    }
+    td.td-cote {
+      font-family: monospace;
+      font-size: .78rem;
+      color: var(--text-light);
+      white-space: nowrap;
+    }
+    td.td-annee { white-space: nowrap; }
+
+    /* Ligne de détail dépliable */
+    .detail-row { display: none; }
+    .detail-row.visible { display: table-row; }
+    .detail-cell {
+      padding: .75rem 1rem 1rem 2.5rem !important;
+      background: #fdf9f5;
+      border-top: none !important;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: .5rem 1.5rem;
+    }
+    .detail-item { display: flex; flex-direction: column; gap: .1rem; }
+    .detail-label {
+      font-size: .68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--text-light);
+    }
+    .detail-value {
+      font-size: .82rem;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    .detail-resume {
+      margin-top: .6rem;
+      padding-top: .6rem;
+      border-top: 1px solid var(--border);
+      font-size: .82rem;
+      color: var(--text);
+      line-height: 1.6;
+      grid-column: 1 / -1;
+    }
+    .detail-resume em { color: var(--text-light); font-style: normal; font-size: .75rem; }
+
+    /* Bouton "voir détails" dans la cellule titre */
+    .btn-detail {
+      display: inline-flex; align-items: center; gap: .25rem;
+      margin-top: .25rem;
+      font-size: .72rem;
+      color: var(--warm-dark);
+      font-weight: 600;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-detail:hover { color: var(--accent); }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .75rem 1rem;
+      border-top: 1px solid var(--border);
+      background: var(--cream);
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .pagination-info {
+      font-size: .78rem;
+      color: var(--text-light);
+    }
+    .pagination-btns {
+      display: flex;
+      gap: .35rem;
+    }
+    .pagination-btns button {
+      padding: .35rem .65rem;
+      font-size: .78rem;
+      font-family: inherit;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .pagination-btns button:hover:not(:disabled) {
+      border-color: var(--warm);
+      color: var(--warm-dark);
+    }
+    .pagination-btns button.active {
+      background: var(--warm);
+      border-color: var(--warm);
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .pagination-btns button:disabled {
+      opacity: .35;
+      cursor: default;
+    }
+
+    /* Etat vide */
+    .empty-state {
+      padding: 3rem 1rem;
+      text-align: center;
+      color: var(--text-light);
+      font-size: .9rem;
+    }
+    .empty-state svg {
+      width: 40px; height: 40px;
+      margin: 0 auto .75rem;
+      opacity: .3;
+    }
+
+    /* Loader */
+    #loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 4rem;
+      color: var(--text-light);
+      font-size: .9rem;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--warm);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Couleurs des fonds */
+    .dot-Douaisien         { background: #3a7ca5; }
+    .dot-Imprimés          { background: #2d5a4a; }
+    .dot-ImprimésdDouaisiens { background: #4a7a3a; }
+    .dot-Incunables        { background: #8b3a1e; }
+    .dot-Hospice           { background: #7a4a8b; }
+    .dot-MarclineDesbordesValmore { background: #b94a48; }
+    .dot-Situationniste    { background: #b07a20; }
+    .dot-Littérature       { background: #1a6a7a; }
+    .dot-LivredArtiste     { background: #6a3a8b; }
+    .dot-Mines             { background: #5a5a5a; }
+    .dot-RéserveDouaisienne { background: #7a3030; }
+    .dot-default           { background: var(--warm); }
+
+    @media (max-width: 700px) {
+      .detail-grid { grid-template-columns: 1fr; }
+      .pagination { flex-direction: column; align-items: flex-start; }
+      td.td-editeur, td.td-type { display: none; }
+      th.col-editeur, th.col-type { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<a href="#main" class="skip-nav">Aller au contenu</a>
+
+<section class="page-hero">
+  <nav class="breadcrumb" aria-label="Fil d'Ariane">
+    <a href="index.html">Patrimoine</a> / Inventaire
+  </nav>
+  <div class="container">
+    <h1 class="page-title">Inventaire des <em>collections</em></h1>
+    <p class="page-lead">Parcourez l'ensemble du fonds patrimonial des Bibliothèques de Douai, classé par fonds de conservation.</p>
+  </div>
+</section>
+
+<div class="inventory-toolbar">
+  <div class="container">
+    <div class="toolbar-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="search-global" placeholder="Rechercher un titre, un auteur, une cote…" autocomplete="off">
+    </div>
+    <input
+      type="number"
+      class="toolbar-select"
+      id="filter-date-start"
+      placeholder="Date début"
+      min="0"
+      max="2100"
+    >
+
+    <input
+      type="number"
+      class="toolbar-select"
+      id="filter-date-end"
+      placeholder="Date fin"
+      min="0"
+      max="2100"
+    >
+    <select class="toolbar-select" id="filter-type">
+      <option value=""><i>Tous les types</i></option>
+    </select>
+    <span class="toolbar-count" id="result-count"></span>
+  </div>
+</div>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="container">
+      <div id="loader">
+        <div class="spinner"></div>
+        Chargement du catalogue…
+      </div>
+      <div id="fonds-list" class="fonds-list" style="display:none;"></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="consultation-card">
+      <div class="consultation-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+      </div>
+      <div class="consultation-text">
+        <h2>Consulter les documents de la Réserve</h2>
+        <p>La consultation des documents de la réserve patrimoniale s'effectue <strong>sur place, sur rendez-vous préalable</strong>. Pour préparer votre visite, contactez l'équipe :</p>
+        <div class="contact-row">
+          <a href="tel:0327978851" class="contact-pill">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            03 27 97 88 51
+          </a>
+          <a href="mailto:bibliotheque@ville-douai.fr" class="contact-pill">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+            bibliotheque@ville-douai.fr
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<script>
+// ══════════════════════════════════════════
+//  Configuration
+// ══════════════════════════════════════════
+const CSV_PATH = 'csv/exemplaires.csv';
+const PAGE_SIZE = 10;
+
+// Couleurs par fonds [couleur haut-gauche, couleur bas-droite]
+const FONDS_COLORS = {
+  'Manuscrits':                   ['#c0622e', '#8b3a1e'],
+  'Douaisien':                    ['#3a7ca5', '#1a4a70'],
+  'Imprimés':                     ['#2d5a4a', '#4a8a6a'],
+  'Imprimés Douaisiens':          ['#4a7a3a', '#2a5a1a'],
+  'Incunables':                   ['#8b3a1e', '#c0622e'],
+  'Hospice':                      ['#7a4a8b', '#4a2a6a'],
+  'Marceline Desbordes-Valmore':  ['#b94a48', '#7a1a1a'],
+  'Situationniste':               ['#b07a20', '#7a4a00'],
+  'Littérature':                  ['#1a6a7a', '#0a4a5a'],
+  "Livres d'Artiste":             ['#6a3a8b', '#9a5ab0'],
+  'Mines':                        ['#5a5a5a', '#8a8a8a'],
+  'Réserve Douaisienne':          ['#7a3030', '#a05050'],
+};
+const FONDS_COLORS_DEFAULT = ['#b07a20', '#7a4a00'];
+const FONDS_IMAGES = {
+  'Douaisien':                   'images/beffroi.jpg',
+  'Marceline Desbordes-Valmore': 'images/marceline.jpg',
+  'Mines':                       'images/mines.jpg',
+  'Hospice':                     'images/hospice.jpg',
+};
+
+// Descriptions et métadonnées des fonds
+const FONDS_INFO = {
+  'Douaisien': "Ensemble de publications liées à Douai par leur auteur ou leur sujet.",
+  'Imprimés': "Collection générale d'imprimés anciens couvrant du XVI\u1d49 au XX\u1d49 siècle, réunissant des ouvrages divers tant par leur provenance que leur sujet.",
+  'Imprimés Douaisiens': "Corpus spécifique des imprimés sortis des presses douaisiennes, témoignant de l'activité typographique locale depuis le XVI\u1d49 siècle.",
+  'Incunables': "Livres imprimés avant 1501, représentant les premiers témoins de l'imprimerie en Europe. La collection douaisienne est l'une des plus importantes du nord de la France.",
+  'Hospice': "Archives et documents provenant de l'Hospice général de Douai.",
+  'Marceline Desbordes-Valmore': "Fonds dédié à la poétesse douaisienne Marceline Desbordes-Valmore (1786–1859).",
+  'Situationniste': "Collection unique rassemblant publications, tracts et documents de l'Internationale situationniste et des mouvements artistiques avant-gardistes des années 1950–1970.",
+  'Littérature': "Fonds littéraire réunissant éditions rares, livres de bibliophilie et œuvres d'auteurs du nord de la France, du XVII\u1d49 au XX\u1d49 siècle.",
+  "Livres d'Artiste": "Ensemble exceptionnel de livres d'artistes contemporains alliant création plastique et littéraire, souvent en édition unique ou tirée à très peu d'exemplaires.",
+  'Mines': "Documents relatifs à l'Histoire de la mine, dans le bassin minier du Nord-Pas-de-Calais mais aussi d'autres bassins houilliers dans le monde.",
+  'Réserve Douaisienne': "",
+  'Manuscrits': "Plus de 2 500 manuscrits, du IX\u1d49 au XIX\u1d49 siècle, dont un grand nombre est enluminé. Provenant principalement des confiscations des collections des abbayes d'Anchin et de Marchiennes lors de la Révolution." 
+};
+
+// Colonnes à afficher
+const COLS = [
+  { key: 'Référence (REFA)',                    label: 'Titre',    cls: 'td-titre col-titre' },
+  { key: 'Auteur (AUTA_display)',     label: 'Auteur',   cls: 'td-auteur col-auteur' },
+  { key: 'Editeur (EDIA_display)',    label: 'Éditeur',  cls: 'td-editeur col-editeur' },
+  { key: 'Année de publication',      label: 'Année',    cls: 'td-annee col-annee' },
+  { key: 'Cote',    label: 'Cote',     cls: 'td-cote col-cote' },
+  { key: 'Type de document',     label: 'Type',     cls: 'td-type col-type' },
+];
+
+// Colonnes de détail supplémentaires
+const DETAIL_COLS = [
+  { key: 'Description physique',      label: 'Description physique' },
+  { key: 'Adresse de publication',    label: 'Lieu de publication' },
+  { key: 'Code langue du document',   label: 'Langue' },
+  { key: 'Sujet',                     label: 'Sujets' },
+  { key: 'Note générale',             label: 'Note générale' },
+];
+
+// ══════════════════════════════════════════
+//  État de l'application
+// ══════════════════════════════════════════
+let allRecords = [];
+let filteredRecords = [];
+
+// Par fonds : page courante et ordre de tri
+const fondsState = {};
+const sousFondsState = {};
+
+// ══════════════════════════════════════════
+//  Chargement du CSV
+// ══════════════════════════════════════════
+function loadCSV() {
+  Papa.parse(CSV_PATH, {
+    download: true,
+    header: true,
+    delimiter: ';',
+    encoding: 'ISO-8859-1',
+    skipEmptyLines: true,
+    complete(results) {
+      allRecords = results.data;
+      init();
+    },
+    error(err) {
+      document.getElementById('loader').innerHTML =
+        `<p style="color:var(--red)">Erreur de chargement : ${err.message}</p>`;
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+//  Initialisation
+// ══════════════════════════════════════════
+function openFondsFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const target = params.get('fonds');
+  if (!target) return;
+
+  // Attendre que renderFondsList ait construit les blocs
+  requestAnimationFrame(() => {
+    const block = document.querySelector(`.fonds-block[data-fonds="${CSS.escape(target)}"]`);
+    if (!block) return;
+
+    // Ouvrir le fonds si pas déjà ouvert
+    if (!fondsState[target]) {
+      fondsState[target] = { page: 1, sortCol: null, sortDir: 'asc', open: false };
+    }
+    if (!fondsState[target].open) {
+      toggleFonds(target);
+    }
+
+    // Centrer après un court délai (le temps que le DOM se construise)
+    setTimeout(() => {
+      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  });
+}
+
+function init() {
+  // Remplir les filtres
+  const allTypes = [...new Set(allRecords.map(r => r['Type de document'] || '').filter(Boolean))].sort();
+
+  const selType = document.getElementById('filter-type');
+  allTypes.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t; o.textContent = t;
+    selType.appendChild(o);
+  });
+
+  // Événements
+  document.getElementById('search-global').addEventListener('input', debounce(applyFilters, 200));
+  document.getElementById('filter-date-start')
+  .addEventListener('input', debounce(applyFilters, 200));
+
+  document.getElementById('filter-date-end')
+  .addEventListener('input', debounce(applyFilters, 200));
+  selType.addEventListener('change', applyFilters);
+
+  applyFilters();
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('fonds-list').style.display = 'flex';
+  openFondsFromURL();
+}
+// ══════════════════════════════════════════
+//  Gestion des dates anciennes et intervalles
+// ══════════════════════════════════════════
+
+function parsePublicationDate(dateStr) {
+  if (!dateStr) return null;
+
+  const str = String(dateStr).trim();
+
+  // Cas : [17xx] → XVIIIe siècle → 1701–1800
+  const centuryMatch = str.match(/^\[(\d{2})xx\]$/i);
+  if (centuryMatch) {
+    const century = parseInt(centuryMatch[1], 10);
+    return {
+      start: century * 100 + 1,
+      end: century * 100 + 100
+    };
+  }
+
+  // Cas : [154x] → 1540–1549
+  const decadeMatch = str.match(/^\[(\d{3})x\]$/i);
+  if (decadeMatch) {
+    const decade = parseInt(decadeMatch[1], 10) * 10;
+    return {
+      start: decade,
+      end: decade + 9
+    };
+  }
+
+  // Cas : année précise
+  const yearMatch = str.match(/(\d{4})/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[1], 10);
+    return {
+      start: year,
+      end: year
+    };
+  }
+
+  return null;
+}
+
+function dateMatchesFilter(recordDate, filterStart, filterEnd) {
+  // Aucun filtre
+  if (!filterStart && !filterEnd) return true;
+
+  const parsed = parsePublicationDate(recordDate);
+  if (!parsed) return false;
+
+  const docStart = parsed.start;
+  const docEnd = parsed.end;
+
+  const searchStart = filterStart || 0;
+  const searchEnd = filterEnd || 9999;
+
+  // Vérifie si les périodes se chevauchent
+  return docEnd >= searchStart && docStart <= searchEnd;
+}
+// ══════════════════════════════════════════
+//  Filtrage global
+// ══════════════════════════════════════════
+function applyFilters() {
+  const q = document.getElementById('search-global').value.trim().toLowerCase();
+
+  const dateStart = parseInt(document.getElementById('filter-date-start').value, 10) || null;
+  const dateEnd = parseInt(document.getElementById('filter-date-end').value, 10) || null;
+
+  const type = document.getElementById('filter-type').value;
+
+  filteredRecords = allRecords.filter(r => {
+
+    // Filtre type
+    if (type && r['Type de document'] !== type) {
+      return false;
+    }
+
+    // Filtre date
+    if (!dateMatchesFilter(r['Année de publication'], dateStart, dateEnd)) {
+      return false;
+    }
+
+    // Recherche texte
+    if (q) {
+      const hay = [
+        r['Référence (REFA)'],
+        r['Auteur (AUTA_display)'],
+        r['Cote 1 des exemplaires'],
+        r['Editeur (EDIA_display)'],
+        r['Sujet']
+      ].join(' ').toLowerCase();
+
+      if (!hay.includes(q)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  document.getElementById('result-count').innerHTML =
+    `<strong>${filteredRecords.length.toLocaleString('fr-FR')}</strong> document${filteredRecords.length > 1 ? 's' : ''}`;
+
+  renderFondsList();
+}
+
+// ══════════════════════════════════════════
+//  Rendu de la liste des fonds
+// ══════════════════════════════════════════
+function renderFondsList() {
+  const container = document.getElementById('fonds-list');
+  container.innerHTML = '';
+
+  // Grouper par fonds
+  const groups = {};
+  filteredRecords.forEach(r => {
+    const f = r['Fonds'] || '(Sans fonds)';
+    if (!groups[f]) groups[f] = [];
+    groups[f].push(r);
+  });
+
+  if (Object.keys(groups).length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 21l-4.35-4.35M11 5a6 6 0 100 12 6 6 0 000-12z"/>
+        </svg>
+        Aucun document ne correspond à votre recherche.
+      </div>`;
+    return;
+  }
+
+  // Trier les fonds alphabétiquement
+  const sortedFonds = Object.keys(groups).sort();
+
+  sortedFonds.forEach(fondsName => {
+    const records = groups[fondsName];
+    if (!fondsState[fondsName]) {
+      fondsState[fondsName] = { page: 1, sortCol: null, sortDir: 'asc', open: false };
+    }
+    container.appendChild(buildFondsBlock(fondsName, records));
+  });
+}
+
+// ══════════════════════════════════════════
+//  Construction d'un bloc fonds
+// ══════════════════════════════════════════
+function buildFondsBlock(fondsName, records) {
+  const state = fondsState[fondsName];
+  const colors = FONDS_COLORS[fondsName] || FONDS_COLORS_DEFAULT;
+  const c1 = colors[0], c2 = colors[1];
+
+  // Dates extrêmes calculées depuis les données
+  const years = records
+    .map(r => parseInt(r['Année de publication'] || ''))
+    .filter(y => y > 0 && y < 2100);
+  const dateMin = years.length ? Math.min(...years) : null;
+  const dateMax = years.length ? Math.max(...years) : null;
+  const dateStr = dateMin
+    ? (dateMin === dateMax ? `${dateMin}` : `${dateMin} – ${dateMax}`)
+    : 'Non renseignées';
+
+  const block = document.createElement('div');
+  block.className = 'fonds-block' + (state.open ? ' open' : '');
+  block.dataset.fonds = fondsName;
+
+  const img = FONDS_IMAGES[fondsName];
+  const iconSVG = `<span class="fonds-color-icon">
+    ${img
+      ? `<img src="${img}" alt="${fondsName}" style="width:100%;height:100%;object-fit:cover;">`
+      : `<svg viewBox="0 0 28 28"><polygon points="0,0 28,0 28,28" fill="${c2}"/><polygon points="0,0 0,28 28,28" fill="${c1}"/></svg>`
+    }
+  </span>`;
+
+  // ── En-tête cliquable
+  const header = document.createElement('button');
+  header.className = 'fonds-header';
+  header.setAttribute('aria-expanded', state.open);
+  header.innerHTML = `
+    ${iconSVG}
+    <div class="fonds-header-text">
+      <span class="fonds-name">${fondsName}</span>
+      <span class="fonds-badge">${records.length.toLocaleString('fr-FR')} doc${records.length > 1 ? 's' : ''}</span>
+      <svg class="fonds-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    </div>`;
+  header.addEventListener('click', (e) => {
+    if (e.target.closest('.fonds-info-btn')) return;
+    toggleFonds(fondsName);
+  });
+  block.appendChild(header);
+
+  // ── Panneau d'information (caché par défaut)
+  const infoPanel = document.createElement('div');
+  infoPanel.className = 'fonds-info-panel';
+  const desc = FONDS_INFO[fondsName] || 'Description non disponible pour ce fonds.';
+  infoPanel.innerHTML = `
+    <div class="fonds-info-desc">
+        <div class="fonds-meta-item">
+        <span class="fonds-meta-label">Présentation du fonds :</span>
+        </div>
+      ${esc(desc)}
+    </div>
+    <div class="fonds-info-meta">
+      <div class="fonds-meta-item">
+        <span class="fonds-meta-label">Dates extrêmes</span>
+        <span class="fonds-meta-value">${dateStr}</span>
+      </div>
+      <div class="fonds-meta-item">
+        <span class="fonds-meta-label">Documents</span>
+        <span class="fonds-meta-value">${records.length.toLocaleString('fr-FR')}</span>
+      </div>
+    </div>`;
+  block.appendChild(infoPanel);
+
+  // ── Corps (table + pagination)
+  const body = document.createElement('div');
+  body.className = 'fonds-body';
+  body.id = `body-${slugify(fondsName)}`;
+  block.appendChild(body);
+
+  if (state.open) renderFondsBody(body, records, fondsName, state);
+
+  return block;
+}
+
+function toggleFonds(fondsName) {
+  const state = fondsState[fondsName];
+  state.open = !state.open;
+
+  const block = document.querySelector(`.fonds-block[data-fonds="${CSS.escape(fondsName)}"]`);
+  if (!block) return;
+
+  block.classList.toggle('open', state.open);
+  block.classList.toggle('info-open', state.open);
+  block.querySelector('.fonds-header').setAttribute('aria-expanded', state.open);
+
+  if (state.open) {
+    const records = filteredRecords.filter(r => (r['Fonds'] || '(Sans fonds)') === fondsName);
+    const body = block.querySelector('.fonds-body');
+    renderFondsBody(body, records, fondsName, state);
+  }
+}
+
+// ══════════════════════════════════════════
+//  Corps du fonds : table paginée
+// ══════════════════════════════════════════
+function renderFondsBody(body, records, fondsName, state) {
+  body.innerHTML = '';
+
+  const sousFondsValues = [...new Set(records.map(r => (r['Sous-fonds'] || '').trim()).filter(Boolean))].sort();
+
+  if (sousFondsValues.length > 0) {
+    const groups = {};
+    sousFondsValues.forEach(sf => groups[sf] = []);
+    groups['Autres'] = [];
+    records.forEach(r => {
+      const sf = (r['Sous-fonds'] || '').trim();
+      if (sf) groups[sf].push(r);
+      else groups['Autres'].push(r);
+    });
+    if (groups['Autres'].length === 0) delete groups['Autres'];
+
+    const sfList = document.createElement('div');
+    sfList.className = 'sous-fonds-list';
+    Object.entries(groups).forEach(([sfName, sfRecords]) => {
+      const sfKey = fondsName + '||' + sfName;
+      if (!sousFondsState[sfKey]) {
+        sousFondsState[sfKey] = { page: 1, sortCol: null, sortDir: 'asc', open: false };
+      }
+      sfList.appendChild(buildSousFondsBlock(sfName, sfRecords, fondsName, sfKey));
+    });
+    body.appendChild(sfList);
+  } else {
+    renderTable(body, records, fondsName, state);
+  }
+}
+function renderTable(body, records, stateKey, state) {
+  body.innerHTML = '';
+
+  // Tri
+  let sorted = [...records];
+  if (state.sortCol) {
+    sorted.sort((a, b) => {
+      const va = (a[state.sortCol] || '').toLowerCase();
+      const vb = (b[state.sortCol] || '').toLowerCase();
+      return state.sortDir === 'asc' ? va.localeCompare(vb, 'fr') : vb.localeCompare(va, 'fr');
+    });
+  }
+
+  // Pagination
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  if (state.page > totalPages) state.page = 1;
+  const start = (state.page - 1) * PAGE_SIZE;
+  const pageRecords = sorted.slice(start, start + PAGE_SIZE);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'fonds-table-wrap';
+
+  const table = document.createElement('table');
+  table.setAttribute('role', 'grid');
+
+  // En-tête
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  COLS.forEach(col => {
+    const th = document.createElement('th');
+    th.className = col.cls;
+    th.innerHTML = `${col.label} <span class="sort-icon">${state.sortCol === col.key ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕'}</span>`;
+    if (state.sortCol === col.key) th.classList.add('sorted');
+    th.addEventListener('click', () => {
+      if (state.sortCol === col.key) {
+        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortCol = col.key;
+        state.sortDir = 'asc';
+      }
+      state.page = 1;
+      renderTable(body, records, stateKey, state);
+    });
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  // Corps
+  const tbody = document.createElement('tbody');
+  pageRecords.forEach((rec, idx) => {
+    const rowId = `${slugify(stateKey)}-${start + idx}`;
+
+    const tr = document.createElement('tr');
+    tr.dataset.rowId = rowId;
+
+    COLS.forEach(col => {
+      const td = document.createElement('td');
+      td.className = col.cls;
+      let val = rec[col.key] || '';
+
+      if (col.key === 'Référence (REFA)') {
+        td.innerHTML = `<span class="td-titre-text">${esc(val) || '<em style="color:var(--text-light)">Sans titre</em>'}</span>
+          <button class="btn-detail" onclick="toggleDetail('${rowId}', event)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Détails
+          </button>`;
+      } else if (col.key === 'Auteur (AUTA_display)') {
+        val = val.replace(/\. auteur$/, '').replace(/\. ([^,]+)$/, '');
+        td.textContent = truncate(val, 60);
+      } else if (col.key === 'Editeur (EDIA_display)') {
+        val = val.replace(/\.\s*[A-Z][a-zÀ-ÿ]+$/, '').trim();
+        td.textContent = truncate(val, 50);
+      } else if (col.key === 'Cote') {
+        td.innerHTML = val.split(',').map(c => `<span style="display:block">${esc(c.trim())}</span>`).join('');
+      } else if (col.key === 'Année de publication') {
+        td.innerHTML = formatPublicationDate(val) || '';
+      } else {
+        td.textContent = val;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+
+    // Ligne détail
+    const dtr = document.createElement('tr');
+    dtr.className = 'detail-row';
+    dtr.id = `detail-${rowId}`;
+    const dtd = document.createElement('td');
+    dtd.className = 'detail-cell';
+    dtd.colSpan = COLS.length;
+    dtd.appendChild(buildDetailContent(rec));
+    dtr.appendChild(dtd);
+    tbody.appendChild(dtr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  body.appendChild(wrap);
+
+  if (totalPages > 1) {
+    body.appendChild(buildPagination(state.page, totalPages, sorted.length, start, stateKey, state, records));
+  }
+}
+
+function buildSousFondsBlock(sfName, records, fondsName, sfKey) {
+  const state = sousFondsState[sfKey];
+
+  const block = document.createElement('div');
+  block.className = 'sous-fonds-block' + (state.open ? ' open' : '');
+  block.dataset.sfkey = sfKey;
+
+  const header = document.createElement('button');
+  header.className = 'sous-fonds-header';
+  header.setAttribute('aria-expanded', state.open);
+  header.innerHTML = `
+    <span class="sous-fonds-name">${esc(sfName)}</span>
+    <span class="sous-fonds-badge">${records.length.toLocaleString('fr-FR')} doc${records.length > 1 ? 's' : ''}</span>
+    <svg class="sous-fonds-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M6 9l6 6 6-6"/>
+    </svg>`;
+  header.addEventListener('click', () => {
+    state.open = !state.open;
+    block.classList.toggle('open', state.open);
+    header.setAttribute('aria-expanded', state.open);
+    if (state.open) renderTable(sfBody, records, sfKey, state);
+  });
+  block.appendChild(header);
+
+  const sfBody = document.createElement('div');
+  sfBody.className = 'sous-fonds-body';
+  if (state.open) renderTable(sfBody, records, sfKey, state);
+  block.appendChild(sfBody);
+
+  return block;
+}
+
+// ══════════════════════════════════════════
+//  Contenu détaillé d'un document
+// ══════════════════════════════════════════
+function buildDetailContent(rec) {
+  const grid = document.createElement('div');
+  grid.className = 'detail-grid';
+
+  DETAIL_COLS.forEach(col => {
+    const val = rec[col.key] || '';
+    if (!val.trim()) return;
+    const item = document.createElement('div');
+    item.className = 'detail-item';
+    item.innerHTML = `<span class="detail-label">${esc(col.label)}</span>
+                      <span class="detail-value">${esc(truncate(val, 200))}</span>`;
+    grid.appendChild(item);
+  });
+
+  const resume = rec['Description du contenu (résumé)'] || '';
+  if (resume.trim()) {
+    const p = document.createElement('div');
+    p.className = 'detail-resume';
+    p.innerHTML = `<em>Résumé —</em> ${esc(resume)}`;
+    grid.appendChild(p);
+  }
+
+  return grid;
+}
+
+function toggleDetail(rowId, event) {
+  event.stopPropagation();
+  const dtr = document.getElementById(`detail-${rowId}`);
+  if (!dtr) return;
+  dtr.classList.toggle('visible');
+  // Mettre à jour le bouton
+  const btn = document.querySelector(`[data-row-id="${rowId}"] .btn-detail`);
+  if (btn) {
+    const expanded = dtr.classList.contains('visible');
+    btn.innerHTML = expanded
+      ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg> Masquer`
+      : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Détails`;
+  }
+}
+
+// ══════════════════════════════════════════
+//  Pagination
+// ══════════════════════════════════════════
+function buildPagination(currentPage, totalPages, total, start, stateKey, state, records) {
+  const end = Math.min(start + PAGE_SIZE, total);
+  const div = document.createElement('div');
+  div.className = 'pagination';
+
+  div.innerHTML = `<span class="pagination-info">Documents ${(start+1).toLocaleString('fr-FR')}–${end.toLocaleString('fr-FR')} sur ${total.toLocaleString('fr-FR')}</span>`;
+
+  const btns = document.createElement('div');
+  btns.className = 'pagination-btns';
+
+  // Précédent
+  const prev = document.createElement('button');
+  prev.textContent = '←';
+  prev.disabled = currentPage === 1;
+  prev.addEventListener('click', () => goToPage(stateKey, state, records, currentPage - 1));
+  btns.appendChild(prev);
+
+  // Pages
+  const range = pageRange(currentPage, totalPages);
+  range.forEach(p => {
+    const btn = document.createElement('button');
+    if (p === '…') {
+      btn.textContent = '…'; btn.disabled = true;
+    } else {
+      btn.textContent = p;
+      if (p === currentPage) btn.classList.add('active');
+      else btn.addEventListener('click', () => goToPage(stateKey, state, records, p));
+    }
+    btns.appendChild(btn);
+  });
+
+  // Suivant
+  const next = document.createElement('button');
+  next.textContent = '→';
+  next.disabled = currentPage === totalPages;
+  next.addEventListener('click', () => goToPage(stateKey, state, records, currentPage + 1));
+  btns.appendChild(next);
+
+  div.appendChild(btns);
+  return div;
+}
+
+function goToPage(stateKey, state, records, page) {
+  state.page = page;
+  // Chercher le body du bon bloc (fonds ou sous-fonds)
+  const sfBlock = document.querySelector(`.sous-fonds-block[data-sfkey="${CSS.escape(stateKey)}"]`);
+  const fondsBlock = document.querySelector(`.fonds-block[data-fonds="${CSS.escape(stateKey)}"]`);
+  const body = sfBlock
+    ? sfBlock.querySelector('.sous-fonds-body')
+    : fondsBlock?.querySelector('.fonds-body');
+  if (body) {
+    renderTable(body, records, stateKey, state);
+    body.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function pageRange(current, total) {
+  if (total <= 7) return Array.from({length: total}, (_, i) => i + 1);
+  const pages = [1];
+  if (current > 3) pages.push('…');
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+  if (current < total - 2) pages.push('…');
+  pages.push(total);
+  return pages;
+}
+
+// ══════════════════════════════════════════
+//  Utilitaires
+// ══════════════════════════════════════════
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function truncate(s, n) {
+  return s.length > n ? s.slice(0, n) + '…' : s;
+}
+function slugify(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+}
+function formatPublicationDate(val) {
+  if (!val) return '';
+  const centuryMatch = String(val).trim().match(/^\[(\d{2})xx\]$/i);
+  if (centuryMatch) {
+    const c = parseInt(centuryMatch[1], 10) + 1; // [17xx] → XVIIIe
+    const roman = ['', 'I','II','III','IV','V','VI','VII','VIII','IX','X',
+                   'XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'][c] || c;
+    const suffix = (c === 1) ? 'er' : 'e';
+    return `${roman}<sup>${suffix}</sup> siècle`;
+  }
+  return val;
+}
+
+// ══════════════════════════════════════════
+//  Démarrage
+// ══════════════════════════════════════════
+loadCSV();
+</script>
+</body>
+</html>
