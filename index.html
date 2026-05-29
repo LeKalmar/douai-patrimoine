@@ -10,20 +10,366 @@
   <link href="https://fonts.googleapis.com/css2?family=Marck+Script&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <script>
-  function sendHeight() {
-    window.parent.postMessage(
-      { type: 'iframeHeight', height: document.documentElement.scrollHeight },
-      '*'
-    );
-  }
 
-  window.addEventListener('load', sendHeight);
-  window.addEventListener('resize', sendHeight);
+  <style>
+    /* ===== HOVER IMAGE SLIDE ===== */
 
-  const observer = new ResizeObserver(sendHeight);
-  observer.observe(document.body);
-  </script>
+    /* Le conteneur de l'image, masqué par défaut */
+    .accordion-hover-bg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 220px;
+      background-size: cover;
+      background-position: center;
+      opacity: 1;
+      clip-path: polygon(0 0, 120px 0, 100px 100%, 0 100%);
+      transition: clip-path 0.55s cubic-bezier(0.76, 0, 0.24, 1),
+                  padding-left 0.55s cubic-bezier(0.76, 0, 0.24, 1);
+      z-index: 0;
+      overflow: visible;
+    }
+
+    .accordion-item:not(.is-open) .accordion-trigger:hover .accordion-hover-bg,
+    .accordion-item.is-open .accordion-hover-bg {
+      clip-path: polygon(0 0, 200px 0, 180px 100%, 0 100%);
+    }
+
+    /* S'assurer que le contenu du trigger passe au-dessus */ 
+    .accordion-label,
+    .accordion-icon {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Légère teinte sombre sur l'image pour ne pas écraser la lisibilité du texte */
+    .accordion-hover-bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to right, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 100%);
+    }
+    /* ===== ACCORDÉON SECTIONS ===== */
+
+    .accordion-wrapper {
+      width: 100%;
+    }
+
+    .accordion-item {
+      width: 100%;
+      border-bottom: 1px solid rgba(201,169,110,0.2);
+      overflow: hidden;
+    }
+
+    .accordion-item:first-child {
+      border-top: 1px solid rgba(201,169,110,0.2);
+    }
+
+    .accordion-item.is-open .accordion-hover-bg {
+      width: 180px;
+    }
+    .accordion-item.is-open .accordion-trigger {
+      padding-left: calc(180px + clamp(1.5rem, 5vw, 4rem));
+    }
+
+    /* --- Bandeau cliquable --- */
+    .accordion-trigger {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;  
+      min-height: 110px;  
+      cursor: pointer;    
+      border: none; 
+      text-align: left;   
+      gap: 2rem;    
+      padding: 0 clamp(1.5rem, 5vw, 4rem);
+      padding-left: calc(120px + clamp(1.5rem, 5vw, 4rem));
+      background: var(--bg, #faf8f4);
+      transition: background 0.3s ease, padding-left 0.55s cubic-bezier(0.76, 0, 0.24, 1);
+    }
+
+    .accordion-trigger::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: #c9a96e;
+      transform: scaleY(0);
+      transform-origin: bottom;
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+    .accordion-item:not(.is-open) .accordion-trigger:hover,
+    .accordion-item.is-open .accordion-trigger {
+      padding-left: calc(180px + clamp(1.5rem, 5vw, 4rem));
+    }
+    .accordion-item.is-open .accordion-trigger::before {
+      transform: scaleY(1);
+    }
+
+    .accordion-trigger:hover,
+    .accordion-item.is-open .accordion-trigger {
+      background: var(--bg-hover, #f0ebe0);
+    }
+
+    /* Label principal */
+    .accordion-label {
+      flex: 1;
+      transition: color 0.3s, transform 0.55s cubic-bezier(0.76, 0, 0.24, 1);
+    }
+
+    .accordion-label h2 {
+      font-family: 'DM Serif Display', Georgia, serif;
+      font-size: clamp(1.2rem, 2.8vw, 2rem);
+      font-weight: 400;
+      color: #1a1410;
+      margin: 0 0 0.2rem;
+      line-height: 1.2;
+    }
+
+    .accordion-label .accordion-subtitle {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      color: #8a7a60;
+      letter-spacing: 0.04em;
+      margin: 0;
+    }
+
+    /* Icône flèche */
+    .accordion-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(201,169,110,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: border-color 0.3s, background 0.3s;
+    }
+
+    .accordion-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: #c9a96e;
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .accordion-trigger:hover .accordion-icon {
+      background: rgba(201,169,110,0.1);
+      border-color: #c9a96e;
+    }
+
+    .accordion-item.is-open .accordion-icon {
+      background: #c9a96e;
+      border-color: #c9a96e;
+    }
+
+    .accordion-item.is-open .accordion-icon svg {
+      stroke: #fff;
+      transform: rotate(180deg);
+    }
+
+    /* --- Panneau de contenu --- */
+    .accordion-panel {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.45s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .accordion-item.is-open .accordion-panel {
+      grid-template-rows: 1fr;
+    }
+
+    .accordion-panel-inner {
+      overflow: hidden;
+    }
+
+    .accordion-panel-content {
+      padding: clamp(1.5rem, 4vw, 3rem) clamp(1.5rem, 5vw, 4rem) clamp(2rem, 5vw, 4rem);
+      background: #f7f3ec;
+      border-top: 1px solid rgba(201,169,110,0.15);
+    }
+
+    /* Alternance de fond */
+    .accordion-item:nth-child(even) .accordion-trigger { --bg: #f5f1e8; --bg-hover: #ede8db; }
+    .accordion-item:nth-child(even) .accordion-panel-content { background: #f2ede4; }
+
+    /* Section sombre (expositions) */
+    .accordion-item.is-dark .accordion-trigger {
+      --bg: #0f0d0a;
+      --bg-hover: #1a1610;
+    }
+    .accordion-item.is-dark .accordion-trigger .accordion-label h2 {
+      color: #f0e8d8;
+    }
+    .accordion-item.is-dark .accordion-trigger .accordion-subtitle {
+      color: rgba(201,169,110,0.7);
+    }
+    .accordion-item.is-dark .accordion-panel-content {
+      background: #0f0d0a;
+    }
+    .accordion-item.is-dark {
+      border-bottom-color: rgba(201,169,110,0.15);
+    }
+
+    /* ===== CARROUSEL EXPOSITIONS ===== */
+    .expo-carousel {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      height: 320px;
+    }
+
+    .expo-slide {
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      opacity: 0;
+      transition: opacity .8s ease;
+      pointer-events: none;
+    }
+
+    .expo-slide--active {
+      opacity: 1;
+      pointer-events: auto;
+      position: relative;
+    }
+
+    .expo-slide-bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      transform: scale(1.04);
+      transition: transform 8s ease;
+    }
+
+    .expo-slide--active .expo-slide-bg {
+      transform: scale(1);
+    }
+
+    .expo-slide-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, rgba(10,8,5,.92) 0%, rgba(10,8,5,.65) 50%, rgba(10,8,5,.15) 100%);
+    }
+
+    .expo-slide-content {
+      position: relative;
+      z-index: 2;
+      padding: 2rem clamp(1.5rem, 5vw, 4rem);
+    }
+
+    .expo-slide-inner { max-width: 600px; }
+
+    .expo-slide-title {
+      font-family: 'DM Serif Display', Georgia, serif;
+      font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+      font-weight: 400;
+      color: #f0e8d8;
+      line-height: 1.2;
+      margin: 0 0 1rem;
+    }
+
+    .expo-slide-desc {
+      font-family: 'DM Sans', sans-serif;
+      font-size: .95rem;
+      line-height: 1.7;
+      color: rgba(230,220,200,.8);
+      margin-bottom: 2rem;
+      max-width: 480px;
+    }
+
+    .expo-slide-cta {
+      display: inline-block;
+      font-family: 'DM Sans', sans-serif;
+      font-size: .85rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      color: #0f0d0a;
+      background: #c9a96e;
+      padding: .7rem 1.6rem;
+      border-radius: 2px;
+      text-decoration: none;
+      transition: background .2s, transform .2s;
+    }
+
+    .expo-slide-cta:hover {
+      background: #dbbf85;
+      transform: translateY(-1px);
+    }
+
+    .expo-controls {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 10;
+    }
+
+    .expo-arrow {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.3);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+      backdrop-filter: blur(4px);
+    }
+
+    .expo-arrow:hover {
+      background: rgba(201,169,110,.4);
+      border-color: #c9a96e;
+    }
+
+    .expo-arrow svg { width: 16px; height: 16px; }
+
+    .expo-dots { display: flex; gap: .5rem; align-items: center; }
+
+    .expo-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,.35);
+      cursor: pointer;
+      padding: 0;
+      transition: background .3s, transform .3s;
+    }
+
+    .expo-dot--active { background: #c9a96e; transform: scale(1.25); }
+
+    .expo-progress {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: rgba(255,255,255,.1);
+      z-index: 10;
+    }
+
+    .expo-progress-bar {
+      height: 100%;
+      background: #c9a96e;
+      width: 0%;
+      transition: width linear;
+    }
+
+    .expo-carousel[data-count="1"] .expo-controls,
+    .expo-carousel[data-count="1"] .expo-progress { display: none; }
+  </style>
 </head>
 <body>
 
@@ -32,9 +378,7 @@
 <!-- ============ HERO PATRIMOINE ============ -->
 <section class="page-hero">
   <div class="container">
-    <nav class="breadcrumb" aria-label="Fil d'Ariane">
-      Patrimoine
-    </nav>
+    <nav class="breadcrumb" aria-label="Fil d'Ariane">Patrimoine</nav>
     <h1 class="page-title">La Réserve <em>patrimoniale</em></h1>
     <p class="page-lead">Un fonds exceptionnel parmi les 54 Bibliothèques Municipales Classées de France.</p>
   </div>
@@ -42,301 +386,399 @@
 
 <!-- ============ MAIN ============ -->
 <main id="main" tabindex="-1">
+  <!-- Expositions — Carrousel pleine largeur -->
+  <section class="expo-carousel-section" aria-label="Expositions numériques">
 
-  <!-- INTRO -->
-  <section class="section">
-    <div class="container">
-      <div class="patrimoine-intro">
-        <div class="patrimoine-intro-text">
-          <p class="lead-paragraph">
-            Les bibliothèques de Douai font partie des <strong>54 Bibliothèques Municipales Classées</strong> en France placées sous la responsabilité d'un Conservateur d'État, qui gèrent un fonds patrimonial appartenant à l'État et provenant notamment de confiscations opérées dans les couvents et abbayes durant la Révolution française.
-          </p>
-          <p class="lead-paragraph">
-            La consultation des documents de la réserve patrimoniale s'effectue <strong>sur place, avec rendez-vous préalable au minimum 48h à l'avance auprès de notre conservateur.</strong> 
-          </p>
+    <div class="expo-carousel" role="region" aria-label="Carrousel des expositions" aria-live="polite">
+
+      <article class="expo-slide expo-slide--active" aria-hidden="false">
+        <div class="expo-slide-bg" style="filter: blur(3px); background-image: url('images/expo-histoire-livre.png');" role="img" aria-label="Illustration de l'exposition sur les métiers du livre"></div>
+        <div class="expo-slide-overlay"></div>
+        <div class="expo-slide-content container">
+          <div class="expo-slide-inner">
+            <h3 class="expo-slide-title">500 ans d'Histoire des métiers du livre à Douai</h3>
+            <p class="expo-slide-desc">Cartographie interactive des personnes ayant exercé des métiers liés au livre depuis l'apparition de l'imprimerie à Douai en 1543 jusqu'à nos jours.</p>
+            <a href="histoire-du-livre.html" class="expo-slide-cta">Visiter l'exposition →</a>
+          </div>
         </div>
-        <aside class="patrimoine-stats">
-          <img src="images/patrimoine-3.png" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
-        </aside>
+      </article>
+
+      <!-- Contrôles de navigation -->
+      <div class="expo-controls" aria-label="Navigation du carrousel">
+        <button class="expo-arrow expo-arrow--prev" aria-label="Exposition précédente" onclick="expoCarousel.prev()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="expo-dots" role="tablist" aria-label="Choisir une exposition"></div>
+        <button class="expo-arrow expo-arrow--next" aria-label="Exposition suivante" onclick="expoCarousel.next()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      <!-- Barre de progression -->
+      <div class="expo-progress" aria-hidden="true">
+        <div class="expo-progress-bar"></div>
       </div>
     </div>
   </section>
 
-  <!-- LES COLLECTIONS -->
-  <section class="section section-alt">
-    <div class="container">
-      <h2 class="section-title section-title-centered">Les collections</h2>
-      <p class="section-intro">La ville de Douai a accueilli son premier imprimeur en 1543. Parcourez ces 500 ans d'Histoire du livre à travers nos collections.</p>
-      <a class="collection-tag" href="inventaire.html">Consulter l'inventaire complet des collections</a>
-      <div class="collections-grid">
-
-        <a class="collection-card" href="inventaire.html?fonds=Manuscrits">
-          <div class="collection-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M4 19.5A2.5 2.5 0 016.5 17H20V2H6.5A2.5 2.5 0 004 4.5v15z"/>
-              <path d="M4 19.5A2.5 2.5 0 016.5 22H20v-5"/>
-            </svg>
+  <div class="accordion-wrapper" role="list">
+    <div class="accordion-item" role="listitem">
+      <button class="accordion-trigger" aria-expanded="false" aria-controls="panel-collections" id="trigger-collections">
+        <div class="accordion-hover-bg" aria-hidden="true" style="background-image: url('images/patrimoine-2.png');"></div>
+        <span class="accordion-label">
+          <h2>Venir consulter</h2>
+          <p class="accordion-subtitle">Informations pratiques quant à la consultation des collections sur place.</p>
+        </span>
+        <span class="accordion-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </span>
+      </button>
+      <div class="accordion-panel" id="panel-collections" role="region" aria-labelledby="trigger-collections">
+        <div class="accordion-panel-inner">
+          <div class="accordion-panel-content">
           </div>
-          <h3>Manuscrits enluminés</h3>
-          <p>Plus de 2 500 manuscrits, du 9<sup>e</sup> au 19<sup>e</sup> siècle, dont un grand nombre est enluminé.</p>
-          <div class="page-corner"></div>
-          <div class="corner-image">
-            <img src="images/fonds-robaut.jpg" alt="">
-          </div>
-        </a>
-
-        <a class="collection-card" href="inventaire.html?fonds=Marceline Desbordes-Valmore">
-          <div class="collection-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M4 4h16v16H4z"/>
-              <path d="M4 8h16M9 4v16"/>
-            </svg>
-          </div>
-          <h3>Fonds Marceline Desbordes-Valmore</h3>
-          <p>Plus de 5 000 lettres autographes de la grande poétesse douaisienne, figure majeure du romantisme français.</p>
-          <div class="page-corner"></div>
-          <div class="corner-image">
-            <img src="images/marceline.jpg" alt="">
-          </div>
-        </a>
-
-        <article class="collection-card">
-          <div class="collection-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="1"/>
-              <path d="M7 7h10M7 11h10M7 15h6"/>
-            </svg>
-          </div>
-          <h3>Incunables</h3>
-          <p>Une collection de près de 300 incunables, représentative des débuts de l'imprimerie en Europe.</p>
-        </article>
-
-        <article class="collection-card">
-          <div class="collection-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
-            </svg>
-          </div>
-          <h3>Impressions douaisiennes</h3>
-          <p>L'ensemble des impressions douaisiennes de 1563 au milieu du 19<sup>e</sup> siècle, témoin de l'intense activité des presses douaisiennes nées de l'Université.</p>
-        </article>
-
-        <article class="collection-card">
-          <div class="collection-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>
-            </svg>
-          </div>
-          <h3>Livres singuliers</h3>
-          <p>Un fonds rassemblant des productions originales : ouvrages de bibliophilie, livres d'artistes, livres-objets…</p>
-        </article>
-
-        <article class="collection-card">
-          <div class="collection-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-          </div>
-          <h3>Édition locale contemporaine</h3>
-          <p>Toutes les publications récentes d'auteurs et autrices et de maisons d'éditions de Douai et du Douaisis.</p>
-        </article>
-
+        </div>
       </div>
     </div>
-  </section>
+    <!-- ====== 3. LES COLLECTIONS ====== -->
+    <div class="accordion-item" role="listitem">
+      <button class="accordion-trigger" aria-expanded="false" aria-controls="panel-collections" id="trigger-collections">
+        <div class="accordion-hover-bg" aria-hidden="true" style="background-image: url('images/patrimoine-3.png');"></div>
+        <span class="accordion-label">
+          <h2>Trouver un document</h2>
+          <p class="accordion-subtitle">Faites une recherche dans notre base de données ou consultez notre inventaire en ligne.</p>
+        </span>
+        <span class="accordion-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </span>
+      </button>
+      <div class="accordion-panel" id="panel-collections" role="region" aria-labelledby="trigger-collections">
+        <div class="accordion-panel-inner">
+          <div class="accordion-panel-content">
+            <p class="section-intro">La ville de Douai a accueilli son premier imprimeur en 1543. Parcourez ces 500 ans d'Histoire du livre à travers nos collections.</p>
+            <a class="collection-tag" href="inventaire.html">Consulter l'inventaire complet des collections</a>
+            <div class="collections-grid">
 
-  <!-- Collections numérisées-->
-  <section class="section">
-    <div class="container">
-      <div class="section-header">
-        <h2 class="section-title">Collections numérisées</h2>
-        <a href="visionneuse.html" class="section-link">Accéder à la visionneuse →</a>
-      </div>
-      <div class="collections-grid">
+              <a class="collection-card" href="inventaire.html?fonds=Manuscrits">
+                <div class="collection-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20V2H6.5A2.5 2.5 0 004 4.5v15z"/>
+                    <path d="M4 19.5A2.5 2.5 0 016.5 22H20v-5"/>
+                  </svg>
+                </div>
+                <h3>Manuscrits enluminés</h3>
+                <p>Plus de 2 500 manuscrits, du 9<sup>e</sup> au 19<sup>e</sup> siècle, dont un grand nombre est enluminé.</p>
+                <div class="page-corner"></div>
+                <div class="corner-image"><img src="images/fonds-robaut.jpg" alt=""></div>
+              </a>
 
-        <a class="collection-card" href="visionneuse.html">
-          <div class="collection-img">
-            <!-- Remplacer par une vignette représentative du fonds -->
-            <div class="collection-img-placeholder">
-              <img src="images/fonds-robaut.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
-            </div>
-          </div>
-          <div class="collection-body">
-            <span class="collection-tag">Dessins & études</span>
-            <h3>Fonds Robaut</h3>
-            <p class="collection-desc">Carnet de relevés et études graphiques d'Alfred Robaut (1830-1909), critique d'art et collectionneur, intime de Corot. Boîtes numérisées disponibles en haute résolution.</p>
-            <span class="collection-cta">Parcourir la collection →</span>
-          </div>
-        </a>
+              <a class="collection-card" href="inventaire.html?fonds=Marceline Desbordes-Valmore">
+                <div class="collection-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 4h16v16H4z"/><path d="M4 8h16M9 4v16"/>
+                  </svg>
+                </div>
+                <h3>Fonds Marceline Desbordes-Valmore</h3>
+                <p>Plus de 5 000 lettres autographes de la grande poétesse douaisienne, figure majeure du romantisme français.</p>
+                <div class="page-corner"></div>
+                <div class="corner-image"><img src="images/marceline.jpg" alt=""></div>
+              </a>
 
-        <a class="collection-card" href="visionneuse.html">
-          <div class="collection-img">
-            <div class="collection-img-placeholder">
-              <img src="images/fonds-bra.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
-            </div>
-          </div>
-          <div class="collection-body">
-            <span class="collection-tag">Sculpture & modelages</span>
-            <h3>Fonds Théophile Bra</h3>
-            <p class="collection-desc">Archives du sculpteur Théophile Bra (1797-1863), natif de Douai. Dessins préparatoires, correspondances et documents iconographiques numérisés par les Bibliothèques.</p>
-            <span class="collection-cta">Parcourir la collection →</span>
-          </div>
-        </a>
+              <article class="collection-card">
+                <div class="collection-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="1"/>
+                    <path d="M7 7h10M7 11h10M7 15h6"/>
+                  </svg>
+                </div>
+                <h3>Incunables</h3>
+                <p>Une collection de près de 300 incunables, représentative des débuts de l'imprimerie en Europe.</p>
+              </article>
 
-      </div>
-    </div>
-  </section>
+              <article class="collection-card">
+                <div class="collection-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+                  </svg>
+                </div>
+                <h3>Impressions douaisiennes</h3>
+                <p>L'ensemble des impressions douaisiennes de 1563 au milieu du 19<sup>e</sup> siècle, témoin de l'intense activité des presses douaisiennes nées de l'Université.</p>
+              </article>
 
-  <!--Thématiques -->
-  <section class="section section-alt">
-    <div class="container">
-      <h2 class="section-title section-title-centered">Thématiques</h2>
-      <p class="section-intro">Explorez l'Histoire de notre ville à travers des thématiques précises.</p>
+              <article class="collection-card">
+                <div class="collection-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>
+                  </svg>
+                </div>
+                <h3>Livres singuliers</h3>
+                <p>Un fonds rassemblant des productions originales : ouvrages de bibliophilie, livres d'artistes, livres-objets…</p>
+              </article>
 
-      <div class="collections-grid" href="thematiques/vues.html">
-        <a class="collection-card">
-          <div class="collection-img">
-            <!-- Remplacer par une vignette représentative du fonds -->
-            <div class="collection-img-placeholder">
-              <img src="images/vues_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+              <article class="collection-card">
+                <div class="collection-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                </div>
+                <h3>Édition locale contemporaine</h3>
+                <p>Toutes les publications récentes d'auteurs et autrices et de maisons d'éditions de Douai et du Douaisis.</p>
+              </article>
+
             </div>
           </div>
-          <div class="collection-body">
-            <h3>Vues de Douai</h3>
-            <p class="collection-desc">Représentations de Douai à travers les âges par divers graveurs, cartographes et artistes.</p>
-            <span class="collection-cta">Explorer la thématique →</span>
-          </div>
-        </a>
-        <a class="collection-card" href="thematiques/enfants.html">
-          <div class="collection-img">
-            <div class="collection-img-placeholder">
-              <img src="images/enfants_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
-            </div>
-          </div>
-          <div class="collection-body">
-            <h3>Enfants de Douai</h3>
-            <p class="collection-desc">Les grandes figures Douaisiennes ayant marqué l'Histoire.</p>
-            <span class="collection-cta">Explorer la thématique →</span>
-          </div>
-        </a>
-        <a class="collection-card" href="thematiques/plumes.html">
-          <div class="collection-img">
-            <div class="collection-img-placeholder">
-              <img src="images/marceline.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
-            </div>
-          </div>
-          <div class="collection-body">
-            <h3>Plumes de Douai</h3>
-            <p class="collection-desc">Auteurs connus et moins connus</p>
-            <span class="collection-cta">Explorer la thématique →</span>
-          </div>
-        </a>
-        <a class="collection-card" href="thematiques/tresors.html">
-          <div class="collection-img">
-            <div class="collection-img-placeholder">
-              
-            </div>
-          </div>
-          <div class="collection-body">
-            <h3>Trésors de Douai</h3>
-            <p class="collection-desc">Pièces exceptionnelles des collections patrimoniales</p>
-            <span class="collection-cta">Explorer la thématique →</span>
-          </div>
-        </a>
-        <a class="collection-card" href="thematiques/lettres.html">
-          <div class="collection-img">
-            <div class="collection-img-placeholder">
-              
-            </div>
-          </div>
-          <div class="collection-body">
-            <h3>Lettres de Douai</h3>
-            <p class="collection-desc"></p>
-            <span class="collection-cta">Explorer la thématique →</span>
-          </div>
-        </a>
-        <a class="collection-card" href="thematiques/presses.html">
-          <div class="collection-img">
-            <div class="collection-img-placeholder">
-              <img src="images/presses_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
-            </div>
-          </div>
-          <div class="collection-body">
-            <h3>Presses de Douai</h3>
-            <p class="collection-desc">Presse locale ancienne</p>
-            <span class="collection-cta">Explorer la thématique →</span>
-          </div>
-        </a>
-        <a class="collection-card" href="thematiques/ecrits.html">
-          <div class="collection-img">
-            <div class="collection-img-placeholder">
-              <img src="images/ecrit_douai.jpg" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
-            </div>
-          </div>
-          <div class="collection-body">
-            <h3>L'Écrit et Douai</h3>
-            <p class="collection-desc">Étapes importantes de l’histoire du livre</p>
-            <span class="collection-cta">Explorer la thématique →</span>
-          </div>
-        </a>
+        </div>
       </div>
     </div>
-  </section>
-  <!-- Expositions -->
-  <section class="section">
-    <div class="container">
-      <div class="section-header">
-        <h2 class="section-title">Expositions numériques</h2>
-        <a href="expositions.html" class="section-link">Accéder aux expositions →</a>
-      </div>
-      <div class="collections-grid">
 
-        <a class="collection-card" href="histoire-du-livre.html">
-          <div class="collection-img">
-            <!-- Remplacer par une vignette représentative du fonds -->
-            <div class="collection-img-placeholder">
-              <img src="images/expo-histoire-livre.png" alt="Couverture du livre Hors Champ de Marie-Hélène Lafon" loading="lazy">
+    <!-- ====== 5. THÉMATIQUES ====== -->
+    <div class="accordion-item" role="listitem">
+      <button class="accordion-trigger" aria-expanded="false" aria-controls="panel-thematiques" id="trigger-thematiques">
+        <div class="accordion-hover-bg" aria-hidden="true" style="background-image: url('images/vues_douai.jpg');"></div>
+        <span class="accordion-label">
+          <h2>Thématiques</h2>
+          <p class="accordion-subtitle">Explorer l'Histoire de Douai par thèmes</p>
+        </span>
+        <span class="accordion-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </span>
+      </button>
+      <div class="accordion-panel" id="panel-thematiques" role="region" aria-labelledby="trigger-thematiques">
+        <div class="accordion-panel-inner">
+          <div class="accordion-panel-content">
+            <p class="section-intro">Explorez l'Histoire de notre ville à travers des thématiques précises.</p>
+            <div class="collections-grid">
+
+              <a class="collection-card" href="thematiques/vues.html">
+                <div class="collection-img">
+                  <div class="collection-img-placeholder">
+                    <img src="images/vues_douai.jpg" alt="Vues de Douai" loading="lazy">
+                  </div>
+                </div>
+                <div class="collection-body">
+                  <h3>Vues de Douai</h3>
+                  <p class="collection-desc">Représentations de Douai à travers les âges par divers graveurs, cartographes et artistes.</p>
+                  <span class="collection-cta">Explorer la thématique →</span>
+                </div>
+              </a>
+
+              <a class="collection-card" href="thematiques/enfants.html">
+                <div class="collection-img">
+                  <div class="collection-img-placeholder">
+                    <img src="images/enfants_douai.jpg" alt="Enfants de Douai" loading="lazy">
+                  </div>
+                </div>
+                <div class="collection-body">
+                  <h3>Enfants de Douai</h3>
+                  <p class="collection-desc">Les grandes figures Douaisiennes ayant marqué l'Histoire.</p>
+                  <span class="collection-cta">Explorer la thématique →</span>
+                </div>
+              </a>
+
+              <a class="collection-card" href="thematiques/plumes.html">
+                <div class="collection-img">
+                  <div class="collection-img-placeholder">
+                    <img src="images/marceline.jpg" alt="Plumes de Douai" loading="lazy">
+                  </div>
+                </div>
+                <div class="collection-body">
+                  <h3>Plumes de Douai</h3>
+                  <p class="collection-desc">Auteurs connus et moins connus</p>
+                  <span class="collection-cta">Explorer la thématique →</span>
+                </div>
+              </a>
+
+              <a class="collection-card" href="thematiques/tresors.html">
+                <div class="collection-img">
+                  <div class="collection-img-placeholder"></div>
+                </div>
+                <div class="collection-body">
+                  <h3>Trésors de Douai</h3>
+                  <p class="collection-desc">Pièces exceptionnelles des collections patrimoniales</p>
+                  <span class="collection-cta">Explorer la thématique →</span>
+                </div>
+              </a>
+
+              <a class="collection-card" href="thematiques/lettres.html">
+                <div class="collection-img">
+                  <div class="collection-img-placeholder"></div>
+                </div>
+                <div class="collection-body">
+                  <h3>Lettres de Douai</h3>
+                  <p class="collection-desc"></p>
+                  <span class="collection-cta">Explorer la thématique →</span>
+                </div>
+              </a>
+
+              <a class="collection-card" href="thematiques/presses.html">
+                <div class="collection-img">
+                  <div class="collection-img-placeholder">
+                    <img src="images/presses_douai.jpg" alt="Presses de Douai" loading="lazy">
+                  </div>
+                </div>
+                <div class="collection-body">
+                  <h3>Presses de Douai</h3>
+                  <p class="collection-desc">Presse locale ancienne</p>
+                  <span class="collection-cta">Explorer la thématique →</span>
+                </div>
+              </a>
+
+              <a class="collection-card" href="thematiques/ecrits.html">
+                <div class="collection-img">
+                  <div class="collection-img-placeholder">
+                    <img src="images/ecrit_douai.jpg" alt="L'Écrit et Douai" loading="lazy">
+                  </div>
+                </div>
+                <div class="collection-body">
+                  <h3>L'Écrit et Douai</h3>
+                  <p class="collection-desc">Étapes importantes de l'histoire du livre</p>
+                  <span class="collection-cta">Explorer la thématique →</span>
+                </div>
+              </a>
+
             </div>
           </div>
-          <div class="collection-body">
-            <span class="collection-tag">Cartographie</span>
-            <h3>500 ans d'Histoire des métiers du livre à Douai</h3>
-            <p class="collection-desc">Cartographie interactive des personnes ayant exercé des métiers liés au livre depuis l'apparition de l'imprimerie à Douai en 1543 jusqu'à nos jours.</p>
-            <span class="collection-cta">Visiter l'exposition →</span>
-          </div>
-        </a>
-
+        </div>
       </div>
     </div>
-  </section>
+
+  </div><!-- /.accordion-wrapper -->
+
   <!-- CONSULTATION -->
-   
-<footer>
-  <div class="consultation-card">
-    <div class="consultation-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="3" y="4" width="18" height="18" rx="2"/>
-        <path d="M16 2v4M8 2v4M3 10h18"/>
-      </svg>
-    </div>
-    <div class="consultation-text">
-      <h2>Consulter les documents de la Réserve</h2>
-      <p>La consultation des documents de la réserve patrimoniale s'effectue <strong>sur place, sur rendez-vous préalable</strong>. Pour préparer votre visite, contactez l'équipe :</p>
-      <div class="contact-row">
-        <a href="tel:0327978851" class="contact-pill">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-          03 27 97 88 51
-        </a>
-        <a href="mailto:bibliotheque@ville-douai.fr" class="contact-pill">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
-          bibliotheque@ville-douai.fr
-        </a>
+  <footer>
+    <div class="consultation-card">
+      <div class="consultation-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+      </div>
+      <div class="consultation-text">
+        <h2>Consulter les documents de la Réserve</h2>
+        <p>La consultation des documents de la réserve patrimoniale s'effectue <strong>sur place, sur rendez-vous préalable</strong>. Pour préparer votre visite, contactez l'équipe :</p>
+        <div class="contact-row">
+          <a href="tel:0327978851" class="contact-pill">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            03 27 97 88 51
+          </a>
+          <a href="mailto:bibliotheque@ville-douai.fr" class="contact-pill">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+            bibliotheque@ville-douai.fr
+          </a>
+        </div>
       </div>
     </div>
-  </div>
-</footer>
+  </footer>
 
 </main>
+
+<script>
+/* ===== ACCORDÉON ===== */
+(function() {
+  var items = document.querySelectorAll('.accordion-item');
+
+  items.forEach(function(item) {
+    var trigger = item.querySelector('.accordion-trigger');
+
+    trigger.addEventListener('click', function() {
+      var isOpen = item.classList.contains('is-open');
+
+      // Fermer tous les autres
+      items.forEach(function(other) {
+        if (other !== item && other.classList.contains('is-open')) {
+          other.classList.remove('is-open');
+          other.querySelector('.accordion-trigger').setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      // Basculer l'item courant
+      if (isOpen) {
+        item.classList.remove('is-open');
+        trigger.setAttribute('aria-expanded', 'false');
+      } else {
+        item.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+
+        // Scroll doux vers le bandeau
+        setTimeout(function() {
+          item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+      }
+    });
+  });
+})();
+
+/* ===== CARROUSEL EXPOSITIONS ===== */
+(function() {
+  var DELAY = 6000;
+  var carousel = document.querySelector('.expo-carousel');
+  if (!carousel) return;
+
+  var slides = Array.from(carousel.querySelectorAll('.expo-slide'));
+  var dotsContainer = carousel.querySelector('.expo-dots');
+  var progressBar = carousel.querySelector('.expo-progress-bar');
+
+  var current = 0;
+  var timer = null;
+
+  carousel.dataset.count = slides.length;
+
+  slides.forEach(function(_, i) {
+    var btn = document.createElement('button');
+    btn.className = 'expo-dot' + (i === 0 ? ' expo-dot--active' : '');
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+    btn.setAttribute('aria-label', 'Exposition ' + (i + 1));
+    btn.addEventListener('click', function() { goTo(i); });
+    dotsContainer.appendChild(btn);
+  });
+
+  var dots = Array.from(dotsContainer.querySelectorAll('.expo-dot'));
+
+  function goTo(index) {
+    slides[current].classList.remove('expo-slide--active');
+    slides[current].setAttribute('aria-hidden', 'true');
+    dots[current].classList.remove('expo-dot--active');
+    dots[current].setAttribute('aria-selected', 'false');
+
+    current = (index + slides.length) % slides.length;
+
+    slides[current].classList.add('expo-slide--active');
+    slides[current].setAttribute('aria-hidden', 'false');
+    dots[current].classList.add('expo-dot--active');
+    dots[current].setAttribute('aria-selected', 'true');
+
+    restartProgress();
+    restartTimer();
+  }
+
+  function restartProgress() {
+    progressBar.style.transition = 'none';
+    progressBar.style.width = '0%';
+    progressBar.offsetWidth; // reflow
+    progressBar.style.transition = 'width ' + DELAY + 'ms linear';
+    progressBar.style.width = '100%';
+  }
+
+  function restartTimer() {
+    clearTimeout(timer);
+    if (slides.length > 1) {
+      timer = setTimeout(function() { goTo(current + 1); }, DELAY);
+    }
+  }
+
+  window.expoCarousel = {
+    prev: function() { goTo(current - 1); },
+    next: function() { goTo(current + 1); }
+  };
+
+  carousel.addEventListener('mouseenter', function() { clearTimeout(timer); });
+  carousel.addEventListener('mouseleave', function() { restartProgress(); restartTimer(); });
+
+  if (slides.length > 1) { restartProgress(); restartTimer(); }
+})();
+</script>
+
 </body>
 </html>

@@ -274,6 +274,7 @@
       width: 100%;
       border-collapse: collapse;
       font-size: .82rem;
+      table-layout: fixed; /* ← ajouter */
     }
     thead tr {
       background: var(--cream);
@@ -559,8 +560,13 @@
 // ══════════════════════════════════════════
 //  Configuration
 // ══════════════════════════════════════════
-const CSV_PATH = 'csv/exemplaires.csv';
+const CSV_PATH = 'csv/inventaire.csv';
 const PAGE_SIZE = 10;
+
+// Clé de la colonne "sous-fonds" dans le CSV.
+// Si la colonne "Sous-fonds" n'existe plus, indiquer ici le nom du champ de remplacement,
+// ou laisser null pour désactiver complètement le regroupement par sous-fonds.
+const SOUS_FONDS_KEY = 'Sous-fonds'; // ← changer ici si la colonne est renommée
 
 // Couleurs par fonds [couleur haut-gauche, couleur bas-droite]
 const FONDS_COLORS = {
@@ -603,21 +609,21 @@ const FONDS_INFO = {
 
 // Colonnes à afficher
 const COLS = [
-  { key: 'Référence (REFA)',                    label: 'Titre',    cls: 'td-titre col-titre' },
-  { key: 'Auteur (AUTA_display)',     label: 'Auteur',   cls: 'td-auteur col-auteur' },
-  { key: 'Editeur (EDIA_display)',    label: 'Éditeur',  cls: 'td-editeur col-editeur' },
-  { key: 'Année de publication',      label: 'Année',    cls: 'td-annee col-annee' },
-  { key: 'Cote',    label: 'Cote',     cls: 'td-cote col-cote' },
-  { key: 'Type de document',     label: 'Type',     cls: 'td-type col-type' },
+  { key: '200$a', label: 'Titre',   cls: 'td-titre col-titre',     width: '35%' },
+  { key: '700$a', label: 'Auteur',  cls: 'td-auteur col-auteur',   width: '20%' },  
+  { key: '210$d', label: 'Année',   cls: 'td-annee col-annee',     width: '7%'  },
+  { key: '930$g', label: 'Cote',    cls: 'td-cote col-cote',       width: '12%' },
+  { key: '200$b', label: 'Type',    cls: 'td-type col-type',       width: '8%'  },
 ];
 
 // Colonnes de détail supplémentaires
 const DETAIL_COLS = [
-  { key: 'Description physique',      label: 'Description physique' },
-  { key: 'Adresse de publication',    label: 'Lieu de publication' },
-  { key: 'Code langue du document',   label: 'Langue' },
-  { key: 'Sujet',                     label: 'Sujets' },
-  { key: 'Note générale',             label: 'Note générale' },
+  { key: '215$a',                     label: 'Pagination' },
+  { key: '215$b',                     label: 'Volumes' },
+  { key: '215$d',                     label: 'Dimensions' },
+  { key: '101$a',                     label: 'Langue' },
+  { key: '610$a',                     label: 'Sujets' },
+  { key: '300$a',                     label: 'Note générale' },
 ];
 
 // ══════════════════════════════════════════
@@ -781,18 +787,18 @@ function applyFilters() {
     }
 
     // Filtre date
-    if (!dateMatchesFilter(r['Année de publication'], dateStart, dateEnd)) {
+    if (!dateMatchesFilter(r['210$d'], dateStart, dateEnd)) {
       return false;
     }
 
     // Recherche texte
     if (q) {
       const hay = [
-        r['Référence (REFA)'],
-        r['Auteur (AUTA_display)'],
-        r['Cote 1 des exemplaires'],
-        r['Editeur (EDIA_display)'],
-        r['Sujet']
+        r['200$a'],
+        r['700$a'],
+        r['701$a'],
+        r['930$g'],
+        r['610$a']
       ].join(' ').toLowerCase();
 
       if (!hay.includes(q)) {
@@ -819,7 +825,7 @@ function renderFondsList() {
   // Grouper par fonds
   const groups = {};
   filteredRecords.forEach(r => {
-    const f = r['Fonds'] || '(Sans fonds)';
+    const f = r['930$e'] || '(Sans fonds)';
     if (!groups[f]) groups[f] = [];
     groups[f].push(r);
   });
@@ -857,7 +863,7 @@ function buildFondsBlock(fondsName, records) {
 
   // Dates extrêmes calculées depuis les données
   const years = records
-    .map(r => parseInt(r['Année de publication'] || ''))
+    .map(r => parseInt(r['210$d'] || ''))
     .filter(y => y > 0 && y < 2100);
   const dateMin = years.length ? Math.min(...years) : null;
   const dateMax = years.length ? Math.max(...years) : null;
@@ -942,7 +948,7 @@ function toggleFonds(fondsName) {
   block.querySelector('.fonds-header').setAttribute('aria-expanded', state.open);
 
   if (state.open) {
-    const records = filteredRecords.filter(r => (r['Fonds'] || '(Sans fonds)') === fondsName);
+    const records = filteredRecords.filter(r => (r['930$e'] || '(Sans fonds)') === fondsName);
     const body = block.querySelector('.fonds-body');
     renderFondsBody(body, records, fondsName, state);
   }
@@ -954,14 +960,16 @@ function toggleFonds(fondsName) {
 function renderFondsBody(body, records, fondsName, state) {
   body.innerHTML = '';
 
-  const sousFondsValues = [...new Set(records.map(r => (r['Sous-fonds'] || '').trim()).filter(Boolean))].sort();
+  const sousFondsValues = SOUS_FONDS_KEY
+    ? [...new Set(records.map(r => (r[SOUS_FONDS_KEY] || '').trim()).filter(Boolean))].sort()
+    : [];
 
   if (sousFondsValues.length > 0) {
     const groups = {};
     sousFondsValues.forEach(sf => groups[sf] = []);
     groups['Autres'] = [];
     records.forEach(r => {
-      const sf = (r['Sous-fonds'] || '').trim();
+      const sf = (r[SOUS_FONDS_KEY] || '').trim();
       if (sf) groups[sf].push(r);
       else groups['Autres'].push(r);
     });
@@ -981,6 +989,16 @@ function renderFondsBody(body, records, fondsName, state) {
     renderTable(body, records, fondsName, state);
   }
 }
+// ══════════════════════════════════════════
+//  Parsing des auteurs (700$a / 700$b)
+// ══════════════════════════════════════════
+function parseAuthors(val) {
+  if (!val) return '';
+  // Si plusieurs valeurs séparées par §, on a plusieurs noms
+  const noms = val.split('§').map(s => s.trim()).filter(Boolean);
+  return noms.map(n => n.toUpperCase()).join(', ');
+}
+
 function renderTable(body, records, stateKey, state) {
   body.innerHTML = '';
 
@@ -1012,6 +1030,7 @@ function renderTable(body, records, stateKey, state) {
   COLS.forEach(col => {
     const th = document.createElement('th');
     th.className = col.cls;
+    if (col.width) th.style.width = col.width;
     th.innerHTML = `${col.label} <span class="sort-icon">${state.sortCol === col.key ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕'}</span>`;
     if (state.sortCol === col.key) th.classList.add('sorted');
     th.addEventListener('click', () => {
@@ -1036,25 +1055,34 @@ function renderTable(body, records, stateKey, state) {
 
     const tr = document.createElement('tr');
     tr.dataset.rowId = rowId;
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => toggleDetail(rowId));
 
     COLS.forEach(col => {
       const td = document.createElement('td');
       td.className = col.cls;
       let val = rec[col.key] || '';
 
-      if (col.key === 'Référence (REFA)') {
-        td.innerHTML = `<span class="td-titre-text">${esc(val) || '<em style="color:var(--text-light)">Sans titre</em>'}</span>
-          <button class="btn-detail" onclick="toggleDetail('${rowId}', event)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Détails
-          </button>`;
-      } else if (col.key === 'Auteur (AUTA_display)') {
+      // APRÈS
+      if (col.key === '200$a') {
+        td.innerHTML = `<span class="td-titre-text">${esc(val) || '<em style="color:var(--text-light)">Sans titre</em>'}</span>`;
+      } else if (col.key === 'Autorite1') {
         val = val.replace(/\. auteur$/, '').replace(/\. ([^,]+)$/, '');
         td.textContent = truncate(val, 60);
-      } else if (col.key === 'Editeur (EDIA_display)') {
+      } else if (col.key === 'Autorite2') {
         val = val.replace(/\.\s*[A-Z][a-zÀ-ÿ]+$/, '').trim();
         td.textContent = truncate(val, 50);
-      } else if (col.key === 'Cote') {
+      } else if (col.key === '700$a') {
+        const prenoms = (rec['700$b'] || '').split('§').map(s => s.trim());
+        const noms = val.split('§').map(s => s.trim()).filter(Boolean);
+        const formatted = noms.map((n, i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ');
+        td.textContent = truncate(formatted, 60);
+      } else if (col.key === '701$a') {
+        const prenoms = (rec['701$b'] || '').split('§').map(s => s.trim());
+        const noms = val.split('§').map(s => s.trim()).filter(Boolean);
+        const formatted = noms.map((n, i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ');
+        td.textContent = truncate(formatted, 50);
+      } else if (col.key === '930$g') {
         td.innerHTML = val.split(',').map(c => `<span style="display:block">${esc(c.trim())}</span>`).join('');
       } else if (col.key === 'Année de publication') {
         td.innerHTML = formatPublicationDate(val) || '';
@@ -1145,19 +1173,17 @@ function buildDetailContent(rec) {
   return grid;
 }
 
-function toggleDetail(rowId, event) {
-  event.stopPropagation();
+function toggleDetail(rowId) {
   const dtr = document.getElementById(`detail-${rowId}`);
   if (!dtr) return;
+  // Fermer les autres lignes ouvertes
+  document.querySelectorAll('.detail-row.visible').forEach(el => {
+    if (el.id !== `detail-${rowId}`) el.classList.remove('visible');
+  });
   dtr.classList.toggle('visible');
-  // Mettre à jour le bouton
-  const btn = document.querySelector(`[data-row-id="${rowId}"] .btn-detail`);
-  if (btn) {
-    const expanded = dtr.classList.contains('visible');
-    btn.innerHTML = expanded
-      ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg> Masquer`
-      : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Détails`;
-  }
+  // Mettre en évidence la ligne parente
+  const tr = document.querySelector(`[data-row-id="${rowId}"]`);
+  if (tr) tr.classList.toggle('expanded', dtr.classList.contains('visible'));
 }
 
 // ══════════════════════════════════════════
