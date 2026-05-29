@@ -17,17 +17,16 @@ const METIERS = [
    ============================================================ */
 const START_YEAR = 1550, END_YEAR = 2026;
 
-let allDocsGlobal          = [];
-let allIndividusGlobal     = [];
-let allImprimeriesGlobal   = [];
-let allImprimeriesCoordMap = {};
-let allLieuxMap            = {};
-let allRows                = [];
-let timelineGroups         = [];
-let allPeriodiquesGlobal   = [];
-// Index : imprimerieId (string) → [périodiques]
+let allDocsGlobal            = [];
+let allIndividusGlobal       = [];
+let allImprimeriesGlobal     = [];
+let allImprimeriesCoordMap   = {};
+let allLieuxMap              = {};
+let allRows                  = [];
+let timelineGroups           = [];
+let allPeriodiquesGlobal     = [];
 let periodiquesParImprimerie = {};
-let currentMarkers         = [];
+let currentMarkers           = [];
 
 let selectedEnseigne  = null;
 let selectedPersonne  = null;
