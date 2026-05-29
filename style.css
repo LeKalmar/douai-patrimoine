@@ -1534,3 +1534,509 @@ ul { list-style: none; }
     .expo-carousel[data-count="1"] .expo-controls,
     .expo-carousel[data-count="1"] .expo-progress { display: none; }
     
+        /* ── Barre de recherche & filtres ── */
+    .section {
+      padding: 0 !important;
+    }
+    .inventory-toolbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .inventory-toolbar .container {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .toolbar-search {
+      flex: 1 1 260px;
+      position: relative;
+    }
+    .toolbar-search input {
+      width: 100%;
+      padding: .55rem .9rem .55rem 2.4rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: .88rem;
+      color: var(--ink);
+      background: var(--paper);
+      outline: none;
+      transition: border-color var(--transition);
+    }
+    .toolbar-search input:focus { border-color: var(--warm); }
+    .toolbar-search svg {
+      position: absolute;
+      left: .7rem; top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      color: var(--text-light);
+      pointer-events: none;
+    }
+    .toolbar-select {
+      padding: .55rem .9rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: .82rem;
+      color: var(--text);
+      background: var(--paper);
+      cursor: pointer;
+      outline: none;
+    }
+    .toolbar-count {
+      font-size: .8rem;
+      color: var(--text-light);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .toolbar-count strong { color: var(--ink); }
+
+    /* ── Accordéon par fonds ── */
+    .fonds-list {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+      padding: 2rem 0;
+    }
+
+    .fonds-block {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: box-shadow var(--transition);
+    }
+    .fonds-block:hover { box-shadow: var(--shadow); }
+
+    .fonds-header {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      border: none;
+      font-family: inherit;
+    }
+    .fonds-header:hover { background: var(--cream); }
+
+    .fonds-header-text {
+      display: flex;
+      padding: 1rem 1.25rem;  
+      gap: 1rem; 
+    }
+    .fonds-color-icon {
+      width: 56px; height: 56px;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    }
+    .fonds-color-icon svg {
+      width: 100%; height: 100%;
+      display: block;
+    }
+    .fonds-name {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--ink);
+      flex: 1;
+    }
+    .fonds-badge {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--text-light);
+      background: var(--cream);
+      border: 1px solid var(--border);
+      padding: .15rem .55rem;
+      border-radius: 50px;
+      white-space: nowrap;
+    }
+    .fonds-chevron {
+      width: 18px; height: 18px;
+      color: var(--text-light);
+      transition: transform .25s ease;
+      flex-shrink: 0;
+    }
+    .fonds-block.open .fonds-chevron { transform: rotate(180deg); }
+
+    /* ── Panneau d'information du fonds (affiché au clic) ── */
+    .fonds-info-panel {
+      display: none;
+      padding: .85rem 1.25rem .85rem 4.25rem;
+      background: linear-gradient(to right, var(--cream), #fff);
+      border-top: 1px solid var(--border);
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+    .fonds-block.info-open .fonds-info-panel { display: flex; }
+    .fonds-info-desc {
+      flex: 1;
+      font-size: .83rem;
+      color: var(--text);
+      line-height: 1.65;
+    }
+    .fonds-info-desc strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: .95rem;
+      color: var(--ink);
+      margin-bottom: .3rem;
+    }
+    .fonds-info-meta {
+      display: flex;
+      flex-direction: column;
+      gap: .4rem;
+      min-width: 180px;
+    }
+    .fonds-meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .fonds-meta-label {
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-light);
+    }
+    .fonds-meta-value {
+      font-size: .82rem;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .fonds-info-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      margin-left: auto;
+      padding: .3rem .6rem;
+      font-size: .75rem;
+      font-family: inherit;
+      font-weight: 600;
+      color: var(--text-light);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all var(--transition);
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+    .fonds-info-btn:hover { border-color: var(--warm); color: var(--warm-dark); }
+    .fonds-block.info-open .fonds-info-btn svg { transform: rotate(180deg); }
+
+
+    .fonds-body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+    .fonds-block.open .fonds-body { display: block; }
+    /* ── Sous-fonds ── */
+    .sous-fonds-list {
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+      padding: .75rem;
+      background: var(--cream);
+      border-top: 1px solid var(--border);
+    }
+    .sous-fonds-block {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .sous-fonds-header {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .6rem 1rem;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .sous-fonds-header:hover { background: #f5f0e8; }
+    .sous-fonds-name {
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--ink-soft);
+      flex: 1;
+    }
+    .sous-fonds-badge {
+      font-size: .7rem;
+      color: var(--text-light);
+      background: var(--cream);
+      border: 1px solid var(--border);
+      padding: .1rem .45rem;
+      border-radius: 50px;
+    }
+    .sous-fonds-chevron {
+      width: 14px; height: 14px;
+      color: var(--text-light);
+      transition: transform .2s ease;
+      flex-shrink: 0;
+    }
+    .sous-fonds-block.open .sous-fonds-chevron { transform: rotate(180deg); }
+    .sous-fonds-body { display: none; border-top: 1px solid var(--border); }
+    .sous-fonds-block.open .sous-fonds-body { display: block; }
+    .fonds-table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+      table-layout: fixed; /* ← ajouter */
+    }
+    thead tr {
+      background: var(--cream);
+    }
+    th {
+      padding: .6rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-light);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { color: var(--ink); }
+    th .sort-icon { margin-left: .25rem; opacity: .4; }
+    th.sorted .sort-icon { opacity: 1; color: var(--warm-dark); }
+
+    tbody tr {
+      border-top: 1px solid var(--border);
+      transition: background var(--transition);
+    }
+    tbody tr:hover { background: #fdf9f4; }
+    tbody tr.expanded { background: #fdf5e8; }
+
+    td {
+      padding: .6rem 1rem;
+      vertical-align: top;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    td.td-titre {
+      font-weight: 500;
+      color: var(--ink);
+      max-width: 320px;
+    }
+    td.td-cote {
+      font-family: monospace;
+      font-size: .78rem;
+      color: var(--text-light);
+      white-space: nowrap;
+    }
+    td.td-annee { white-space: nowrap; }
+
+    /* Ligne de détail dépliable */
+    .detail-row { display: none; }
+    .detail-row.visible { display: table-row; }
+    .detail-cell {
+      padding: .75rem 1rem 1rem 2.5rem !important;
+      background: #fdf9f5;
+      border-top: none !important;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: .5rem 1.5rem;
+    }
+    .detail-item { display: flex; flex-direction: column; gap: .1rem; }
+    .detail-label {
+      font-size: .68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--text-light);
+    }
+    .detail-value {
+      font-size: .82rem;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    .detail-resume {
+      margin-top: .6rem;
+      padding-top: .6rem;
+      border-top: 1px solid var(--border);
+      font-size: .82rem;
+      color: var(--text);
+      line-height: 1.6;
+      grid-column: 1 / -1;
+    }
+    .detail-resume em { color: var(--text-light); font-style: normal; font-size: .75rem; }
+
+    /* Bouton "voir détails" dans la cellule titre */
+    .btn-detail {
+      display: inline-flex; align-items: center; gap: .25rem;
+      margin-top: .25rem;
+      font-size: .72rem;
+      color: var(--warm-dark);
+      font-weight: 600;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-detail:hover { color: var(--accent); }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .75rem 1rem;
+      border-top: 1px solid var(--border);
+      background: var(--cream);
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .pagination-info {
+      font-size: .78rem;
+      color: var(--text-light);
+    }
+    .pagination-btns {
+      display: flex;
+      gap: .35rem;
+    }
+    .pagination-btns button {
+      padding: .35rem .65rem;
+      font-size: .78rem;
+      font-family: inherit;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .pagination-btns button:hover:not(:disabled) {
+      border-color: var(--warm);
+      color: var(--warm-dark);
+    }
+    .pagination-btns button.active {
+      background: var(--warm);
+      border-color: var(--warm);
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .pagination-btns button:disabled {
+      opacity: .35;
+      cursor: default;
+    }
+
+    /* Etat vide */
+    .empty-state {
+      padding: 3rem 1rem;
+      text-align: center;
+      color: var(--text-light);
+      font-size: .9rem;
+    }
+    .empty-state svg {
+      width: 40px; height: 40px;
+      margin: 0 auto .75rem;
+      opacity: .3;
+    }
+
+    /* Loader */
+    #loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 4rem;
+      color: var(--text-light);
+      font-size: .9rem;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--warm);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Couleurs des fonds */
+    .dot-Douaisien         { background: #3a7ca5; }
+    .dot-Imprimés          { background: #2d5a4a; }
+    .dot-ImprimésdDouaisiens { background: #4a7a3a; }
+    .dot-Incunables        { background: #8b3a1e; }
+    .dot-Hospice           { background: #7a4a8b; }
+    .dot-MarclineDesbordesValmore { background: #b94a48; }
+    .dot-Situationniste    { background: #b07a20; }
+    .dot-Littérature       { background: #1a6a7a; }
+    .dot-LivredArtiste     { background: #6a3a8b; }
+    .dot-Mines             { background: #5a5a5a; }
+    .dot-RéserveDouaisienne { background: #7a3030; }
+    .dot-default           { background: var(--warm); }
+
+    @media (max-width: 700px) {
+      .detail-grid { grid-template-columns: 1fr; }
+      .pagination { flex-direction: column; align-items: flex-start; }
+      td.td-editeur, td.td-type { display: none; }
+      th.col-editeur, th.col-type { display: none; }
+    }
+
+        /* ── Section "Venir consulter" ── */
+    .venir-top-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+    .venir-block--map #venir-map {
+      width: 100%;
+      height: 220px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,.12);
+      margin-top: .5rem;
+    }
+    .venir-adresse {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: .9rem;
+      margin: .35rem 0 .75rem;
+      color: inherit;
+      line-height: 1.5;
+    }
+    .venir-adresse svg { flex-shrink: 0; margin-top: 3px; }
+    .venir-bottom-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(0,0,0,.08);
+    }
+    @media (max-width: 768px) {
+      .venir-top-row    { grid-template-columns: 1fr; }
+      .venir-bottom-row { grid-template-columns: 1fr; }
+    }
+    /* Popup MapLibre */
+    .maplibregl-popup-content {
+      font-family: inherit;
+      font-size: .82rem;
+      padding: 10px 14px;
+      border-radius: 8px;
+      box-shadow: 0 3px 14px rgba(0,0,0,.2);
+      line-height: 1.5;
+    }
+    .maplibregl-popup-content strong { font-size: .9rem; }
