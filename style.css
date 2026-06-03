@@ -1596,12 +1596,68 @@ ul { list-style: none; }
     }
     .toolbar-count strong { color: var(--ink); }
 
+    /* ── Onglets fonds / thèmes ── */
+    .inv-tabs {
+      display: flex;
+      border-left: 2px solid var(--border);
+      border-right: 2px solid var(--border);
+      border-bottom: 2px solid var(--border);
+      margin-bottom: .5rem;
+      border-radius: 0 0 6px 6px;
+    }
+    .inv-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      padding: .90rem 1.1rem;
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-light);
+      background: none;
+      border: none;
+      border-left: 2px solid transparent;
+      border-right: 2px solid transparent;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer;
+      transition: color var(--transition), border-color var(--transition), background var(--transition);
+      flex: 1;
+      border-radius: 0 0 6px 6px;
+    }
+    .inv-tab:hover { color: var(--ink); background: var(--cream); }
+    .inv-tab--active {
+      color: var(--ink);
+      border-bottom-color: var(--warm-dark);
+      background: var(--cream);
+    }
+    .inv-tab svg { opacity: .65; }
+    .inv-tab--active svg { opacity: 1; }
+
+    /* ── Icône initiale pour les blocs thème ── */
+    .theme-icon {
+      background: linear-gradient(135deg, var(--ink-soft), var(--accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .theme-icon-letter {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 400;
+      color: rgba(255,255,255,.85);
+      line-height: 1;
+      pointer-events: none;
+    }
+
     /* ── Accordéon par fonds ── */
+
     .fonds-list {
       display: flex;
+      padding-bottom: 0.75rem;
       flex-direction: column;
       gap: .5rem;
-      padding: 2rem 0;
     }
 
     .fonds-block {
@@ -1616,6 +1672,8 @@ ul { list-style: none; }
     .fonds-header {
       display: flex;
       align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
       cursor: pointer;
       user-select: none;
       background: none;
@@ -1626,17 +1684,55 @@ ul { list-style: none; }
     }
     .fonds-header:hover { background: var(--cream); }
 
+    /* Zone texte centrale : prend tout l'espace disponible */
     .fonds-header-text {
+      flex: 1;
+      min-width: 0;
       display: flex;
-      padding: 1rem 1.25rem;  
-      gap: 1rem; 
+      flex-direction: column;
+      gap: .35rem;
     }
+    /* Ligne haute : nom + badge */
+    .fonds-header-top {
+      display: flex;
+      align-items: baseline;
+      gap: .6rem;
+      flex-wrap: wrap;
+    }
+    /* Description succincte (toujours visible) */
+    .fonds-header-desc {
+      margin: 0;
+      font-size: .83rem;
+      color: var(--text);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      opacity: .85;
+    }
+    /* Ligne des métadonnées : dates extrêmes */
+    .fonds-header-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .fonds-meta-dates {
+      font-size: .75rem;
+      color: var(--text-light);
+      white-space: nowrap;
+    }
+
+    /* Vignette image/couleur agrandie */
     .fonds-color-icon {
-      width: 56px; height: 56px;
+      width: 90px;
       flex-shrink: 0;
+      align-self: stretch;
       overflow: hidden;
       position: relative;
       box-shadow: 0 1px 3px rgba(0,0,0,.15);
+      border-radius: 6px;
     }
     .fonds-color-icon svg {
       width: 100%; height: 100%;
@@ -1646,7 +1742,6 @@ ul { list-style: none; }
       font-family: var(--font-display);
       font-size: 1.1rem;
       color: var(--ink);
-      flex: 1;
     }
     .fonds-badge {
       font-size: .72rem;
@@ -1658,80 +1753,19 @@ ul { list-style: none; }
       border-radius: 50px;
       white-space: nowrap;
     }
+    /* Chevron poussé à droite, jamais écrasé */
     .fonds-chevron {
-      width: 18px; height: 18px;
+      width: 20px; height: 20px;
       color: var(--text-light);
       transition: transform .25s ease;
       flex-shrink: 0;
+      margin-left: auto;
     }
     .fonds-block.open .fonds-chevron { transform: rotate(180deg); }
 
-    /* ── Panneau d'information du fonds (affiché au clic) ── */
-    .fonds-info-panel {
-      display: none;
-      padding: .85rem 1.25rem .85rem 4.25rem;
-      background: linear-gradient(to right, var(--cream), #fff);
-      border-top: 1px solid var(--border);
-      gap: 1.5rem;
-      align-items: flex-start;
-    }
-    .fonds-block.info-open .fonds-info-panel { display: flex; }
-    .fonds-info-desc {
-      flex: 1;
-      font-size: .83rem;
-      color: var(--text);
-      line-height: 1.65;
-    }
-    .fonds-info-desc strong {
-      display: block;
-      font-family: var(--font-display);
-      font-size: .95rem;
-      color: var(--ink);
-      margin-bottom: .3rem;
-    }
-    .fonds-info-meta {
-      display: flex;
-      flex-direction: column;
-      gap: .4rem;
-      min-width: 180px;
-    }
-    .fonds-meta-item {
-      display: flex;
-      flex-direction: column;
-    }
-    .fonds-meta-label {
-      font-size: .65rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--text-light);
-    }
-    .fonds-meta-value {
-      font-size: .82rem;
-      color: var(--ink);
-      font-weight: 500;
-    }
-    .fonds-info-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: .3rem;
-      margin-left: auto;
-      padding: .3rem .6rem;
-      font-size: .75rem;
-      font-family: inherit;
-      font-weight: 600;
-      color: var(--text-light);
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all var(--transition);
-      flex-shrink: 0;
-      align-self: flex-start;
-    }
-    .fonds-info-btn:hover { border-color: var(--warm); color: var(--warm-dark); }
-    .fonds-block.info-open .fonds-info-btn svg { transform: rotate(180deg); }
-
+    /* ── Panneau d'information du fonds — désormais intégré dans l'en-tête ── */
+    .fonds-info-panel { display: none; }
+    .fonds-info-btn { display: none; }
 
     .fonds-body {
       display: none;
@@ -1842,6 +1876,43 @@ ul { list-style: none; }
       white-space: nowrap;
     }
     td.td-annee { white-space: nowrap; }
+    td.td-type {
+      text-align: center;
+      padding-left: .5rem;
+      padding-right: .5rem;
+    }
+    .type-icon-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: color-mix(in srgb, currentColor 12%, transparent);
+      transition: background var(--transition);
+      cursor: default;
+    }
+    .type-icon-wrap:hover {
+      background: color-mix(in srgb, currentColor 22%, transparent);
+    }
+    .type-icon-wrap svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      flex-shrink: 0;
+    }
+    .type-icon-unknown {
+      display: inline-block;
+      font-size: .65rem;
+      font-weight: 700;
+      color: var(--text-light);
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: .1rem .3rem;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
 
     /* Ligne de détail dépliable */
     .detail-row { display: none; }

@@ -2,489 +2,696 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Générateur de manifeste — Visionneuse patrimoniale</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Générateur de manifest — Bibliothèques Douai</title>
   <style>
     :root {
-      --bg: #f5f2ec; --surface: #fff; --border: #ddd8ce;
-      --text: #1a1714; --muted: #6b6560;
-      --accent: #8b3a1e; --accent-light: #f0e8e3;
-      --green: #2d6a4f; --green-light: #e8f5ee;
-      --radius: 6px;
+      --bg:       #f5f2ec;
+      --surface:  #ffffff;
+      --border:   #ddd8ce;
+      --ink:      #1a1714;
+      --muted:    #6b6560;
+      --accent:   #8b3a1e;
+      --accent-l: #f0e8e3;
+      --green:    #2d5a4a;
+      --green-l:  #e8f2ee;
+      --orange:   #c0622e;
+      --orange-l: #fdf0e8;
+      --red:      #9e2a2b;
+      --red-l:    #fdecea;
+      --radius:   6px;
+      --mono:     'Courier New', monospace;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 3rem 1rem; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 2rem; max-width: 640px; width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
-    h1 { font-size: 1.3rem; color: var(--accent); margin-bottom: .35rem; }
-    .subtitle { font-size: .82rem; color: var(--muted); margin-bottom: 1.75rem; line-height: 1.5; }
 
-    .drop-area {
+    body {
+      font-family: 'DM Sans', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .wrap { max-width: 860px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .page-header {
+      margin-bottom: 2rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 2px solid var(--accent);
+    }
+    .page-header h1 {
+      font-family: Georgia, serif;
+      font-size: 1.6rem;
+      font-weight: 400;
+      color: var(--accent);
+      margin-bottom: 0.35rem;
+    }
+    .page-header p { font-size: .85rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .card-title {
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Config ── */
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .85rem;
+    }
+    @media(max-width:600px){ .config-grid { grid-template-columns: 1fr; } }
+
+    label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .3rem; }
+    input[type="text"], select {
+      width: 100%;
+      padding: .45rem .7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: .78rem;
+      background: var(--bg);
+      color: var(--ink);
+      outline: none;
+    }
+    input[type="text"]:focus, select:focus { border-color: var(--accent); }
+
+    .hint {
+      font-size: .72rem;
+      color: var(--muted);
+      margin-top: .3rem;
+      line-height: 1.5;
+    }
+
+    /* ── Drop zone ── */
+    .dropzone {
       border: 2px dashed var(--border);
       border-radius: var(--radius);
-      padding: 2.5rem 1rem;
+      padding: 2.5rem 1.5rem;
       text-align: center;
       cursor: pointer;
-      transition: all .2s;
-      color: var(--muted);
-      font-size: .85rem;
+      transition: border-color .15s, background .15s;
       position: relative;
     }
-    .drop-area:hover, .drop-area.drag { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
-    .drop-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-    .drop-area svg { display: block; margin: 0 auto .75rem; opacity: .4; }
-    .drop-area strong { display: block; font-size: .95rem; margin-bottom: .25rem; color: var(--text); }
-
-    .options { margin: 1.25rem 0; display: flex; flex-direction: column; gap: .75rem; }
-    label.opt { font-size: .82rem; display: flex; flex-direction: column; gap: .3rem; color: var(--muted); }
-    label.opt strong { color: var(--text); font-size: .85rem; }
-    input[type="text"] {
-      padding: .4rem .65rem; border: 1px solid var(--border); border-radius: var(--radius);
-      font-family: inherit; font-size: .82rem; background: var(--bg); color: var(--text); outline: none;
+    .dropzone:hover, .dropzone.over {
+      border-color: var(--accent);
+      background: var(--accent-l);
     }
-    input[type="text"]:focus { border-color: var(--accent); }
+    .dropzone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .dropzone-icon { font-size: 2rem; margin-bottom: .5rem; }
+    .dropzone-label { font-size: .9rem; font-weight: 600; color: var(--ink); }
+    .dropzone-hint { font-size: .78rem; color: var(--muted); margin-top: .3rem; }
+    .dropzone.loaded { border-color: var(--green); background: var(--green-l); }
+    .dropzone.loaded .dropzone-icon::after { content: ' ✓'; font-size: 1.2rem; color: var(--green); }
 
+    /* ── Boutons ── */
     .btn {
       display: inline-flex; align-items: center; gap: .4rem;
-      padding: .55rem 1.1rem; border-radius: var(--radius); border: none;
-      font-family: inherit; font-size: .85rem; font-weight: 500; cursor: pointer;
-      transition: opacity .15s;
+      padding: .55rem 1.2rem;
+      border: none; border-radius: var(--radius);
+      font-family: inherit; font-size: .85rem; font-weight: 600;
+      cursor: pointer; transition: opacity .15s, transform .1s;
     }
+    .btn:active { transform: scale(.98); }
     .btn:disabled { opacity: .4; cursor: default; }
     .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover:not(:disabled) { opacity: .85; }
-    .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
-    .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .btn-primary:hover:not(:disabled) { opacity: .88; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover:not(:disabled) { opacity: .88; }
+    .btn-row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
 
-    .actions { display: flex; gap: .65rem; margin-top: 1.25rem; flex-wrap: wrap; }
-
-    .result {
-      margin-top: 1.5rem; padding: 1rem 1.25rem;
-      border-radius: var(--radius); font-size: .8rem; line-height: 1.7;
-      display: none;
+    /* ── Stats ── */
+    .stats-row {
+      display: flex; flex-wrap: wrap; gap: .75rem;
+      margin-bottom: 1.25rem;
     }
-    .result.ok { background: var(--green-light); border: 1px solid #a8d5be; color: var(--green); }
-    .result.err { background: var(--accent-light); border: 1px solid #d4a090; color: var(--accent); }
-    .result strong { font-size: .9rem; }
+    .stat-pill {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .3rem .85rem;
+      border-radius: 20px;
+      font-size: .78rem; font-weight: 600;
+    }
+    .stat-pill.green  { background: var(--green-l);  color: var(--green);  border: 1px solid #b2d4c8; }
+    .stat-pill.orange { background: var(--orange-l); color: var(--orange); border: 1px solid #f0c8a8; }
+    .stat-pill.red    { background: var(--red-l);    color: var(--red);    border: 1px solid #f0b8b8; }
+    .stat-pill.grey   { background: #f0ede8;         color: var(--muted);  border: 1px solid var(--border); }
 
-    .tree-preview {
-      margin-top: 1.25rem; display: none;
-      border: 1px solid var(--border); border-radius: var(--radius);
-      max-height: 280px; overflow-y: auto;
-      font-size: .75rem; font-family: 'Cascadia Code', 'Fira Mono', monospace;
-      background: #1a1714; color: #d4cfc8; padding: .75rem 1rem;
+    /* ── Log ── */
+    #log {
+      font-family: var(--mono);
+      font-size: .75rem;
       line-height: 1.7;
-    }
-    .tree-preview .folder { color: #e8a87c; }
-    .tree-preview .img    { color: #9ec8a0; }
-    .tree-preview .count  { color: #6b8f71; }
-
-    .note {
-      margin-top: 1.5rem; padding: .8rem 1rem;
-      background: var(--accent-light); border-radius: var(--radius);
-      font-size: .75rem; line-height: 1.6; color: var(--muted);
-    }
-    .note strong { color: var(--accent); }
-
-    /* ── Qualification des dossiers ── */
-    .qualify-panel {
-      margin-top: 1.5rem; display: none;
-    }
-    .qualify-panel h3 {
-      font-size: .88rem; font-weight: 600; margin-bottom: .25rem; color: var(--text);
-    }
-    .qualify-panel .hint {
-      font-size: .75rem; color: var(--muted); margin-bottom: .9rem; line-height: 1.5;
-    }
-    .qualify-table {
-      display: flex; flex-direction: column; gap: 2px;
-    }
-    .qualify-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      align-items: center;
-      gap: .5rem;
-      padding: .45rem .65rem;
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 1rem;
+      background: #1a1714;
+      color: #e8e4dc;
       border-radius: var(--radius);
+    }
+    #log .ok     { color: #7ecfa0; }
+    #log .warn   { color: #f0c060; }
+    #log .err    { color: #f08080; }
+    #log .info   { color: #80c0f0; }
+    #log .dim    { color: #6b6560; }
+    #log .head   { color: #c9a96e; font-weight: bold; }
+
+    /* ── Preview arbre ── */
+    #preview {
+      font-family: var(--mono);
+      font-size: .75rem;
+      line-height: 1.8;
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 1rem;
       background: var(--bg);
       border: 1px solid var(--border);
+      border-radius: var(--radius);
     }
-    .qualify-row .folder-label {
-      font-size: .8rem; font-weight: 500;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      display: flex; align-items: center; gap: .4rem;
-    }
-    .qualify-row .folder-label .sub-count {
-      font-size: .7rem; font-weight: 400; color: var(--muted);
-    }
-    .qualify-row .radio-group {
-      display: flex; gap: 4px; flex-shrink: 0;
-    }
-    .radio-group label {
-      display: flex; align-items: center; gap: 3px;
-      font-size: .72rem; cursor: pointer;
-      padding: .2rem .5rem;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: #fff;
-      transition: all .15s;
-      white-space: nowrap;
-      user-select: none;
-    }
-    .radio-group input[type=radio] { display: none; }
-    .radio-group input[type=radio]:checked + span { font-weight: 600; }
-    .radio-group label:has(input[value=folder]:checked)  { border-color: #a0a0a0; background: #f0f0f0; }
-    .radio-group label:has(input[value=book]:checked)    { border-color: #8b3a1e; background: #f0e8e3; color: #8b3a1e; }
-    .radio-group label:has(input[value=isolated]:checked){ border-color: #2d6a4f; background: #e8f5ee; color: #2d6a4f; }
+    .tree-folder { color: var(--accent); font-weight: bold; }
+    .tree-image  { color: var(--green); }
+    .tree-book   { color: #3a7ca5; font-weight: bold; }
+    .tree-page   { color: var(--muted); }
+    .tree-warn   { color: var(--orange); }
+
+    /* ── Masqué ── */
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-<div class="card">
-  <h1>Générateur de manifeste</h1>
-  <p class="subtitle">
-    Sélectionnez le dossier racine de vos images numérisées.<br>
-    Le script construit l'arborescence et télécharge le <code>manifest.json</code> prêt à l'emploi.
-  </p>
+<div class="wrap">
 
-  <div class="drop-area" id="dropArea">
-    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-    </svg>
-    <strong>Cliquez pour choisir un dossier</strong>
-    ou glissez-le ici
-    <!-- webkitdirectory permet de sélectionner un dossier entier -->
-    <input type="file" id="folderInput" webkitdirectory multiple accept="image/*,.jpg,.jpeg,.png,.tif,.tiff,.webp">
-  </div>
-
-  <div class="options">
-    <label class="opt">
-      <strong>Nom affiché pour la racine dans l'arbre</strong>
-      <input type="text" id="rootName" value="Documents numérisés" placeholder="ex : Fonds numérisés">
-    </label>
-  </div>
-
-  <div class="actions">
-    <button class="btn btn-primary" id="btnGenerate" disabled>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-      Générer et télécharger manifest.json
-    </button>
-    <button class="btn btn-secondary" id="btnPreview" disabled>Aperçu de l'arbre</button>
-  </div>
-
-  <!-- ── Qualification des sous-dossiers ── -->
-  <div class="qualify-panel" id="qualifyPanel">
-    <h3>Qualifier les dossiers</h3>
-    <p class="hint">
-      Pour chaque sous-dossier direct, indiquez s'il contient un <strong style="color:#8b3a1e">Livre</strong> (pages séquentielles → 1 item),
-      des <strong style="color:#2d6a4f">Pièces isolées</strong> (chaque image = 1 item),
-      ou laissez en <strong>Dossier</strong> (comportement par défaut, peut contenir d'autres sous-dossiers).
+  <header class="page-header">
+    <h1>Générateur de manifest.json</h1>
+    <p>
+      Chargez votre <code>inventaire.csv</code> pour générer automatiquement le fichier <code>js/manifest.json</code>
+      utilisé par la visionneuse patrimoniale.<br>
+      Tout se passe dans votre navigateur — aucun fichier n'est envoyé sur Internet.
     </p>
-    <div class="qualify-table" id="qualifyTable"></div>
+  </header>
+
+  <!-- ── Étape 1 : configuration ── -->
+  <div class="card">
+    <div class="card-title">① Configuration</div>
+    <div class="config-grid">
+      <div>
+        <label for="cfg-root">Racine R2 (IMAGES_ROOT)</label>
+        <input type="text" id="cfg-root" value="https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/">
+        <p class="hint">URL de base de votre bucket R2, avec le slash final.</p>
+      </div>
+      <div>
+        <label for="cfg-col-lien">Colonne pièces isolées</label>
+        <input type="text" id="cfg-col-lien" value="lien_num">
+        <p class="hint">Colonne CSV contenant l'URL complète de l'image (ex. <code>lien_num</code>).</p>
+      </div>
+      <div>
+        <label for="cfg-col-num">Colonne dossier livre</label>
+        <input type="text" id="cfg-col-num" value="num">
+        <p class="hint">Colonne CSV contenant le chemin R2 du <em>dossier</em> du livre (ex. <code>num-robaut/Boîte 1/MonLivre</code>).</p>
+      </div>
+      <div>
+        <label for="cfg-col-type">Colonne type de document</label>
+        <input type="text" id="cfg-col-type" value="200$b">
+        <p class="hint">Colonne CSV qui distingue les types. Les valeurs ci-dessous seront traitées comme livres multi-pages.</p>
+      </div>
+      <div>
+        <label for="cfg-book-types">Types = livre multi-pages</label>
+        <input type="text" id="cfg-book-types" value="Manuscrit,Texte Imprimé,Livre d'Artiste">
+        <p class="hint">Valeurs séparées par des virgules. Ces documents seront cherchés par dossier (colonne <em>num</em>).</p>
+      </div>
+      <div>
+        <label for="cfg-col-pages">Colonne pages (optionnelle)</label>
+        <input type="text" id="cfg-col-pages" value="pages">
+        <p class="hint">Si présente : noms de fichiers des pages séparés par <code>§</code>
+          (ex. <code>001.jpg§002.jpg§003.jpg</code>). Laisser vide si la colonne n'existe pas.</p>
+      </div>
+      <div>
+        <label for="cfg-col-titre">Colonne titre (pour nommer les nœuds)</label>
+        <input type="text" id="cfg-col-titre" value="200$a">
+        <p class="hint">Utilisé comme nom d'affichage dans la visionneuse.</p>
+      </div>
+      <div>
+        <label for="cfg-separateur">Séparateur CSV</label>
+        <select id="cfg-separateur">
+          <option value=";" selected>Point-virgule  ;</option>
+          <option value=",">Virgule  ,</option>
+          <option value="	">Tabulation</option>
+        </select>
+        <p class="hint">Doit correspondre au séparateur de votre CSV.</p>
+      </div>
+    </div>
   </div>
 
-  <div class="result" id="result"></div>
-  <div class="tree-preview" id="treePreview"></div>
-
-  <div class="note">
-    <strong>Comment l'utiliser&nbsp;?</strong><br>
-    1. Choisissez le dossier racine (ex : <em>3-Travail Interne</em>).<br>
-    2. Cliquez sur <em>Générer</em> — le fichier se télécharge automatiquement.<br>
-    3. Déplacez-le dans <code>site_web/js/manifest.json</code>.<br>
-    4. À relancer à chaque ajout d'images.
+  <!-- ── Étape 2 : chargement CSV ── -->
+  <div class="card">
+    <div class="card-title">② Charger l'inventaire.csv</div>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".csv,.txt">
+      <div class="dropzone-icon">📂</div>
+      <div class="dropzone-label">Cliquez ou déposez votre inventaire.csv ici</div>
+      <div class="dropzone-hint">Le fichier reste sur votre ordinateur — rien n'est envoyé.</div>
+    </div>
   </div>
-</div>
 
+  <!-- ── Étape 3 : résultats ── -->
+  <div class="card hidden" id="section-result">
+    <div class="card-title">③ Résultat</div>
+
+    <div class="stats-row" id="stats-row"></div>
+
+    <div style="margin-bottom:1rem">
+      <div class="card-title" style="margin-bottom:.5rem">Journal de traitement</div>
+      <div id="log"></div>
+    </div>
+
+    <div style="margin-bottom:1.25rem">
+      <div class="card-title" style="margin-bottom:.5rem">Aperçu de l'arborescence</div>
+      <div id="preview"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-success" id="btn-download" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Télécharger manifest.json
+      </button>
+      <span id="dl-hint" class="hint" style="margin:0"></span>
+    </div>
+  </div>
+
+  <!-- ── Aide livres ── -->
+  <div class="card" style="background:#fffbf5; border-color:#f0d8b8;">
+    <div class="card-title" style="color:#8b5a20">💡 Comment gérer les livres multi-pages</div>
+    <p style="font-size:.82rem; line-height:1.7; color:#3a2a10;">
+      Pour qu'un livre apparaisse dans la visionneuse avec toutes ses pages,
+      vous avez deux options :
+    </p>
+    <ol style="font-size:.82rem; line-height:1.9; color:#3a2a10; margin-top:.6rem; padding-left:1.2rem;">
+      <li>
+        <strong>Colonne <code>pages</code> dans le CSV</strong> — ajoutez une colonne nommée <code>pages</code>
+        et renseignez les noms des fichiers de pages séparés par <code>§</code> :<br>
+        <code style="background:#f0e8d8; padding:2px 6px; border-radius:3px; font-size:.75rem;">
+          001.jpg§002.jpg§003.jpg§…
+        </code><br>
+        Ces noms seront combinés avec la valeur de la colonne <code>num</code>
+        (ex. <code>num-robaut/Boîte 1/MonLivre/001.jpg</code>).
+      </li>
+      <li style="margin-top:.5rem;">
+        <strong>Compléter le manifest à la main</strong> — téléchargez d'abord le manifest généré,
+        puis ajoutez les pages des livres signalés en avertissement dans le journal.
+        La structure attendue est :<br>
+        <code style="background:#f0e8d8; padding:2px 6px; border-radius:3px; font-size:.75rem; white-space:pre">
+{ "type": "book", "name": "Mon Livre", "pages": [
+    { "path": "num-robaut/Boîte 1/MonLivre/001.jpg" },
+    { "path": "num-robaut/Boîte 1/MonLivre/002.jpg" }
+  ]
+}</code>
+      </li>
+    </ol>
+  </div>
+
+</div><!-- /wrap -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 <script>
-  const IMG_EXTS = new Set(['jpg','jpeg','png','tif','tiff','webp','gif']);
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  UTILITAIRES                                                         ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 
-  const folderInput  = document.getElementById('folderInput');
-  const btnGenerate  = document.getElementById('btnGenerate');
-  const btnPreview   = document.getElementById('btnPreview');
-  const resultBox    = document.getElementById('result');
-  const treePreview  = document.getElementById('treePreview');
-  const dropArea     = document.getElementById('dropArea');
-  const qualifyPanel = document.getElementById('qualifyPanel');
-  const qualifyTable = document.getElementById('qualifyTable');
+let generatedManifest = null;
 
-  let manifest = null;
-  // Map : chemin relatif du dossier (ex "num-bra/Ms1721") → 'folder' | 'book' | 'isolated'
-  let folderTypes = {};
-  // Arbre intermédiaire brut (avant qualification)
-  let rawTree = null;
+const $ = id => document.getElementById(id);
+const log = $('log');
+const preview = $('preview');
 
-  // ── Drag & drop visuel ──
-  dropArea.addEventListener('dragover',  e => { e.preventDefault(); dropArea.classList.add('drag'); });
-  dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag'));
-  dropArea.addEventListener('drop', e => { e.preventDefault(); dropArea.classList.remove('drag'); });
+function addLog(msg, cls = '') {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.innerHTML = msg;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
 
-  folderInput.addEventListener('change', () => {
-    const files = folderInput.files;
-    if (!files || files.length === 0) return;
-    const images = Array.from(files).filter(f => isImage(f.name));
-    const folderName = getFolderName(files);
-    dropArea.querySelector('strong').textContent = `📁 ${folderName}`;
-    dropArea.querySelector('strong').nextSibling.textContent =
-      ` — ${images.length} image${images.length > 1 ? 's' : ''} trouvée${images.length > 1 ? 's' : ''}`;
-    btnGenerate.disabled = false;
-    btnPreview.disabled  = false;
-    manifest = null;
-    folderTypes = {};
-    rawTree = buildRawTree(files);
-    renderQualifyPanel();
+function cfg(id) { return $(id).value.trim(); }
+
+// Retire la racine R2 d'une URL complète pour obtenir le chemin relatif
+function stripRoot(url, root) {
+  if (!url) return '';
+  url = url.trim();
+  if (url.startsWith(root)) return url.slice(root.length);
+  // Essai sans trailing slash
+  const rootNoSlash = root.endsWith('/') ? root.slice(0, -1) : root;
+  if (url.startsWith(rootNoSlash + '/')) return url.slice(rootNoSlash.length + 1);
+  return url; // retour brut si racine introuvable
+}
+
+// Décompose un chemin en segments propres
+function segments(path) {
+  return path.split('/').map(s => s.trim()).filter(Boolean);
+}
+
+// Insère un nœud dans la hiérarchie { name, type:'folder'|'image'|'book', children, ... }
+function insertNode(root, pathSegs, nodeData) {
+  if (pathSegs.length === 0) return;
+  if (pathSegs.length === 1) {
+    // Feuille — vérifier doublon par chemin ou nom
+    const exists = root.children.some(c => {
+      if (nodeData.type === 'image') return c.path === nodeData.path;
+      if (nodeData.type === 'book')  return c.name === nodeData.name;
+      return false;
+    });
+    if (!exists) root.children.push(nodeData);
+    return;
+  }
+  // Dossier intermédiaire
+  const folderName = pathSegs[0];
+  let folder = root.children.find(c => c.type === 'folder' && c.name === folderName);
+  if (!folder) {
+    folder = { type: 'folder', name: folderName, children: [] };
+    root.children.push(folder);
+  }
+  insertNode(folder, pathSegs.slice(1), nodeData);
+}
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  TRAITEMENT CSV → MANIFEST                                           ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+function buildManifest(records) {
+  const root = { type: 'folder', name: 'root', children: [] };
+
+  const imagesRoot  = cfg('cfg-root');
+  const colLien     = cfg('cfg-col-lien');
+  const colNum      = cfg('cfg-col-num');
+  const colType     = cfg('cfg-col-type');
+  const colPages    = cfg('cfg-col-pages');
+  const colTitre    = cfg('cfg-col-titre');
+  const bookTypes   = cfg('cfg-book-types').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+  let countImage = 0, countBook = 0, countBookNoPages = 0, countSkipped = 0;
+  const warnings = [];
+
+  addLog('─'.repeat(52), 'dim');
+  addLog(`  Racine R2 : <span style="color:#c9a96e">${imagesRoot}</span>`, 'info');
+  addLog(`  Types livres : <span style="color:#c9a96e">${bookTypes.join(', ') || '(aucun)'}</span>`, 'info');
+  addLog('─'.repeat(52), 'dim');
+
+  records.forEach((rec, i) => {
+    const type  = (rec[colType]  || '').trim();
+    const lien  = (rec[colLien]  || '').trim();
+    const num   = (rec[colNum]   || '').trim();
+    const titre = (rec[colTitre] || '').trim() || `Document ${i + 1}`;
+    const pages = colPages ? (rec[colPages] || '').trim() : '';
+
+    const isBook = bookTypes.includes(type.toLowerCase());
+
+    // ── Livre multi-pages ──────────────────────────────────────────────
+    if (isBook && num) {
+      const dossier = stripRoot(num.startsWith('http') ? num : (imagesRoot + num), imagesRoot);
+      const segs    = segments(dossier);
+
+      if (segs.length < 2) {
+        addLog(`⚠ Ligne ${i+2} "${titre}" — chemin dossier trop court : <code>${num}</code>`, 'warn');
+        countSkipped++;
+        return;
+      }
+
+      // Pages depuis la colonne dédiée, sinon liste vide
+      let pageNodes = [];
+      if (pages) {
+        pageNodes = pages.split('§').map(p => p.trim()).filter(Boolean).map(p => ({
+          path: dossier.replace(/\/$/, '') + '/' + p,
+          name: p.replace(/\.[^.]+$/, '') // nom sans extension
+        }));
+      }
+
+      const bookNode = {
+        type: 'book',
+        name: titre,
+        pages: pageNodes
+      };
+
+      // Les dossiers parents sont tout sauf le dernier segment (nom du sous-dossier livre)
+      const parentSegs = segs.slice(0, -1);
+      insertNode(root, [...parentSegs, '__book__'], bookNode);
+      // Correction : on insère directement sous le parent, pas sous un faux nœud
+      // → réécriture directe
+      insertBookUnder(root, parentSegs, bookNode);
+
+      countBook++;
+      if (pageNodes.length === 0) {
+        countBookNoPages++;
+        const warn = `Livre sans pages : "<strong>${esc(titre)}</strong>" (dossier : <code>${dossier}</code>) — ajoutez une colonne <code>pages</code> ou complétez le manifest manuellement.`;
+        warnings.push(warn);
+        addLog(`⚠ ${warn}`, 'warn');
+      } else {
+        addLog(`📖 Livre : ${esc(titre)} → ${pageNodes.length} page(s) dans <code>${dossier}</code>`, 'ok');
+      }
+      return;
+    }
+
+    // ── Pièce isolée ───────────────────────────────────────────────────
+    if (lien) {
+      const path = stripRoot(lien, imagesRoot);
+      const segs = segments(path);
+
+      if (segs.length < 2) {
+        addLog(`⚠ Ligne ${i+2} "${titre}" — chemin trop court : <code>${path}</code>`, 'warn');
+        countSkipped++;
+        return;
+      }
+
+      const fileName  = segs[segs.length - 1];
+      const parentSegs = segs.slice(0, -1);
+
+      const imageNode = {
+        type: 'image',
+        name: titre,    // titre lisible pour l'arbre
+        path: path      // chemin complet depuis la racine R2
+      };
+
+      insertNode(root, [...parentSegs, fileName], imageNode);
+      countImage++;
+      return;
+    }
+
+    // Aucun des deux → ignorer silencieusement
+    countSkipped++;
   });
 
-  function getFolderName(files) {
-    const first = files[0].webkitRelativePath || '';
-    return first.split('/')[0] || 'dossier';
-  }
+  addLog('─'.repeat(52), 'dim');
+  addLog(`  ✅ Images    : <strong>${countImage}</strong>`, 'ok');
+  addLog(`  📖 Livres    : <strong>${countBook}</strong> (dont ${countBookNoPages} sans pages)`, countBookNoPages > 0 ? 'warn' : 'ok');
+  addLog(`  ⏭ Ignorés   : <strong>${countSkipped}</strong> (sans lien_num ni num)`, 'dim');
+  addLog('─'.repeat(52), 'dim');
 
-  function isImage(name) {
-    const ext = name.split('.').pop().toLowerCase();
-    return IMG_EXTS.has(ext);
-  }
+  // Trier les enfants de chaque dossier : dossiers d'abord, puis par nom
+  sortTree(root);
 
-  function naturalCompare(a, b) {
-    const re = /(\d+)/g;
-    const partsA = a.split(re), partsB = b.split(re);
-    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-      const pa = partsA[i] || '', pb = partsB[i] || '';
-      const na = parseInt(pa, 10), nb = parseInt(pb, 10);
-      if (!isNaN(na) && !isNaN(nb)) { if (na !== nb) return na - nb; }
-      else { const c = pa.localeCompare(pb, 'fr'); if (c !== 0) return c; }
+  return { manifest: root, countImage, countBook, countBookNoPages, countSkipped, warnings };
+}
+
+// Insertion d'un livre directement sous ses dossiers parents
+function insertBookUnder(root, parentSegs, bookNode) {
+  let cur = root;
+  for (const seg of parentSegs) {
+    let folder = cur.children.find(c => c.type === 'folder' && c.name === seg);
+    if (!folder) {
+      folder = { type: 'folder', name: seg, children: [] };
+      cur.children.push(folder);
     }
-    return 0;
+    cur = folder;
   }
+  // Éviter les doublons
+  const exists = cur.children.some(c => c.type === 'book' && c.name === bookNode.name);
+  if (!exists) cur.children.push(bookNode);
+}
 
-  // ── Construction de l'arbre intermédiaire brut ──
-  // Chaque nœud : { __type:'folder'|'image', __name, __children:{}, __path, __relPath }
-  function buildRawTree(files) {
-    const tree = {};
-    Array.from(files).filter(f => isImage(f.name)).forEach(f => {
-      const parts = f.webkitRelativePath.split('/');
-      parts.shift(); // retirer la racine OS
-      if (parts.length === 0) return;
-      let current = tree;
-      for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        if (!current[part]) {
-          current[part] = { __type: 'folder', __name: part, __children: {} };
-        }
-        current = current[part].__children;
-      }
-      const filename = parts[parts.length - 1];
-      current[filename] = { __type: 'image', __name: filename, __path: parts.join('/') };
-    });
-    return tree;
-  }
+function sortTree(node) {
+  if (!node.children) return;
+  node.children.sort((a, b) => {
+    // Dossiers avant feuilles
+    const aIsFolder = a.type === 'folder';
+    const bIsFolder = b.type === 'folder';
+    if (aIsFolder !== bIsFolder) return aIsFolder ? -1 : 1;
+    return (a.name || '').localeCompare(b.name || '', 'fr', { numeric: true });
+  });
+  node.children.forEach(sortTree);
+}
 
-  // ── Panneau de qualification ──
-  // On liste tous les sous-dossiers directs du niveau 1 (et niveau 2 si nécessaire)
-  // pour permettre de qualifier chacun.
-  function renderQualifyPanel() {
-    qualifyTable.innerHTML = '';
-    folderTypes = {};
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-    // Collecter tous les dossiers qui contiennent directement des images
-    // (ou d'autres dossiers). On affiche jusqu'à 2 niveaux.
-    const rows = [];
-    collectQualifiableNodes(rawTree, '', 0, rows);
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  APERÇU ARBORESCENCE                                                 ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+function renderPreview(node, depth = 0) {
+  if (!node) return '';
+  const indent = '  '.repeat(depth);
+  let html = '';
 
-    if (rows.length === 0) { qualifyPanel.style.display = 'none'; return; }
-
-    rows.forEach(({ relPath, name, depth, imageCount, subFolderCount }) => {
-      folderTypes[relPath] = 'folder'; // défaut
-
-      const row = document.createElement('div');
-      row.className = 'qualify-row';
-      row.style.marginLeft = (depth * 16) + 'px';
-
-      const uid = 'q_' + relPath.replace(/[^a-zA-Z0-9]/g, '_');
-      const desc = subFolderCount > 0
-        ? `${subFolderCount} sous-dossier${subFolderCount > 1 ? 's' : ''}`
-        : `${imageCount} image${imageCount > 1 ? 's' : ''}`;
-
-      row.innerHTML = `
-        <div class="folder-label">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-          </svg>
-          ${escHtml(name)}
-          <span class="sub-count">(${desc})</span>
-        </div>
-        <div class="radio-group">
-          <label><input type="radio" name="${uid}" value="folder" checked><span>📁 Dossier</span></label>
-          <label><input type="radio" name="${uid}" value="book"><span>📖 Livre</span></label>
-          <label><input type="radio" name="${uid}" value="isolated"><span>🗂 Pièces isolées</span></label>
-        </div>
-      `;
-
-      // Mettre à jour folderTypes à chaque changement
-      row.querySelectorAll('input[type=radio]').forEach(radio => {
-        radio.addEventListener('change', () => {
-          if (radio.checked) folderTypes[relPath] = radio.value;
+  if (node.type === 'folder') {
+    if (depth === 0) {
+      // racine : ne pas l'afficher, juste ses enfants
+      html += (node.children || []).map(c => renderPreview(c, 0)).join('');
+    } else {
+      html += `<div class="tree-folder">${indent}📁 ${esc(node.name)}/</div>`;
+      html += (node.children || []).map(c => renderPreview(c, depth + 1)).join('');
+    }
+  } else if (node.type === 'image') {
+    html += `<div class="tree-image">${indent}🖼 ${esc(node.name)}</div>`;
+  } else if (node.type === 'book') {
+    const nbPages = (node.pages || []).length;
+    if (nbPages === 0) {
+      html += `<div class="tree-warn">${indent}📖 ${esc(node.name)} <em>(⚠ 0 page)</em></div>`;
+    } else {
+      html += `<div class="tree-book">${indent}📖 ${esc(node.name)} <span class="tree-page">(${nbPages} pages)</span></div>`;
+      if (depth < 3) {
+        (node.pages || []).slice(0, 3).forEach(p => {
+          html += `<div class="tree-page">${indent}  └ ${esc(p.name || p.path.split('/').pop())}</div>`;
         });
-      });
-
-      qualifyTable.appendChild(row);
-    });
-
-    qualifyPanel.style.display = 'block';
-  }
-
-  function collectQualifiableNodes(node, basePath, depth, out) {
-    if (depth > 2) return; // on limite à 3 niveaux de qualification
-    const entries = Object.entries(node).filter(([, v]) => v.__type === 'folder');
-    entries.sort(([a], [b]) => naturalCompare(a, b));
-    entries.forEach(([name, child]) => {
-      const relPath = basePath ? basePath + '/' + name : name;
-      const imageCount = countRawImages(child.__children);
-      const subFolderCount = Object.values(child.__children).filter(v => v.__type === 'folder').length;
-      out.push({ relPath, name, depth, imageCount, subFolderCount });
-      // Récurser seulement si ce dossier contient lui-même des sous-dossiers
-      if (subFolderCount > 0) {
-        collectQualifiableNodes(child.__children, relPath, depth + 1, out);
+        if (nbPages > 3) html += `<div class="tree-page">${indent}  └ … (${nbPages - 3} de plus)</div>`;
       }
-    });
+    }
   }
+  return html;
+}
 
-  function countRawImages(node) {
-    return Object.values(node).reduce((s, v) => {
-      if (v.__type === 'image') return s + 1;
-      if (v.__type === 'folder') return s + countRawImages(v.__children);
-      return s;
-    }, 0);
-  }
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  LECTURE DU CSV                                                      ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+function processCSV(file) {
+  log.innerHTML = '';
+  preview.innerHTML = '';
+  generatedManifest = null;
+  $('btn-download').disabled = true;
+  $('dl-hint').textContent = '';
+  $('stats-row').innerHTML = '';
+  $('section-result').classList.remove('hidden');
 
-  // ── Conversion arbre brut → JSON final avec qualification ──
-  function buildTree() {
-    function convert(node, relPath) {
-      const entries = Object.entries(node);
-      entries.sort(([nameA, a], [nameB, b]) => {
-        const aIsDir = a.__type === 'folder';
-        const bIsDir = b.__type === 'folder';
-        if (aIsDir !== bIsDir) return aIsDir ? -1 : 1;
-        return naturalCompare(nameA, nameB);
-      });
+  addLog(`<span class="head">📂 Chargement de : ${esc(file.name)}</span>`);
 
-      return entries.map(([, v]) => {
-        if (v.__type === 'image') {
-          return { type: 'image', name: v.__name, path: v.__path };
-        }
-        // C'est un dossier — regarder sa qualification
-        const childPath = relPath ? relPath + '/' + v.__name : v.__name;
-        const qual = folderTypes[childPath] || 'folder';
+  Papa.parse(file, {
+    header: true,
+    delimiter: cfg('cfg-separateur'),
+    encoding: 'ISO-8859-1',
+    skipEmptyLines: true,
+    complete(results) {
+      const records = results.data;
+      addLog(`${records.length} enregistrements lus.`, 'info');
+      addLog('');
 
-        if (qual === 'book') {
-          // Collecter toutes les images (à plat, triées) comme pages
-          const pages = collectPages(v.__children);
-          return { type: 'book', name: v.__name, pages };
-        } else if (qual === 'isolated') {
-          // Comme un dossier normal mais les sous-dossiers éventuels
-          // sont ignorés — on remonte toutes les images à plat
-          const pages = collectPages(v.__children);
-          return {
-            type: 'folder',
-            name: v.__name,
-            children: pages.map(p => ({ type: 'image', name: p.name, path: p.path }))
-          };
-        } else {
-          // Dossier standard : récursion normale
-          return {
-            type: 'folder',
-            name: v.__name,
-            children: convert(v.__children, childPath)
-          };
+      // Avertissements colonnes manquantes
+      const cols = results.meta.fields || [];
+      const colLien  = cfg('cfg-col-lien');
+      const colNum   = cfg('cfg-col-num');
+      const colType  = cfg('cfg-col-type');
+      const colTitre = cfg('cfg-col-titre');
+      [colLien, colNum, colType, colTitre].forEach(c => {
+        if (c && !cols.includes(c)) {
+          addLog(`⚠ Colonne introuvable dans le CSV : <code>${esc(c)}</code>`, 'warn');
         }
       });
+
+      const { manifest, countImage, countBook, countBookNoPages, countSkipped } = buildManifest(records);
+
+      // Supprimer le nœud __book__ parasitaire si présent (artefact)
+      cleanDummy(manifest);
+
+      generatedManifest = manifest;
+
+      // Stats
+      const statsHtml = [
+        `<span class="stat-pill green">🖼 ${countImage} image${countImage>1?'s':''}</span>`,
+        `<span class="stat-pill ${countBook>0?'blue':'grey'}">📖 ${countBook} livre${countBook>1?'s':''}</span>`,
+        countBookNoPages > 0
+          ? `<span class="stat-pill orange">⚠ ${countBookNoPages} livre${countBookNoPages>1?'s':''} sans pages</span>`
+          : '',
+        countSkipped > 0
+          ? `<span class="stat-pill grey">⏭ ${countSkipped} ignoré${countSkipped>1?'s':''}</span>`
+          : '',
+      ].filter(Boolean).join('');
+      $('stats-row').innerHTML = statsHtml;
+
+      // Aperçu
+      preview.innerHTML = renderPreview(manifest, 0) || '<em style="color:var(--muted)">Aucun élément trouvé.</em>';
+
+      // Activer téléchargement
+      $('btn-download').disabled = false;
+      const size = Math.round(JSON.stringify(manifest, null, 2).length / 1024);
+      $('dl-hint').textContent = `Taille estimée : ${size} Ko`;
+    },
+    error(err) {
+      addLog(`❌ Erreur de parsing : ${err.message}`, 'err');
     }
-
-    return {
-      type: 'folder',
-      name: document.getElementById('rootName').value.trim() || 'Documents numérisés',
-      children: convert(rawTree, '')
-    };
-  }
-
-  // Collecte toutes les images d'un nœud à plat, triées naturellement
-  function collectPages(node) {
-    const pages = [];
-    function walk(n) {
-      const entries = Object.entries(n);
-      entries.sort(([a], [b]) => naturalCompare(a, b));
-      entries.forEach(([, v]) => {
-        if (v.__type === 'image') pages.push({ name: v.__name, path: v.__path });
-        else if (v.__type === 'folder') walk(v.__children);
-      });
-    }
-    walk(node);
-    return pages;
-  }
-
-  // ── Comptage pour le résumé ──
-  function countFinalImages(node) {
-    if (node.type === 'image') return 1;
-    if (node.type === 'book') return (node.pages || []).length;
-    return (node.children || []).reduce((s, c) => s + countFinalImages(c), 0);
-  }
-  function countFinalDocs(node) {
-    if (node.type === 'image') return 1;
-    if (node.type === 'book') return 1;
-    return (node.children || []).reduce((s, c) => s + countFinalDocs(c), 0);
-  }
-  function countFolders(node) {
-    if (node.type === 'image' || node.type === 'book') return 0;
-    return (node.children || []).reduce((s, c) => s + countFolders(c), 0) +
-      (node.children || []).filter(c => c.type === 'folder').length;
-  }
-
-  function escHtml(s) {
-    return String(s).replace(/[&<>"']/g, c =>
-      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-
-  // ── Générer et télécharger ──
-  btnGenerate.addEventListener('click', () => {
-    manifest = buildTree();
-    const totalImages = countFinalImages(manifest);
-    const totalDocs   = countFinalDocs(manifest);
-    const nbDir       = countFolders(manifest);
-    const json        = JSON.stringify(manifest, null, 2);
-
-    const blob = new Blob([json], { type: 'application/json' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'manifest.json'; a.click();
-    URL.revokeObjectURL(url);
-
-    resultBox.className = 'result ok';
-    resultBox.style.display = 'block';
-    resultBox.innerHTML = `
-      <strong>✓ manifest.json téléchargé</strong><br>
-      ${totalDocs} document${totalDocs > 1 ? 's' : ''} (${totalImages} image${totalImages > 1 ? 's' : ''})
-      dans ${nbDir} dossier${nbDir > 1 ? 's' : ''}.<br>
-      Déplacez-le dans <code>site_web/js/manifest.json</code> puis rechargez la visionneuse.
-    `;
-    treePreview.style.display = 'none';
   });
+}
 
-  // ── Aperçu ──
-  btnPreview.addEventListener('click', () => {
-    manifest = buildTree();
-    treePreview.style.display = 'block';
-    treePreview.innerHTML = renderPreview(manifest, 0);
-  });
+// Supprime les nœuds __book__ parasitaires créés par erreur lors de l'insertion
+function cleanDummy(node) {
+  if (!node.children) return;
+  node.children = node.children.filter(c => !(c.type === 'folder' && c.name === '__book__'));
+  node.children.forEach(cleanDummy);
+}
 
-  function renderPreview(node, depth) {
-    const indent = '  '.repeat(depth);
-    if (node.type === 'image') {
-      return `<span class="img">${indent}🖼 ${node.name}</span>\n`;
-    }
-    if (node.type === 'book') {
-      return `<span class="folder">${indent}📖 ${node.name} <span class="count">(${node.pages.length} pages)</span></span>\n`;
-    }
-    const nb = countFinalDocs(node);
-    let html = `<span class="folder">${indent}📁 ${node.name} <span class="count">(${nb} doc${nb>1?'s':''})</span></span>\n`;
-    (node.children || []).forEach(child => { html += renderPreview(child, depth + 1); });
-    return html;
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  TÉLÉCHARGEMENT                                                      ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+$('btn-download').addEventListener('click', () => {
+  if (!generatedManifest) return;
+  const json = JSON.stringify(generatedManifest, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'manifest.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  $('dl-hint').textContent = '✅ Téléchargé ! Placez le fichier dans js/manifest.json sur votre serveur.';
+});
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  ÉVÉNEMENTS FICHIER                                                  ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const dropzone  = $('dropzone');
+const fileInput = $('fileInput');
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) {
+    dropzone.classList.add('loaded');
+    dropzone.querySelector('.dropzone-label').textContent = e.target.files[0].name;
+    dropzone.querySelector('.dropzone-hint').textContent  = 'Fichier chargé — traitement en cours…';
+    processCSV(e.target.files[0]);
   }
+});
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    dropzone.classList.add('loaded');
+    dropzone.querySelector('.dropzone-label').textContent = file.name;
+    dropzone.querySelector('.dropzone-hint').textContent  = 'Fichier déposé — traitement en cours…';
+    processCSV(file);
+  }
+});
 </script>
 </body>
 </html>

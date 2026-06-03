@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="inventaire-thumbnail.css">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <script defer src="js/parent-page-height.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
@@ -85,11 +86,12 @@
               <div class="venir-block venir-block--horaires">
                 <h3 class="venir-heading">Horaires</h3>
                 <dl class="horaires-list">
-                  <div class="horaire-row horaire-closed"><dt>Mardi</dt><dd>Fermé</dd></div>
-                  <div class="horaire-row"><dt>Mercredi</dt><dd>10h – 12h30 | 14h – 17h</dd></div>
-                  <div class="horaire-row horaire-closed"><dt>Jeudi</dt><dd>Fermé</dd></div>
-                  <div class="horaire-row"><dt>Vendredi</dt><dd>10h – 12h30 | 14h – 17h</dd></div>
-                  <div class="horaire-row"><dt>Samedi</dt><dd>10h – 12h30</dd></div>
+                  <div class="horaire-row horaire-head"><dt>Jour</dt><dd>Matin</dd><dd>Après-midi</dd></div>
+                  <div class="horaire-row horaire-closed"><dt>Mardi</dt><dd>Fermé</dd><dd>Fermé</dd></div>
+                  <div class="horaire-row"><dt>Mercredi</dt><dd>10h – 12h30</dd><dd>14h – 17h</dd></div>
+                  <div class="horaire-row horaire-closed"><dt>Jeudi</dt><dd>Fermé</dd><dd>Fermé</dd></div>
+                  <div class="horaire-row"><dt>Vendredi</dt><dd>10h – 12h30</dd><dd>14h – 17h</dd></div>
+                  <div class="horaire-row"><dt>Samedi</dt><dd>10h – 12h30</dd><dd class="horaire-closed">Fermé</dd></div>
                 </dl>
               </div>
               <div class="venir-block venir-block--map">
@@ -136,6 +138,80 @@
         </div>
       </div>
     </div>
+
+    <!-- Obtenir une reproduction -->
+  <div class="accordion-wrapper" role="list">
+    <div class="accordion-item" role="listitem">
+      <button class="accordion-trigger" aria-expanded="false" aria-controls="panel-collections" id="trigger-collections">
+        <div class="accordion-hover-bg" aria-hidden="true" style="background-image: url('images/fonds-robaut.jpg');"></div>
+        <span class="accordion-label">
+          <h2>Documents numérisés</h2>
+          <p class="accordion-subtitle">Accédez à notre visionneuse pour consulter en ligne nos documents numérisés.</p>
+        </span>
+        <span class="accordion-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </span>
+      </button>
+      <div class="accordion-panel" id="panel-collections" role="region" aria-labelledby="trigger-collections">
+        <div class="accordion-panel-inner">
+          <div class="accordion-panel-content">
+            <div class="venir-top-row">
+              <div class="venir-block venir-block--horaires">
+                <h3 class="venir-heading">Horaires</h3>
+                <dl class="horaires-list">
+                  <div class="horaire-row horaire-head"><dt>Jour</dt><dd>Matin</dd><dd>Après-midi</dd></div>
+                  <div class="horaire-row horaire-closed"><dt>Mardi</dt><dd>Fermé</dd><dd>Fermé</dd></div>
+                  <div class="horaire-row"><dt>Mercredi</dt><dd>10h – 12h30</dd><dd>14h – 17h</dd></div>
+                  <div class="horaire-row horaire-closed"><dt>Jeudi</dt><dd>Fermé</dd><dd>Fermé</dd></div>
+                  <div class="horaire-row"><dt>Vendredi</dt><dd>10h – 12h30</dd><dd>14h – 17h</dd></div>
+                  <div class="horaire-row"><dt>Samedi</dt><dd>10h – 12h30</dd><dd class="horaire-closed">Fermé</dd></div>
+                </dl>
+              </div>
+              <div class="venir-block venir-block--map">
+                <h3 class="venir-heading">Où nous trouver</h3>
+                <p class="venir-adresse">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:middle;margin-right:5px;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span><strong>Bibliothèque Marceline Desbordes-Valmore</strong><br>8 Rue de la Fonderie, 59500 Douai</span>
+                </p>
+                <div id="venir-map"></div>
+              </div>
+            </div>
+
+            <div class="venir-bottom-row">
+              <div class="venir-block">
+                <h3 class="venir-heading">Modalités</h3>
+                <ul class="venir-list">
+                  <li>Demande écrite ou téléphonique <strong>48h à l'avance</strong> minimum (jours ouvrés)</li>
+                  <li>Carte de bibliothèque de consultation sur place requise — délivrée gratuitement sur pièce d'identité</li>
+                  <li>Formulaire de consultation à signer avant chaque séance</li>
+                </ul>
+              </div>
+              <div class="venir-block">
+                <h3 class="venir-heading">Conditions</h3>
+                <ul class="venir-list">
+                  <li>Crayons de bois uniquement — pas de stylos</li>
+                  <li>Photos sans flash autorisées</li>
+                  <li>Pas de photocopies</li>
+                  <li>5 documents maximum par consultation</li>
+                  <li>Communications arrêtées 30 min avant la fermeture</li>
+                  <li>Certains documents nécessitent gants, futon ou lutrin — le matériel est fourni</li>
+                  <li>Les 2 premières reproductions sont gratuites</li>
+                </ul>
+              </div>
+              <div class="venir-block">
+                <h3 class="venir-heading">Contact</h3>
+                <ul class="venir-list venir-contact">
+                  <li><a href="tel:0327978851">03 27 97 88 51</a></li>
+                  <li><a href="mailto:bibliotheque@ville-douai.fr">bibliotheque@ville-douai.fr</a></li>
+                </ul>
+              </div>
+            </div>
+
+          </div>  
+        </div>
+      </div>
+    </div>
+
     <!-- ====== 3. LES COLLECTIONS ====== -->
     <div class="accordion-item" role="listitem">
       <button class="accordion-trigger" aria-expanded="false" aria-controls="panel-documents" id="trigger-documents">
@@ -209,7 +285,6 @@
       <div class="accordion-panel" id="panel-thematiques" role="region" aria-labelledby="trigger-thematiques">
         <div class="accordion-panel-inner">
           <div class="accordion-panel-content">
-            <p class="section-intro">Explorez l'Histoire de notre ville à travers des thématiques précises.</p>
             <div class="collections-grid">
 
               <a class="collection-card" href="thematiques/vues.html">

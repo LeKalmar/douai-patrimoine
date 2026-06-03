@@ -477,8 +477,8 @@
   <!-- ── Sidebar ── -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <nav class="breadcrumb" aria-label="Fil d'Ariane">
-      <a href="index.html">Patrimoine</a> / Visionneuse
+      <nav class="breadcrumb" id="visionneuseBreadcrumb" aria-label="Fil d'Ariane">
+        <a href="index.html">Patrimoine</a> / Visionneuse
       </nav>
       <h2>Documents numérisés</h2>
       <p>Parcourez les fonds par boîte</p>
@@ -612,6 +612,8 @@
       buildFlatList();
       renderTree();
       updateFooter();
+      // Ouvrir automatiquement le dossier cible si fourni en paramètre URL
+      if (dossierCible) openDossierCible(dossierCible);
     } catch (err) {
       tree.innerHTML = `
         <div class="tree-error">
@@ -624,6 +626,78 @@
         </div>`;
       sidebarFooter.textContent = 'Erreur de chargement';
     }
+  }
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  OUVERTURE AUTOMATIQUE DU DOSSIER CIBLE (?dossier=)              ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  /**
+   * Cherche dans la hiérarchie un dossier dont le nom correspond à `cible`
+   * (comparaison insensible à la casse), ouvre le premier fichier qu'il contient,
+   * et déplie les nœuds parents dans l'arbre pour le rendre visible.
+   */
+  function openDossierCible(cible) {
+    if (!cible || !manifest) return;
+    const lc = cible.toLowerCase();
+
+    // Recherche récursive du premier fichier contenu dans le dossier cible
+    function findFirstInNode(node) {
+      if (!node) return null;
+      // Le dossier lui-même correspond-il ?
+      const nodeMatchesTarget = node.type === 'folder' && node.name.toLowerCase() === lc;
+
+      if (nodeMatchesTarget) {
+        // Prendre le premier fichier descendant
+        return findFirstFile(node);
+      }
+      // Sinon descendre dans les enfants
+      for (const child of (node.children || [])) {
+        const found = findFirstInNode(child);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    function findFirstFile(node) {
+      if (node.type === 'image') return { kind: 'image', path: node.path };
+      if (node.type === 'book')  return { kind: 'book',  name: node.name };
+      for (const child of (node.children || [])) {
+        const f = findFirstFile(child);
+        if (f) return f;
+      }
+      return null;
+    }
+
+    let found = null;
+    for (const root of (manifest.children || [])) {
+      found = findFirstInNode(root);
+      if (found) break;
+    }
+
+    if (!found) return; // dossier introuvable dans le manifeste
+
+    // Ouvrir le fichier dans la visionneuse
+    if (found.kind === 'image') {
+      openByPath(found.path);
+    } else if (found.kind === 'book') {
+      const idx = flatFiles.findIndex(f => f.kind === 'book' && f.name === found.name);
+      if (idx >= 0) openFile(idx, 0);
+    }
+
+    // Déplier le nœud dans l'arbre pour que l'item actif soit visible
+    requestAnimationFrame(() => {
+      const activeEl = tree.querySelector('.tree-item.active, .tree-book.active');
+      if (activeEl) {
+        // Remonter les ancêtres .tree-node et les déplier
+        let parent = activeEl.parentElement;
+        while (parent && parent !== tree) {
+          if (parent.classList.contains('tree-node')) parent.classList.add('expanded');
+          if (parent.classList.contains('tree-book-wrapper')) parent.classList.add('expanded');
+          parent = parent.parentElement;
+        }
+        activeEl.scrollIntoView({ block: 'center' });
+      }
+    });
   }
 
   // Aplatit la hiérarchie en une seule liste pour la navigation préc/suiv.
@@ -1110,6 +1184,23 @@
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => renderTree(searchInput.value), 150);
   });
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  MODE MODALE & PRÉ-SÉLECTION PAR PARAMÈTRE URL                   ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+
+  // Détecte si la visionneuse est embarquée dans une modale (iframe)
+  const isEmbedded = window.self !== window.top;
+
+  if (isEmbedded) {
+    // Masquer le fil d'Ariane (navigation inutile en mode modale)
+    const breadcrumb = document.getElementById('visionneuseBreadcrumb');
+    if (breadcrumb) breadcrumb.style.display = 'none';
+  }
+
+  // Paramètre ?dossier= : identifiant du dossier à ouvrir automatiquement
+  const urlParams   = new URLSearchParams(window.location.search);
+  const dossierCible = (urlParams.get('dossier') || '').trim();
 
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  DÉMARRAGE                                                       ║
