@@ -30,6 +30,10 @@ const FONDS_IMAGES = {
   'Marceline Desbordes-Valmore': 'images/marceline.jpg',
   'Mines':                       'images/mines.jpg',
   'Hospice':                     'images/hospice.jpg',
+  'Protestantisme':              'images/protestantisme.jpg',
+  'Manuscrits':                  'images/manuscrits.jpg',
+  'Littérature':                 'images/litterature.jpg',
+  'Robaut':                      'images/robaut.jpg',
 };
 
 // Descriptions et métadonnées des fonds
@@ -43,7 +47,7 @@ const FONDS_INFO = {
   'Situationniste': "Collection unique rassemblant publications, tracts et documents de l'Internationale situationniste et des mouvements artistiques avant-gardistes des années 1950–1970.",
   'Littérature': "Fonds littéraire réunissant éditions rares, livres de bibliophilie et œuvres d'auteurs du nord de la France, du XVII\u1d49 au XX\u1d49 siècle.",
   "Livres d'Artiste": "Ensemble exceptionnel de livres d'artistes contemporains alliant création plastique et littéraire, souvent en édition unique ou tirée à très peu d'exemplaires.",
-  'Mines': "Documents relatifs à l'Histoire de la mine, dans le bassin minier du Nord-Pas-de-Calais mais aussi d'autres bassins houilliers dans le monde.",
+  'Mines': "Documents relatifs à l'Histoire de la mine dans les autres bassins miniers du monde.",
   'Réserve Douaisienne': "",
   'Robaut':"Fonds iconographique comprenant de nombreuses réalisations des ateliers Robaut au XIXe siècle",
   'Objets': "Divers objets versés à la bibliothèque municipale de Douai.",
@@ -62,7 +66,7 @@ const COLS = [
 
 // Icônes SVG par type de document (200$b)
 const TYPE_ICONS = {
-  'Manuscrit': {
+  'MANU': {
     label: 'Manuscrit',
     color: '#8b3a1e',
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -70,7 +74,7 @@ const TYPE_ICONS = {
       <path d="m15 5 4 4"/>
     </svg>`
   },
-  'Texte Imprimé': {
+  'IMP': {
     label: 'Texte Imprimé',
     color: '#2d5a4a',
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -89,7 +93,7 @@ const TYPE_ICONS = {
       <line x1="15" y1="6" x2="15" y2="21"/>
     </svg>`
   },
-  'Iconographie': {
+  'ICO': {
     label: 'Iconographie',
     color: '#7a4a8b',
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -106,7 +110,7 @@ const TYPE_ICONS = {
       <circle cx="12" cy="13" r="4"/>
     </svg>`
   },
-  'Numismatique': {
+  'NUMI': {
     label: 'Numismatique',
     color: '#b07a20',
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -116,7 +120,7 @@ const TYPE_ICONS = {
       <line x1="12" y1="14" x2="12" y2="16"/>
     </svg>`
   },
-  "Livre d'Artiste": {
+  "LIVA": {
     label: "Livre d'Artiste",
     color: '#6a3a8b',
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">

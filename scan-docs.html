@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ScanDocs — Rognage & Renommage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#0e0f11; --surface:#16181c; --surface2:#1e2026;
+    --border:#2a2d35; --border2:#3a3e4a;
+    --accent:#5cffb1; --accent2:#3de89a;
+    --warn:#ffcc44; --danger:#ff5f5f;
+    --text:#e8eaf0; --muted:#7a7f90;
+    --r:10px; --rl:16px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;display:flex;flex-direction:column}
+  header{height:54px;flex-shrink:0;border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between}
+  .logo-mark{font-weight:800;font-size:1.15rem;color:var(--accent);letter-spacing:-.02em}
+  .logo-sub{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-left:.5rem}
+  .cpill{font-family:'DM Mono',monospace;font-size:.7rem;padding:3px 11px;border:1px solid var(--border2);border-radius:999px;color:var(--muted)}
+  .cpill span{color:var(--accent);font-weight:500}
+  main{flex:1;min-height:0;display:grid;grid-template-columns:320px 1fr;overflow:hidden}
+  .lp{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;height:100%}
+  .dz{flex-shrink:0;margin:.9rem .9rem .6rem;border:1.5px dashed var(--border2);border-radius:var(--rl);padding:1rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+  .dz:hover,.dz.over{border-color:var(--accent);background:rgba(92,255,177,.04)}
+  .dz-icon{font-size:1.4rem;display:block;margin-bottom:.3rem}
+  .dz-title{font-weight:700;font-size:.82rem;margin-bottom:.1rem}
+  .dz-sub{font-size:.67rem;color:var(--muted);font-family:'DM Mono',monospace}
+  #fi{display:none}
+  .qh{flex-shrink:0;padding:0 .9rem .35rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+  .clear-btn{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px}
+  .clear-btn:hover{color:var(--danger);background:rgba(255,95,95,.08)}
+  .ql{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 .45rem .75rem}
+  .ql::-webkit-scrollbar{width:3px}
+  .ql::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+  .qi{display:flex;align-items:center;gap:.45rem;padding:.4rem .55rem;border-radius:8px;cursor:pointer;transition:background .12s;font-size:.74rem}
+  .qi:hover{background:var(--surface2)}
+  .qi.active{background:var(--surface2);border:1px solid var(--border2)}
+  .qi.done .qin{color:var(--muted);text-decoration:line-through}
+  .qii{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);min-width:22px}
+  .qin{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qid{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .qid.p{background:var(--border2)}
+  .qid.a{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+  .qid.d{background:var(--accent2)}
+  .qid.s{background:var(--warn)}
+  .noq{padding:.9rem;font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);text-align:center}
+  .rp{display:flex;flex-direction:column;overflow:hidden;height:100%}
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted)}
+  .empty-big{font-size:2.2rem}
+  .empty p{font-size:.78rem;font-family:'DM Mono',monospace}
+  .editor{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  .crow{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:.65rem;padding:.85rem .85rem .45rem;overflow:hidden}
+  .cwrap{display:flex;flex-direction:column;gap:.35rem;min-height:0;overflow:hidden}
+  .clabel{flex-shrink:0;font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:.4rem}
+  .clabel .dim{color:var(--border2)}
+  .cbox{flex:1;min-height:0;background:#080a0c;border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+  canvas{max-width:100%;max-height:100%;object-fit:contain;display:block}
+  #origbox{cursor:crosshair}
+  #overlay{position:absolute;pointer-events:none}
+  .ctrl{flex-shrink:0;border-top:1px solid var(--border);padding:.65rem .85rem;display:flex;flex-direction:column;gap:.55rem}
+  .brow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+  .bb{font-family:'DM Mono',monospace;font-size:.63rem;padding:2px 9px;border-radius:999px;font-weight:500;flex-shrink:0}
+  .bb.ok{background:rgba(92,255,177,.12);color:var(--accent);border:1px solid rgba(92,255,177,.25)}
+  .bb.warn{background:rgba(255,204,68,.12);color:var(--warn);border:1px solid rgba(255,204,68,.25)}
+  .bb.load{background:rgba(122,127,144,.1);color:var(--muted);border:1px solid var(--border2)}
+  .bval{font-family:'DM Mono',monospace;font-size:.76rem;color:var(--accent)}
+  .fnrow{display:flex;align-items:center;gap:.55rem}
+  .fnrow label{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);white-space:nowrap}
+  .fnwrap{flex:1;display:flex;align-items:center;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);overflow:hidden;transition:border-color .2s}
+  .fnwrap:focus-within{border-color:var(--accent)}
+  #fn{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Mono',monospace;font-size:.8rem;padding:6px 10px}
+  .fnext{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);padding:0 9px;border-left:1px solid var(--border)}
+  .arow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+  .mc{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted)}
+  input[type=range]{-webkit-appearance:none;width:75px;height:3px;background:var(--border2);border-radius:3px;outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer}
+  .mv{min-width:18px;color:var(--accent);font-weight:500}
+  .btn{display:inline-flex;align-items:center;gap:.3rem;padding:5px 13px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Syne',sans-serif;font-size:.74rem;font-weight:500;cursor:pointer;transition:background .12s,transform .1s;white-space:nowrap}
+  .btn:hover{background:#2a2d35}
+  .btn:active{transform:scale(.97)}
+  .btn-a{background:var(--accent);color:#0a0c0f;border-color:var(--accent);font-weight:700}
+  .btn-a:hover{background:var(--accent2);border-color:var(--accent2)}
+  .mla{margin-left:auto}
+  .sbar{flex-shrink:0;border-top:1px solid var(--border);padding:.28rem .85rem;display:flex;align-items:center;gap:.65rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}
+  #sm{color:var(--text)}
+  .sep{color:var(--border2)}
+  .spin{width:11px;height:11px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:none}
+  .spin.on{display:inline-block}
+  .qi.validated .qin { color: var(--accent); }
+  .qi.validated .qid { background: var(--accent) !important; }
+  #loupe {
+    position: fixed;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    box-shadow: 0 4px 24px rgba(0,0,0,.6);
+    pointer-events: none;
+    display: none;
+    overflow: hidden;
+    z-index: 1000;
+  }
+  #loupe canvas { position: absolute; top: 0; left: 0; }
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <div><span class="logo-mark">ScanDocs</span><span class="logo-sub">zxing-wasm · sans installation</span></div>
+  <div class="cpill">Traités : <span id="dc">0</span> / <span id="tc">0</span></div>
+</header>
+<main>
+  <div class="lp">
+    <div class="dz" id="dz">
+      <span class="dz-icon">📂</span>
+      <div class="dz-title">Déposer les photos ici</div>
+      <div class="dz-sub">ou cliquer · JPG PNG WEBP · plusieurs à la fois</div>
+    </div>
+    <input type="file" id="fi" accept="image/*" multiple />
+    <div class="qh">
+      <span>File d'attente</span>
+      <button class="clear-btn" id="clr" title="Vider la file">✕ vider</button>
+    </div>
+    <div class="ql" id="ql"><div class="noq" id="noq">Aucune image chargée</div></div>
+  </div>
+  <div class="rp">
+    <div class="empty" id="es">
+      <span class="empty-big">🖼</span>
+      <p>Déposez des photos pour commencer</p>
+    </div>
+    <div class="editor" id="ed" style="display:none">
+      <div class="crow">
+        <div class="cwrap">
+          <div class="clabel">ORIGINAL <span class="dim" id="od"></span></div>
+          <div class="cbox" id="origbox">
+            <canvas id="co"></canvas>
+            <canvas id="overlay"></canvas>
+          </div>
+        </div>
+        <div class="cwrap">
+          <div class="clabel">ROGNÉE <span class="dim" id="cd"></span></div>
+          <div class="cbox"><canvas id="cc"></canvas></div>
+        </div>
+      </div>
+      <div class="ctrl">
+        <div class="brow">
+          <span class="bb load" id="bb">CODE-BARRE</span>
+          <span class="bval" id="bv">—</span>
+          <div class="spin" id="sp"></div>
+        </div>
+        <div class="fnrow">
+          <label>Nom :</label>
+          <div class="fnwrap"><input type="text" id="fn" placeholder="code-barre ou saisie manuelle" autocomplete="off" spellcheck="false" /><span class="fnext">.jpg</span></div>
+        </div>
+        <div class="arow">
+          <div class="mc">Marge <input type="range" id="ms" min="0" max="80" value="8" step="1" /> <span class="mv" id="mv">8</span>px</div>
+          <button class="btn" id="br">🔲 Re-détecter</button>
+          <button class="btn" id="bsk">Passer →</button>
+          <button class="btn" id="bs">✓ Valider</button>
+          <button class="btn btn-a" id="bdl" disabled style="opacity:.4">⬇ Télécharger tout (<span id="vc">0</span>)</button>
+        </div>
+      </div>
+      <div class="sbar"><span id="sm">Prêt</span><span class="sep">·</span><span id="pm"></span></div>
+    </div>
+  </div>
+  <div id="loupe"><canvas id="loupeCanvas"></canvas></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/iife/reader/index.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+let files = [];          // tous les fichiers chargés
+let idx = 0;             // index courant
+let done = 0;            // nombre traité
+let origImg = null;      // Image() chargée
+let cropR = null;        // {x,y,w,h} sans marge
+let displayScale = 1;    // facteur d'affichage du canvas original
+let dragState = null;    // {edge} pendant un drag
+let scanGen = 0;         // génération pour annuler les scans obsolètes
+
+/* ════════════════════════════════════════════════════════════════
+   DOM
+═══════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const dz=$('dz'),fi=$('fi'),ql=$('ql'),noq=$('noq'),clr=$('clr');
+const es=$('es'),ed=$('ed');
+const co=$('co'),cc=$('cc'),overlay=$('overlay'),origbox=$('origbox');
+const od=$('od'),cd=$('cd');
+const bb=$('bb'),bv=$('bv'),sp=$('sp'),fn=$('fn');
+const ms=$('ms'),mv=$('mv'),bs=$('bs'),br=$('br'),bsk=$('bsk');
+const sm=$('sm'),pm=$('pm'),dc=$('dc'),tc=$('tc');
+
+/* ════════════════════════════════════════════════════════════════
+   EVENTS
+═══════════════════════════════════════════════════════════════ */
+dz.addEventListener('click', () => fi.click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
+  handleFiles(e.dataTransfer.files);
+});
+fi.addEventListener('change', e => { handleFiles(e.target.files); fi.value = ''; });
+clr.addEventListener('click', clearQueue);
+
+ms.addEventListener('input', () => {
+  mv.textContent = ms.value;
+  if (origImg) { drawOverlay(); renderCrop(); }
+});
+br.addEventListener('click', () => { if (origImg) { doAutoCrop(origImg); scanBarcode(origImg); } });
+bs.addEventListener('click', doValidate);
+$('bdl').addEventListener('click', doDownloadAll);
+bsk.addEventListener('click', () => { markItem(idx, 's'); advance(); });
+
+// Drag des poignées
+function posFromEvent(e) {
+  const r = overlay.getBoundingClientRect();
+  const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+  return { x: cx, y: cy };
+}
+
+function getHandles() {
+  if (!cropR || !origImg) return [];
+  const m = parseInt(ms.value);
+  const sc = displayScale;
+  const rx = Math.max(0, cropR.x - m) * sc;
+  const ry = Math.max(0, cropR.y - m) * sc;
+  const rw = Math.min(origImg.width, cropR.w + m * 2) * sc;
+  const rh = Math.min(origImg.height, cropR.h + m * 2) * sc;
+  return [
+    { x: rx + rw/2, y: ry,         edge: 'top'    },
+    { x: rx + rw/2, y: ry + rh,    edge: 'bottom' },
+    { x: rx,        y: ry + rh/2,  edge: 'left'   },
+    { x: rx + rw,   y: ry + rh/2,  edge: 'right'  },
+  ];
+}
+
+origbox.addEventListener('mousedown', startDrag);
+origbox.addEventListener('mousemove', e => {
+  if (dragState) return doDrag(e);
+  // Curseur dynamique
+  if (!cropR) return;
+  const { x, y } = posFromEvent(e);
+  const hit = getHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  origbox.style.cursor = hit ? (hit.edge === 'top' || hit.edge === 'bottom' ? 'ns-resize' : 'ew-resize') : 'crosshair';
+});
+window.addEventListener('mouseup', endDrag);
+origbox.addEventListener('touchstart', startDrag, { passive: false });
+origbox.addEventListener('touchmove', doDrag, { passive: false });
+window.addEventListener('touchend', endDrag);
+
+function startDrag(e) {
+  if (!cropR) return;
+  const { x, y } = posFromEvent(e);
+  const hit = getHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  if (hit) {
+    e.preventDefault();
+    dragState = { edge: hit.edge };
+  }
+}
+
+function doDrag(e) {
+  if (!dragState || !cropR || !origImg) return;
+  e.preventDefault();
+  const { x, y } = posFromEvent(e);
+  const sc = displayScale;
+  const m = parseInt(ms.value);
+  const imgX = x / sc, imgY = y / sc;
+  const r = cropR;
+  const { edge } = dragState;
+
+  if (edge === 'top') {
+    const nt = Math.max(0, Math.min(imgY + m, r.y + r.h - 30));
+    r.h = r.h + (r.y - nt); r.y = nt;
+  } else if (edge === 'bottom') {
+    r.h = Math.max(30, Math.min(imgY - m, origImg.height) - r.y);
+  } else if (edge === 'left') {
+    const nl = Math.max(0, Math.min(imgX + m, r.x + r.w - 30));
+    r.w = r.w + (r.x - nl); r.x = nl;
+  } else if (edge === 'right') {
+    r.w = Math.max(30, Math.min(imgX - m, origImg.width) - r.x);
+  }
+  drawOverlay(); renderCrop();
+}
+
+function endDrag() { dragState = null; }
+
+/* ════════════════════════════════════════════════════════════════
+   FILE QUEUE
+═══════════════════════════════════════════════════════════════ */
+function handleFiles(fl) {
+  const nf = Array.from(fl).filter(f => f.type.startsWith('image/'));
+  if (!nf.length) return;
+  const si = files.length;
+  files = files.concat(nf);
+  tc.textContent = files.length;
+  noq.style.display = 'none';
+  nf.forEach((f, i) => addQI(f, si + i));
+  if (si === 0) { idx = 0; loadFile(0); }
+}
+
+function clearQueue() {
+  if (files.length && !confirm('Vider la file d\'attente ?')) return;
+  files = []; idx = 0; done = 0;
+  tc.textContent = '0'; dc.textContent = '0';
+  ql.innerHTML = '<div class="noq" id="noq">Aucune image chargée</div>';
+  es.style.display = 'flex'; ed.style.display = 'none';
+  origImg = null; cropR = null;
+  scanGen++;
+}
+
+function addQI(file, i) {
+  const d = document.createElement('div');
+  d.className = 'qi'; d.id = 'qi-' + i;
+  d.innerHTML = `<span class="qii">${String(i+1).padStart(3,'0')}</span><span class="qin">${esc(file.name)}</span><span class="qid p" id="qd-${i}"></span>`;
+  d.addEventListener('click', () => { idx = i; loadFile(i); });
+  ql.appendChild(d);
+}
+
+function markItem(i, s) {
+  const d = $('qd-' + i), el = $('qi-' + i);
+  if (!d || !el) return;
+  d.className = 'qid ' + s;
+  if (s === 'd' || s === 's') el.classList.add('done');
+  el.classList.remove('active');
+}
+
+function setActive(i) {
+  document.querySelectorAll('.qi').forEach(e => e.classList.remove('active'));
+  const el = $('qi-' + i), d = $('qd-' + i);
+  if (el) { el.classList.add('active'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  if (d) d.className = 'qid a';
+}
+
+function advance() {
+  idx++;
+  if (idx < files.length) loadFile(idx);
+  else { sm.textContent = '✓ Toutes les images ont été traitées'; pm.textContent = ''; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   LOAD IMAGE
+═══════════════════════════════════════════════════════════════ */
+function loadFile(i) {
+  if (i >= files.length) return;
+  idx = i; setActive(i);
+  scanGen++;
+  es.style.display = 'none'; ed.style.display = 'flex';
+  origImg = null; cropR = null;
+  fn.value = stripExt(files[i].name);
+  bv.textContent = '—'; bb.className = 'bb load'; bb.textContent = 'LECTURE…';
+  sp.classList.add('on');
+  sm.textContent = 'Chargement…';
+  pm.textContent = `Image ${i+1} / ${files.length}`;
+
+  // Effacer canvas
+  [co, cc, overlay].forEach(c => c.getContext('2d').clearRect(0, 0, c.width, c.height));
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      origImg = img;
+      od.textContent = img.width + '×' + img.height;
+      drawOrig(img);
+      doAutoCrop(img);
+      scanBarcode(img);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(files[i]);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DRAW ORIGINAL + OVERLAY
+═══════════════════════════════════════════════════════════════ */
+function drawOrig(img) {
+  const box = co.parentElement;
+  const scale = Math.min((box.clientWidth - 2) / img.width, (box.clientHeight - 2) / img.height, 1);
+  displayScale = scale;
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+  co.width = w; co.height = h;
+  overlay.width = w; overlay.height = h;
+  overlay.style.width = w + 'px'; overlay.style.height = h + 'px';
+  // Centrer l'overlay sur le canvas image
+  const offsetX = (box.clientWidth - w) / 2;
+  const offsetY = (box.clientHeight - h) / 2;
+  overlay.style.left = offsetX + 'px';
+  overlay.style.top = offsetY + 'px';
+  const ctx = co.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+}
+
+function drawOverlay() {
+  const ctx = overlay.getContext('2d');
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  if (!cropR || !origImg) return;
+  const m = parseInt(ms.value);
+  const sc = displayScale;
+  const rx = Math.max(0, cropR.x - m) * sc;
+  const ry = Math.max(0, cropR.y - m) * sc;
+  const rw = Math.min(origImg.width, cropR.w + m * 2) * sc;
+  const rh = Math.min(origImg.height, cropR.h + m * 2) * sc;
+  // Assombrir extérieur
+  ctx.fillStyle = 'rgba(0,0,0,.5)';
+  ctx.fillRect(0, 0, overlay.width, ry);
+  ctx.fillRect(0, ry + rh, overlay.width, overlay.height - ry - rh);
+  ctx.fillRect(0, ry, rx, rh);
+  ctx.fillRect(rx + rw, ry, overlay.width - rx - rw, rh);
+  // Bordure
+  ctx.strokeStyle = '#5cffb1'; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.strokeRect(rx, ry, rw, rh);
+  // Poignées
+  const handles = [
+    [rx + rw/2, ry], [rx + rw/2, ry + rh],
+    [rx, ry + rh/2], [rx + rw, ry + rh/2]
+  ];
+  handles.forEach(([hx, hy]) => {
+    ctx.fillStyle = '#5cffb1';
+    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#0a0c0f'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.stroke();
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   AUTO-CROP (détection bords par projection)
+═══════════════════════════════════════════════════════════════ */
+function doAutoCrop(img) {
+  sm.textContent = 'Détection des bords…';
+  const MAX = 1400;
+  const sc = Math.min(MAX/img.width, MAX/img.height, 1);
+  const W = Math.round(img.width*sc), H = Math.round(img.height*sc);
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  tmp.getContext('2d').drawImage(img, 0, 0, W, H);
+  const d = tmp.getContext('2d').getImageData(0, 0, W, H).data;
+  // Grayscale
+  const g = new Float32Array(W*H);
+  for (let i = 0; i < W*H; i++) {
+    g[i] = .299*d[i*4] + .587*d[i*4+1] + .114*d[i*4+2];
+  }
+  // Fond médian de chaque côté (bande 3%)
+  const bw = Math.max(6, Math.round(W*.03)), bh = Math.max(6, Math.round(H*.03));
+  const med = arr => { const s = [...arr].sort((a,b)=>a-b); return s[s.length>>1]; };
+  const bgTop = (()=>{const v=[];for(let y=0;y<bh;y++)for(let x=bw;x<W-bw;x++)v.push(g[y*W+x]);return med(v)})();
+  const bgBot = (()=>{const v=[];for(let y=H-bh;y<H;y++)for(let x=bw;x<W-bw;x++)v.push(g[y*W+x]);return med(v)})();
+  const bgL = (()=>{const v=[];for(let x=0;x<bw;x++)for(let y=bh;y<H-bh;y++)v.push(g[y*W+x]);return med(v)})();
+  const bgR = (()=>{const v=[];for(let x=W-bw;x<W;x++)for(let y=bh;y<H-bh;y++)v.push(g[y*W+x]);return med(v)})();
+  const THR = 22, FRAC = 0.18;
+  const rowDiff = (y, bg) => { let n=0; for(let x=0;x<W;x++) if(Math.abs(g[y*W+x]-bg)>THR) n++; return n/W; };
+  const colDiff = (x, bg) => { let n=0; for(let y=0;y<H;y++) if(Math.abs(g[y*W+x]-bg)>THR) n++; return n/H; };
+  let top=0, bot=H-1, left=0, right=W-1;
+  for(let y=0;y<H;y++){if(rowDiff(y,bgTop)>FRAC){top=y;break}}
+  for(let y=H-1;y>=0;y--){if(rowDiff(y,bgBot)>FRAC){bot=y;break}}
+  for(let x=0;x<W;x++){if(colDiff(x,bgL)>FRAC){left=x;break}}
+  for(let x=W-1;x>=0;x--){if(colDiff(x,bgR)>FRAC){right=x;break}}
+  const isc = 1/sc;
+  cropR = {
+    x: Math.max(0, Math.round((left-2)*isc)),
+    y: Math.max(0, Math.round((top-2)*isc)),
+    w: Math.round((right-left+4)*isc),
+    h: Math.round((bot-top+4)*isc)
+  };
+  cropR.w = Math.min(img.width - cropR.x, cropR.w);
+  cropR.h = Math.min(img.height - cropR.y, cropR.h);
+  drawOverlay();
+  renderCrop();
+  sm.textContent = 'Recadrage effectué — ajustez la marge ou glissez les poignées';
+}
+
+function renderCrop() {
+  if (!origImg || !cropR) return;
+  const m = parseInt(ms.value);
+  const x = Math.max(0, cropR.x - m);
+  const y = Math.max(0, cropR.y - m);
+  const w = Math.min(origImg.width - x, cropR.w + m*2);
+  const h = Math.min(origImg.height - y, cropR.h + m*2);
+  cd.textContent = w + '×' + h;
+  const box = cc.parentElement;
+  const scale = Math.min((box.clientWidth - 2)/w, (box.clientHeight - 2)/h, 1);
+  cc.width = Math.round(w*scale);
+  cc.height = Math.round(h*scale);
+  const ctx = cc.getContext('2d');
+  ctx.clearRect(0, 0, cc.width, cc.height);
+  ctx.drawImage(origImg, x, y, w, h, 0, 0, cc.width, cc.height);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SCAN BARCODE (ZXing-WASM)
+   Stratégie : envoyer une version redimensionnée à 2000px max.
+   En interne, ZXing gère les rotations et la détection multi-zone.
+═══════════════════════════════════════════════════════════════ */
+async function scanBarcode(img) {
+  const myGen = ++scanGen;
+  sm.textContent = 'Scan code-barre…';
+
+  // Préparer une version redimensionnée pour la rapidité
+  const MAX = 2000;
+  const sc = Math.min(MAX / img.width, MAX / img.height, 1);
+  const w = Math.round(img.width * sc);
+  const h = Math.round(img.height * sc);
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  tmp.getContext('2d').drawImage(img, 0, 0, w, h);
+
+  try {
+    // Attendre que ZXing soit prêt
+    if (typeof ZXingWASM === 'undefined') {
+      setBR(null, 'INDISPONIBLE', 'warn');
+      sm.textContent = 'ZXing non chargé — vérifiez votre connexion internet';
+      return;
+    }
+
+    // Convertir en blob pour ZXing
+    const blob = await new Promise(res => tmp.toBlob(res, 'image/jpeg', 0.95));
+    if (myGen !== scanGen) return;
+
+    const results = await ZXingWASM.readBarcodes(blob, {
+      formats: ['Code128', 'Code39', 'Code93', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'ITF', 'Codabar', 'DataMatrix', 'QRCode'],
+      tryHarder: true,
+      tryRotate: true,
+      tryInvert: true,
+      tryDownscale: true,
+      maxNumberOfSymbols: 5
+    });
+
+    if (myGen !== scanGen) return;
+
+    if (results && results.length > 0) {
+      // Prendre le résultat le plus "code de bibliothèque" : que des chiffres, 5-10 caractères
+      let best = results.find(r => /^\d{5,10}$/.test(r.text));
+      if (!best) best = results[0];
+      setBR(best.text, 'ZXING', 'ok');
+    } else {
+      // Réessai avec image plus grande (2× la taille)
+      retryWithLarger(img, myGen);
+    }
+  } catch (e) {
+    console.error('ZXing error:', e);
+    if (myGen === scanGen) setBR(null, 'ERREUR', 'warn');
+  }
+}
+
+async function retryWithLarger(img, myGen) {
+  // Si la 1ère passe échoue, on essaie en taille originale (sans redim)
+  try {
+    const tmp = document.createElement('canvas');
+    tmp.width = img.width; tmp.height = img.height;
+    tmp.getContext('2d').drawImage(img, 0, 0);
+    const blob = await new Promise(res => tmp.toBlob(res, 'image/jpeg', 0.95));
+    if (myGen !== scanGen) return;
+    const results = await ZXingWASM.readBarcodes(blob, {
+      formats: ['Code128', 'Code39', 'Code93', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'ITF', 'Codabar'],
+      tryHarder: true, tryRotate: true, tryInvert: true, tryDownscale: true,
+      maxNumberOfSymbols: 5
+    });
+    if (myGen !== scanGen) return;
+    if (results && results.length > 0) {
+      let best = results.find(r => /^\d{5,10}$/.test(r.text));
+      if (!best) best = results[0];
+      setBR(best.text, 'ZXING HD', 'ok');
+    } else {
+      setBR(null, 'NON DÉTECTÉ', 'warn');
+    }
+  } catch (e) {
+    if (myGen === scanGen) setBR(null, 'ERREUR', 'warn');
+  }
+}
+
+function setBR(code, label, cls) {
+  sp.classList.remove('on');
+  bb.className = 'bb ' + cls;
+  bb.textContent = label;
+  if (code) {
+    bv.textContent = code;
+    fn.value = code;
+    sm.textContent = 'Code-barre détecté — prêt à télécharger';
+  } else {
+    bv.textContent = 'aucun code détecté';
+    sm.textContent = 'Saisissez le numéro manuellement';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SAVE
+═══════════════════════════════════════════════════════════════ */
+/* ── VALIDATION & TÉLÉCHARGEMENT ── */
+let validated = []; // [{idx, img, cropR, margin, name}]
+
+function doValidate() {
+  if (!origImg || !cropR) return;
+  // Lire le nom EN PREMIER, avant que advance()/loadFile() ne touche à fn.value
+  const name = (fn.value.trim() || 'document') + '.jpg';
+  const m = parseInt(ms.value);
+  const savedIdx = idx;
+
+  validated = validated.filter(v => v.fileIdx !== savedIdx);
+  validated.push({ fileIdx: savedIdx, img: origImg, cropR: { ...cropR }, margin: m, name });
+
+  const el = $('qi-' + savedIdx);
+  if (el) el.classList.add('validated');
+  markItem(savedIdx, 'd');
+
+  $('vc').textContent = validated.length;
+  const bdl = $('bdl');
+  bdl.disabled = false;
+  bdl.style.opacity = '1';
+
+  sm.textContent = `✓ Validé : ${name} — ${validated.length} en attente de téléchargement`;
+  advance(); // seulement après avoir tout sauvegardé
+}
+
+async function doDownloadAll() {
+  if (!validated.length) return;
+  const bdl = $('bdl');
+  bdl.disabled = true;
+  bdl.textContent = '⏳ En cours…';
+
+  for (const v of validated) {
+    await new Promise(res => {
+      const x = Math.max(0, v.cropR.x - v.margin);
+      const y = Math.max(0, v.cropR.y - v.margin);
+      const w = Math.min(v.img.width - x, v.cropR.w + v.margin*2);
+      const h = Math.min(v.img.height - y, v.cropR.h + v.margin*2);
+      const out = document.createElement('canvas');
+      out.width = w; out.height = h;
+      out.getContext('2d').drawImage(v.img, x, y, w, h, 0, 0, w, h);
+      out.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = v.name;
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); res(); }, 300);
+      }, 'image/jpeg', 0.93);
+    });
+  }
+
+  done += validated.length;
+  dc.textContent = done;
+  sm.textContent = `✓ ${validated.length} fichiers téléchargés`;
+  validated = [];
+  $('vc').textContent = '0';
+  bdl.disabled = true;
+  bdl.style.opacity = '.4';
+  bdl.innerHTML = '⬇ Télécharger tout (<span id="vc">0</span>)';
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════════════════════ */
+function stripExt(n) { return n.replace(/\.[^.]+$/, ''); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ── LOUPE ── */
+const loupe = $('loupe');
+const loupeCanvas = $('loupeCanvas');
+const LOUPE_SIZE = 200;   // diamètre px
+const ZOOM = 0.25;           // facteur de zoom
+
+origbox.addEventListener('mousemove', e => {
+  if (dragState || !origImg) return;
+  // Position souris dans le canvas original
+  const rect = co.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  // Hors image → cacher
+  if (mx < 0 || my < 0 || mx > co.width || my > co.height) {
+    loupe.style.display = 'none'; return;
+  }
+  // Coordonnées dans l'image originale
+  const ix = mx / displayScale;
+  const iy = my / displayScale;
+  // Taille de la zone capturée (= LOUPE_SIZE / ZOOM en pixels originaux)
+  const capture = LOUPE_SIZE / ZOOM;
+  const sx = ix - capture / 2;
+  const sy = iy - capture / 2;
+  // Dessiner dans la loupe
+  loupeCanvas.width = LOUPE_SIZE;
+  loupeCanvas.height = LOUPE_SIZE;
+  const ctx = loupeCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#080a0c';
+  ctx.fillRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
+  ctx.drawImage(origImg, sx, sy, capture, capture, 0, 0, LOUPE_SIZE, LOUPE_SIZE);
+  // Positionner la loupe (décalée pour ne pas cacher le curseur)
+  loupe.style.display = 'block';
+  loupe.style.left = (e.clientX + 20) + 'px';
+  loupe.style.top  = (e.clientY - LOUPE_SIZE/2) + 'px';
+});
+
+origbox.addEventListener('mouseleave', () => { loupe.style.display = 'none'; });
+</script>
+</body>
+</html>
