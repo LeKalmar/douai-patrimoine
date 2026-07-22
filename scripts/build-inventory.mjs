@@ -42,6 +42,10 @@ const CONFIG = {
     inventaire: 'data/inventaire.json',
     report:     'data/build-report.json',
   },
+  // Base fixe du bucket de vignettes. Le nom de fichier est toujours le
+  // code-barres de l'exemplaire (= $915$b côté exemplaire = $995$f côté
+  // notice, la clé de jointure principale) suivi de ".jpg".
+  vignetteBaseUrl: 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/vignette/',
   // Seuil minimal de jointure : si moins de X% des items sont rattachés à une
   // notice, on considère que quelque chose cloche (mauvais fichier, IDs
   // décalés, encodage…). Réglable.
@@ -232,6 +236,15 @@ function buildItems(xml, index) {
     merged._itemId = itemId;
     merged._noticeId = noticeId ?? null;
     merged._joinType = joinType;
+
+    // Vignette : reconstruite à partir du code-barres de l'exemplaire, plus
+    // besoin d'une colonne CSV dédiée — l'URL S3/R2 est fixe, seul le nom du
+    // fichier (le code-barres) change.
+    const barcode = b915 ? b915.trim() : null;
+    if (barcode) {
+      merged.lien_num = `${CONFIG.vignetteBaseUrl}${barcode}.jpg`;
+      merged['995$f'] = barcode;
+    }
 
     items.push(merged);
   }
