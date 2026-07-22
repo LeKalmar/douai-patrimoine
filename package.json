@@ -1,0 +1,14 @@
+{
+  "name": "reserve-patrimoniale-douai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site public de la Réserve patrimoniale — build de l'inventaire depuis les exports Syracuse.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build-inventory.mjs",
+    "build:force": "SYRACUSE_FORCE=1 node scripts/build-inventory.mjs"
+  }
+}

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════
 //  Configuration
 // ══════════════════════════════════════════
-const CSV_PATH = 'csv/inventaire.csv';
+const JSON_PATH = '/inventaire.json';
 const PAGE_SIZE = 10;
 
 // Clé de la colonne "sous-fonds" dans le CSV.
@@ -159,24 +159,22 @@ const themeState = {};
 const sousThemeState = {};
 
 // ══════════════════════════════════════════
-//  Chargement du CSV
+//  Chargement du JSON
 // ══════════════════════════════════════════
-function loadCSV() {
-  Papa.parse(CSV_PATH, {
-    download: true,
-    header: true,
-    delimiter: ';',
-    encoding: 'ISO-8859-1',
-    skipEmptyLines: true,
-    complete(results) {
-      allRecords = results.data;
+function loadCSV() {                       // gardez le nom, ça évite de toucher au reste
+  fetch('data/inventaire.json')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      allRecords = data;
       init();
-    },
-    error(err) {
+    })
+    .catch(err => {
       document.getElementById('loader').innerHTML =
         `<p style="color:var(--red)">Erreur de chargement : ${err.message}</p>`;
-    }
-  });
+    });
 }
 
 // ══════════════════════════════════════════
