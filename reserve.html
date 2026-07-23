@@ -16,8 +16,6 @@
       --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
       --plan-low: #1A1E99; --plan-mid: #E8445A; --plan-high: #C02840;
       --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
-      --plan-drawer: #7A7FEE; --plan-drawer-brd: #1A1E99;
-      --plan-wood: #F07080; --plan-wood-brd: #C02840;
       --red: #E8445A; --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
     }
     body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
@@ -61,7 +59,6 @@
     .room-section-title::after{content:'';flex:1;height:1px;background:#e0e0e0}
     .room-plan{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem 1rem;overflow-x:auto}
     .room-inner{display:flex;flex-wrap:nowrap;gap:.6rem;align-items:flex-end;min-width:max-content}
-    .room-bottom-row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:1px dashed #ddd}
     .travee-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
     .travee-wrap:hover .tv-box{border-color:#555}
     .travee-wrap.sel .tv-box{border:2px solid var(--red)!important}
@@ -71,14 +68,6 @@
     .tv-label{font-size:9px;color:#888;text-align:center;white-space:nowrap;line-height:1}
     .tv-sublabel{font-size:8px;color:#bbb;text-align:center;white-space:nowrap;line-height:1}
     .vsep{width:1px;background:#ddd;min-height:60px;margin:0 .25rem;align-self:center;flex-shrink:0}
-    .armoire-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
-    .armoire-wrap:hover .arm-box{border-color:#555!important}
-    .armoire-wrap.sel .arm-box{border:2px solid var(--red)!important}
-    .arm-box{border:1.5px solid;border-radius:var(--radius-sm);padding:3px;display:flex;flex-direction:column;gap:1px}
-    .arm-box.tiroir{border-color:var(--plan-drawer-brd);background:#e3f2fd}
-    .arm-box.bois{border-color:var(--plan-wood-brd);background:#fff8e1}
-    .arm-slot{border-radius:1px}
-    .arm-label{font-size:9px;color:#888;text-align:center;white-space:nowrap}
     .detail-panel{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-top:1rem}
     .detail-panel-title{font-family:'DM Serif Display',serif;font-size:1.1rem;font-weight:400;margin:0 0 .75rem;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}
     .detail-badge{font-family:'DM Sans',sans-serif;font-size:.7rem;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
@@ -159,8 +148,6 @@
         <div class="leg"><div class="leg-dot" style="background:var(--plan-mid)"></div><span>Dense (20–80)</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-high)"></div><span>Très dense (&gt;80)</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></div><span>Non inventorié</span></div>
-        <div class="leg"><div class="leg-dot" style="background:var(--plan-drawer);border:1px solid var(--plan-drawer-brd)"></div><span>Tiroir</span></div>
-        <div class="leg"><div class="leg-dot" style="background:var(--plan-wood);border:1px solid var(--plan-wood-brd)"></div><span>Armoire bois</span></div>
       </div>
 
       <div class="search-results" id="sres"></div>
@@ -169,7 +156,6 @@
         <h2 class="room-section-title">Réserve principale</h2>
         <div class="room-plan">
           <div class="room-inner" id="room-travees"></div>
-          <div class="room-bottom-row" id="room-bottom"></div>
         </div>
       </div>
 
@@ -180,8 +166,22 @@
         </div>
       </div>
 
+      <div class="room-section">
+        <h2 class="room-section-title">Armoires (bois)</h2>
+        <div class="room-plan">
+          <div class="room-inner" id="room-armoires"></div>
+        </div>
+      </div>
+
+      <div class="room-section">
+        <h2 class="room-section-title">Armoires à tiroirs</h2>
+        <div class="room-plan">
+          <div class="room-inner" id="room-tiroirs"></div>
+        </div>
+      </div>
+
       <div class="detail-panel" id="detail">
-        <p class="placeholder-msg">Sélectionnez une travée ou une armoire pour afficher son contenu.</p>
+        <p class="placeholder-msg">Sélectionnez une travée, une armoire ou un tiroir pour afficher son contenu.</p>
       </div>
 
     </div>
@@ -202,12 +202,31 @@
   }
 })();
 
-/* TRAVEES, GROUPES, ARMOIRES_TIROIRS, ARMOIRES_BAS, parseCote/compareCotes
-   sont définis dans js/reserve-shared.js (partagé avec recolement.html). */
+/* TRAVEES, GROUPES, EMPLACEMENTS_ARMOIRE, EMPLACEMENTS_TIROIR, LOCATIONS_ALL,
+   parseCote/compareCotes sont définis dans js/reserve-shared.js (partagé avec
+   recolement.html). Armoires et tiroirs sont traités comme des pseudo-travées
+   (colonne = meuble, étage = tiroir/niveau) et passent par la même mécanique
+   (CNT/DET/colsOf/maxEtageOf) que les travées classiques. */
 
 /* ════════════ ÉTAT ════════════ */
-let CNT={}, DET={}, ADET={}, VIDE={};
+let CNT={}, DET={}, VIDE={};
 let selId=null, filter='all', csvLoaded=false;
+
+function travTitle(tid){
+  if(tid==='ARMOIRE') return 'Armoires (bois)';
+  if(tid==='TIROIR') return 'Armoires à tiroirs';
+  return 'Travée '+tid.replace(/^RD-/,'');
+}
+function etageWordFor(tid){
+  if(tid==='ARMOIRE') return 'niveau';
+  if(tid==='TIROIR') return 'tiroir';
+  return 'étage';
+}
+function etageLabelPrefix(tid){
+  if(tid==='ARMOIRE') return 'Niv.';
+  if(tid==='TIROIR') return 'Tiroir';
+  return 'Ét.';
+}
 
 /* ════════════ CHARGEMENT DU RÉCOLEMENT ════════════
    data/recolement.json regroupe scans, non-catalogués et étagères vides :
@@ -241,7 +260,7 @@ function parseVide(rows){
 }
 
 function parseRecolement(rows){
-  CNT={}; DET={}; ADET={};
+  CNT={}; DET={};
   rows.forEach(row=>{
     const t     =(row.travee  ||'').trim();
     const col   =(row.colonne ||'').trim();
@@ -251,14 +270,8 @@ function parseRecolement(rows){
     const auteur=(row.auteur  ||'').trim().slice(0,40);
     const fonds =(row.fonds   ||'').trim();
     const etat  =(row.etat    ||'').trim().slice(0,30);
-    if(!t) return;
+    if(!t || !etage) return;
     const n={c:cote,t:titre,a:auteur,f:fonds,e:etat};
-    if(t.startsWith('AB')||t==='T1'||t==='T2'||t==='T3'){
-      if (!ADET[t]) ADET[t] = [];
-      const dejaVue = cote && ADET[t].some(x => x.c === cote);
-      if (!dejaVue) ADET[t].push(n);
-    }
-    if(!etage) return;
     const key = `${t}|${col}|${etage}`;
     if (!DET[key]) DET[key] = [];
 
@@ -271,8 +284,7 @@ function parseRecolement(rows){
   });
   csvLoaded=true;
   document.getElementById('csv-loader').style.display='none';
-  const total=Object.values(CNT).reduce((s,v)=>s+v,0)
-             +Object.values(ADET).reduce((s,a)=>s+a.length,0);
+  const total=Object.values(CNT).reduce((s,v)=>s+v,0);
   document.getElementById('sn').textContent=total.toLocaleString('fr-FR');
   buildPlan();
 }
@@ -317,7 +329,7 @@ function slotColor(n){
 }
 
 /* ════════════ CONSTRUCTION DU PLAN ════════════ */
-function buildPlan(){ buildTravees(); buildBottom(); buildTraveesDouaisienne(); updateStats(); }
+function buildPlan(){ buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs(); updateStats(); }
 
 function buildTravees(){
   const room=document.getElementById('room-travees');
@@ -328,10 +340,6 @@ function buildTravees(){
       const tDef=TRAVEES.find(x=>x.id===tid);
       room.appendChild(makeTraveeEl(tid,tDef,colsOf(tDef)));
     });
-    if(gi===GROUPES.length-1){
-      const s=document.createElement('div');s.className='vsep';room.appendChild(s);
-      ARMOIRES_TIROIRS.forEach(arm=>room.appendChild(makeArmoireEl(arm)));
-    }
   });
 }
 
@@ -341,6 +349,20 @@ function buildTraveesDouaisienne(){
   TRAVEES_DOUAISIENNE.forEach(tDef=>{
     room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
   });
+}
+
+function buildArmoires(){
+  const room=document.getElementById('room-armoires');
+  room.innerHTML='';
+  const tDef=EMPLACEMENTS_ARMOIRE[0];
+  room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+}
+
+function buildTiroirs(){
+  const room=document.getElementById('room-tiroirs');
+  room.innerHTML='';
+  const tDef=EMPLACEMENTS_TIROIR[0];
+  room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
 }
 
 function makeTraveeEl(tid,tDef,cols){
@@ -366,62 +388,23 @@ function makeTraveeEl(tid,tDef,cols){
     box.appendChild(cd);
   });
   wrap.appendChild(box);
-  const lbl=document.createElement('div');lbl.className='tv-label';lbl.textContent=tid.replace(/^RD-/,'');wrap.appendChild(lbl);
+  const lbl=document.createElement('div');lbl.className='tv-label';
+  lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'');
+  wrap.appendChild(lbl);
   if(csvLoaded&&!known){const sub=document.createElement('div');sub.className='tv-sublabel';sub.textContent='—';wrap.appendChild(sub);}
   wrap.addEventListener('click',()=>selectTravee(tid,tDef,cols));
   wrap.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')selectTravee(tid,tDef,cols);});
   return wrap;
 }
 
-function makeArmoireEl(arm){
-  const notices=arm.csvId?(ADET[arm.csvId]||[]):[];
-  const wrap=document.createElement('div');
-  wrap.className='armoire-wrap'+(selId===arm.id?' sel':'');
-  wrap.setAttribute('role','button');wrap.setAttribute('tabindex','0');
-  const box=document.createElement('div');box.className='arm-box '+arm.type;
-  const W=arm.type==='bois'?16:20, H=arm.type==='bois'?3:5;
-  const SHOWN=arm.type==='bois'?Math.min(arm.nb,14):arm.nb;
-  for(let n=SHOWN;n>=1;n--){
-    const s=document.createElement('div');s.className='arm-slot';
-    const bg=arm.type==='tiroir'?'var(--plan-drawer)':(notices.length?'var(--plan-low)':'var(--plan-wood)');
-    s.style.cssText=`width:${W}px;height:${H}px;background:${bg}`;
-    box.appendChild(s);
-  }
-  if(arm.type==='bois'&&arm.nb>14){
-    const m=document.createElement('div');
-    m.style.cssText='font-size:7px;color:rgba(255,255,255,0.5);text-align:center;margin-top:1px';
-    m.textContent=`+${arm.nb-14}`;box.appendChild(m);
-  }
-  wrap.appendChild(box);
-  const lbl=document.createElement('div');lbl.className='arm-label';
-  lbl.textContent=arm.id.replace('TIRB','TB').replace('TIRJ','TJ').replace('BOIS','B');wrap.appendChild(lbl);
-  if(notices.length){
-    const sub=document.createElement('div');sub.className='arm-label';
-    sub.style.color='#2e7d32';sub.textContent=notices.length+' notices';wrap.appendChild(sub);
-  }
-  wrap.addEventListener('click',()=>selectArmoire(arm));
-  wrap.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')selectArmoire(arm);});
-  return wrap;
-}
-
-function buildBottom(){
-  const row=document.getElementById('room-bottom');
-  row.innerHTML='';
-  ARMOIRES_BAS.forEach(arm=>row.appendChild(makeArmoireEl(arm)));
-}
-
 /* ════════════ STATS ════════════ */
 function updateStats(){
   let total=0,occ=0;
-  TRAVEES_ALL.forEach(t=>{
+  LOCATIONS_ALL.forEach(t=>{
     colsOf(t).forEach(col=>{
       const maxE=maxEtageOf(t.id,col);
       for(let e=1;e<=maxE;e++){total++;if(cnt(t.id,col,String(e))>0) occ++;}
     });
-  });
-  [...ARMOIRES_TIROIRS,...ARMOIRES_BAS].forEach(arm=>{
-    total+=arm.nb;
-    if(arm.csvId&&ADET[arm.csvId]&&ADET[arm.csvId].length) occ+=Math.min(arm.nb,ADET[arm.csvId].length);
   });
   document.getElementById('st').textContent=total.toLocaleString('fr-FR');
   document.getElementById('so').textContent=occ.toLocaleString('fr-FR');
@@ -438,7 +421,7 @@ function selectTravee(tid,tDef,cols){
   cols.forEach(col=>allEtagesOf(tid,col).forEach(e=>{total+=cnt(tid,col,e);}));
 
   const douaisienne=tid.startsWith('RD-');
-  let html=`<div class="detail-panel-title">Travée ${tid.replace(/^RD-/,'')}
+  let html=`<div class="detail-panel-title">${travTitle(tid)}
     ${douaisienne?'<span class="detail-badge badge-amber">Réserve Douaisienne</span>':''}
     <span class="detail-badge badge-grey">${cols.length} col.</span>
     ${!known&&csvLoaded?'<span class="detail-badge badge-blue">non inventoriée</span>':''}
@@ -446,7 +429,7 @@ function selectTravee(tid,tDef,cols){
   </div>`;
 
   if(!known){
-    html+=`<p class="placeholder-msg">${csvLoaded?'Aucune donnée de récolement pour cette travée.':'Chargement en cours…'}</p>`;
+    html+=`<p class="placeholder-msg">${csvLoaded?'Aucune donnée de récolement pour cet emplacement.':'Chargement en cours…'}</p>`;
     panel.innerHTML=html; return;
   }
 
@@ -459,7 +442,7 @@ function selectTravee(tid,tDef,cols){
       const pct=Math.min(100,Math.round(n/200*100));
       const spec=isNaN(parseInt(e));
       rows+=`<div class="etage-row" onclick="showNotices('${tid}','${col}','${e}')">
-        <span class="etage-lbl">${spec?e:'Ét. '+e}</span>
+        <span class="etage-lbl">${spec?e:etageLabelPrefix(tid)+' '+e}</span>
         <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${slotColor(n)}"></div>
         <div class="bar-count">${n}</div></div>
       </div>`;
@@ -469,21 +452,21 @@ function selectTravee(tid,tDef,cols){
       ${rows}</div>`;
   });
   html+=`</div><div id="notices-zone"></div>
-  <div class="detail-meta">Cliquez sur un étage pour afficher les documents.</div>`;
+  <div class="detail-meta">Cliquez sur un ${etageWordFor(tid)} pour afficher les documents.</div>`;
   panel.innerHTML=html;
 }
 
-/* ════════════ NOTICES D'UN ÉTAGE ════════════ */
+/* ════════════ NOTICES D'UN EMPLACEMENT ════════════ */
 function showNotices(tid,col,etage){
   const zone=document.getElementById('notices-zone');
   if(!zone) return;
   const key=`${tid}|${col}|${etage}`;
   const notices=DET[key]||[];
   const spec=isNaN(parseInt(etage));
-  const lbl=spec?etage:`étage ${etage}`;
+  const lbl=spec?etage:`${etageWordFor(tid)} ${etage}`;
   if(!notices.length){
     const msg=VIDE[key]
-      ? `Étagère confirmée vide lors du récolement (col. ${col}, ${lbl}).`
+      ? `Emplacement confirmé vide lors du récolement (col. ${col}, ${lbl}).`
       : `Aucune notice pour col. ${col}, ${lbl}.`;
     zone.innerHTML=`<p class="placeholder-msg" style="margin-top:.5rem">${msg}</p>`;
     return;
@@ -505,43 +488,6 @@ function showNotices(tid,col,etage){
 function rerenderEtage(key,sort){
   const el=document.getElementById('nl-'+key.replace(/\|/g,'_'));
   if(el) el.innerHTML=noticeRows(DET[key]||[],sort);
-}
-
-/* ════════════ DÉTAIL ARMOIRE ════════════ */
-function selectArmoire(arm){
-  selId=arm.id; buildPlan();
-  const notices=arm.csvId?(ADET[arm.csvId]||[]):[];
-  const panel=document.getElementById('detail');
-  const typeLabel=arm.type==='tiroir'?'Armoire à tiroirs':'Armoire en bois';
-  const bc=arm.type==='tiroir'?'badge-blue':'badge-amber';
-  let html=`<div class="detail-panel-title">${esc(arm.label)}
-    <span class="detail-badge ${bc}">${typeLabel}</span>
-    <span class="detail-badge badge-grey">${arm.nb} ${arm.type==='tiroir'?'tiroirs':'niveaux'}</span>
-    ${notices.length?`<span class="detail-badge badge-green">${notices.length} notices</span>`:''}
-  </div>`;
-  if(arm.type==='bois') html+=`<p style="font-size:.75rem;color:rgba(255,255,255,0.5);margin:0 0 .75rem;font-style:italic">${arm.nb} niveaux au total — seule une dizaine est utilisée.</p>`;
-  if(notices.length){
-    html+=`<div class="notices-section">
-      <div class="notices-header">
-        <span class="notices-title">${notices.length} notices</span>
-        <div class="notices-sort">Trier par&nbsp;
-          <select onchange="rerenderArm('${arm.id}',this.value)">
-            <option value="cote">Cote</option><option value="titre">Titre</option><option value="auteur">Auteur</option>
-          </select>
-        </div>
-      </div>
-      <div class="notices-list" id="nla-${arm.id}">${noticeRows(notices,'cote')}</div>
-    </div>`;
-  } else {
-    html+=`<p class="placeholder-msg">Aucune notice enregistrée pour cette armoire.</p>`;
-  }
-  panel.innerHTML=html;
-}
-function rerenderArm(armId,sort){
-  const arm=[...ARMOIRES_TIROIRS,...ARMOIRES_BAS].find(a=>a.id===armId);
-  if(!arm||!arm.csvId) return;
-  const el=document.getElementById('nla-'+armId);
-  if(el) el.innerHTML=noticeRows(ADET[arm.csvId]||[],sort);
 }
 
 /* ════════════ RENDU DES LIGNES DE NOTICES ════════════ */
@@ -579,14 +525,10 @@ document.getElementById('sq').addEventListener('input',function(){
   if(q.length<2){box.style.display='none';return;}
   const hits=[];
 
-  TRAVEES_ALL.forEach(t=>{
-    if(!t.id.toLowerCase().includes(q)) return;
+  LOCATIONS_ALL.forEach(t=>{
+    if(!t.id.toLowerCase().includes(q) && !(t.label||'').toLowerCase().includes(q)) return;
     const douaisienne=t.id.startsWith('RD-');
-    hits.push({type:'travee',label:'Travée '+t.id.replace(/^RD-/,''),sub:(hasData(t.id)?'':'non inventoriée')+(douaisienne?' — Réserve Douaisienne':''),tid:t.id});
-  });
-  [...ARMOIRES_TIROIRS,...ARMOIRES_BAS].forEach(a=>{
-    if(a.label.toLowerCase().includes(q)||a.id.toLowerCase().includes(q))
-      hits.push({type:'armoire',label:a.label,sub:'',arm:a});
+    hits.push({type:'travee',label:travTitle(t.id),sub:(hasData(t.id)?'':'non inventorié')+(douaisienne?' — Réserve Douaisienne':''),tid:t.id});
   });
 
   let nc=0;
@@ -595,17 +537,7 @@ document.getElementById('sq').addEventListener('input',function(){
     for(const n of notices){
       if((n.c||'').toLowerCase().includes(q)||(n.t||'').toLowerCase().includes(q)||(n.a||'').toLowerCase().includes(q)){
         const[tid,col,etage]=key.split('|');
-        hits.push({type:'notice',label:n.t||n.c,sub:`${n.c} — travée ${tid}, col. ${col}, ét. ${etage}`,tid,col,etage});
-        nc++; break;
-      }
-    }
-  }
-  for(const[csvId,notices] of Object.entries(ADET)){
-    if(nc>=12) break;
-    for(const n of notices){
-      if((n.c||'').toLowerCase().includes(q)||(n.t||'').toLowerCase().includes(q)){
-        const arm=[...ARMOIRES_TIROIRS,...ARMOIRES_BAS].find(a=>a.csvId===csvId);
-        if(arm) hits.push({type:'armoire',label:arm.label,sub:n.c,arm});
+        hits.push({type:'notice',label:n.t||n.c,sub:`${n.c} — ${travTitle(tid)}, col. ${col}, ${etageWordFor(tid)} ${etage}`,tid,col,etage});
         nc++; break;
       }
     }
@@ -618,10 +550,9 @@ document.getElementById('sq').addEventListener('input',function(){
       const h=hits[i];
       el.addEventListener('click',()=>{
         document.getElementById('sq').value=''; box.style.display='none';
-        if(h.type==='travee'){const tDef=TRAVEES_ALL.find(x=>x.id===h.tid);selectTravee(h.tid,tDef,colsOf(tDef));}
-        else if(h.type==='armoire'){selectArmoire(h.arm);}
+        if(h.type==='travee'){const tDef=LOCATIONS_ALL.find(x=>x.id===h.tid);selectTravee(h.tid,tDef,colsOf(tDef));}
         else if(h.type==='notice'){
-          const tDef=TRAVEES_ALL.find(x=>x.id===h.tid);
+          const tDef=LOCATIONS_ALL.find(x=>x.id===h.tid);
           selectTravee(h.tid,tDef,colsOf(tDef));
           setTimeout(()=>showNotices(h.tid,h.col,h.etage),60);
         }

@@ -138,12 +138,16 @@
 <div class="locbar">
   <div class="container">
     <div class="loc-kind">
-      <button type="button" id="kind-travee" class="active">Travée</button>
-      <button type="button" id="kind-armoire">Armoire</button>
-      <button type="button" id="kind-catalogage">Catalogage</button>
+      <button type="button" id="mode-scan" class="active">Code-barre</button>
+      <button type="button" id="mode-catalogage">À cataloguer</button>
     </div>
 
     <select class="loc-sel" id="sel-reserve"></select>
+    <select class="loc-sel" id="sel-loctype">
+      <option value="etagere">Étagère</option>
+      <option value="armoire">Armoire</option>
+      <option value="tiroir">Tiroir</option>
+    </select>
 
     <div class="stepper" id="stp-travee-wrap">
       <button type="button" data-step="travee" data-dir="-1">−</button>
@@ -161,13 +165,6 @@
       <button type="button" data-step="etage" data-dir="1">+</button>
     </div>
 
-    <select class="loc-sel" id="sel-armoire" style="display:none"></select>
-    <div class="stepper" id="stp-tiroir-wrap" style="display:none">
-      <button type="button" data-step="tiroir" data-dir="-1">−</button>
-      <span id="val-tiroir">1</span>
-      <button type="button" data-step="tiroir" data-dir="1">+</button>
-    </div>
-
     <span class="loc-readout" id="loc-readout">—</span>
   </div>
 </div>
@@ -182,7 +179,7 @@
         <div class="stat-card"><div class="stat-card-label">Progression</div><div class="stat-card-val" id="st-progress">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Étagères vides</div><div class="stat-card-val" id="st-vide">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Emplacements vides</div><div class="stat-card-val" id="st-vide">0</div></div>
       </div>
 
       <div class="scan-zone">
@@ -194,8 +191,8 @@
           <div class="feedback" id="feedback"></div>
         </div>
         <div class="vide-row" id="vide-row">
-          <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cette étagère comme vide</button>
-          <span class="vide-note">À utiliser quand une étagère ne contient aucun livre (catalogué ou non), y compris entre des étagères remplies.</span>
+          <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cet emplacement comme vide</button>
+          <span class="vide-note">À utiliser quand un emplacement (étagère, niveau, tiroir) ne contient aucun livre (catalogué ou non), y compris entre des emplacements remplis.</span>
         </div>
         <div id="noncat-mode-zone" style="display:none">
           <div class="scan-row">
@@ -251,7 +248,7 @@
 
       <div class="log-wrap">
         <div class="log-header">
-          <span class="log-title">Étagères marquées vides</span>
+          <span class="log-title">Emplacements marqués vides</span>
         </div>
         <div class="log-body"><table class="log-table">
           <thead><tr><th>Travée</th><th>Colonne</th><th>Étage</th><th>Marquée le</th><th></th></tr></thead>
@@ -307,9 +304,8 @@ document.getElementById('logout-btn').addEventListener('click', function(){
 });
 
 /* ════════════ CONSTANTES / STOCKAGE ════════════
-   TRAVEES, GROUPES, ARMOIRES_TIROIRS, ARMOIRES_BAS, compareCotes, getFondsFromCote
-   viennent de js/reserve-shared.js */
-const ARMOIRES = [...ARMOIRES_TIROIRS, ...ARMOIRES_BAS].filter(a => a.csvId);
+   TRAVEES, GROUPES, EMPLACEMENTS_ARMOIRE, EMPLACEMENTS_TIROIR, compareCotes,
+   getFondsFromCote viennent de js/reserve-shared.js */
 const LS_SCANS  = 'rp_recolement_scans';
 const LS_LOC    = 'rp_recolement_loc';
 const LS_BASE   = 'rp_recolement_baseline';
@@ -318,8 +314,10 @@ const LS_VIDE   = 'rp_recolement_vide';
 
 let scans = loadJSON(LS_SCANS, {});           // barcode -> record
 let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
-let loc = loadJSON(LS_LOC, { kind:'travee', reserve:'patrimoniale', travee:'I', colonne:1, etage:1, armoireId:ARMOIRES[0].id, tiroir:1 });
+let loc = loadJSON(LS_LOC, { mode:'scan', locType:'etagere', reserve:'patrimoniale', travee:'I', colonne:1, etage:1 });
 loc.reserve = loc.reserve || 'patrimoniale';  // compat anciennes sessions sans champ "reserve"
+loc.locType = loc.locType || 'etagere';       // compat anciennes sessions (ex-loc.kind)
+loc.mode = loc.mode || 'scan';
 let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat}
 let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
 let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
@@ -353,52 +351,61 @@ fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
   document.getElementById('st-catalog').textContent = 'indisponible';
 });
 
-/* ════════════ EMPLACEMENT ════════════ */
+/* ════════════ EMPLACEMENT ════════════
+   Deux axes indépendants : le mode (loc.mode : "scan" pour le code-barre,
+   "catalogage" pour les livres à cataloguer) et le type d'emplacement
+   (loc.locType : "etagere" = travée+colonne+étage, "armoire"/"tiroir" =
+   colonne+étage seuls, sur les pseudo-travées EMPLACEMENTS_ARMOIRE /
+   EMPLACEMENTS_TIROIR définies dans js/reserve-shared.js). */
 const scanInput = document.getElementById('scan-input');
 const noncatInput = document.getElementById('noncat-input');
-const selReserve=document.getElementById('sel-reserve'), selArmoire=document.getElementById('sel-armoire');
-const kindTraveeBtn=document.getElementById('kind-travee'), kindArmoireBtn=document.getElementById('kind-armoire'), kindCatalogageBtn=document.getElementById('kind-catalogage');
+const selReserve=document.getElementById('sel-reserve'), selLocType=document.getElementById('sel-loctype');
+const modeScanBtn=document.getElementById('mode-scan'), modeCatalogageBtn=document.getElementById('mode-catalogage');
 
 RESERVES.forEach(r=>{
   const o=document.createElement('option'); o.value=r.id; o.textContent=r.label;
   selReserve.appendChild(o);
 });
-ARMOIRES.forEach(a=>{
-  const o=document.createElement('option'); o.value=a.id; o.textContent=a.label;
-  selArmoire.appendChild(o);
-});
 selReserve.value = loc.reserve;
-selArmoire.value = loc.armoireId;
+selLocType.value = loc.locType;
 
 function activeTravees(){ return traveesOfReserve(loc.reserve); }
 function currentTraveeDef(){ const list=activeTravees(); return list.find(t=>t.id===loc.travee) || list[0]; }
-function currentArmoireDef(){ return ARMOIRES.find(a=>a.id===loc.armoireId) || ARMOIRES[0]; }
-
-function setKind(kind){
-  loc.kind = kind;
-  const showTraveeFields = kind==='travee' || kind==='catalogage';
-  kindTraveeBtn.classList.toggle('active', kind==='travee');
-  kindArmoireBtn.classList.toggle('active', kind==='armoire');
-  kindCatalogageBtn.classList.toggle('active', kind==='catalogage');
-  document.getElementById('stp-travee-wrap').style.display = showTraveeFields ? '' : 'none';
-  document.getElementById('stp-colonne-wrap').style.display = showTraveeFields ? '' : 'none';
-  document.getElementById('stp-etage-wrap').style.display = showTraveeFields ? '' : 'none';
-  selArmoire.style.display = kind==='armoire' ? '' : 'none';
-  document.getElementById('stp-tiroir-wrap').style.display = kind==='armoire' ? '' : 'none';
-  document.getElementById('scan-mode-zone').style.display = kind==='catalogage' ? 'none' : '';
-  document.getElementById('noncat-mode-zone').style.display = kind==='catalogage' ? '' : 'none';
-  document.getElementById('vide-row').style.display = kind==='travee' ? '' : 'none';
-  refreshLoc();
+function currentLocDef(){
+  if(loc.locType==='armoire') return EMPLACEMENTS_ARMOIRE[0];
+  if(loc.locType==='tiroir')  return EMPLACEMENTS_TIROIR[0];
+  return currentTraveeDef();
 }
-kindTraveeBtn.addEventListener('click', ()=>setKind('travee'));
-kindArmoireBtn.addEventListener('click', ()=>setKind('armoire'));
-kindCatalogageBtn.addEventListener('click', ()=>setKind('catalogage'));
+
+function setMode(mode, skipRefresh){
+  loc.mode = mode;
+  modeScanBtn.classList.toggle('active', mode==='scan');
+  modeCatalogageBtn.classList.toggle('active', mode==='catalogage');
+  document.getElementById('scan-mode-zone').style.display = mode==='catalogage' ? 'none' : '';
+  document.getElementById('noncat-mode-zone').style.display = mode==='catalogage' ? '' : 'none';
+  document.getElementById('vide-row').style.display = mode==='scan' ? '' : 'none';
+  if(!skipRefresh) refreshLoc();
+}
+modeScanBtn.addEventListener('click', ()=>setMode('scan'));
+modeCatalogageBtn.addEventListener('click', ()=>setMode('catalogage'));
+
+function setLocType(type, skipRefresh){
+  loc.locType = type;
+  document.getElementById('stp-travee-wrap').style.display = type==='etagere' ? '' : 'none';
+  const def = currentLocDef();
+  loc.colonne = Math.min(def.nbCols, Math.max(1, loc.colonne||1));
+  loc.etage = Math.min(def.maxEt, Math.max(1, loc.etage||1));
+  if(!skipRefresh) refreshLoc();
+}
+selLocType.addEventListener('change', ()=>setLocType(selLocType.value));
 
 function applyReserveVisibility(){
-  // Les armoires sont physiquement dans la réserve patrimoniale uniquement.
+  // Les armoires et tiroirs sont physiquement dans la réserve patrimoniale uniquement.
   const hasArmoires = loc.reserve === 'patrimoniale';
-  kindArmoireBtn.style.display = hasArmoires ? '' : 'none';
-  if(!hasArmoires && loc.kind === 'armoire') loc.kind = 'travee';
+  [...selLocType.options].forEach(o=>{ if(o.value!=='etagere') o.disabled = !hasArmoires; });
+  if(!hasArmoires && loc.locType!=='etagere'){
+    loc.locType='etagere'; selLocType.value='etagere';
+  }
 }
 
 selReserve.addEventListener('change', ()=>{
@@ -406,12 +413,7 @@ selReserve.addEventListener('change', ()=>{
   const list = activeTravees();
   loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
   applyReserveVisibility();
-  setKind(loc.kind);
-});
-
-selArmoire.addEventListener('change', ()=>{
-  loc.armoireId = selArmoire.value; loc.tiroir = 1;
-  refreshLoc();
+  setLocType(loc.locType);
 });
 
 document.querySelectorAll('[data-step]').forEach(btn=>{
@@ -422,14 +424,11 @@ document.querySelectorAll('[data-step]').forEach(btn=>{
       const idx = Math.min(list.length-1, Math.max(0, list.findIndex(t=>t.id===loc.travee) + dir));
       loc.travee = list[idx].id; loc.colonne = 1; loc.etage = 1;
     } else if(field==='colonne'){
-      const max = currentTraveeDef().nbCols;
+      const max = currentLocDef().nbCols;
       loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
     } else if(field==='etage'){
-      const max = currentTraveeDef().maxEt;
+      const max = currentLocDef().maxEt;
       loc.etage = Math.min(max, Math.max(1, loc.etage + dir));
-    } else if(field==='tiroir'){
-      const max = currentArmoireDef().nb;
-      loc.tiroir = Math.min(max, Math.max(1, loc.tiroir + dir));
     }
     refreshLoc();
   });
@@ -438,23 +437,40 @@ document.querySelectorAll('[data-step]').forEach(btn=>{
 function colLetter(n){ return String.fromCharCode(64+n); }
 
 function locFieldsOf(l){
-  if(l.kind==='travee' || l.kind==='catalogage') return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
-  const arm = ARMOIRES.find(a=>a.id===l.armoireId) || ARMOIRES[0];
-  return { travee: arm.csvId, colonne:'', etage:String(l.tiroir) };
+  if(l.locType==='armoire') return { travee:'ARMOIRE', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  if(l.locType==='tiroir')  return { travee:'TIROIR', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
 }
 
-function displayTraveeId(t){ return (t||'').replace(/^RD-/, ''); }
+function displayTraveeId(t){
+  if(t==='ARMOIRE') return 'Armoire (bois)';
+  if(t==='TIROIR') return 'Armoire à tiroirs';
+  return (t||'').replace(/^RD-/, '');
+}
+
+function locLabel(t){
+  if(t==='ARMOIRE' || t==='TIROIR') return displayTraveeId(t);
+  return 'Travée '+displayTraveeId(t);
+}
+
+function locSortIndex(t){
+  const i = TRAVEES_ALL.findIndex(x=>x.id===t);
+  if(i>=0) return i;
+  if(t==='ARMOIRE') return 1000;
+  if(t==='TIROIR') return 1001;
+  return 999;
+}
 
 function refreshLoc(){
   saveLoc();
-  document.getElementById('val-travee').textContent = displayTraveeId(loc.travee);
   document.getElementById('val-colonne').textContent = colLetter(loc.colonne);
   document.getElementById('val-etage').textContent = loc.etage;
-  document.getElementById('val-tiroir').textContent = loc.tiroir;
+  if(loc.locType==='etagere') document.getElementById('val-travee').textContent = displayTraveeId(loc.travee);
   const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
-  const readout = loc.kind==='armoire'
-    ? `${currentArmoireDef().label} · N°${loc.tiroir}`
-    : `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
+  let readout;
+  if(loc.locType==='armoire') readout = `${reserveLabel} · Armoire (bois) · Meuble ${colLetter(loc.colonne)} · Niveau ${loc.etage}`;
+  else if(loc.locType==='tiroir') readout = `${reserveLabel} · Armoire à tiroirs · Meuble ${colLetter(loc.colonne)} · Tiroir ${loc.etage}`;
+  else readout = `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
   document.getElementById('loc-readout').textContent = readout;
   renderExpected();
   renderHereLog();
@@ -463,10 +479,12 @@ function refreshLoc(){
   renderNonCatLog();
   updateVideUI();
   renderVideLog();
-  if(loc.kind==='catalogage') noncatInput.focus(); else scanInput.focus();
+  if(loc.mode==='catalogage') noncatInput.focus(); else scanInput.focus();
 }
 applyReserveVisibility();
-setKind(loc.kind);
+setMode(loc.mode, true);
+setLocType(loc.locType, true);
+refreshLoc();
 
 /* ════════════ SON ════════════ */
 let audioCtx = null;
@@ -523,7 +541,7 @@ function handleScan(barcode){
     auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
     fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
     etat: cat ? cat.etat : (prev ? prev.etat : ''),
-    kind: loc.kind,
+    kind: loc.locType,
     travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
     ts: Date.now()
   };
@@ -557,7 +575,7 @@ function showFeedback(record, status, prev){
   html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
   if(status==='moved' && prev){
-    html += `<div class="fb-meta">Précédemment : ${esc(prev.travee)}${prev.colonne?' · col. '+esc(prev.colonne):''} · étage/n° ${esc(prev.etage)}</div>`;
+    html += `<div class="fb-meta">Précédemment : ${esc(locLabel(prev.travee))}${prev.colonne?' · col. '+esc(prev.colonne):''} · étage/n° ${esc(prev.etage)}</div>`;
   }
   if(status==='unknown'){
     html += `<div class="fb-manual">
@@ -589,7 +607,7 @@ function currentNonCatCount(){
 }
 
 function updateNonCatInput(){
-  if(loc.kind==='catalogage') noncatInput.value = currentNonCatCount();
+  if(loc.mode==='catalogage') noncatInput.value = currentNonCatCount();
 }
 
 function saveNonCatCount(){
@@ -629,8 +647,8 @@ document.getElementById('noncat-plus').addEventListener('click', ()=>{
 function renderNonCatLog(){
   const tbody = document.getElementById('log-noncat');
   const rows = Object.values(nonCat).sort((a,b)=>{
-    const ta = TRAVEES.findIndex(t=>t.id===a.travee), tb = TRAVEES.findIndex(t=>t.id===b.travee);
-    if(ta!==tb) return ta-tb;
+    const c = locSortIndex(a.travee)-locSortIndex(b.travee);
+    if(c!==0) return c;
     if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
     return parseInt(a.etage,10)-parseInt(b.etage,10);
   });
@@ -640,7 +658,7 @@ function renderNonCatLog(){
   }
   tbody.innerHTML = rows.map(r=>`
     <tr>
-      <td>Travée ${esc(r.travee)}</td>
+      <td>${esc(locLabel(r.travee))}</td>
       <td>Col. ${esc(r.colonne)}</td>
       <td>Étage ${esc(r.etage)}</td>
       <td style="font-weight:600;color:#12157A">${r.count}</td>
@@ -661,10 +679,9 @@ function videKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.et
 function isCurrentVide(){ return !!videShelves[videKey(locFieldsOf(loc))]; }
 
 function updateVideUI(){
-  if(loc.kind!=='travee') return;
   const btn = document.getElementById('btn-vide');
   const marked = isCurrentVide();
-  btn.textContent = marked ? '☑ Étagère marquée vide' : '☐ Marquer cette étagère comme vide';
+  btn.textContent = marked ? '☑ Emplacement marqué vide' : '☐ Marquer cet emplacement comme vide';
   btn.classList.toggle('active', marked);
 }
 
@@ -673,7 +690,7 @@ document.getElementById('btn-vide').addEventListener('click', ()=>{
   const key = videKey(fields);
   if(!videShelves[key]){
     const hereCount = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
-    if(hereCount>0 && !confirm(`${hereCount} scan(s) déjà enregistré(s) sur cet emplacement. Marquer quand même cette étagère comme vide ?`)) return;
+    if(hereCount>0 && !confirm(`${hereCount} scan(s) déjà enregistré(s) sur cet emplacement. Marquer quand même comme vide ?`)) return;
     videShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
     beep(660,.1);
   } else {
@@ -688,18 +705,18 @@ document.getElementById('btn-vide').addEventListener('click', ()=>{
 function renderVideLog(){
   const tbody = document.getElementById('log-vide');
   const rows = Object.values(videShelves).sort((a,b)=>{
-    const ta = TRAVEES_ALL.findIndex(t=>t.id===a.travee), tb = TRAVEES_ALL.findIndex(t=>t.id===b.travee);
-    if(ta!==tb) return ta-tb;
+    const c = locSortIndex(a.travee)-locSortIndex(b.travee);
+    if(c!==0) return c;
     if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
     return parseInt(a.etage,10)-parseInt(b.etage,10);
   });
   if(!rows.length){
-    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucune étagère marquée vide pour l\'instant.</td></tr>';
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucun emplacement marqué vide pour l\'instant.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r=>`
     <tr>
-      <td>Travée ${esc(displayTraveeId(r.travee))}</td>
+      <td>${esc(locLabel(r.travee))}</td>
       <td>Col. ${esc(r.colonne)}</td>
       <td>Étage ${esc(r.etage)}</td>
       <td>${new Date(r.ts).toLocaleString('fr-FR')}</td>
@@ -788,7 +805,7 @@ function renderAllLog(filter){
     <tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
-      <td>${esc(r.travee)}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
     </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${filtered.length-300} de plus (affinez la recherche)</td></tr>` : '');

@@ -46,21 +46,19 @@ function traveesOfReserve(reserveId){
   return r ? r.travees : TRAVEES;
 }
 
-/* Armoires à tiroirs côté droit (csvId = identifiant utilisé dans le champ "travee" du récolement) */
-const ARMOIRES_TIROIRS = [
-  {id:'TIRB1', label:'Armoire tiroirs 1', type:'tiroir', nb:10, csvId:'T1'},
-  {id:'TIRB2', label:'Armoire tiroirs 2', type:'tiroir', nb:10, csvId:'T2'},
-];
-/* Bas de salle */
-const ARMOIRES_BAS = [
-  {id:'TIRJ1', label:'Armoire 7 tiroirs', type:'tiroir', nb:7,  csvId:'T3'},
-  {id:'BOIS1', label:'Armoire bois 1',    type:'bois',   nb:34, csvId:'AB-1'},
-  {id:'BOIS2', label:'Armoire bois 2',    type:'bois',   nb:34, csvId:'AB-4'},
-  {id:'BOIS3', label:'Armoire bois 3',    type:'bois',   nb:34, csvId:'AB-5'},
-  {id:'BOIS4', label:'Armoire bois 4',    type:'bois',   nb:34, csvId:'AB-6'},
-  {id:'BOIS5', label:'Armoire bois 5',    type:'bois',   nb:34, csvId:null},
-  {id:'BOIS6', label:'Armoire bois 6',    type:'bois',   nb:34, csvId:null},
-];
+/* Meubles hors travées (armoires en bois et armoires à tiroirs), physiquement
+   dans la réserve patrimoniale uniquement. Modélisés comme des pseudo-travées
+   à une seule entrée (colonne = quel meuble, étage = tiroir/niveau dans ce
+   meuble) pour réutiliser telle quelle toute la mécanique des travées
+   (UI de récolement, rendu du plan, calcul d'occupation) plutôt qu'un système
+   séparé de meubles nommés individuellement.
+   6 armoires en bois, jusqu'à 34 niveaux chacune ; 3 armoires à tiroirs,
+   jusqu'à 10 tiroirs (Armoire tiroirs 1 et 2 en ont 10, Armoire 7 tiroirs en
+   a 7 — 10 est retenu comme borne commune, même approximation que maxEt par
+   travée pour des colonnes de capacités différentes). */
+const EMPLACEMENTS_ARMOIRE = [{id:'ARMOIRE', label:'Armoires (bois)',     nbCols:6, maxEt:34}];
+const EMPLACEMENTS_TIROIR  = [{id:'TIROIR',  label:'Armoires à tiroirs',  nbCols:3, maxEt:10}];
+const LOCATIONS_ALL = [...TRAVEES_ALL, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_TIROIR];
 
 /* ════════════ TRI DES COTES (ex. "D104214" < "D104273") ════════════ */
 function parseCote(cote){
