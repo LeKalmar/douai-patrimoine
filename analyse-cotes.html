@@ -6,7 +6,6 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Analyse des cotes — Réserve patrimoniale</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
     :root {
       --warm: #c9a96e;
@@ -139,7 +138,7 @@
 </section>
 
 <div class="csv-loader" id="csv-loader">
-  <p>Chargement du récolement depuis <code>csv/inventaire.csv</code>…</p>
+  <p>Chargement du récolement depuis <code>data/inventaire.json</code>…</p>
   <div class="spinner-row"><div class="sp"></div><div class="sp"></div><div class="sp"></div><span>Analyse en cours</span></div>
 </div>
 
@@ -172,129 +171,119 @@
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ════════════════════════════════════════════════════════════
-   ANALYSE DES COTES — chargement depuis csv/inventaire.csv
+   ANALYSE DES COTES — chargement depuis data/inventaire.json
+   ════════════════════════════════════════════════════════════
+   Le fonds d'un document est déterminé par le préfixe de sa cote
+   (930$g), selon la même règle que js/inventaire.js. Seuls les
+   fonds à numérotation séquentielle simple sont analysables ici
+   (trous / densité) : les cotes hiérarchiques comme "I-17-1664-1-11"
+   (Imprimés) ou "RD-18-1791-1" (Réserve Douaisienne) sont hors
+   périmètre — la notion de "trou" n'a pas de sens pour elles.
    ════════════════════════════════════════════════════════════ */
 
-/* Configuration des séries (Colonne1 : prefix.n1.n2) */
-const SERIES_META = {
-  ms:    { label:'Manuscrits',               color:'#3949AB' },
-  d:     { label:'Douaisien',                color:'#00897B' },
-  ab:    { label:'Armoires en bois',         color:'#6D4C41' },
-  l:     { label:'Littérature',              color:'#039BE5' },
-  p:     { label:'Protestantisme',           color:'#7CB342' },
-  rt:    { label:'Robaut',                   color:'#FB8C00' },
-  min:   { label:'Mines',                    color:'#E91E63' },
-};
-
-/*
- * Sous-fonds du fond douaisien D :
- * Chaque tranche a un préfixe unique, une borne basse et une borne haute.
- * La borne haute est le PLAFOND jamais atteint (ex : 1–999, 1000–9999…).
- * On s'arrête à la dernière cote utilisée dans chaque tranche.
- */
-const D_TRANCHES = [
-  { id:'d_1',      label:'D 1 – 199',          min:1,      max:999    },
-  { id:'d_1000',   label:'D 1000 – 1 999',      min:1000,   max:1999   },
-  { id:'d_10000',  label:'D 10 000 – 19 999',   min:10000,  max:19999  },
-  { id:'d_100000', label:'D 100 000 – 199 999',  min:100000, max:199999 },
+const FONDS_DEF = [
+  { prefix:'D',   label:'Douaisien',      color:'#3a7ca5' },
+  { prefix:'P',   label:'Protestantisme', color:'#4a6a3a' },
+  { prefix:'MIN', label:'Mines',          color:'#5a5a5a' },
+  { prefix:'L',   label:'Littérature',    color:'#1a6a7a' },
 ];
 
-/* Données calculées */
-let SERIES = {};
-let D_SUBFONDS = {}; /* id -> { label, min, max, ceiling, used:Set, items:Map } */
-let ALL_COTES_MAP = {};
+/* Au-delà de cet écart entre deux numéros utilisés consécutifs, on
+   considère qu'il s'agit d'un nouveau bloc de cotes (campagne de
+   numérotation différente) plutôt que d'un trou à combler. */
+const TRANCHE_GAP_THRESHOLD = 1000;
 
-function parseCol1(val){
-  /* Format réel : prefix.NNNNNN[.segments_optionnels...]
-   * Ex : d.011781 / d.000100.000010 / d.000012.001801.000001
-   *      ms.000023 / liva.001944.000002 / ab.000001.000001
-   * On extrait le préfixe (lettres) et n1 (1er bloc numérique, zéros compris). */
-  const m = /^([a-z]+)\.(\d+)/i.exec((val||'').trim().toLowerCase());
-  return m ? { prefix: m[1], n1: parseInt(m[2], 10) } : null;
+/* Données calculées */
+let SERIES = {};        /* clé "PREFIX__i" -> { label, color, min, max, used:Set, items:Map } */
+let ALL_COTES_MAP = {}; /* doublons, scopés aux fonds analysés */
+let FONDS_SUMMARY = []; /* pour la bannière "prochain numéro disponible" */
+
+function parseCoteNumber(cote, prefix){
+  const up = (cote||'').split(',')[0].trim().toUpperCase();
+  if(!up.startsWith(prefix)) return null;
+  const m = /^(\d+)/.exec(up.slice(prefix.length));
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function clusterTranches(usedSet, threshold){
+  const sorted = [...usedSet].sort((a,b)=>a-b);
+  const tranches = [];
+  let start = sorted[0], prev = sorted[0];
+  for(let i=1;i<sorted.length;i++){
+    const n = sorted[i];
+    if(n - prev > threshold){ tranches.push({min:start,max:prev}); start = n; }
+    prev = n;
+  }
+  tranches.push({min:start, max:prev});
+  return tranches;
 }
 
 function buildCotesAnalysis(rows){
   SERIES = {};
-  D_SUBFONDS = {};
   ALL_COTES_MAP = {};
+  FONDS_SUMMARY = [];
 
-  /* Initialiser les sous-fonds D */
-  D_TRANCHES.forEach(t => {
-    D_SUBFONDS[t.id] = {
-      label: t.label, min: t.min, ceiling: t.max,
-      lastUsed: null,           /* dernier numéro effectivement utilisé */
-      used: new Set(),
-      items: new Map(),
-    };
-  });
+  const fondsData = {};
+  FONDS_DEF.forEach(f => fondsData[f.prefix] = { used:new Set(), items:new Map() });
 
   rows.forEach(row => {
-    const col1  = (row['Colonne1'] || '').trim();
-    const cote  = (row['930$g']   || '').trim();
-    const titre = (row['200$a']   || '').trim().slice(0,100);
+    const cote  = (row['930$g'] || '').trim();
+    const titre = (row['200$a'] || '').trim().slice(0,100);
+    if(!cote) return;
 
-    /* Doublons : toutes cotes non vides */
-    if(cote){
-      if(!ALL_COTES_MAP[cote]) ALL_COTES_MAP[cote] = [];
-      ALL_COTES_MAP[cote].push({ titre, col1 });
+    let matched = null, n1 = null;
+    for(const f of FONDS_DEF){
+      const num = parseCoteNumber(cote, f.prefix);
+      if(num !== null){ matched = f; n1 = num; break; }
     }
+    if(!matched) return; /* fonds non séquentiel : hors périmètre de l'outil */
 
-    const parsed = parseCol1(col1);
-    if(!parsed) return;
-    const { prefix, n1 } = parsed;
+    if(!ALL_COTES_MAP[cote]) ALL_COTES_MAP[cote] = [];
+    ALL_COTES_MAP[cote].push({ titre });
 
-    /* Séries générales (hors 'd' qui a son propre traitement) */
-    if(prefix !== 'd'){
-      if(!SERIES[prefix]){
-        const meta = SERIES_META[prefix] || { label: prefix.toUpperCase(), color:'#888' };
-        SERIES[prefix] = { ...meta, min:n1, max:n1, used:new Set(), items:new Map() };
-      }
-      const s = SERIES[prefix];
-      s.used.add(n1);
-      s.min = Math.min(s.min, n1);
-      s.max = Math.max(s.max, n1);
-      if(!s.items.has(n1)) s.items.set(n1, []);
-      s.items.get(n1).push({ cote, titre });
-      return;
-    }
-
-    /* Fond D : ventiler dans le bon sous-fond */
-    const tranche = D_TRANCHES.find(t => n1 >= t.min && n1 <= t.max);
-    if(!tranche) return;
-    const sf = D_SUBFONDS[tranche.id];
-    sf.used.add(n1);
-    if(sf.lastUsed === null || n1 > sf.lastUsed) sf.lastUsed = n1;
-    if(!sf.items.has(n1)) sf.items.set(n1, []);
-    sf.items.get(n1).push({ cote, titre });
+    const fd = fondsData[matched.prefix];
+    fd.used.add(n1);
+    if(!fd.items.has(n1)) fd.items.set(n1, []);
+    fd.items.get(n1).push({ cote, titre });
   });
 
-  /* Trier les préfixes (hors 'd') */
-  const order = Object.keys(SERIES_META).filter(k => k !== 'd');
-  const prefixes = [
-    ...order.filter(p => SERIES[p]),
-    ...Object.keys(SERIES).filter(p => !order.includes(p)),
-  ];
+  /* Construire une série par tranche détectée automatiquement */
+  FONDS_DEF.forEach(f => {
+    const fd = fondsData[f.prefix];
+    if(!fd.used.size) return;
+    const tranches = clusterTranches(fd.used, TRANCHE_GAP_THRESHOLD);
+    tranches.forEach((t, i) => {
+      const used  = new Set([...fd.used].filter(n => n >= t.min && n <= t.max));
+      const items = new Map([...fd.items].filter(([n]) => n >= t.min && n <= t.max));
+      const key = f.prefix + '__' + i;
+      SERIES[key] = {
+        label: tranches.length > 1
+          ? `${f.label} ${t.min.toLocaleString('fr-FR')} – ${t.max.toLocaleString('fr-FR')}`
+          : f.label,
+        color: f.color, min:t.min, max:t.max, used, items,
+      };
+    });
+    FONDS_SUMMARY.push({ label:f.label, prefix:f.prefix, lastUsed:Math.max(...fd.used) });
+  });
 
-  /* Sous-titre global */
   const totalCotes = Object.keys(ALL_COTES_MAP).length;
-  const activeSf   = D_TRANCHES.filter(t => D_SUBFONDS[t.id].used.size > 0).length;
-  document.getElementById('cotes-subhead').textContent =
-    `${totalCotes.toLocaleString('fr-FR')} cotes — fond douaisien D (${activeSf} tranche${activeSf>1?'s':''} actives) + ${prefixes.length} autre${prefixes.length>1?'s':''} série${prefixes.length>1?'s':''}.`;
+  const nextAvail = FONDS_SUMMARY
+    .map(f => `${f.label} — prochain n° : <strong>${f.prefix}${(f.lastUsed+1).toLocaleString('fr-FR')}</strong>`)
+    .join(' · ');
+  document.getElementById('cotes-subhead').innerHTML =
+    `${totalCotes.toLocaleString('fr-FR')} cotes analysées (fonds Douaisien, Protestantisme, Mines, Littérature). ${nextAvail}`;
 
-  renderCotesTabs(prefixes);
-  renderCotesPanels(prefixes);
-  /* Activer le premier sous-fond D s'il existe, sinon premier préfixe */
-  const firstActive = D_TRANCHES.find(t => D_SUBFONDS[t.id].used.size > 0);
-  activateCotesTab(firstActive ? firstActive.id : (prefixes[0] || '__dup__'));
+  const keys = Object.keys(SERIES);
+  renderCotesTabs(keys);
+  renderCotesPanels(keys);
+  activateCotesTab(keys[0] || '__dup__');
 }
 
 /* ════ Onglets ════ */
-let activeCotesPrefix = null;
-function renderCotesTabs(prefixes){
+function renderCotesTabs(keys){
   const container = document.getElementById('cotes-tabs');
   container.innerHTML = '';
 
-  /* Onglet doublons */
   const dupCount = Object.values(ALL_COTES_MAP).filter(v=>v.length>1).length;
   const dupBtn = document.createElement('button');
   dupBtn.className = 'ctab';
@@ -304,33 +293,18 @@ function renderCotesTabs(prefixes){
   dupBtn.onclick = () => activateCotesTab('__dup__');
   container.appendChild(dupBtn);
 
-  /* Onglets sous-fonds D */
-  D_TRANCHES.forEach(t => {
-    const sf = D_SUBFONDS[t.id];
-    if(!sf.used.size) return;
-    const gapCount = getGapsListD(sf).length;
+  keys.forEach(key => {
+    const s = SERIES[key];
     const btn = document.createElement('button');
     btn.className = 'ctab';
-    btn.dataset.prefix = t.id;
-    btn.innerHTML = `${t.label} <span class="ctab-badge">${sf.used.size}</span>`;
-    btn.onclick = () => activateCotesTab(t.id);
-    container.appendChild(btn);
-  });
-
-  /* Onglets autres séries */
-  prefixes.forEach(p => {
-    const s = SERIES[p];
-    const btn = document.createElement('button');
-    btn.className = 'ctab';
-    btn.dataset.prefix = p;
+    btn.dataset.prefix = key;
     btn.innerHTML = `${s.label} <span class="ctab-badge">${s.used.size}</span>`;
-    btn.onclick = () => activateCotesTab(p);
+    btn.onclick = () => activateCotesTab(key);
     container.appendChild(btn);
   });
 }
 
 function activateCotesTab(prefix){
-  activeCotesPrefix = prefix;
   document.querySelectorAll('.ctab').forEach(b =>
     b.classList.toggle('active', b.dataset.prefix === prefix));
   document.querySelectorAll('.cotes-panel').forEach(p =>
@@ -338,145 +312,14 @@ function activateCotesTab(prefix){
 }
 
 /* ════ Panneaux ════ */
-function renderCotesPanels(prefixes){
+function renderCotesPanels(keys){
   const container = document.getElementById('cotes-panels');
   container.innerHTML = '';
   container.appendChild(buildDupPanel());
-  D_TRANCHES.forEach(t => {
-    if(D_SUBFONDS[t.id].used.size) container.appendChild(buildDPanel(t.id));
-  });
-  prefixes.forEach(p => container.appendChild(buildSeriesPanel(p)));
+  keys.forEach(key => container.appendChild(buildSeriesPanel(key)));
 }
 
-/* ════ Trous — fond D avec plafond intelligent ════
- *
- * On ne liste les trous QUE entre le premier et le dernier numéro utilisé.
- * Tout ce qui est après lastUsed est "disponible" et affiché en bannière,
- * sans lister chaque numéro individuellement.
- */
-function getGapsListD(sf){
-  const usedArr = [...sf.used].sort((a,b)=>a-b);
-  if(!usedArr.length) return [];
-  const first = usedArr[0];
-  const last  = sf.lastUsed;
-  const gaps  = [];
-  for(let i = first; i <= last; i++){
-    if(!sf.used.has(i)){
-      const prev = usedArr.filter(n=>n<i).at(-1);
-      const next = usedArr.find(n=>n>i);
-      gaps.push({
-        n: i,
-        prevN: prev, prevItem: prev != null ? sf.items.get(prev) : null,
-        nextN: next, nextItem: next != null ? sf.items.get(next) : null,
-      });
-    }
-  }
-  return gaps;
-}
-
-/* ════ Panneau sous-fond D ════ */
-function buildDPanel(sfId){
-  const sf     = D_SUBFONDS[sfId];
-  const gaps   = getGapsListD(sf);
-  const usedArr= [...sf.used].sort((a,b)=>a-b);
-  const first  = usedArr[0];
-  const last   = sf.lastUsed;
-  const activeSpan = last - first + 1;            /* plage analysée */
-  const fillPct    = Math.round(sf.used.size / activeSpan * 100);
-  const availAfter = sf.ceiling - last;           /* disponibles après lastUsed */
-  const color  = SERIES_META['d'].color;
-
-  const div = document.createElement('div');
-  div.className = 'cotes-panel';
-  div.dataset.prefix = sfId;
-
-  /* Stats */
-  div.innerHTML = `
-  <div class="cotes-stats">
-    <div class="cstat"><div class="cstat-lbl">Cotes utilisées</div><div class="cstat-val ok">${sf.used.size.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Trous intercalaires</div><div class="cstat-val ${gaps.length?'warn':'ok'}">${gaps.length.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Plage analysée</div><div class="cstat-val">${first} – ${last}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Remplissage (plage)</div><div class="cstat-val">${fillPct} %</div></div>
-    <div class="cstat"><div class="cstat-lbl">Disponibles après D ${last}</div><div class="cstat-val ok">${availAfter.toLocaleString('fr-FR')}</div></div>
-  </div>`;
-
-  /* Bannière "disponible après" */
-  div.innerHTML += `
-  <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:.65rem 1rem;margin-bottom:1.25rem;font-size:.8rem;color:#2e7d32;display:flex;align-items:center;gap:.5rem">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#2e7d32" stroke-width="1.8"><path d="M8 1v6l3 3" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5"/></svg>
-    <span>Dernière cote utilisée : <strong>D ${last}</strong>.
-    Les numéros <strong>D ${last+1}</strong> à <strong>D ${sf.ceiling}</strong>
-    (${availAfter.toLocaleString('fr-FR')} cotes) sont entièrement disponibles.</span>
-  </div>`;
-
-  /* SVG densité (uniquement sur la plage first–last) */
-  div.appendChild(buildDensitySvgD(sf, first, last, color));
-
-  /* Tableau des trous intercalaires */
-  div.appendChild(buildGapsTable(gaps, sfId, sf, true));
-
-  return div;
-}
-
-/* ════ SVG densité pour un sous-fond D ════ */
-function buildDensitySvgD(sf, first, last, color){
-  const wrap = document.createElement('div');
-  wrap.className = 'density-wrap';
-
-  const rangeSpan = last - first + 1;
-  const BUCKETS   = Math.min(400, rangeSpan);
-  const bSize     = rangeSpan / BUCKETS;
-  const counts    = new Array(BUCKETS).fill(0);
-  sf.used.forEach(n => {
-    if(n >= first && n <= last){
-      const b = Math.min(BUCKETS-1, Math.floor((n - first) / bSize));
-      counts[b]++;
-    }
-  });
-
-  const W = 780, H = 60, PAD = 2;
-  const bw = W / BUCKETS;
-  const maxC = Math.max(...counts, 1);
-
-  let bars = '';
-  counts.forEach((c, i) => {
-    const bh = c === 0 ? 4 : Math.max(6, Math.round(c / maxC * (H - PAD*2)));
-    const by = H - bh;
-    const fill   = c === 0 ? '#e8f5e9' : color;
-    const stroke = c === 0 ? '#a5d6a7' : 'none';
-    bars += `<rect x="${(i*bw).toFixed(1)}" y="${by}" width="${Math.max(1,bw-.5).toFixed(1)}" height="${bh}" fill="${fill}" stroke="${stroke}" stroke-width="0.5"/>`;
-  });
-
-  const step = Math.max(1, Math.pow(10, Math.floor(Math.log10(rangeSpan / 4))));
-  let labels = '';
-  for(let v = Math.ceil(first/step)*step; v <= last; v += step){
-    const x = ((v - first) / rangeSpan * W).toFixed(1);
-    labels += `<text x="${x}" y="${H+12}" font-size="9" fill="#bbb" text-anchor="middle" font-family="monospace">${v}</text>`;
-  }
-
-  wrap.innerHTML = `
-  <div class="density-header">
-    <span class="density-title">Carte de densité (D ${first} – D ${last})</span>
-    <div class="density-legend">
-      <div class="dleg"><div class="dleg-dot" style="background:${color}"></div><span>Cote utilisée</span></div>
-      <div class="dleg"><div class="dleg-dot" style="background:#e8f5e9;border:1px solid #a5d6a7"></div><span>Trou (libre)</span></div>
-    </div>
-  </div>
-  <div class="density-svg-wrap">
-    <svg viewBox="0 0 ${W} ${H+16}" width="100%" height="${H+16}" xmlns="http://www.w3.org/2000/svg" style="min-width:340px">
-      ${bars}${labels}
-    </svg>
-  </div>`;
-  return wrap;
-}
-
-/* ════ Calcul trous séries générales ════ */
-function countGaps(s){
-  let g = 0;
-  for(let i = s.min; i <= s.max; i++) if(!s.used.has(i)) g++;
-  return g;
-}
-
+/* ════ Calcul trous ════ */
 function getGapsList(s){
   const usedArr = [...s.used].sort((a,b)=>a-b);
   const gaps = [];
@@ -494,42 +337,41 @@ function getGapsList(s){
   return gaps;
 }
 
-/* ════ Panneau série générale ════ */
-function buildSeriesPanel(prefix){
-  const s = SERIES[prefix];
+/* ════ Panneau série ════ */
+function buildSeriesPanel(key){
+  const s = SERIES[key];
   const gaps = getGapsList(s);
   const rangeSpan = s.max - s.min + 1;
   const fillPct = rangeSpan > 0 ? Math.round(s.used.size / rangeSpan * 100) : 100;
 
   const div = document.createElement('div');
   div.className = 'cotes-panel';
-  div.dataset.prefix = prefix;
+  div.dataset.prefix = key;
 
   div.innerHTML = `
   <div class="cotes-stats">
     <div class="cstat"><div class="cstat-lbl">Cotes utilisées</div><div class="cstat-val ok">${s.used.size.toLocaleString('fr-FR')}</div></div>
     <div class="cstat"><div class="cstat-lbl">Trous (libres)</div><div class="cstat-val ${gaps.length?'warn':'ok'}">${gaps.length.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Plage</div><div class="cstat-val">${s.min} – ${s.max}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Plage</div><div class="cstat-val">${s.min.toLocaleString('fr-FR')} – ${s.max.toLocaleString('fr-FR')}</div></div>
     <div class="cstat"><div class="cstat-lbl">Remplissage</div><div class="cstat-val">${fillPct} %</div></div>
   </div>`;
 
-  div.appendChild(buildDensitySvg(s, prefix));
-  div.appendChild(buildGapsTable(gaps, prefix, s, false));
+  div.appendChild(buildDensitySvg(s));
+  div.appendChild(buildGapsTable(gaps, key));
   return div;
 }
 
-/* ════ SVG densité séries générales ════ */
-function buildDensitySvg(s, prefix){
+/* ════ SVG densité ════ */
+function buildDensitySvg(s){
   const wrap = document.createElement('div');
   wrap.className = 'density-wrap';
 
-  const usedArr   = [...s.used].sort((a,b)=>a-b);
   const rangeSpan = s.max - s.min + 1;
-  const color     = (SERIES_META[prefix]||{color:'#3949AB'}).color;
+  const color     = s.color;
   const BUCKETS   = Math.min(400, rangeSpan);
   const bSize     = rangeSpan / BUCKETS;
   const counts    = new Array(BUCKETS).fill(0);
-  usedArr.forEach(n => {
+  s.used.forEach(n => {
     const b = Math.min(BUCKETS-1, Math.floor((n - s.min) / bSize));
     counts[b]++;
   });
@@ -571,27 +413,25 @@ function buildDensitySvg(s, prefix){
 }
 
 /* ════ État de pagination (une entrée par tableau de trous) ════ */
-const GAPS_STATE = {};   /* gapId -> { gaps, filtered, page, perPage } */
+const GAPS_STATE = {};
 
-/* ════ Tableau des trous avec pagination (commun) ════ */
-function buildGapsTable(gaps, id, s, isD){
+/* ════ Tableau des trous avec pagination ════ */
+function buildGapsTable(gaps, id){
   const wrap  = document.createElement('div');
   wrap.className = 'gaps-wrap';
   const gapId = 'gaps-' + id;
-  const titleExtra = isD ? ' intercalaires' : '';
 
-  /* Initialiser l'état de pagination */
   GAPS_STATE[gapId] = { gaps, filtered: gaps, page: 1, perPage: 25 };
 
   wrap.innerHTML = `
   <div class="gaps-header">
-    <span class="gaps-header-title">${gaps.length} numéro${gaps.length!==1?'s':''}${titleExtra} libre${gaps.length!==1?'s':''}</span>
+    <span class="gaps-header-title">${gaps.length} numéro${gaps.length!==1?'s':''} libre${gaps.length!==1?'s':''}</span>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
       <div class="gaps-search">
         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="#999" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l2.5 2.5"/></svg>
         <input type="text" id="${gapId}-search" placeholder="Filtrer par numéro…" oninput="filterGapsTable('${gapId}',this.value)" autocomplete="off">
       </div>
-      <button class="export-btn" onclick="exportGapsCSV('${id}',${isD})">
+      <button class="export-btn" onclick="exportGapsCSV('${id}')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v9M4 6l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Exporter
       </button>
@@ -600,7 +440,7 @@ function buildGapsTable(gaps, id, s, isD){
   <div class="gaps-filter-info" id="${gapId}-finfo"></div>
   <div class="gaps-body" id="${gapId}-body">
     ${gaps.length === 0
-      ? `<div class="gaps-empty">✓ Aucun trou intercalaire dans cette plage.</div>`
+      ? `<div class="gaps-empty">✓ Aucun numéro libre dans cette plage.</div>`
       : `<table class="gaps-table">
            <thead><tr>
              <th>N° libre</th>
@@ -614,7 +454,6 @@ function buildGapsTable(gaps, id, s, isD){
   ${gaps.length > 0 ? `<div class="gaps-pagination" id="${gapId}-pag"></div>` : ''}
   `;
 
-  /* Premier rendu différé (le DOM doit exister) */
   if(gaps.length > 0) setTimeout(() => renderGapsPage(gapId), 0);
 
   return wrap;
@@ -633,35 +472,29 @@ function renderGapsPage(gapId){
   const start = (curPage - 1) * perPage;
   const slice = filtered.slice(start, start + perPage);
 
-  /* Lignes */
   const tbody = document.getElementById(gapId + '-tbody');
   if(tbody) tbody.innerHTML = renderGapsRows(slice);
 
-  /* Pagination */
   const pagEl = document.getElementById(gapId + '-pag');
   if(!pagEl) return;
 
-  /* Info texte */
   const from = total === 0 ? 0 : start + 1;
   const to   = Math.min(start + perPage, total);
   const infoTxt = total === 0
     ? 'Aucun résultat'
     : `${from}–${to} sur ${total.toLocaleString('fr-FR')} trou${total>1?'s':''}`;
 
-  /* Boutons de page */
   const btnPrev  = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',${curPage-1})" ${curPage<=1?'disabled':''}>‹</button>`;
   const btnFirst = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',1)" ${curPage<=1?'disabled':''}>«</button>`;
   const btnNext  = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',${curPage+1})" ${curPage>=pages?'disabled':''}>›</button>`;
   const btnLast  = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',${pages})" ${curPage>=pages?'disabled':''}>»</button>`;
 
-  /* Numéros de page : max 7 boutons visibles */
   let pageButtons = '';
   if(pages <= 7){
     for(let p = 1; p <= pages; p++){
       pageButtons += `<button class="pag-btn${p===curPage?' active':''}" onclick="gotoGapsPage('${gapId}',${p})">${p}</button>`;
     }
   } else {
-    /* Fenêtre glissante autour de la page courante */
     const show = new Set([1, pages, curPage, curPage-1, curPage+1].filter(p=>p>=1&&p<=pages));
     const sorted = [...show].sort((a,b)=>a-b);
     let prev = 0;
@@ -672,7 +505,6 @@ function renderGapsPage(gapId){
     });
   }
 
-  /* Sélecteur lignes/page */
   const perPageSel = `<select class="pag-perpage" onchange="changeGapsPerPage('${gapId}',this.value)" title="Lignes par page">
     ${[25,50,100,200].map(n=>`<option value="${n}"${n===perPage?' selected':''}>${n} / page</option>`).join('')}
   </select>`;
@@ -694,7 +526,6 @@ window.gotoGapsPage = function(gapId, page){
   const pages = Math.max(1, Math.ceil(st.filtered.length / st.perPage));
   st.page = Math.max(1, Math.min(page, pages));
   renderGapsPage(gapId);
-  /* Scroll doux vers le tableau */
   const el = document.getElementById(gapId + '-body');
   if(el) el.scrollIntoView({ behavior:'smooth', block:'nearest' });
 };
@@ -746,10 +577,10 @@ function renderGapsRows(slice){
   }).join('');
 }
 
-window.exportGapsCSV = function(id, isD){
-  const src   = isD ? D_SUBFONDS[id] : SERIES[id];
+window.exportGapsCSV = function(id){
+  const src = SERIES[id];
   if(!src) return;
-  const gaps  = isD ? getGapsListD(src) : getGapsList(src);
+  const gaps  = getGapsList(src);
   const lines = ['Numéro libre,Cote précédente,Titre précédent,Cote suivante,Titre suivant'];
   gaps.forEach(g => {
     const pc = (g.prevItem&&g.prevItem[0]&&g.prevItem[0].cote)||(g.prevN!=null?'n°'+g.prevN:'');
@@ -758,12 +589,6 @@ window.exportGapsCSV = function(id, isD){
     const nt = (g.nextItem&&g.nextItem[0]&&g.nextItem[0].titre)||'';
     lines.push([g.n,pc,pt,nc,nt].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
   });
-  /* Pour les sous-fonds D, ajouter une ligne de synthèse sur les disponibles après */
-  if(isD){
-    const sf = src;
-    lines.push('');
-    lines.push(`"Disponibles après D ${sf.lastUsed}","D ${sf.lastUsed+1} à D ${sf.ceiling}","${sf.ceiling - sf.lastUsed} cotes libres","",""`);
-  }
   const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -810,9 +635,7 @@ function buildDupPanel(){
             <td><span class="dup-cote">${esc(cote)}</span></td>
             <td><span class="dup-count">${items.length}×</span></td>
             <td><ul class="dup-titles">${items.map(it=>`
-              <li>${esc(it.titre||'(sans titre)')}
-              ${it.col1?`<span class="dup-loc"> — ${esc(it.col1)}</span>`:''}
-              </li>`).join('')}
+              <li>${esc(it.titre||'(sans titre)')}</li>`).join('')}
             </ul></td>
           </tr>`).join('')}
         </tbody>
@@ -826,10 +649,10 @@ function buildDupPanel(){
 
 window.exportDupsCSV = function(){
   const dups = Object.entries(ALL_COTES_MAP).filter(([,v])=>v.length>1).sort((a,b)=>b[1].length-a[1].length);
-  const lines = ['Cote,Nb occurrences,Titre,Colonne1'];
+  const lines = ['Cote,Nb occurrences,Titre'];
   dups.forEach(([cote,items]) => {
     items.forEach(it => {
-      lines.push([cote,items.length,it.titre||'',it.col1||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+      lines.push([cote,items.length,it.titre||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
     });
   });
   const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
@@ -840,25 +663,19 @@ window.exportDupsCSV = function(){
 };
 
 /* ════════════ DÉMARRAGE ════════════ */
-function loadCSV(){
-  Papa.parse('csv/inventaire.csv',{
-    download:true, header:true, delimiter:';', encoding:'ISO-8859-1', skipEmptyLines:true,
-    complete(r){
-      document.getElementById('csv-loader').style.display='none';
-      buildCotesAnalysis(r.data);
-    },
-    error(err){
-      document.getElementById('csv-loader').innerHTML=
-        '<p style="color:#c62828">Erreur de chargement : '+err.message+'</p>';
-    }
+fetch('data/inventaire.json')
+  .then(r => {
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(rows => {
+    document.getElementById('csv-loader').style.display = 'none';
+    buildCotesAnalysis(rows);
+  })
+  .catch(err => {
+    document.getElementById('csv-loader').innerHTML =
+      '<p style="color:#c62828">Erreur de chargement : ' + err.message + '</p>';
   });
-}
-function waitPapa(cb,n){
-  if(typeof Papa!=='undefined'){cb();return;}
-  if((n=n||0)>50){document.getElementById('csv-loader').innerHTML='<p style="color:#c62828">PapaParse non disponible.</p>';return;}
-  setTimeout(()=>waitPapa(cb,n+1),150);
-}
-waitPapa(loadCSV);
 </script>
 </body>
 </html>
