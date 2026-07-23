@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
   <title>Plan de la Réserve — Bibliothèques de Douai</title>
   <meta name="description" content="Plan interactif de la réserve patrimoniale. Visualisation des travées, colonnes, armoires et de leur taux d'occupation d'après le récolement.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -186,6 +187,13 @@
 </footer>
 
 <script>
+/* ════════════ AUTH ════════════ */
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+
 /* TRAVEES, GROUPES, ARMOIRES_TIROIRS, ARMOIRES_BAS, parseCote/compareCotes
    sont définis dans js/reserve-shared.js (partagé avec recolement.html). */
 

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════
 //  Configuration
 // ══════════════════════════════════════════
-const JSON_PATH = '/inventaire.json';
+const JSON_PATH = 'data/inventaire.json';
 const PAGE_SIZE = 10;
 
 // Clé de la colonne "sous-fonds" dans le CSV.
@@ -183,7 +183,7 @@ const sousThemeState = {};
 //  Chargement du JSON
 // ══════════════════════════════════════════
 function loadCSV() {                       // gardez le nom, ça évite de toucher au reste
-  fetch('data/inventaire.json')
+  fetch(JSON_PATH)
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.json();
