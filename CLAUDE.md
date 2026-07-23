@@ -81,6 +81,21 @@ le `localStorage` du navigateur ; `reserve.html` relit ce
 partagent la géométrie de la réserve (travées, colonnes, armoires) via
 `js/reserve-shared.js`.
 
+Dans `recolement.html`, le mode (bouton « Code-barre » = scan, ou
+« À cataloguer » = comptage de non-catalogués) et le type d'emplacement
+(menu déroulant « Étagère » / « Armoire » / « Tiroir », juste après le choix
+de réserve) sont deux axes indépendants (`loc.mode` / `loc.locType`) — les
+deux modes sont utilisables sur les trois types d'emplacement. Les armoires
+et les tiroirs sont modélisés dans `js/reserve-shared.js` comme des
+pseudo-travées à une seule entrée (`EMPLACEMENTS_ARMOIRE`,
+`EMPLACEMENTS_TIROIR` — colonne = quel meuble, étage = tiroir/niveau dans ce
+meuble) plutôt que comme des meubles nommés individuellement : ça permet de
+réutiliser telle quelle toute la mécanique des travées (stepper
+colonne/étage, rendu du plan, calcul d'occupation) des deux côtés. Ne
+recommencez pas à ajouter un système de meubles nommés séparé sans relire
+d'abord cette partie du code (uniquement dans la réserve patrimoniale ; le
+menu déroulant se désactive automatiquement sur « Réserve Douaisienne »).
+
 `data/recolement.json` regroupe en un seul fichier trois catégories de
 données produites par `recolement.html` (un seul bouton « Exporter le
 récolement », un seul export/import à gérer) :

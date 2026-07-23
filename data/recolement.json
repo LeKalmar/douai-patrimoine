@@ -2120,32 +2120,6 @@
       "ts": 1784802854876
     },
     {
-      "barcode": ".",
-      "cote": "",
-      "titre": "",
-      "auteur": "",
-      "fonds": "",
-      "etat": "",
-      "kind": "travee",
-      "travee": "I",
-      "colonne": "1",
-      "etage": "1",
-      "ts": 1784801929188
-    },
-    {
-      "barcode": "1237(45",
-      "cote": "",
-      "titre": "",
-      "auteur": "",
-      "fonds": "",
-      "etat": "",
-      "kind": "travee",
-      "travee": "IX",
-      "colonne": "1",
-      "etage": "1",
-      "ts": 1784802237961
-    },
-    {
       "barcode": "Z",
       "cote": "",
       "titre": "",
@@ -2211,6 +2185,280 @@
       "ts": 1784806061225
     }
   ],
-  "nonCatalogues": [],
-  "videShelves": []
+  "nonCatalogues": [
+    {
+      "travee": "XVII",
+      "colonne": "A",
+      "etage": "1",
+      "count": 6,
+      "ts": 1784815514092
+    },
+    {
+      "travee": "XVII",
+      "colonne": "A",
+      "etage": "2",
+      "count": 25,
+      "ts": 1784815520509
+    },
+    {
+      "travee": "XVII",
+      "colonne": "A",
+      "etage": "3",
+      "count": 13,
+      "ts": 1784815525189
+    },
+    {
+      "travee": "XVII",
+      "colonne": "A",
+      "etage": "4",
+      "count": 21,
+      "ts": 1784815531692
+    },
+    {
+      "travee": "XVII",
+      "colonne": "A",
+      "etage": "5",
+      "count": 12,
+      "ts": 1784815537573
+    },
+    {
+      "travee": "XVII",
+      "colonne": "B",
+      "etage": "1",
+      "count": 10,
+      "ts": 1784815543780
+    },
+    {
+      "travee": "XVII",
+      "colonne": "B",
+      "etage": "2",
+      "count": 24,
+      "ts": 1784815546735
+    },
+    {
+      "travee": "XVII",
+      "colonne": "B",
+      "etage": "3",
+      "count": 15,
+      "ts": 1784815553110
+    },
+    {
+      "travee": "XVII",
+      "colonne": "B",
+      "etage": "4",
+      "count": 14,
+      "ts": 1784815556921
+    },
+    {
+      "travee": "XVII",
+      "colonne": "B",
+      "etage": "5",
+      "count": 24,
+      "ts": 1784815560668
+    },
+    {
+      "travee": "XVII",
+      "colonne": "B",
+      "etage": "6",
+      "count": 23,
+      "ts": 1784816489616
+    },
+    {
+      "travee": "XVII",
+      "colonne": "C",
+      "etage": "1",
+      "count": 33,
+      "ts": 1784816496915
+    },
+    {
+      "travee": "XVII",
+      "colonne": "C",
+      "etage": "2",
+      "count": 29,
+      "ts": 1784816501967
+    },
+    {
+      "travee": "XVII",
+      "colonne": "C",
+      "etage": "4",
+      "count": 20,
+      "ts": 1784816526251
+    },
+    {
+      "travee": "XVII",
+      "colonne": "C",
+      "etage": "5",
+      "count": 13,
+      "ts": 1784816532306
+    },
+    {
+      "travee": "XVII",
+      "colonne": "C",
+      "etage": "6",
+      "count": 32,
+      "ts": 1784816539862
+    },
+    {
+      "travee": "XVII",
+      "colonne": "D",
+      "etage": "1",
+      "count": 6,
+      "ts": 1784816549292
+    },
+    {
+      "travee": "XVII",
+      "colonne": "D",
+      "etage": "2",
+      "count": 10,
+      "ts": 1784816552192
+    },
+    {
+      "travee": "XVII",
+      "colonne": "D",
+      "etage": "3",
+      "count": 32,
+      "ts": 1784816555997
+    },
+    {
+      "travee": "XVII",
+      "colonne": "D",
+      "etage": "4",
+      "count": 12,
+      "ts": 1784816559524
+    },
+    {
+      "travee": "XVII",
+      "colonne": "D",
+      "etage": "5",
+      "count": 33,
+      "ts": 1784816565701
+    },
+    {
+      "travee": "XVII",
+      "colonne": "D",
+      "etage": "6",
+      "count": 18,
+      "ts": 1784816569517
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "D",
+      "etage": "1",
+      "count": 11,
+      "ts": 1784816621348
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "D",
+      "etage": "2",
+      "count": 19,
+      "ts": 1784816626834
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "D",
+      "etage": "3",
+      "count": 16,
+      "ts": 1784816631836
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "D",
+      "etage": "4",
+      "count": 34,
+      "ts": 1784816635526
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "E",
+      "etage": "1",
+      "count": 37,
+      "ts": 1784816660723
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "E",
+      "etage": "2",
+      "count": 26,
+      "ts": 1784816664679
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "E",
+      "etage": "3",
+      "count": 20,
+      "ts": 1784816668541
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "E",
+      "etage": "4",
+      "count": 5,
+      "ts": 1784816672990
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "F",
+      "etage": "1",
+      "count": 14,
+      "ts": 1784816678595
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "F",
+      "etage": "2",
+      "count": 11,
+      "ts": 1784816681691
+    },
+    {
+      "travee": "XVIII",
+      "colonne": "F",
+      "etage": "3",
+      "count": 23,
+      "ts": 1784816687904
+    },
+    {
+      "travee": "TIROIR",
+      "colonne": "B",
+      "etage": "1",
+      "count": 11,
+      "ts": 1784818000629
+    },
+    {
+      "travee": "TIROIR",
+      "colonne": "B",
+      "etage": "2",
+      "count": 11,
+      "ts": 1784818003219
+    },
+    {
+      "travee": "TIROIR",
+      "colonne": "B",
+      "etage": "3",
+      "count": 14,
+      "ts": 1784818005266
+    },
+    {
+      "travee": "TIROIR",
+      "colonne": "B",
+      "etage": "7",
+      "count": 39,
+      "ts": 1784818632785
+    },
+    {
+      "travee": "TIROIR",
+      "colonne": "B",
+      "etage": "8",
+      "count": 62,
+      "ts": 1784818650504
+    }
+  ],
+  "videShelves": [
+    {
+      "travee": "XVII",
+      "colonne": "C",
+      "etage": "3",
+      "ts": 1784816513519
+    }
+  ]
 }
