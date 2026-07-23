@@ -221,6 +221,9 @@
         </div>
       </div>
     </div>
+    <div class="footer-admin-bar">
+      <button type="button" id="admin-trigger" class="admin-trigger" aria-label="Espace professionnel">⚙</button>
+    </div>
   </footer>
 
 </main>
@@ -437,7 +440,68 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 })();
+
+/* ===== ESPACE PROFESSIONNEL ===== */
+(function() {
+  var ADMIN_USER = 'VDOUC-patrimoine';
+  var ADMIN_PASS = 'RESERVE15287';
+
+  var trigger = document.getElementById('admin-trigger');
+  var modal = document.getElementById('admin-modal');
+  var form = document.getElementById('admin-login-form');
+  var userField = document.getElementById('admin-user');
+  var passField = document.getElementById('admin-pass');
+  var errorMsg = document.getElementById('admin-login-error');
+  var cancelBtn = document.getElementById('admin-modal-cancel');
+
+  function openModal() {
+    modal.hidden = false;
+    errorMsg.hidden = true;
+    form.reset();
+    userField.focus();
+  }
+  function closeModal() {
+    modal.hidden = true;
+  }
+
+  trigger.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+  });
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (userField.value.trim() === ADMIN_USER && passField.value === ADMIN_PASS) {
+      sessionStorage.setItem('rp_admin_auth', '1');
+      window.location.href = 'admin.html';
+    } else {
+      errorMsg.hidden = false;
+    }
+  });
+})();
 </script>
+
+<!-- ============ MODALE ESPACE PROFESSIONNEL ============ -->
+<div id="admin-modal" class="admin-modal" hidden>
+  <div class="admin-modal-box" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+    <h2 id="admin-modal-title">Espace professionnel</h2>
+    <form id="admin-login-form" novalidate>
+      <label for="admin-user">Identifiant</label>
+      <input type="text" id="admin-user" autocomplete="username" required>
+      <label for="admin-pass">Mot de passe</label>
+      <input type="password" id="admin-pass" autocomplete="current-password" required>
+      <p id="admin-login-error" class="admin-login-error" hidden>Identifiant ou mot de passe incorrect.</p>
+      <div class="admin-modal-actions">
+        <button type="button" id="admin-modal-cancel" class="admin-btn-secondary">Annuler</button>
+        <button type="submit" class="admin-btn-primary">Se connecter</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 </body>
 </html>

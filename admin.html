@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Espace professionnel — Réserve patrimoniale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: var(--cream); }
+    .admin-page { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .admin-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border);
+    }
+    .admin-topbar h1 {
+      font-family: var(--font-display); font-size: 1.6rem; color: var(--ink);
+    }
+    .admin-topbar .admin-actions { display: flex; gap: 0.6rem; }
+    .admin-section { margin-bottom: 2.5rem; }
+    .admin-section h2 {
+      font-family: var(--font-display); font-size: 1.15rem; color: var(--ink);
+      margin-bottom: 1rem;
+    }
+    .admin-stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    .admin-stat-card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.1rem; box-shadow: var(--shadow);
+    }
+    .admin-stat-card .value {
+      font-family: var(--font-display); font-size: 1.6rem; color: var(--accent);
+    }
+    .admin-stat-card .label {
+      font-size: 0.75rem; color: var(--text-light); margin-top: 0.2rem;
+    }
+    .admin-stat-note {
+      font-size: 0.8rem; color: var(--text-light); margin-top: 0.75rem;
+    }
+    .admin-tools-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .admin-tool-card {
+      display: block; background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem; text-decoration: none;
+      box-shadow: var(--shadow); transition: box-shadow var(--transition), transform var(--transition);
+    }
+    .admin-tool-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+    .admin-tool-card h3 {
+      font-family: var(--font-body); font-weight: 700; font-size: 0.98rem; color: var(--ink);
+      margin-bottom: 0.4rem;
+    }
+    .admin-tool-card p { font-size: 0.82rem; color: var(--text-light); line-height: 1.5; }
+    .admin-files-list {
+      list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.5rem;
+    }
+    .admin-files-list a {
+      display: block; background: #fff; border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.6rem 0.85rem; font-size: 0.82rem; color: var(--text); text-decoration: none;
+      font-family: 'DM Mono', monospace;
+    }
+    .admin-files-list a:hover { border-color: var(--warm); color: var(--warm-dark); }
+  </style>
+</head>
+<body>
+
+<div class="admin-page">
+  <div class="admin-topbar">
+    <h1>Espace professionnel</h1>
+    <div class="admin-actions">
+      <a href="index.html" class="admin-btn-secondary" style="text-decoration:none;display:inline-block;">← Retour au site</a>
+      <button type="button" id="admin-logout" class="admin-btn-primary">Se déconnecter</button>
+    </div>
+  </div>
+
+  <section class="admin-section">
+    <h2>État de l'inventaire</h2>
+    <div id="admin-stats" class="admin-stats-grid">
+      <p class="admin-stat-note">Chargement du dernier rapport de build…</p>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <h2>Outils</h2>
+    <div class="admin-tools-grid">
+      <a href="reserve.html" class="admin-tool-card">
+        <h3>Plan de la Réserve</h3>
+        <p>Plan interactif des travées, colonnes et armoires, avec taux d'occupation d'après le récolement.</p>
+      </a>
+      <a href="scan-docs.html" class="admin-tool-card">
+        <h3>ScanDocs — Rognage &amp; Renommage</h3>
+        <p>Prépare les images scannées (rognage, renommage par cote) avant intégration au fonds numérisé.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <h2>Fichiers sources</h2>
+    <ul class="admin-files-list">
+      <li><a href="data/inventaire.json" download>inventaire.json</a></li>
+      <li><a href="data/build-report.json" download>build-report.json</a></li>
+      <li><a href="data/xml/notices.xml" download>notices.xml</a></li>
+      <li><a href="data/xml/exemplaires.xml" download>exemplaires.xml</a></li>
+      <li><a href="csv/inventaire.csv" download>inventaire.csv</a></li>
+      <li><a href="csv/auteurs.csv" download>auteurs.csv</a></li>
+      <li><a href="csv/Documents.csv" download>Documents.csv</a></li>
+      <li><a href="csv/Individus.csv" download>Individus.csv</a></li>
+      <li><a href="csv/Lieux.csv" download>Lieux.csv</a></li>
+      <li><a href="csv/Professionnels.csv" download>Professionnels.csv</a></li>
+      <li><a href="csv/Imprimeries.csv" download>Imprimeries.csv</a></li>
+      <li><a href="csv/periodiques.csv" download>periodiques.csv</a></li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+    return;
+  }
+
+  document.getElementById('admin-logout').addEventListener('click', function() {
+    sessionStorage.removeItem('rp_admin_auth');
+    window.location.href = 'index.html';
+  });
+
+  fetch('data/build-report.json')
+    .then(function(res) { return res.json(); })
+    .then(function(report) {
+      var stats = report.stats || {};
+      var date = report.generatedAt ? new Date(report.generatedAt).toLocaleString('fr-FR') : '—';
+      var html = '';
+      html += statCard(stats.notices, 'Notices');
+      html += statCard(stats.items, 'Exemplaires');
+      html += statCard(stats.joinRate != null ? stats.joinRate + ' %' : '—', 'Taux de jointure');
+      html += statCard(stats.orphans, 'Orphelins');
+      document.getElementById('admin-stats').innerHTML =
+        html + '<p class="admin-stat-note" style="grid-column:1/-1;">Dernier build : ' + date +
+        (report.status ? ' — statut : ' + report.status : '') + '</p>';
+    })
+    .catch(function() {
+      document.getElementById('admin-stats').innerHTML =
+        '<p class="admin-stat-note">Rapport de build indisponible.</p>';
+    });
+
+  function statCard(value, label) {
+    return '<div class="admin-stat-card"><div class="value">' + (value != null ? value : '—') +
+      '</div><div class="label">' + label + '</div></div>';
+  }
+})();
+</script>
+
+</body>
+</html>
