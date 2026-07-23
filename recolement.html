@@ -52,6 +52,10 @@
   #scan-input{flex:1;min-width:220px;font-size:1.2rem;font-family:'DM Mono',monospace,inherit;padding:.75rem 1rem;border:1px solid #ccc;border-radius:8px;outline:none}
   #scan-input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
   .sound-toggle{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#666;white-space:nowrap}
+  .noncat-label{font-size:.9rem;color:#333}
+  #stp-noncat-wrap{padding:.15rem .3rem}
+  #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit}
+  #noncat-input::-webkit-inner-spin-button,#noncat-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 
   .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
   .feedback.show{display:block}
@@ -131,9 +135,16 @@
     <div class="loc-kind">
       <button type="button" id="kind-travee" class="active">Travée</button>
       <button type="button" id="kind-armoire">Armoire</button>
+      <button type="button" id="kind-catalogage">Catalogage</button>
     </div>
 
-    <select class="loc-sel" id="sel-travee"></select>
+    <select class="loc-sel" id="sel-reserve"></select>
+
+    <div class="stepper" id="stp-travee-wrap">
+      <button type="button" data-step="travee" data-dir="-1">−</button>
+      <span id="val-travee">I</span>
+      <button type="button" data-step="travee" data-dir="1">+</button>
+    </div>
     <div class="stepper" id="stp-colonne-wrap">
       <button type="button" data-step="colonne" data-dir="-1">−</button>
       <span id="val-colonne">1</span>
@@ -165,14 +176,29 @@
         <div class="stat-card"><div class="stat-card-label">Notices cataloguées</div><div class="stat-card-val" id="st-catalog">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Progression</div><div class="stat-card-val" id="st-progress">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
       </div>
 
       <div class="scan-zone">
-        <div class="scan-row">
-          <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
-          <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
+        <div id="scan-mode-zone">
+          <div class="scan-row">
+            <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
+            <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
+          </div>
+          <div class="feedback" id="feedback"></div>
         </div>
-        <div class="feedback" id="feedback"></div>
+        <div id="noncat-mode-zone" style="display:none">
+          <div class="scan-row">
+            <span class="noncat-label">Livres non catalogués sur cette étagère :</span>
+            <div class="stepper" id="stp-noncat-wrap">
+              <button type="button" id="noncat-minus">−</button>
+              <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric">
+              <button type="button" id="noncat-plus">+</button>
+            </div>
+            <button type="button" class="tool-btn" id="noncat-save">Enregistrer</button>
+          </div>
+          <div class="feedback" id="noncat-feedback"></div>
+        </div>
       </div>
 
       <div class="expected-panel">
@@ -203,6 +229,16 @@
         </table></div>
       </div>
 
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">Livres non catalogués par emplacement</span>
+        </div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Travée</th><th>Colonne</th><th>Étage</th><th>Nombre estimé</th><th></th></tr></thead>
+          <tbody id="log-noncat"></tbody>
+        </table></div>
+      </div>
+
       <div class="tools-row">
         <div class="tool-card">
           <h3>Exporter</h3>
@@ -222,8 +258,13 @@
           <input type="file" id="file-baseline" accept="application/json">
         </div>
         <div class="tool-card">
+          <h3>Non catalogués — exporter</h3>
+          <p>Télécharge en JSON les comptages de livres non catalogués saisis en mode « Catalogage », par emplacement.</p>
+          <button type="button" class="tool-btn" id="btn-export-noncat">⬇ Exporter les non-catalogués</button>
+        </div>
+        <div class="tool-card">
           <h3>Réinitialiser</h3>
-          <p>Efface tous les scans enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
+          <p>Efface tous les scans et tous les comptages de livres non catalogués enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
           <button type="button" class="tool-btn danger" id="btn-reset">✕ Tout effacer</button>
         </div>
       </div>
@@ -254,14 +295,17 @@ document.getElementById('logout-btn').addEventListener('click', function(){
    TRAVEES, GROUPES, ARMOIRES_TIROIRS, ARMOIRES_BAS, compareCotes, getFondsFromCote
    viennent de js/reserve-shared.js */
 const ARMOIRES = [...ARMOIRES_TIROIRS, ...ARMOIRES_BAS].filter(a => a.csvId);
-const LS_SCANS = 'rp_recolement_scans';
-const LS_LOC   = 'rp_recolement_loc';
-const LS_BASE  = 'rp_recolement_baseline';
+const LS_SCANS  = 'rp_recolement_scans';
+const LS_LOC    = 'rp_recolement_loc';
+const LS_BASE   = 'rp_recolement_baseline';
+const LS_NONCAT = 'rp_recolement_noncat';
 
 let scans = loadJSON(LS_SCANS, {});           // barcode -> record
 let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
-let loc = loadJSON(LS_LOC, { kind:'travee', travee:'I', colonne:1, etage:1, armoireId:ARMOIRES[0].id, tiroir:1 });
+let loc = loadJSON(LS_LOC, { kind:'travee', reserve:'patrimoniale', travee:'I', colonne:1, etage:1, armoireId:ARMOIRES[0].id, tiroir:1 });
+loc.reserve = loc.reserve || 'patrimoniale';  // compat anciennes sessions sans champ "reserve"
 let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat}
+let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
 
 function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -270,6 +314,7 @@ function loadJSON(key, fallback){
 function saveScans(){ localStorage.setItem(LS_SCANS, JSON.stringify(scans)); }
 function saveLoc(){ localStorage.setItem(LS_LOC, JSON.stringify(loc)); }
 function saveBaseline(){ localStorage.setItem(LS_BASE, baseline ? JSON.stringify(baseline) : ''); }
+function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
@@ -292,41 +337,59 @@ fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
 
 /* ════════════ EMPLACEMENT ════════════ */
 const scanInput = document.getElementById('scan-input');
-const selTravee=document.getElementById('sel-travee'), selArmoire=document.getElementById('sel-armoire');
-const kindTraveeBtn=document.getElementById('kind-travee'), kindArmoireBtn=document.getElementById('kind-armoire');
+const noncatInput = document.getElementById('noncat-input');
+const selReserve=document.getElementById('sel-reserve'), selArmoire=document.getElementById('sel-armoire');
+const kindTraveeBtn=document.getElementById('kind-travee'), kindArmoireBtn=document.getElementById('kind-armoire'), kindCatalogageBtn=document.getElementById('kind-catalogage');
 
-TRAVEES.forEach(t=>{
-  const o=document.createElement('option'); o.value=t.id; o.textContent='Travée '+t.id;
-  selTravee.appendChild(o);
+RESERVES.forEach(r=>{
+  const o=document.createElement('option'); o.value=r.id; o.textContent=r.label;
+  selReserve.appendChild(o);
 });
 ARMOIRES.forEach(a=>{
   const o=document.createElement('option'); o.value=a.id; o.textContent=a.label;
   selArmoire.appendChild(o);
 });
-selTravee.value = loc.travee;
+selReserve.value = loc.reserve;
 selArmoire.value = loc.armoireId;
 
-function currentTraveeDef(){ return TRAVEES.find(t=>t.id===loc.travee) || TRAVEES[0]; }
+function activeTravees(){ return traveesOfReserve(loc.reserve); }
+function currentTraveeDef(){ const list=activeTravees(); return list.find(t=>t.id===loc.travee) || list[0]; }
 function currentArmoireDef(){ return ARMOIRES.find(a=>a.id===loc.armoireId) || ARMOIRES[0]; }
 
 function setKind(kind){
   loc.kind = kind;
+  const showTraveeFields = kind==='travee' || kind==='catalogage';
   kindTraveeBtn.classList.toggle('active', kind==='travee');
   kindArmoireBtn.classList.toggle('active', kind==='armoire');
-  selTravee.style.display = kind==='travee' ? '' : 'none';
-  document.getElementById('stp-colonne-wrap').style.display = kind==='travee' ? '' : 'none';
-  document.getElementById('stp-etage-wrap').style.display = kind==='travee' ? '' : 'none';
+  kindCatalogageBtn.classList.toggle('active', kind==='catalogage');
+  document.getElementById('stp-travee-wrap').style.display = showTraveeFields ? '' : 'none';
+  document.getElementById('stp-colonne-wrap').style.display = showTraveeFields ? '' : 'none';
+  document.getElementById('stp-etage-wrap').style.display = showTraveeFields ? '' : 'none';
   selArmoire.style.display = kind==='armoire' ? '' : 'none';
   document.getElementById('stp-tiroir-wrap').style.display = kind==='armoire' ? '' : 'none';
+  document.getElementById('scan-mode-zone').style.display = kind==='catalogage' ? 'none' : '';
+  document.getElementById('noncat-mode-zone').style.display = kind==='catalogage' ? '' : 'none';
   refreshLoc();
 }
 kindTraveeBtn.addEventListener('click', ()=>setKind('travee'));
 kindArmoireBtn.addEventListener('click', ()=>setKind('armoire'));
+kindCatalogageBtn.addEventListener('click', ()=>setKind('catalogage'));
 
-selTravee.addEventListener('change', ()=>{
-  loc.travee = selTravee.value; loc.colonne = 1; loc.etage = 1;
-  refreshLoc();
+function applyReserveVisibility(){
+  // Les armoires sont physiquement dans la réserve patrimoniale uniquement.
+  const hasArmoires = loc.reserve === 'patrimoniale';
+  kindArmoireBtn.style.display = hasArmoires ? '' : 'none';
+  if(!hasArmoires && loc.kind === 'armoire') loc.kind = 'travee';
+}
+
+selReserve.addEventListener('change', ()=>{
+  loc.reserve = selReserve.value;
+  const list = activeTravees();
+  loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
+  applyReserveVisibility();
+  setKind(loc.kind);
 });
+
 selArmoire.addEventListener('change', ()=>{
   loc.armoireId = selArmoire.value; loc.tiroir = 1;
   refreshLoc();
@@ -335,7 +398,11 @@ selArmoire.addEventListener('change', ()=>{
 document.querySelectorAll('[data-step]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const field = btn.dataset.step, dir = parseInt(btn.dataset.dir);
-    if(field==='colonne'){
+    if(field==='travee'){
+      const list = activeTravees();
+      const idx = Math.min(list.length-1, Math.max(0, list.findIndex(t=>t.id===loc.travee) + dir));
+      loc.travee = list[idx].id; loc.colonne = 1; loc.etage = 1;
+    } else if(field==='colonne'){
       const max = currentTraveeDef().nbCols;
       loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
     } else if(field==='etage'){
@@ -352,25 +419,32 @@ document.querySelectorAll('[data-step]').forEach(btn=>{
 function colLetter(n){ return String.fromCharCode(64+n); }
 
 function locFieldsOf(l){
-  if(l.kind==='travee') return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
+  if(l.kind==='travee' || l.kind==='catalogage') return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
   const arm = ARMOIRES.find(a=>a.id===l.armoireId) || ARMOIRES[0];
   return { travee: arm.csvId, colonne:'', etage:String(l.tiroir) };
 }
 
+function displayTraveeId(t){ return (t||'').replace(/^RD-/, ''); }
+
 function refreshLoc(){
   saveLoc();
+  document.getElementById('val-travee').textContent = displayTraveeId(loc.travee);
   document.getElementById('val-colonne').textContent = colLetter(loc.colonne);
   document.getElementById('val-etage').textContent = loc.etage;
   document.getElementById('val-tiroir').textContent = loc.tiroir;
-  const readout = loc.kind==='travee'
-    ? `Travée ${loc.travee} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`
-    : `${currentArmoireDef().label} · N°${loc.tiroir}`;
+  const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
+  const readout = loc.kind==='armoire'
+    ? `${currentArmoireDef().label} · N°${loc.tiroir}`
+    : `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
   document.getElementById('loc-readout').textContent = readout;
   renderExpected();
   renderHereLog();
   updateStats();
-  scanInput.focus();
+  updateNonCatInput();
+  renderNonCatLog();
+  if(loc.kind==='catalogage') noncatInput.focus(); else scanInput.focus();
 }
+applyReserveVisibility();
 setKind(loc.kind);
 
 /* ════════════ SON ════════════ */
@@ -485,6 +559,81 @@ function showFeedback(record, status, prev){
   }
 }
 
+/* ════════════ NON CATALOGUÉS (mode "Catalogage") ════════════ */
+function nonCatKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.etage}`; }
+
+function currentNonCatCount(){
+  const rec = nonCat[nonCatKey(locFieldsOf(loc))];
+  return rec ? rec.count : 0;
+}
+
+function updateNonCatInput(){
+  if(loc.kind==='catalogage') noncatInput.value = currentNonCatCount();
+}
+
+function saveNonCatCount(){
+  const fields = locFieldsOf(loc);
+  const key = nonCatKey(fields);
+  let count = parseInt(noncatInput.value, 10);
+  if(isNaN(count) || count < 0) count = 0;
+  noncatInput.value = count;
+  if(count === 0) delete nonCat[key];
+  else nonCat[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, count, ts:Date.now() };
+  saveNonCat();
+  showNonCatFeedback(count);
+  beep(880, .12);
+  updateStats();
+  renderNonCatLog();
+}
+
+function showNonCatFeedback(count){
+  const fb = document.getElementById('noncat-feedback');
+  fb.className = 'feedback show ok';
+  fb.innerHTML = count > 0
+    ? `<div class="fb-top"><span class="fb-badge ok">✓ Enregistré</span></div><div class="fb-titre">${count} livre${count>1?'s':''} non catalogué${count>1?'s':''} estimé${count>1?'s':''} sur cet emplacement.</div>`
+    : `<div class="fb-top"><span class="fb-badge ok">✓ Enregistré</span></div><div class="fb-titre">Emplacement marqué sans livre non catalogué.</div>`;
+}
+
+document.getElementById('noncat-save').addEventListener('click', saveNonCatCount);
+noncatInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); saveNonCatCount(); }
+});
+document.getElementById('noncat-minus').addEventListener('click', ()=>{
+  noncatInput.value = Math.max(0, (parseInt(noncatInput.value,10)||0) - 1);
+});
+document.getElementById('noncat-plus').addEventListener('click', ()=>{
+  noncatInput.value = (parseInt(noncatInput.value,10)||0) + 1;
+});
+
+function renderNonCatLog(){
+  const tbody = document.getElementById('log-noncat');
+  const rows = Object.values(nonCat).sort((a,b)=>{
+    const ta = TRAVEES.findIndex(t=>t.id===a.travee), tb = TRAVEES.findIndex(t=>t.id===b.travee);
+    if(ta!==tb) return ta-tb;
+    if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
+    return parseInt(a.etage,10)-parseInt(b.etage,10);
+  });
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun emplacement avec livres non catalogués pour l\'instant.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r=>`
+    <tr>
+      <td>Travée ${esc(r.travee)}</td>
+      <td>Col. ${esc(r.colonne)}</td>
+      <td>Étage ${esc(r.etage)}</td>
+      <td style="font-weight:600;color:#12157A">${r.count}</td>
+      <td><button class="log-del" data-key="${esc(nonCatKey(r))}">✕</button></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>{
+    delete nonCat[b.dataset.key];
+    saveNonCat();
+    updateStats();
+    renderNonCatLog();
+    updateNonCatInput();
+  }));
+}
+
 /* ════════════ ATTENDU ICI ════════════ */
 function renderExpected(){
   const list = document.getElementById('exp-list');
@@ -585,6 +734,8 @@ function updateStats(){
     const matched = Object.keys(scans).filter(bc=>catalog[bc]).length;
     document.getElementById('st-progress').textContent = catalogCount ? Math.round(matched/catalogCount*100)+' %' : '—';
   }
+  const nonCatTotal = Object.values(nonCat).reduce((s,r)=>s+r.count, 0);
+  document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
 }
 
 /* ════════════ EXPORT / IMPORT / RESET ════════════ */
@@ -638,10 +789,22 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
   e.target.value='';
 });
 
+document.getElementById('btn-export-noncat').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(Object.values(nonCat), null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  a.download = `non-catalogues-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}h${pad(d.getMinutes())}.json`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+});
+
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  if(!confirm('Effacer tous les scans enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
+  if(!confirm('Effacer tous les scans et tous les comptages de livres non catalogués enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
   scans = {}; saveScans();
-  renderExpected(); renderHereLog(); renderAllLog(''); updateStats();
+  nonCat = {}; saveNonCat();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput();
 });
 
 /* ════════════ DÉMARRAGE ════════════ */

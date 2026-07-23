@@ -29,6 +29,23 @@ const GROUPES = [
   ['IX','X','XI','XII','XIII','XIV','XV'],
   ['XVI','XVII','XVIII','XIX'],
 ];
+
+/* Réserve Douaisienne — second local physique, distinct de la réserve
+   principale ci-dessus. Identifiants de travée préfixés "RD-" pour ne pas
+   entrer en collision avec les travées I à VII de la réserve principale
+   (les deux locaux numérotent leurs travées en chiffres romains à partir de I). */
+const TRAVEES_DOUAISIENNE = ['I','II','III','IV','V','VI','VII'].map(id => ({id:'RD-'+id, nbCols:5, maxEt:5}));
+const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE];
+
+const RESERVES = [
+  {id:'patrimoniale', label:'Réserve patrimoniale', travees:TRAVEES},
+  {id:'douaisienne',  label:'Réserve Douaisienne',  travees:TRAVEES_DOUAISIENNE},
+];
+function traveesOfReserve(reserveId){
+  const r = RESERVES.find(r=>r.id===reserveId);
+  return r ? r.travees : TRAVEES;
+}
+
 /* Armoires à tiroirs côté droit (csvId = identifiant utilisé dans le champ "travee" du récolement) */
 const ARMOIRES_TIROIRS = [
   {id:'TIRB1', label:'Armoire tiroirs 1', type:'tiroir', nb:10, csvId:'T1'},
