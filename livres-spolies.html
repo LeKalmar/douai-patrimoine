@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Livres spoliés — Réserve patrimoniale</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --warm: #c9a96e;
+      --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+    }
+    body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+    .page-hero{background:#12157A;color:#fff;padding:2.5rem 1.5rem 2rem}
+    .page-hero .container{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.75rem;letter-spacing:.04em}
+    .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:400;margin:0 0 .5rem;line-height:1.15}
+    .page-lead{font-size:.9rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
+    .hero-actions a, .hero-actions button {
+      font-family:inherit;font-size:.82rem;color:rgba(255,255,255,0.8);
+      background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
+      padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;
+      transition:all .15s;
+    }
+    .hero-actions a:hover, .hero-actions button:hover { background:rgba(255,255,255,0.2); color:#fff; }
+    .container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
+    .loader{background:#F5F5FF;border:1px dashed #ccc;border-radius:var(--radius-md);padding:1.5rem;text-align:center;margin:2rem auto;max-width:1200px}
+    .loader p{font-size:.85rem;color:#666;margin:0 0 .5rem}
+    .spinner-row{display:flex;align-items:center;justify-content:center;gap:.4rem;font-size:.8rem;color:#999}
+    .sp{width:7px;height:7px;border-radius:50%;background:#ccc;animation:sp 1.2s infinite}
+    .sp:nth-child(2){animation-delay:.2s}.sp:nth-child(3){animation-delay:.4s}
+    @keyframes sp{0%,80%,100%{opacity:.2}40%{opacity:1}}
+    footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:3rem;font-size:.8rem;text-align:center}
+    footer a{color: var(--warm);text-decoration:none}
+
+    .ls-section{padding:2rem 0 3rem}
+    .section-heading{font-family:'DM Serif Display',serif;font-size:1.4rem;font-weight:400;margin:0 0 .35rem;color:#12157A}
+    .section-subhead{font-size:.875rem;color:#888;margin:0 0 1.25rem}
+
+    /* Stats */
+    .ls-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:1.75rem}
+    .cstat{background:#F5F5FF;border:1px solid #e8e8f0;border-radius:8px;padding:.75rem .9rem}
+    .cstat-lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#999;margin-bottom:.25rem}
+    .cstat-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#12157A}
+    .cstat-val.warn{color:#c9a227}
+    .cstat-val.ok{color:#2e7d32}
+
+    /* Recherche catalogue */
+    .catalog-search-wrap{background:#fff;border:1px solid #e8e8f0;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.75rem;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .catalog-search-label{font-size:.75rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem}
+    .catalog-search-bar{display:flex;align-items:center;gap:.5rem;background:#F5F5FF;border:1px solid #ddd;border-radius:8px;padding:.6rem .9rem}
+    .catalog-search-bar svg{flex-shrink:0}
+    .catalog-search-bar input{flex:1;border:none;outline:none;background:transparent;font-size:.95rem;font-family:inherit;color:#333}
+    .catalog-search-hint{font-size:.72rem;color:#aaa;margin-top:.5rem}
+    .catalog-results{margin-top:1rem;display:grid;gap:.5rem;max-height:360px;overflow-y:auto}
+    .catalog-result{display:flex;align-items:center;gap:.75rem;padding:.55rem .75rem;border:1px solid #eee;border-radius:8px;background:#fafafa}
+    .catalog-result .cr-type{flex-shrink:0;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;font-weight:700;color:#fff;background:#3a7ca5;border-radius:10px;padding:2px 8px;white-space:nowrap}
+    .catalog-result .cr-main{flex:1;min-width:0}
+    .catalog-result .cr-titre{font-size:.85rem;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .catalog-result .cr-meta{font-size:.72rem;color:#888;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .catalog-result .cr-cote{flex-shrink:0;font-family:monospace;font-size:.78rem;font-weight:700;color:#12157A;background:#eef0ff;padding:2px 8px;border-radius:5px}
+    .catalog-empty{padding:.75rem;text-align:center;color:#bbb;font-size:.8rem;font-style:italic}
+    .catalog-more{padding:.4rem;text-align:center;font-size:.7rem;color:#999;font-style:italic}
+
+    /* Table livres spoliés */
+    .ls-wrap{background:#fff;border:1px solid #e8e8f0;border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
+    .ls-header{display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;background:#F5F5FF;border-bottom:1px solid #e8e8f0;flex-wrap:wrap;gap:.5rem}
+    .ls-header-title{font-size:.75rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.05em}
+    .ls-header-actions{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+    .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s;display:flex;align-items:center;gap:.3rem}
+    .export-btn:hover{background:#f5f5f5;border-color:#999}
+    .export-btn.primary{background:#12157A;border-color:#12157A;color:#fff}
+    .export-btn.primary:hover{background:#1c2199}
+    .export-btn.danger{color:#c62828;border-color:#f0c0c0}
+    .export-btn.danger:hover{background:#fff5f5;border-color:#e57373}
+    .export-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
+    .ls-filter-info{font-size:.72rem;color:#666;font-style:italic;padding:.3rem .75rem;background:#fffde7;border-bottom:1px solid #fff9c4;display:none}
+    .ls-filter-info.visible{display:block}
+    .ls-table-scroll{overflow-x:auto}
+    .ls-table{width:100%;border-collapse:collapse;font-size:.78rem;min-width:1180px}
+    .ls-table th{position:sticky;top:0;background:#F5F5FF;padding:.45rem .65rem;text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.04em;color:#888;border-bottom:1px solid #e8e8f0;font-weight:600;white-space:nowrap}
+    .ls-table td{padding:.4rem .65rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+    .ls-table tr:last-child td{border-bottom:none}
+    .ls-table tr:hover td{background:#fafafa}
+    .ls-table tr.is-found td{background:#f3fbf3}
+    .ls-table tr.is-found:hover td{background:#eaf7ea}
+    .ls-titre{font-weight:600;color:#1a1a1a;max-width:260px}
+    .ls-auteur{color:#555;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ls-pub{color:#999;font-size:.72rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ls-caisse{font-family:monospace;color:#888}
+    .ls-type{font-size:.68rem;color:#3a7ca5;text-transform:uppercase;letter-spacing:.03em}
+    .ls-input{font-family:monospace;font-size:.75rem;border:1px solid #ddd;border-radius:5px;padding:.25rem .4rem;width:100%;box-sizing:border-box;color:#333}
+    .ls-input:focus{outline:none;border-color:#12157A;background:#F5F5FF}
+    .ls-input.possesseur{font-family:'DM Sans',sans-serif}
+    .col-cote{min-width:110px}
+    .col-possesseur{min-width:160px}
+    .ls-checkbox-cell{text-align:center}
+    .ls-checkbox{width:18px;height:18px;cursor:pointer;accent-color:#12157A}
+    .ls-checkbox.exlibris{accent-color:#8b3a1e}
+    .ls-empty{padding:1.5rem;text-align:center;color:#bbb;font-size:.85rem;font-style:italic}
+
+    /* Pagination (repris d'analyse-cotes.html) */
+    .ls-pagination{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-top:1px solid #e8e8f0;background:#fafafa;flex-wrap:wrap;gap:.5rem}
+    .pag-info{font-size:.72rem;color:#888}
+    .pag-controls{display:flex;align-items:center;gap:.25rem}
+    .pag-btn{font-family:inherit;font-size:.72rem;padding:.2rem .55rem;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;color:#555;transition:all .12s;min-width:28px;text-align:center;line-height:1.4}
+    .pag-btn:hover:not(:disabled){background:#e8e8f0;border-color:#aaa}
+    .pag-btn:disabled{opacity:.35;cursor:default}
+    .pag-btn.active{background:#12157A;color:#fff;border-color:#12157A;font-weight:600}
+    .pag-ellipsis{font-size:.72rem;color:#bbb;padding:0 .15rem}
+    .pag-perpage{font-family:inherit;font-size:.72rem;border:1px solid #ddd;border-radius:5px;padding:.2rem .4rem;background:#fff;color:#555;cursor:pointer}
+
+    .ls-note{font-size:.78rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
+    .ls-note strong{color:#665c00}
+  </style>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
+      <h1 class="page-title">Livres <em>spoliés</em></h1>
+      <p class="page-lead">Recherche croisée entre la liste des ouvrages spoliés à retrouver et le catalogue numérisé, avec suivi du récolement (retrouvé, ex-libris, ancien possesseur).</p>
+    </div>
+    <div class="hero-actions">
+      <a href="admin.html">← Espace professionnel</a>
+    </div>
+  </div>
+</section>
+
+<div class="loader" id="loader">
+  <p>Chargement de la liste des livres spoliés et du catalogue…</p>
+  <div class="spinner-row"><div class="sp"></div><div class="sp"></div><div class="sp"></div><span>Chargement en cours</span></div>
+</div>
+
+<section class="ls-section" id="ls-main" style="display:none">
+  <div class="container">
+
+    <p class="ls-note">
+      <strong>Comment ça marche :</strong> tapez un titre, un auteur ou une cote dans la barre de recherche pour
+      vérifier si un ouvrage figure déjà dans le catalogue numérisé (partiellement affiché ci-dessous) — la même
+      recherche filtre aussi le tableau des livres spoliés. Tout n'étant pas catalogué, pensez aussi aux fiches
+      papier. Cochez <strong>Retrouvé</strong> une fois l'ouvrage localisé, <strong>Ex-libris</strong> s'il porte une
+      marque de provenance, et notez le nom de l'ancien possesseur dès qu'il est identifié. Les modifications sont
+      enregistrées automatiquement dans ce navigateur — pensez à cliquer sur « Exporter le JSON » régulièrement et à
+      déposer le fichier sous <code>data/livres-spolies.json</code> pour que le suivi soit partagé avec le reste de
+      l'équipe.
+    </p>
+
+    <div class="ls-stats" id="ls-stats"></div>
+
+    <div class="catalog-search-wrap">
+      <div class="catalog-search-label">Rechercher dans le catalogue &amp; filtrer la liste</div>
+      <div class="catalog-search-bar">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#999" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l2.5 2.5"/></svg>
+        <input type="text" id="search-input" placeholder="Titre, auteur ou cote…" autocomplete="off">
+      </div>
+      <p class="catalog-search-hint">La recherche porte sur le titre, l'auteur et la cote, à la fois dans le catalogue et dans la liste des livres spoliés ci-dessous.</p>
+      <div class="catalog-results" id="catalog-results"></div>
+    </div>
+
+    <div class="ls-wrap">
+      <div class="ls-header">
+        <span class="ls-header-title" id="ls-header-title">Liste des livres spoliés</span>
+        <div class="ls-header-actions">
+          <button class="export-btn danger" id="btn-reset" title="Effacer les modifications enregistrées dans ce navigateur">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M6 4V2.5A.5.5 0 0 1 6.5 2h3a.5.5 0 0 1 .5.5V4M12.5 4l-.6 9a1 1 0 0 1-1 .9H5.1a1 1 0 0 1-1-.9L3.5 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Réinitialiser
+          </button>
+          <button class="export-btn primary" id="btn-export">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v9M4 6l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Exporter le JSON
+          </button>
+        </div>
+      </div>
+      <div class="ls-filter-info" id="ls-filter-info"></div>
+      <div class="ls-table-scroll">
+        <table class="ls-table">
+          <thead>
+            <tr>
+              <th>Caisse</th>
+              <th>Type</th>
+              <th>Auteur</th>
+              <th>Titre</th>
+              <th>Publication</th>
+              <th class="col-cote">Cote BM</th>
+              <th>Retrouvé</th>
+              <th>Ex-libris</th>
+              <th class="col-possesseur">Ancien possesseur</th>
+            </tr>
+          </thead>
+          <tbody id="ls-tbody"></tbody>
+        </table>
+      </div>
+      <div class="ls-pagination" id="ls-pag"></div>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function norm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function debounce(fn, ms){
+  let t;
+  return function(...args){ clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
+}
+
+/* ════════════════════════════════════════════════════════════
+   LIVRES SPOLIÉS — état & persistance locale
+   ════════════════════════════════════════════════════════════
+   Les données de base viennent de data/livres-spolies.json
+   (converti depuis data/livres-spolies.ods). Les cases cochées
+   et champs remplis par l'équipe sont surchargés par-dessus via
+   localStorage, puis peuvent être exportés en JSON pour être
+   déposés définitivement dans data/livres-spolies.json.
+   ════════════════════════════════════════════════════════════ */
+
+const LS_KEY = 'rp_livres_spolies_overrides';
+const TYPE_LABELS = {
+  'MANU': 'Manuscrit', 'IMP': 'Texte imprimé', 'ICO': 'Iconographie',
+  'Photographie': 'Photographie', 'NUMI': 'Numismatique', 'LIVA': "Livre d'artiste",
+  'Document Cartographique': 'Carte',
+};
+
+let BASE = [];       // data brute de data/livres-spolies.json
+let OVERRIDES = {};  // { [id]: { trouve, exLibris, possesseur, coteBM } }
+let ROWS = [];        // BASE fusionné avec OVERRIDES
+let FILTERED = [];
+let CATALOG = [];      // data/inventaire.json, indexé pour la recherche
+
+const STATE = { page: 1, perPage: 50 };
+
+function loadOverrides(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveOverrides(){
+  localStorage.setItem(LS_KEY, JSON.stringify(OVERRIDES));
+}
+
+function mergeRows(){
+  ROWS = BASE.map(r => {
+    const o = OVERRIDES[r.id] || {};
+    return {
+      ...r,
+      trouve: o.trouve != null ? o.trouve : r.trouve,
+      exLibris: o.exLibris != null ? o.exLibris : r.exLibris,
+      possesseur: o.possesseur != null ? o.possesseur : r.possesseur,
+      coteBM: o.coteBM != null ? o.coteBM : r.coteBM,
+      _search: norm([r.auteur, r.titre, r.coteBM, r.type, r.lieu, r.editeur].join(' ')),
+    };
+  });
+}
+
+function setOverride(id, field, value){
+  if(!OVERRIDES[id]) OVERRIDES[id] = {};
+  OVERRIDES[id][field] = value;
+  saveOverrides();
+  const row = ROWS.find(r => r.id === id);
+  if(row) row[field] = value;
+  renderStats();
+}
+
+/* ════ Stats ════ */
+function renderStats(){
+  const total = ROWS.length;
+  const trouve = ROWS.filter(r => r.trouve).length;
+  const exlibris = ROWS.filter(r => r.exLibris).length;
+  const possesseurConnu = ROWS.filter(r => r.possesseur && r.possesseur.trim()).length;
+  document.getElementById('ls-stats').innerHTML = `
+    <div class="cstat"><div class="cstat-lbl">Ouvrages listés</div><div class="cstat-val">${total.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Retrouvés</div><div class="cstat-val ok">${trouve.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Restants</div><div class="cstat-val warn">${(total-trouve).toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Avec ex-libris</div><div class="cstat-val">${exlibris.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Possesseur identifié</div><div class="cstat-val">${possesseurConnu.toLocaleString('fr-FR')}</div></div>
+  `;
+}
+
+/* ════ Recherche catalogue (data/inventaire.json) ════ */
+function buildCatalogIndex(rows){
+  CATALOG = rows.map(r => {
+    const titre = r['200$a'] || '';
+    const auteur = [r['700$a'], r['700$b']].filter(Boolean).join(' ');
+    const cote = r['930$g'] || '';
+    const annee = r['210$d'] || '';
+    const type = r['200$b'] || '';
+    return {
+      titre, auteur, cote, annee, type,
+      _search: norm([titre, auteur, cote].join(' ')),
+    };
+  });
+}
+
+function renderCatalogResults(query){
+  const box = document.getElementById('catalog-results');
+  if(!query){
+    box.innerHTML = '';
+    return;
+  }
+  const q = norm(query);
+  const matches = CATALOG.filter(r => r._search.includes(q));
+  if(!matches.length){
+    box.innerHTML = `<div class="catalog-empty">Aucun résultat dans le catalogue pour « ${esc(query)} ».</div>`;
+    return;
+  }
+  const shown = matches.slice(0, 25);
+  box.innerHTML = shown.map(r => `
+    <div class="catalog-result">
+      <span class="cr-type">${esc(TYPE_LABELS[r.type] || r.type || '—')}</span>
+      <div class="cr-main">
+        <div class="cr-titre">${esc(r.titre || '(sans titre)')}</div>
+        <div class="cr-meta">${esc(r.auteur || 'Auteur inconnu')}${r.annee ? ' · ' + esc(r.annee) : ''}</div>
+      </div>
+      <span class="cr-cote">${esc(r.cote || '—')}</span>
+    </div>
+  `).join('') + (matches.length > shown.length
+    ? `<div class="catalog-more">+ ${matches.length - shown.length} autre${matches.length - shown.length > 1 ? 's' : ''} résultat${matches.length - shown.length > 1 ? 's' : ''} dans le catalogue…</div>`
+    : '');
+}
+
+/* ════ Filtre + rendu du tableau des livres spoliés ════ */
+function applyFilter(query){
+  const q = norm(query);
+  FILTERED = q ? ROWS.filter(r => r._search.includes(q)) : ROWS;
+  STATE.page = 1;
+
+  const finfo = document.getElementById('ls-filter-info');
+  if(q){
+    finfo.textContent = `Filtre actif « ${query} » — ${FILTERED.length} résultat${FILTERED.length !== 1 ? 's' : ''} sur ${ROWS.length}`;
+    finfo.classList.add('visible');
+  } else {
+    finfo.textContent = '';
+    finfo.classList.remove('visible');
+  }
+  document.getElementById('ls-header-title').textContent =
+    `Liste des livres spoliés (${FILTERED.length.toLocaleString('fr-FR')})`;
+
+  renderTablePage();
+}
+
+function formatPub(r){
+  return [r.lieu, r.editeur, r.date].filter(Boolean).join(', ');
+}
+
+function renderTablePage(){
+  const total = FILTERED.length;
+  const pages = Math.max(1, Math.ceil(total / STATE.perPage));
+  STATE.page = Math.min(STATE.page, pages);
+  const start = (STATE.page - 1) * STATE.perPage;
+  const slice = FILTERED.slice(start, start + STATE.perPage);
+
+  const tbody = document.getElementById('ls-tbody');
+  if(!slice.length){
+    tbody.innerHTML = `<tr><td colspan="9"><div class="ls-empty">Aucun résultat.</div></td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => `
+      <tr class="${r.trouve ? 'is-found' : ''}" data-id="${r.id}">
+        <td class="ls-caisse">${esc(r.caisse)}</td>
+        <td class="ls-type">${esc(TYPE_LABELS[r.type] || r.type)}</td>
+        <td class="ls-auteur" title="${esc(r.auteur)}">${esc(r.auteur || '—')}</td>
+        <td class="ls-titre">${esc(r.titre)}</td>
+        <td class="ls-pub" title="${esc(formatPub(r))}">${esc(formatPub(r)) || '—'}${r.volumes ? ' · vol. ' + esc(r.volumes) : ''}</td>
+        <td class="col-cote"><input type="text" class="ls-input" data-field="coteBM" placeholder="ex. D12345" value="${esc(r.coteBM)}"></td>
+        <td class="ls-checkbox-cell"><input type="checkbox" class="ls-checkbox" data-field="trouve" ${r.trouve ? 'checked' : ''}></td>
+        <td class="ls-checkbox-cell"><input type="checkbox" class="ls-checkbox exlibris" data-field="exLibris" ${r.exLibris ? 'checked' : ''}></td>
+        <td class="col-possesseur"><input type="text" class="ls-input possesseur" data-field="possesseur" placeholder="Nom de l'ancien possesseur" value="${esc(r.possesseur)}"></td>
+      </tr>
+    `).join('');
+  }
+
+  renderPagination(total, pages);
+}
+
+function renderPagination(total, pages){
+  const pagEl = document.getElementById('ls-pag');
+  const start = (STATE.page - 1) * STATE.perPage;
+  const from = total === 0 ? 0 : start + 1;
+  const to = Math.min(start + STATE.perPage, total);
+  const infoTxt = total === 0 ? 'Aucun résultat' : `${from}–${to} sur ${total.toLocaleString('fr-FR')}`;
+
+  const curPage = STATE.page;
+  const btnPrev  = `<button class="pag-btn" onclick="gotoPage(${curPage-1})" ${curPage<=1?'disabled':''}>‹</button>`;
+  const btnFirst = `<button class="pag-btn" onclick="gotoPage(1)" ${curPage<=1?'disabled':''}>«</button>`;
+  const btnNext  = `<button class="pag-btn" onclick="gotoPage(${curPage+1})" ${curPage>=pages?'disabled':''}>›</button>`;
+  const btnLast  = `<button class="pag-btn" onclick="gotoPage(${pages})" ${curPage>=pages?'disabled':''}>»</button>`;
+
+  let pageButtons = '';
+  if(pages <= 7){
+    for(let p = 1; p <= pages; p++){
+      pageButtons += `<button class="pag-btn${p===curPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+    }
+  } else {
+    const show = new Set([1, pages, curPage, curPage-1, curPage+1].filter(p=>p>=1&&p<=pages));
+    const sorted = [...show].sort((a,b)=>a-b);
+    let prev = 0;
+    sorted.forEach(p => {
+      if(p - prev > 1) pageButtons += `<span class="pag-ellipsis">…</span>`;
+      pageButtons += `<button class="pag-btn${p===curPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+      prev = p;
+    });
+  }
+
+  const perPageSel = `<select class="pag-perpage" onchange="changePerPage(this.value)" title="Lignes par page">
+    ${[25,50,100,200].map(n=>`<option value="${n}"${n===STATE.perPage?' selected':''}>${n} / page</option>`).join('')}
+  </select>`;
+
+  pagEl.innerHTML = total === 0 ? '' : `
+    <span class="pag-info">${infoTxt}</span>
+    <div class="pag-controls">
+      ${perPageSel}
+      ${btnFirst}${btnPrev}
+      ${pageButtons}
+      ${btnNext}${btnLast}
+    </div>`;
+}
+
+window.gotoPage = function(page){
+  const pages = Math.max(1, Math.ceil(FILTERED.length / STATE.perPage));
+  STATE.page = Math.max(1, Math.min(page, pages));
+  renderTablePage();
+  document.querySelector('.ls-table-scroll').scrollIntoView({ behavior:'smooth', block:'nearest' });
+};
+
+window.changePerPage = function(val){
+  STATE.perPage = parseInt(val, 10);
+  STATE.page = 1;
+  renderTablePage();
+};
+
+/* ════ Édition des cellules (délégation d'évènements) ════ */
+document.getElementById('ls-tbody').addEventListener('change', function(e){
+  const target = e.target;
+  const field = target.dataset.field;
+  if(!field) return;
+  const tr = target.closest('tr');
+  const id = parseInt(tr.dataset.id, 10);
+  const value = target.type === 'checkbox' ? target.checked : target.value;
+  setOverride(id, field, value);
+  if(field === 'trouve') tr.classList.toggle('is-found', !!value);
+});
+
+/* ════ Export / réinitialisation ════ */
+document.getElementById('btn-export').addEventListener('click', function(){
+  const out = ROWS.map(({ _search, ...r }) => r);
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'livres-spolies.json';
+  a.click();
+});
+
+document.getElementById('btn-reset').addEventListener('click', function(){
+  if(!confirm('Effacer toutes les modifications enregistrées dans ce navigateur (retrouvé, ex-libris, cote BM, possesseur) ? Cette action ne peut pas être annulée. Pensez à exporter le JSON avant si besoin.')) return;
+  localStorage.removeItem(LS_KEY);
+  OVERRIDES = {};
+  mergeRows();
+  applyFilter(document.getElementById('search-input').value.trim());
+  renderStats();
+});
+
+/* ════ Barre de recherche unique (catalogue + filtre tableau) ════ */
+const onSearch = debounce(function(value){
+  renderCatalogResults(value.trim());
+  applyFilter(value.trim());
+}, 150);
+document.getElementById('search-input').addEventListener('input', function(){
+  onSearch(this.value);
+});
+
+/* ════ Démarrage ════ */
+Promise.all([
+  fetch('data/livres-spolies.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (livres-spolies.json)'); return r.json(); }),
+  fetch('data/inventaire.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (inventaire.json)'); return r.json(); }),
+]).then(([spolies, inventaire]) => {
+  BASE = spolies;
+  OVERRIDES = loadOverrides();
+  mergeRows();
+  buildCatalogIndex(inventaire);
+
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('ls-main').style.display = '';
+
+  renderStats();
+  applyFilter('');
+}).catch(err => {
+  document.getElementById('loader').innerHTML =
+    `<p style="color:#c62828">Erreur de chargement : ${err.message}</p>`;
+});
+</script>
+</body>
+</html>
