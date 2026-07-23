@@ -52,6 +52,11 @@
   #scan-input{flex:1;min-width:220px;font-size:1.2rem;font-family:'DM Mono',monospace,inherit;padding:.75rem 1rem;border:1px solid #ccc;border-radius:8px;outline:none}
   #scan-input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
   .sound-toggle{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#666;white-space:nowrap}
+  .vide-row{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .vide-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#555;cursor:pointer;transition:all .15s}
+  .vide-btn:hover{background:#f5f5f5}
+  .vide-btn.active{background:var(--ok);border-color:var(--ok);color:#fff}
+  .vide-note{font-size:.75rem;color:#888}
   .noncat-label{font-size:.9rem;color:#333}
   #stp-noncat-wrap{padding:.15rem .3rem}
   #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit}
@@ -177,6 +182,7 @@
         <div class="stat-card"><div class="stat-card-label">Progression</div><div class="stat-card-val" id="st-progress">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Étagères vides</div><div class="stat-card-val" id="st-vide">0</div></div>
       </div>
 
       <div class="scan-zone">
@@ -186,6 +192,10 @@
             <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
           </div>
           <div class="feedback" id="feedback"></div>
+        </div>
+        <div class="vide-row" id="vide-row">
+          <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cette étagère comme vide</button>
+          <span class="vide-note">À utiliser quand une étagère ne contient aucun livre (catalogué ou non), y compris entre des étagères remplies.</span>
         </div>
         <div id="noncat-mode-zone" style="display:none">
           <div class="scan-row">
@@ -239,32 +249,37 @@
         </table></div>
       </div>
 
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">Étagères marquées vides</span>
+        </div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Travée</th><th>Colonne</th><th>Étage</th><th>Marquée le</th><th></th></tr></thead>
+          <tbody id="log-vide"></tbody>
+        </table></div>
+      </div>
+
       <div class="tools-row">
         <div class="tool-card">
           <h3>Exporter</h3>
-          <p>Télécharge l'ensemble des scans en cours en JSON. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
+          <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués et des étagères marquées vides. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
           <button type="button" class="tool-btn" id="btn-export">⬇ Exporter le récolement</button>
         </div>
         <div class="tool-card">
           <h3>Reprendre une session</h3>
-          <p>Importe un export JSON précédent et le fusionne avec les scans en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
+          <p>Importe un export JSON précédent (scans, non-catalogués, étagères vides) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
           <label class="tool-btn secondary" for="file-resume">⬆ Importer et fusionner</label>
           <input type="file" id="file-resume" accept="application/json">
         </div>
         <div class="tool-card">
           <h3>Récolement de référence</h3>
-          <p>Charge un export JSON précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher aux scans en cours.</p>
+          <p>Charge un export JSON précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher à la session en cours.</p>
           <label class="tool-btn secondary" for="file-baseline">⬆ Charger une référence</label>
           <input type="file" id="file-baseline" accept="application/json">
         </div>
         <div class="tool-card">
-          <h3>Non catalogués — exporter</h3>
-          <p>Télécharge en JSON les comptages de livres non catalogués saisis en mode « Catalogage », par emplacement.</p>
-          <button type="button" class="tool-btn" id="btn-export-noncat">⬇ Exporter les non-catalogués</button>
-        </div>
-        <div class="tool-card">
           <h3>Réinitialiser</h3>
-          <p>Efface tous les scans et tous les comptages de livres non catalogués enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
+          <p>Efface tous les scans, tous les comptages de livres non catalogués et toutes les étagères marquées vides enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
           <button type="button" class="tool-btn danger" id="btn-reset">✕ Tout effacer</button>
         </div>
       </div>
@@ -299,6 +314,7 @@ const LS_SCANS  = 'rp_recolement_scans';
 const LS_LOC    = 'rp_recolement_loc';
 const LS_BASE   = 'rp_recolement_baseline';
 const LS_NONCAT = 'rp_recolement_noncat';
+const LS_VIDE   = 'rp_recolement_vide';
 
 let scans = loadJSON(LS_SCANS, {});           // barcode -> record
 let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
@@ -306,6 +322,7 @@ let loc = loadJSON(LS_LOC, { kind:'travee', reserve:'patrimoniale', travee:'I', 
 loc.reserve = loc.reserve || 'patrimoniale';  // compat anciennes sessions sans champ "reserve"
 let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat}
 let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
+let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 
 function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -315,6 +332,7 @@ function saveScans(){ localStorage.setItem(LS_SCANS, JSON.stringify(scans)); }
 function saveLoc(){ localStorage.setItem(LS_LOC, JSON.stringify(loc)); }
 function saveBaseline(){ localStorage.setItem(LS_BASE, baseline ? JSON.stringify(baseline) : ''); }
 function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); }
+function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShelves)); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
@@ -369,6 +387,7 @@ function setKind(kind){
   document.getElementById('stp-tiroir-wrap').style.display = kind==='armoire' ? '' : 'none';
   document.getElementById('scan-mode-zone').style.display = kind==='catalogage' ? 'none' : '';
   document.getElementById('noncat-mode-zone').style.display = kind==='catalogage' ? '' : 'none';
+  document.getElementById('vide-row').style.display = kind==='travee' ? '' : 'none';
   refreshLoc();
 }
 kindTraveeBtn.addEventListener('click', ()=>setKind('travee'));
@@ -442,6 +461,8 @@ function refreshLoc(){
   updateStats();
   updateNonCatInput();
   renderNonCatLog();
+  updateVideUI();
+  renderVideLog();
   if(loc.kind==='catalogage') noncatInput.focus(); else scanInput.focus();
 }
 applyReserveVisibility();
@@ -634,6 +655,65 @@ function renderNonCatLog(){
   }));
 }
 
+/* ════════════ ÉTAGÈRES VIDES ════════════ */
+function videKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.etage}`; }
+
+function isCurrentVide(){ return !!videShelves[videKey(locFieldsOf(loc))]; }
+
+function updateVideUI(){
+  if(loc.kind!=='travee') return;
+  const btn = document.getElementById('btn-vide');
+  const marked = isCurrentVide();
+  btn.textContent = marked ? '☑ Étagère marquée vide' : '☐ Marquer cette étagère comme vide';
+  btn.classList.toggle('active', marked);
+}
+
+document.getElementById('btn-vide').addEventListener('click', ()=>{
+  const fields = locFieldsOf(loc);
+  const key = videKey(fields);
+  if(!videShelves[key]){
+    const hereCount = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
+    if(hereCount>0 && !confirm(`${hereCount} scan(s) déjà enregistré(s) sur cet emplacement. Marquer quand même cette étagère comme vide ?`)) return;
+    videShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    beep(660,.1);
+  } else {
+    delete videShelves[key];
+  }
+  saveVideShelves();
+  updateVideUI();
+  updateStats();
+  renderVideLog();
+});
+
+function renderVideLog(){
+  const tbody = document.getElementById('log-vide');
+  const rows = Object.values(videShelves).sort((a,b)=>{
+    const ta = TRAVEES_ALL.findIndex(t=>t.id===a.travee), tb = TRAVEES_ALL.findIndex(t=>t.id===b.travee);
+    if(ta!==tb) return ta-tb;
+    if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
+    return parseInt(a.etage,10)-parseInt(b.etage,10);
+  });
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucune étagère marquée vide pour l\'instant.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r=>`
+    <tr>
+      <td>Travée ${esc(displayTraveeId(r.travee))}</td>
+      <td>Col. ${esc(r.colonne)}</td>
+      <td>Étage ${esc(r.etage)}</td>
+      <td>${new Date(r.ts).toLocaleString('fr-FR')}</td>
+      <td><button class="log-del" data-key="${esc(videKey(r))}">✕</button></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>{
+    delete videShelves[b.dataset.key];
+    saveVideShelves();
+    updateStats();
+    updateVideUI();
+    renderVideLog();
+  }));
+}
+
 /* ════════════ ATTENDU ICI ════════════ */
 function renderExpected(){
   const list = document.getElementById('exp-list');
@@ -736,18 +816,29 @@ function updateStats(){
   }
   const nonCatTotal = Object.values(nonCat).reduce((s,r)=>s+r.count, 0);
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
+  document.getElementById('st-vide').textContent = Object.keys(videShelves).length.toLocaleString('fr-FR');
 }
 
-/* ════════════ EXPORT / IMPORT / RESET ════════════ */
-document.getElementById('btn-export').addEventListener('click', ()=>{
-  const blob = new Blob([JSON.stringify(Object.values(scans), null, 2)], {type:'application/json'});
+/* ════════════ EXPORT / IMPORT / RESET ════════════
+   Un seul fichier JSON regroupe scans, non-catalogués et étagères vides :
+   { scans:[...], nonCatalogues:[...], videShelves:[...] }.
+   Les anciens exports (simple tableau de scans) restent importables. */
+function exportPayload(){
+  return { scans: Object.values(scans), nonCatalogues: Object.values(nonCat), videShelves: Object.values(videShelves) };
+}
+function downloadJSON(data, prefix){
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   const d = new Date();
   const pad = n => String(n).padStart(2,'0');
-  a.download = `recolement-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}h${pad(d.getMinutes())}.json`;
+  a.download = `${prefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}h${pad(d.getMinutes())}.json`;
   a.href = URL.createObjectURL(blob);
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+}
+
+document.getElementById('btn-export').addEventListener('click', ()=>{
+  downloadJSON(exportPayload(), 'recolement');
 });
 
 document.getElementById('file-resume').addEventListener('change', function(e){
@@ -755,17 +846,28 @@ document.getElementById('file-resume').addEventListener('change', function(e){
   const reader = new FileReader();
   reader.onload = ev=>{
     try{
-      const rows = JSON.parse(ev.target.result);
+      const data = JSON.parse(ev.target.result);
+      const scanRows = Array.isArray(data) ? data : (data.scans||[]);
+      const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
+      const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+
       let added=0, updated=0;
-      rows.forEach(r=>{
+      scanRows.forEach(r=>{
         if(!r.barcode) return;
         if(scans[r.barcode]){
           if(!scans[r.barcode].ts || (r.ts||0) > scans[r.barcode].ts) { scans[r.barcode]=r; updated++; }
         } else { scans[r.barcode]=r; added++; }
       });
       saveScans();
-      alert(`Import terminé : ${added} nouveaux scans, ${updated} mis à jour.`);
-      renderExpected(); renderHereLog(); renderAllLog(''); updateStats();
+
+      nonCatRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonCat[nonCatKey(r)] = r; });
+      saveNonCat();
+
+      videRows.forEach(r=>{ if(r.travee && r.etage!==undefined) videShelves[videKey(r)] = r; });
+      saveVideShelves();
+
+      alert(`Import terminé : ${added} nouveaux scans, ${updated} mis à jour, ${nonCatRows.length} emplacement(s) non catalogué(s) fusionné(s), ${videRows.length} étagère(s) vide(s) fusionnée(s).`);
+      renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog();
     }catch(err){ alert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
@@ -777,7 +879,8 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
   const reader = new FileReader();
   reader.onload = ev=>{
     try{
-      const rows = JSON.parse(ev.target.result);
+      const data = JSON.parse(ev.target.result);
+      const rows = Array.isArray(data) ? data : (data.scans||[]);
       baseline = {};
       rows.forEach(r=>{ if(r.barcode) baseline[r.barcode]=r; });
       saveBaseline();
@@ -789,22 +892,12 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
   e.target.value='';
 });
 
-document.getElementById('btn-export-noncat').addEventListener('click', ()=>{
-  const blob = new Blob([JSON.stringify(Object.values(nonCat), null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  const d = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  a.download = `non-catalogues-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}h${pad(d.getMinutes())}.json`;
-  a.href = URL.createObjectURL(blob);
-  a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
-});
-
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  if(!confirm('Effacer tous les scans et tous les comptages de livres non catalogués enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
+  if(!confirm('Effacer tous les scans, tous les comptages de livres non catalogués et toutes les étagères marquées vides enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
   scans = {}; saveScans();
   nonCat = {}; saveNonCat();
-  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput();
+  videShelves = {}; saveVideShelves();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog();
 });
 
 /* ════════════ DÉMARRAGE ════════════ */

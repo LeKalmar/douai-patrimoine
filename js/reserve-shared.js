@@ -2,25 +2,25 @@
    partagés entre reserve.html et recolement.html. */
 
 const TRAVEES = [
-  {id:'I',     nbCols:4, maxEt:5},
-  {id:'II',    nbCols:5, maxEt:5},
-  {id:'III',   nbCols:5, maxEt:5},
+  {id:'I',     nbCols:4, maxEt:6},
+  {id:'II',    nbCols:5, maxEt:6},
+  {id:'III',   nbCols:5, maxEt:6},
   {id:'IV',    nbCols:5, maxEt:7},
   {id:'V',     nbCols:5, maxEt:9},
   {id:'VI',    nbCols:8, maxEt:8},
-  {id:'VII',   nbCols:8, maxEt:5},
-  {id:'VIII',  nbCols:8, maxEt:5},
-  {id:'IX',    nbCols:8, maxEt:5},
+  {id:'VII',   nbCols:8, maxEt:6},
+  {id:'VIII',  nbCols:8, maxEt:6},
+  {id:'IX',    nbCols:8, maxEt:6},
   {id:'X',     nbCols:8, maxEt:9},
   {id:'XI',    nbCols:8, maxEt:7},
-  {id:'XII',   nbCols:8, maxEt:5},
-  {id:'XIII',  nbCols:8, maxEt:5},
-  {id:'XIV',   nbCols:8, maxEt:5},
-  {id:'XV',    nbCols:8, maxEt:5},
-  {id:'XVI',   nbCols:8, maxEt:5},
-  {id:'XVII',  nbCols:8, maxEt:5},
-  {id:'XVIII', nbCols:8, maxEt:5},
-  {id:'XIX',   nbCols:8, maxEt:5},
+  {id:'XII',   nbCols:8, maxEt:6},
+  {id:'XIII',  nbCols:8, maxEt:6},
+  {id:'XIV',   nbCols:8, maxEt:6},
+  {id:'XV',    nbCols:8, maxEt:6},
+  {id:'XVI',   nbCols:8, maxEt:6},
+  {id:'XVII',  nbCols:8, maxEt:6},
+  {id:'XVIII', nbCols:8, maxEt:6},
+  {id:'XIX',   nbCols:8, maxEt:6},
 ];
 const GROUPES = [
   ['I'],
@@ -34,7 +34,7 @@ const GROUPES = [
    principale ci-dessus. Identifiants de travée préfixés "RD-" pour ne pas
    entrer en collision avec les travées I à VII de la réserve principale
    (les deux locaux numérotent leurs travées en chiffres romains à partir de I). */
-const TRAVEES_DOUAISIENNE = ['I','II','III','IV','V','VI','VII'].map(id => ({id:'RD-'+id, nbCols:5, maxEt:5}));
+const TRAVEES_DOUAISIENNE = ['I','II','III','IV','V','VI','VII'].map(id => ({id:'RD-'+id, nbCols:5, maxEt:6}));
 const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE];
 
 const RESERVES = [

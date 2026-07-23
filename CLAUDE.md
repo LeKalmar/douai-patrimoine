@@ -81,6 +81,20 @@ le `localStorage` du navigateur ; `reserve.html` relit ce
 partagent la géométrie de la réserve (travées, colonnes, armoires) via
 `js/reserve-shared.js`.
 
+`data/recolement.json` regroupe en un seul fichier trois catégories de
+données produites par `recolement.html` (un seul bouton « Exporter le
+récolement », un seul export/import à gérer) :
+`{ scans:[...], nonCatalogues:[...], videShelves:[...] }`. `videShelves`
+sert à marquer explicitement qu'une étagère est vide (aucun livre,
+catalogué ou non) — utile car le nombre d'étagères réelles par colonne
+varie (jusqu'à `maxEt` défini par travée dans `js/reserve-shared.js`, mais
+pas toujours atteint) et une étagère vide peut se trouver au milieu
+d'étagères remplies ; sans ce marquage, une étagère sans aucun scan
+au-delà du dernier scan serait simplement absente du calcul de `maxEt` par
+colonne dans `reserve.html`. Les anciens exports au format « tableau plat
+de scans » restent lus correctement (import et chargement dans
+`reserve.html`), pour ne pas casser d'anciens fichiers en circulation.
+
 `histoire-du-livre.html` est indépendante de ce flux : elle charge ses
 propres CSV (`csv/Professionnels.csv`, `Individus.csv`, `Documents.csv`,
 `Lieux.csv`, `Imprimeries.csv`, `periodiques.csv`, `auteurs.csv`) via

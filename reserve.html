@@ -206,14 +206,22 @@
    sont définis dans js/reserve-shared.js (partagé avec recolement.html). */
 
 /* ════════════ ÉTAT ════════════ */
-let CNT={}, DET={}, ADET={};
+let CNT={}, DET={}, ADET={}, VIDE={};
 let selId=null, filter='all', csvLoaded=false;
 
-/* ════════════ CHARGEMENT DU RÉCOLEMENT ════════════ */
+/* ════════════ CHARGEMENT DU RÉCOLEMENT ════════════
+   data/recolement.json regroupe scans, non-catalogués et étagères vides :
+   { scans:[...], nonCatalogues:[...], videShelves:[...] }.
+   Les anciens exports (simple tableau de scans) restent lisibles. */
 function loadRecolement(){
   fetch('data/recolement.json')
     .then(r=>{ if(!r.ok) throw new Error('missing'); return r.json(); })
-    .then(rows=>parseRecolement(rows))
+    .then(data=>{
+      const rows = Array.isArray(data) ? data : (data.scans||[]);
+      const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+      parseVide(videRows);
+      parseRecolement(rows);
+    })
     .catch(()=>{
       csvLoaded=true;
       document.getElementById('csv-loader').innerHTML=
@@ -221,6 +229,15 @@ function loadRecolement(){
       document.getElementById('sn').textContent='0';
       buildPlan();
     });
+}
+
+function parseVide(rows){
+  VIDE={};
+  (rows||[]).forEach(row=>{
+    const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
+    if(!t||!etage) return;
+    VIDE[`${t}|${col}|${etage}`]=true;
+  });
 }
 
 function parseRecolement(rows){
@@ -262,7 +279,7 @@ function parseRecolement(rows){
 
 /* ════════════ HELPERS ════════════ */
 function cnt(t,c,e){ return CNT[`${t}|${c}|${e}`]||0; }
-function hasData(tid){ return Object.keys(CNT).some(k=>k.startsWith(tid+'|')); }
+function hasData(tid){ return Object.keys(CNT).some(k=>k.startsWith(tid+'|')) || Object.keys(VIDE).some(k=>k.startsWith(tid+'|')); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function colsOf(tDef){
@@ -279,6 +296,7 @@ function colsOf(tDef){
 function maxEtageOf(tid,col){
   let m=0;
   Object.keys(CNT).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
+  Object.keys(VIDE).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
   if(!m){const d=TRAVEES_ALL.find(x=>x.id===tid);m=d?d.maxEt:5;}
   return m;
 }
@@ -286,6 +304,7 @@ function maxEtageOf(tid,col){
 function allEtagesOf(tid,col){
   const s=new Set();
   Object.keys(CNT).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col) s.add(e);});
+  Object.keys(VIDE).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col) s.add(e);});
   if(!s.size){const m=maxEtageOf(tid,col);for(let i=1;i<=m;i++) s.add(String(i));}
   return [...s].sort((a,b)=>{const na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb)) return na-nb;if(!isNaN(na)) return -1;if(!isNaN(nb)) return 1;return a.localeCompare(b,'fr');});
 }
@@ -463,7 +482,10 @@ function showNotices(tid,col,etage){
   const spec=isNaN(parseInt(etage));
   const lbl=spec?etage:`étage ${etage}`;
   if(!notices.length){
-    zone.innerHTML=`<p class="placeholder-msg" style="margin-top:.5rem">Aucune notice pour col. ${col}, ${lbl}.</p>`;
+    const msg=VIDE[key]
+      ? `Étagère confirmée vide lors du récolement (col. ${col}, ${lbl}).`
+      : `Aucune notice pour col. ${col}, ${lbl}.`;
+    zone.innerHTML=`<p class="placeholder-msg" style="margin-top:.5rem">${msg}</p>`;
     return;
   }
   zone.innerHTML=`<div class="notices-section">
