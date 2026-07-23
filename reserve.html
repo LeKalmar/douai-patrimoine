@@ -14,7 +14,7 @@
   <style>
     :root {
       --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
-      --plan-low: #1A1E99; --plan-mid: #E8445A; --plan-high: #C02840;
+      --plan-cat: #1A1E99; --plan-noncat: #F9A825;
       --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
       --red: #E8445A; --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
     }
@@ -47,6 +47,7 @@
     .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
     .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.75rem;line-height:1}
     .stat-card-val.green{color:#2e7d32}.stat-card-val.red{color:#c62828}
+    .stat-card-val.cat{color:var(--plan-cat)}.stat-card-val.noncat{color:var(--plan-noncat)}
     .legend-row{display:flex;flex-wrap:wrap;gap:.75rem;font-size:.75rem;color:#555;margin-bottom:1rem;align-items:center}
     .leg{display:flex;align-items:center;gap:.35rem}
     .leg-dot{width:13px;height:13px;border-radius:3px;flex-shrink:0}
@@ -137,32 +138,25 @@
       <div class="stats-row">
         <div class="stat-card"><div class="stat-card-label">Notices localisées</div><div class="stat-card-val" id="sn">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Emplacements totaux</div><div class="stat-card-val" id="st">—</div></div>
-        <div class="stat-card"><div class="stat-card-label">Occupés</div><div class="stat-card-val green" id="so">—</div></div>
-        <div class="stat-card"><div class="stat-card-label">Libres</div><div class="stat-card-val red" id="sv">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Catalogués</div><div class="stat-card-val cat" id="so">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Non catalogués</div><div class="stat-card-val noncat" id="so-noncat">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Vides confirmés</div><div class="stat-card-val green" id="sv">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Taux de remplissage</div><div class="stat-card-val" id="sr">—</div></div>
       </div>
 
       <div class="legend-row">
-        <div class="leg"><div class="leg-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></div><span>Vide</span></div>
-        <div class="leg"><div class="leg-dot" style="background:var(--plan-low)"></div><span>Occupé (&lt;20)</span></div>
-        <div class="leg"><div class="leg-dot" style="background:var(--plan-mid)"></div><span>Dense (20–80)</span></div>
-        <div class="leg"><div class="leg-dot" style="background:var(--plan-high)"></div><span>Très dense (&gt;80)</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-cat)"></div><span>Catalogué</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-noncat)"></div><span>Non catalogué</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></div><span>Vide (confirmé)</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></div><span>Non inventorié</span></div>
       </div>
 
       <div class="search-results" id="sres"></div>
 
       <div class="room-section">
-        <h2 class="room-section-title">Réserve principale</h2>
+        <h2 class="room-section-title">Réserve patrimoniale</h2>
         <div class="room-plan">
           <div class="room-inner" id="room-travees"></div>
-        </div>
-      </div>
-
-      <div class="room-section">
-        <h2 class="room-section-title">Réserve Douaisienne</h2>
-        <div class="room-plan">
-          <div class="room-inner" id="room-travees-douaisienne"></div>
         </div>
       </div>
 
@@ -177,6 +171,13 @@
         <h2 class="room-section-title">Armoires à tiroirs</h2>
         <div class="room-plan">
           <div class="room-inner" id="room-tiroirs"></div>
+        </div>
+      </div>
+
+      <div class="room-section">
+        <h2 class="room-section-title">Réserve Douaisienne</h2>
+        <div class="room-plan">
+          <div class="room-inner" id="room-travees-douaisienne"></div>
         </div>
       </div>
 
@@ -209,7 +210,7 @@
    (CNT/DET/colsOf/maxEtageOf) que les travées classiques. */
 
 /* ════════════ ÉTAT ════════════ */
-let CNT={}, DET={}, VIDE={};
+let CNT={}, DET={}, VIDE={}, NONCAT={};
 let selId=null, filter='all', csvLoaded=false;
 
 function travTitle(tid){
@@ -238,7 +239,9 @@ function loadRecolement(){
     .then(data=>{
       const rows = Array.isArray(data) ? data : (data.scans||[]);
       const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+      const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
       parseVide(videRows);
+      parseNonCat(nonCatRows);
       parseRecolement(rows);
     })
     .catch(()=>{
@@ -256,6 +259,16 @@ function parseVide(rows){
     const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
     if(!t||!etage) return;
     VIDE[`${t}|${col}|${etage}`]=true;
+  });
+}
+
+function parseNonCat(rows){
+  NONCAT={};
+  (rows||[]).forEach(row=>{
+    const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
+    const count=parseInt(row.count,10)||0;
+    if(!t||!etage||count<=0) return;
+    NONCAT[`${t}|${col}|${etage}`]=count;
   });
 }
 
@@ -291,8 +304,28 @@ function parseRecolement(rows){
 
 /* ════════════ HELPERS ════════════ */
 function cnt(t,c,e){ return CNT[`${t}|${c}|${e}`]||0; }
-function hasData(tid){ return Object.keys(CNT).some(k=>k.startsWith(tid+'|')) || Object.keys(VIDE).some(k=>k.startsWith(tid+'|')); }
+function nc(t,c,e){ return NONCAT[`${t}|${c}|${e}`]||0; }
+function hasData(tid){
+  return Object.keys(CNT).some(k=>k.startsWith(tid+'|'))
+    || Object.keys(VIDE).some(k=>k.startsWith(tid+'|'))
+    || Object.keys(NONCAT).some(k=>k.startsWith(tid+'|'));
+}
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* Catégorie d'un emplacement : catalogué > non catalogué > vide confirmé >
+   non inventorié (priorité dans cet ordre si plusieurs sont vrais à la fois). */
+function slotState(t,c,e){
+  if(cnt(t,c,e)>0) return 'cat';
+  if(nc(t,c,e)>0) return 'noncat';
+  if(VIDE[`${t}|${c}|${e}`]) return 'vide';
+  return 'unknown';
+}
+function stateColor(state){
+  if(state==='cat') return 'var(--plan-cat)';
+  if(state==='noncat') return 'var(--plan-noncat)';
+  if(state==='vide') return 'var(--plan-free)';
+  return 'var(--plan-unknown)';
+}
 
 function colsOf(tDef){
   const from=new Set();
@@ -307,25 +340,20 @@ function colsOf(tDef){
 
 function maxEtageOf(tid,col){
   let m=0;
-  Object.keys(CNT).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
-  Object.keys(VIDE).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
-  if(!m){const d=TRAVEES_ALL.find(x=>x.id===tid);m=d?d.maxEt:5;}
+  [CNT,VIDE,NONCAT].forEach(dict=>{
+    Object.keys(dict).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
+  });
+  if(!m){const d=LOCATIONS_ALL.find(x=>x.id===tid);m=d?d.maxEt:5;}
   return m;
 }
 
 function allEtagesOf(tid,col){
   const s=new Set();
-  Object.keys(CNT).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col) s.add(e);});
-  Object.keys(VIDE).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col) s.add(e);});
+  [CNT,VIDE,NONCAT].forEach(dict=>{
+    Object.keys(dict).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col) s.add(e);});
+  });
   if(!s.size){const m=maxEtageOf(tid,col);for(let i=1;i<=m;i++) s.add(String(i));}
   return [...s].sort((a,b)=>{const na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb)) return na-nb;if(!isNaN(na)) return -1;if(!isNaN(nb)) return 1;return a.localeCompare(b,'fr');});
-}
-
-function slotColor(n){
-  if(n===0)  return 'var(--plan-free)';
-  if(n<20)   return 'var(--plan-low)';
-  if(n<80)   return 'var(--plan-mid)';
-  return 'var(--plan-high)';
 }
 
 /* ════════════ CONSTRUCTION DU PLAN ════════════ */
@@ -375,13 +403,13 @@ function makeTraveeEl(tid,tDef,cols){
     const maxE=maxEtageOf(tid,col);
     const cd=document.createElement('div');cd.className='tv-col';
     for(let e=maxE;e>=1;e--){
-      const n=cnt(tid,col,String(e));
+      const state=slotState(tid,col,String(e));
       const s=document.createElement('div');s.className='tv-slot';
       const w=tDef.nbCols<=5?9:7, h=Math.max(7,Math.round(56/maxE));
-      let bg=known?slotColor(n):'var(--plan-unknown)';
+      const bg=stateColor(state);
       let op='1';
-      if(filter==='occ'&&n===0) op='.15';
-      if(filter==='free'&&n>0)  op='.15';
+      if(filter==='occ'&&!(state==='cat'||state==='noncat')) op='.15';
+      if(filter==='free'&&state!=='vide') op='.15';
       s.style.cssText=`width:${w}px;height:${h}px;background:${bg};opacity:${op}`;
       cd.appendChild(s);
     }
@@ -399,17 +427,24 @@ function makeTraveeEl(tid,tDef,cols){
 
 /* ════════════ STATS ════════════ */
 function updateStats(){
-  let total=0,occ=0;
+  let total=0,cat=0,noncat=0,vide=0;
   LOCATIONS_ALL.forEach(t=>{
     colsOf(t).forEach(col=>{
       const maxE=maxEtageOf(t.id,col);
-      for(let e=1;e<=maxE;e++){total++;if(cnt(t.id,col,String(e))>0) occ++;}
+      for(let e=1;e<=maxE;e++){
+        total++;
+        const state=slotState(t.id,col,String(e));
+        if(state==='cat') cat++;
+        else if(state==='noncat') noncat++;
+        else if(state==='vide') vide++;
+      }
     });
   });
   document.getElementById('st').textContent=total.toLocaleString('fr-FR');
-  document.getElementById('so').textContent=occ.toLocaleString('fr-FR');
-  document.getElementById('sv').textContent=(total-occ).toLocaleString('fr-FR');
-  document.getElementById('sr').textContent=total?Math.round(occ/total*100)+' %':'—';
+  document.getElementById('so').textContent=cat.toLocaleString('fr-FR');
+  document.getElementById('so-noncat').textContent=noncat.toLocaleString('fr-FR');
+  document.getElementById('sv').textContent=vide.toLocaleString('fr-FR');
+  document.getElementById('sr').textContent=total?Math.round((cat+noncat)/total*100)+' %':'—';
 }
 
 /* ════════════ DÉTAIL TRAVÉE ════════════ */
@@ -439,12 +474,16 @@ function selectTravee(tid,tDef,cols){
     let colTotal=0, rows='';
     [...etages].reverse().forEach(e=>{
       const n=cnt(tid,col,e); colTotal+=n;
-      const pct=Math.min(100,Math.round(n/200*100));
+      const ncCount=nc(tid,col,e);
+      const state=slotState(tid,col,e);
+      const qty=state==='cat'?n:(state==='noncat'?ncCount:0);
+      const pct=Math.min(100,Math.round(qty/200*100));
+      const countLabel=state==='cat'?n:(state==='noncat'?ncCount+' n.c.':(state==='vide'?'vide':''));
       const spec=isNaN(parseInt(e));
       rows+=`<div class="etage-row" onclick="showNotices('${tid}','${col}','${e}')">
         <span class="etage-lbl">${spec?e:etageLabelPrefix(tid)+' '+e}</span>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${slotColor(n)}"></div>
-        <div class="bar-count">${n}</div></div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${stateColor(state)}"></div>
+        <div class="bar-count">${countLabel}</div></div>
       </div>`;
     });
     html+=`<div class="detail-col">
@@ -462,18 +501,20 @@ function showNotices(tid,col,etage){
   if(!zone) return;
   const key=`${tid}|${col}|${etage}`;
   const notices=DET[key]||[];
+  const ncCount=NONCAT[key]||0;
   const spec=isNaN(parseInt(etage));
   const lbl=spec?etage:`${etageWordFor(tid)} ${etage}`;
   if(!notices.length){
-    const msg=VIDE[key]
-      ? `Emplacement confirmé vide lors du récolement (col. ${col}, ${lbl}).`
-      : `Aucune notice pour col. ${col}, ${lbl}.`;
+    let msg;
+    if(ncCount) msg=`${ncCount} livre(s) non catalogué(s) estimé(s) sur cet emplacement (col. ${col}, ${lbl}) — aucune notice cataloguée.`;
+    else if(VIDE[key]) msg=`Emplacement confirmé vide lors du récolement (col. ${col}, ${lbl}).`;
+    else msg=`Aucune notice pour col. ${col}, ${lbl}.`;
     zone.innerHTML=`<p class="placeholder-msg" style="margin-top:.5rem">${msg}</p>`;
     return;
   }
   zone.innerHTML=`<div class="notices-section">
     <div class="notices-header">
-      <span class="notices-title">Col. ${col} — ${lbl} (${notices.length})</span>
+      <span class="notices-title">Col. ${col} — ${lbl} (${notices.length})${ncCount?` <span style="color:var(--plan-noncat);font-weight:400;text-transform:none;letter-spacing:0">+ ${ncCount} non catalogué(s)</span>`:''}</span>
       <div class="notices-sort">Trier par&nbsp;
         <select onchange="rerenderEtage('${key}',this.value)">
           <option value="cote">Cote</option>

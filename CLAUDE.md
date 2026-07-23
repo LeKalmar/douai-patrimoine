@@ -110,6 +110,18 @@ colonne dans `reserve.html`. Les anciens exports au format « tableau plat
 de scans » restent lus correctement (import et chargement dans
 `reserve.html`), pour ne pas casser d'anciens fichiers en circulation.
 
+Le code couleur du plan (`reserve.html`) est catégoriel, pas un dégradé de
+densité : chaque emplacement (travée/colonne/étage, ou meuble/étage pour
+armoires et tiroirs) est classé en **catalogué** (bleu, au moins un
+exemplaire catalogué via `scans`), **non catalogué** (ambre, aucun
+catalogué mais un comptage `nonCatalogues` > 0), **vide confirmé** (vert,
+marqué via `videShelves`) ou **non inventorié** (gris, aucune des trois
+données ci-dessus) — dans cet ordre de priorité (`slotState()` dans
+`reserve.html`). Il n'y a volontairement pas de code couleur par quantité
+de livres (impossible à estimer sans mesurer chaque reliure) ; la quantité
+reste visible via la largeur des barres et les compteurs dans le panneau
+de détail, mais jamais via la couleur.
+
 `histoire-du-livre.html` est indépendante de ce flux : elle charge ses
 propres CSV (`csv/Professionnels.csv`, `Individus.csv`, `Documents.csv`,
 `Lieux.csv`, `Imprimeries.csv`, `periodiques.csv`, `auteurs.csv`) via
