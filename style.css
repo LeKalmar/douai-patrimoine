@@ -944,26 +944,23 @@ ul { list-style: none; }
 .footer-bottom a { color: var(--warm-dark); }
 
 /* === ESPACE PROFESSIONNEL === */
-.footer-admin-bar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.5rem 1.5rem;
-}
 .admin-trigger {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.9rem;
   background: none;
   border: none;
   font-size: 0.95rem;
   line-height: 1;
-  color: var(--border);
-  opacity: 0.5;
+  color: #fff;
+  opacity: 0.25;
   cursor: pointer;
-  padding: 0.35rem 0.5rem;
-  transition: opacity var(--transition), color var(--transition);
+  padding: 0.35rem;
+  transition: opacity var(--transition);
 }
 .admin-trigger:hover,
 .admin-trigger:focus-visible {
-  opacity: 1;
-  color: var(--text-light);
+  opacity: 0.8;
 }
 .admin-modal {
   position: fixed;
