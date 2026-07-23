@@ -349,19 +349,21 @@ document.querySelectorAll('[data-step]').forEach(btn=>{
   });
 });
 
+function colLetter(n){ return String.fromCharCode(64+n); }
+
 function locFieldsOf(l){
-  if(l.kind==='travee') return { travee:l.travee, colonne:String(l.colonne), etage:String(l.etage) };
+  if(l.kind==='travee') return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
   const arm = ARMOIRES.find(a=>a.id===l.armoireId) || ARMOIRES[0];
   return { travee: arm.csvId, colonne:'', etage:String(l.tiroir) };
 }
 
 function refreshLoc(){
   saveLoc();
-  document.getElementById('val-colonne').textContent = loc.colonne;
+  document.getElementById('val-colonne').textContent = colLetter(loc.colonne);
   document.getElementById('val-etage').textContent = loc.etage;
   document.getElementById('val-tiroir').textContent = loc.tiroir;
   const readout = loc.kind==='travee'
-    ? `Travée ${loc.travee} · Col. ${loc.colonne} · Étage ${loc.etage}`
+    ? `Travée ${loc.travee} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`
     : `${currentArmoireDef().label} · N°${loc.tiroir}`;
   document.getElementById('loc-readout').textContent = readout;
   renderExpected();
@@ -383,6 +385,21 @@ function beep(freq, dur){
     g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime+dur);
     o.connect(g); g.connect(audioCtx.destination);
     o.start(); o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+function beepError(){
+  if(!document.getElementById('sound-toggle').checked) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    [0, .16].forEach(offset=>{
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type='square'; o.frequency.value=160;
+      g.gain.setValueAtTime(.15, now+offset);
+      g.gain.exponentialRampToValueAtTime(.001, now+offset+.14);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(now+offset); o.stop(now+offset+.14);
+    });
   }catch(e){}
 }
 
@@ -422,11 +439,13 @@ function handleScan(barcode){
   else if(prev) status = 'moved';
   else status = 'ok';
 
-  scans[barcode] = record;
-  saveScans();
+  if(status!=='unknown'){
+    scans[barcode] = record;
+    saveScans();
+  }
 
   showFeedback(record, status, prev);
-  beep(status==='unknown' ? 220 : 880, status==='unknown' ? .25 : .12);
+  if(status==='unknown') beepError(); else beep(880, .12);
 
   renderExpected();
   renderHereLog();
@@ -455,10 +474,11 @@ function showFeedback(record, status, prev){
   if(status==='unknown'){
     document.getElementById('manual-save').addEventListener('click', ()=>{
       const v = document.getElementById('manual-cote').value.trim();
-      if(v && scans[record.barcode]){
-        scans[record.barcode].cote = v;
-        scans[record.barcode].fonds = getFondsFromCote(v);
-        saveScans(); renderHereLog();
+      if(v){
+        record.cote = v;
+        record.fonds = getFondsFromCote(v);
+        scans[record.barcode] = record;
+        saveScans(); renderExpected(); renderHereLog(); updateStats();
       }
       scanInput.focus();
     });

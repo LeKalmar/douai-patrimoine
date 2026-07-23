@@ -257,7 +257,7 @@ function colsOf(tDef){
     if(!isNaN(na)&&!isNaN(nb)) return na-nb;
     return a.localeCompare(b,'fr');
   });
-  const c=[]; for(let i=1;i<=tDef.nbCols;i++) c.push(String(i)); return c;
+  const c=[]; for(let i=1;i<=tDef.nbCols;i++) c.push(String.fromCharCode(64+i)); return c;
 }
 
 function maxEtageOf(tid,col){
