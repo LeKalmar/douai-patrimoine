@@ -2451,6 +2451,902 @@
       "etage": "8",
       "count": 62,
       "ts": 1784818650504
+    },
+    {
+      "travee": "I",
+      "colonne": "A",
+      "etage": "1",
+      "count": 28,
+      "ts": 1784818903935
+    },
+    {
+      "travee": "I",
+      "colonne": "A",
+      "etage": "2",
+      "count": 21,
+      "ts": 1784818944885
+    },
+    {
+      "travee": "I",
+      "colonne": "A",
+      "etage": "3",
+      "count": 1,
+      "ts": 1784818947882
+    },
+    {
+      "travee": "I",
+      "colonne": "A",
+      "etage": "4",
+      "count": 48,
+      "ts": 1784818959132
+    },
+    {
+      "travee": "I",
+      "colonne": "A",
+      "etage": "5",
+      "count": 15,
+      "ts": 1784818978591
+    },
+    {
+      "travee": "I",
+      "colonne": "B",
+      "etage": "1",
+      "count": 11,
+      "ts": 1784818988316
+    },
+    {
+      "travee": "I",
+      "colonne": "B",
+      "etage": "2",
+      "count": 12,
+      "ts": 1784818995614
+    },
+    {
+      "travee": "I",
+      "colonne": "B",
+      "etage": "3",
+      "count": 14,
+      "ts": 1784819002665
+    },
+    {
+      "travee": "I",
+      "colonne": "B",
+      "etage": "4",
+      "count": 15,
+      "ts": 1784819008669
+    },
+    {
+      "travee": "I",
+      "colonne": "B",
+      "etage": "5",
+      "count": 13,
+      "ts": 1784819022466
+    },
+    {
+      "travee": "I",
+      "colonne": "C",
+      "etage": "1",
+      "count": 14,
+      "ts": 1784819032267
+    },
+    {
+      "travee": "I",
+      "colonne": "C",
+      "etage": "2",
+      "count": 23,
+      "ts": 1784819040159
+    },
+    {
+      "travee": "I",
+      "colonne": "C",
+      "etage": "3",
+      "count": 44,
+      "ts": 1784819051237
+    },
+    {
+      "travee": "I",
+      "colonne": "C",
+      "etage": "4",
+      "count": 85,
+      "ts": 1784819065742
+    },
+    {
+      "travee": "I",
+      "colonne": "C",
+      "etage": "5",
+      "count": 35,
+      "ts": 1784819075025
+    },
+    {
+      "travee": "I",
+      "colonne": "D",
+      "etage": "1",
+      "count": 75,
+      "ts": 1784819089682
+    },
+    {
+      "travee": "I",
+      "colonne": "D",
+      "etage": "2",
+      "count": 30,
+      "ts": 1784819099909
+    },
+    {
+      "travee": "I",
+      "colonne": "D",
+      "etage": "3",
+      "count": 28,
+      "ts": 1784819113404
+    },
+    {
+      "travee": "I",
+      "colonne": "D",
+      "etage": "4",
+      "count": 74,
+      "ts": 1784819125338
+    },
+    {
+      "travee": "I",
+      "colonne": "D",
+      "etage": "5",
+      "count": 81,
+      "ts": 1784819136575
+    },
+    {
+      "travee": "II",
+      "colonne": "A",
+      "etage": "1",
+      "count": 71,
+      "ts": 1784819149412
+    },
+    {
+      "travee": "II",
+      "colonne": "A",
+      "etage": "2",
+      "count": 66,
+      "ts": 1784819159091
+    },
+    {
+      "travee": "II",
+      "colonne": "A",
+      "etage": "3",
+      "count": 11,
+      "ts": 1784819167616
+    },
+    {
+      "travee": "II",
+      "colonne": "A",
+      "etage": "4",
+      "count": 20,
+      "ts": 1784819174036
+    },
+    {
+      "travee": "II",
+      "colonne": "A",
+      "etage": "5",
+      "count": 30,
+      "ts": 1784819181595
+    },
+    {
+      "travee": "II",
+      "colonne": "B",
+      "etage": "1",
+      "count": 52,
+      "ts": 1784819195485
+    },
+    {
+      "travee": "II",
+      "colonne": "B",
+      "etage": "2",
+      "count": 63,
+      "ts": 1784819207514
+    },
+    {
+      "travee": "II",
+      "colonne": "B",
+      "etage": "3",
+      "count": 34,
+      "ts": 1784819218671
+    },
+    {
+      "travee": "II",
+      "colonne": "B",
+      "etage": "4",
+      "count": 66,
+      "ts": 1784819251871
+    },
+    {
+      "travee": "II",
+      "colonne": "B",
+      "etage": "5",
+      "count": 67,
+      "ts": 1784819263735
+    },
+    {
+      "travee": "II",
+      "colonne": "C",
+      "etage": "1",
+      "count": 81,
+      "ts": 1784819280260
+    },
+    {
+      "travee": "II",
+      "colonne": "C",
+      "etage": "2",
+      "count": 49,
+      "ts": 1784819292703
+    },
+    {
+      "travee": "II",
+      "colonne": "C",
+      "etage": "3",
+      "count": 37,
+      "ts": 1784819306390
+    },
+    {
+      "travee": "II",
+      "colonne": "C",
+      "etage": "4",
+      "count": 32,
+      "ts": 1784819317189
+    },
+    {
+      "travee": "II",
+      "colonne": "C",
+      "etage": "5",
+      "count": 62,
+      "ts": 1784819333299
+    },
+    {
+      "travee": "II",
+      "colonne": "D",
+      "etage": "1",
+      "count": 47,
+      "ts": 1784819357571
+    },
+    {
+      "travee": "II",
+      "colonne": "D",
+      "etage": "2",
+      "count": 77,
+      "ts": 1784819370973
+    },
+    {
+      "travee": "II",
+      "colonne": "D",
+      "etage": "3",
+      "count": 84,
+      "ts": 1784819386195
+    },
+    {
+      "travee": "II",
+      "colonne": "D",
+      "etage": "4",
+      "count": 123,
+      "ts": 1784819406145
+    },
+    {
+      "travee": "II",
+      "colonne": "D",
+      "etage": "5",
+      "count": 26,
+      "ts": 1784819419503
+    },
+    {
+      "travee": "II",
+      "colonne": "E",
+      "etage": "1",
+      "count": 10,
+      "ts": 1784819433042
+    },
+    {
+      "travee": "II",
+      "colonne": "E",
+      "etage": "2",
+      "count": 13,
+      "ts": 1784819440721
+    },
+    {
+      "travee": "II",
+      "colonne": "E",
+      "etage": "3",
+      "count": 3,
+      "ts": 1784819446673
+    },
+    {
+      "travee": "II",
+      "colonne": "E",
+      "etage": "4",
+      "count": 5,
+      "ts": 1784819451006
+    },
+    {
+      "travee": "III",
+      "colonne": "A",
+      "etage": "1",
+      "count": 191,
+      "ts": 1784819539644
+    },
+    {
+      "travee": "III",
+      "colonne": "A",
+      "etage": "2",
+      "count": 207,
+      "ts": 1784819553138
+    },
+    {
+      "travee": "III",
+      "colonne": "A",
+      "etage": "3",
+      "count": 88,
+      "ts": 1784819564881
+    },
+    {
+      "travee": "III",
+      "colonne": "A",
+      "etage": "4",
+      "count": 37,
+      "ts": 1784819586193
+    },
+    {
+      "travee": "III",
+      "colonne": "A",
+      "etage": "5",
+      "count": 10,
+      "ts": 1784819597048
+    },
+    {
+      "travee": "IV",
+      "colonne": "C",
+      "etage": "1",
+      "count": 1,
+      "ts": 1784819614623
+    },
+    {
+      "travee": "IV",
+      "colonne": "C",
+      "etage": "2",
+      "count": 1,
+      "ts": 1784819616256
+    },
+    {
+      "travee": "IV",
+      "colonne": "C",
+      "etage": "3",
+      "count": 1,
+      "ts": 1784819618049
+    },
+    {
+      "travee": "IV",
+      "colonne": "C",
+      "etage": "4",
+      "count": 1,
+      "ts": 1784819619744
+    },
+    {
+      "travee": "IV",
+      "colonne": "C",
+      "etage": "5",
+      "count": 4,
+      "ts": 1784819625850
+    },
+    {
+      "travee": "IV",
+      "colonne": "C",
+      "etage": "6",
+      "count": 2,
+      "ts": 1784819636885
+    },
+    {
+      "travee": "IV",
+      "colonne": "D",
+      "etage": "1",
+      "count": 1,
+      "ts": 1784819658063
+    },
+    {
+      "travee": "IV",
+      "colonne": "D",
+      "etage": "2",
+      "count": 1,
+      "ts": 1784819659498
+    },
+    {
+      "travee": "IV",
+      "colonne": "D",
+      "etage": "3",
+      "count": 1,
+      "ts": 1784819661332
+    },
+    {
+      "travee": "IV",
+      "colonne": "D",
+      "etage": "4",
+      "count": 1,
+      "ts": 1784819663048
+    },
+    {
+      "travee": "IV",
+      "colonne": "D",
+      "etage": "5",
+      "count": 3,
+      "ts": 1784819671237
+    },
+    {
+      "travee": "IV",
+      "colonne": "D",
+      "etage": "6",
+      "count": 1,
+      "ts": 1784819674697
+    },
+    {
+      "travee": "IV",
+      "colonne": "D",
+      "etage": "7",
+      "count": 3,
+      "ts": 1784819676372
+    },
+    {
+      "travee": "IV",
+      "colonne": "E",
+      "etage": "1",
+      "count": 14,
+      "ts": 1784819690140
+    },
+    {
+      "travee": "IV",
+      "colonne": "E",
+      "etage": "2",
+      "count": 1,
+      "ts": 1784819694087
+    },
+    {
+      "travee": "IV",
+      "colonne": "E",
+      "etage": "3",
+      "count": 3,
+      "ts": 1784819698860
+    },
+    {
+      "travee": "IV",
+      "colonne": "E",
+      "etage": "4",
+      "count": 1,
+      "ts": 1784819702689
+    },
+    {
+      "travee": "IV",
+      "colonne": "E",
+      "etage": "5",
+      "count": 1,
+      "ts": 1784819707102
+    },
+    {
+      "travee": "IV",
+      "colonne": "E",
+      "etage": "6",
+      "count": 8,
+      "ts": 1784819714293
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "1",
+      "count": 13,
+      "ts": 1784819724409
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "2",
+      "count": 2,
+      "ts": 1784819728084
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "3",
+      "count": 6,
+      "ts": 1784819734799
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "4",
+      "count": 11,
+      "ts": 1784819740522
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "5",
+      "count": 2,
+      "ts": 1784819745329
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "6",
+      "count": 3,
+      "ts": 1784819750194
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "7",
+      "count": 2,
+      "ts": 1784819758038
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "8",
+      "count": 2,
+      "ts": 1784819761923
+    },
+    {
+      "travee": "V",
+      "colonne": "A",
+      "etage": "9",
+      "count": 3,
+      "ts": 1784819766043
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "1",
+      "count": 2,
+      "ts": 1784819778939
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "2",
+      "count": 2,
+      "ts": 1784819780301
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "3",
+      "count": 2,
+      "ts": 1784819784306
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "4",
+      "count": 19,
+      "ts": 1784819791653
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "5",
+      "count": 3,
+      "ts": 1784819798082
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "6",
+      "count": 1,
+      "ts": 1784819800204
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "7",
+      "count": 3,
+      "ts": 1784819804715
+    },
+    {
+      "travee": "V",
+      "colonne": "B",
+      "etage": "8",
+      "count": 1,
+      "ts": 1784819808853
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "1",
+      "count": 7,
+      "ts": 1784819823119
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "2",
+      "count": 5,
+      "ts": 1784819830354
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "3",
+      "count": 2,
+      "ts": 1784819835473
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "4",
+      "count": 21,
+      "ts": 1784819843483
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "5",
+      "count": 11,
+      "ts": 1784819858813
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "6",
+      "count": 6,
+      "ts": 1784819864283
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "7",
+      "count": 5,
+      "ts": 1784819874334
+    },
+    {
+      "travee": "V",
+      "colonne": "C",
+      "etage": "8",
+      "count": 30,
+      "ts": 1784819883510
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "1",
+      "count": 10,
+      "ts": 1784819892105
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "2",
+      "count": 64,
+      "ts": 1784819904695
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "3",
+      "count": 20,
+      "ts": 1784819912421
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "4",
+      "count": 2,
+      "ts": 1784819917083
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "5",
+      "count": 9,
+      "ts": 1784819924667
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "6",
+      "count": 2,
+      "ts": 1784819928552
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "7",
+      "count": 1,
+      "ts": 1784819932260
+    },
+    {
+      "travee": "V",
+      "colonne": "D",
+      "etage": "8",
+      "count": 1,
+      "ts": 1784819935894
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "1",
+      "count": 4,
+      "ts": 1784819944636
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "2",
+      "count": 2,
+      "ts": 1784819949317
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "3",
+      "count": 1,
+      "ts": 1784819953454
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "4",
+      "count": 3,
+      "ts": 1784819959049
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "5",
+      "count": 1,
+      "ts": 1784819964280
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "7",
+      "count": 3,
+      "ts": 1784819975733
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "8",
+      "count": 2,
+      "ts": 1784819980515
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "9",
+      "count": 7,
+      "ts": 1784819990956
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "1",
+      "count": 5,
+      "ts": 1784820002079
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "2",
+      "count": 3,
+      "ts": 1784820007556
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "3",
+      "count": 4,
+      "ts": 1784820013734
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "4",
+      "count": 7,
+      "ts": 1784820022038
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "5",
+      "count": 5,
+      "ts": 1784820042150
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "6",
+      "count": 9,
+      "ts": 1784820048711
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "7",
+      "count": 10,
+      "ts": 1784820060563
+    },
+    {
+      "travee": "VI",
+      "colonne": "A",
+      "etage": "8",
+      "count": 6,
+      "ts": 1784820068039
+    },
+    {
+      "travee": "VI",
+      "colonne": "B",
+      "etage": "1",
+      "count": 22,
+      "ts": 1784820083925
+    },
+    {
+      "travee": "VI",
+      "colonne": "B",
+      "etage": "2",
+      "count": 7,
+      "ts": 1784820090179
+    },
+    {
+      "travee": "VI",
+      "colonne": "B",
+      "etage": "3",
+      "count": 12,
+      "ts": 1784820096353
+    },
+    {
+      "travee": "VI",
+      "colonne": "B",
+      "etage": "4",
+      "count": 9,
+      "ts": 1784820103439
+    },
+    {
+      "travee": "VI",
+      "colonne": "B",
+      "etage": "5",
+      "count": 9,
+      "ts": 1784820109879
+    },
+    {
+      "travee": "VI",
+      "colonne": "B",
+      "etage": "6",
+      "count": 1,
+      "ts": 1784820114060
+    },
+    {
+      "travee": "VI",
+      "colonne": "C",
+      "etage": "1",
+      "count": 1,
+      "ts": 1784820119869
+    },
+    {
+      "travee": "VI",
+      "colonne": "C",
+      "etage": "2",
+      "count": 2,
+      "ts": 1784820125455
+    },
+    {
+      "travee": "VI",
+      "colonne": "C",
+      "etage": "3",
+      "count": 6,
+      "ts": 1784820131969
+    },
+    {
+      "travee": "VI",
+      "colonne": "C",
+      "etage": "4",
+      "count": 3,
+      "ts": 1784820136589
+    },
+    {
+      "travee": "VI",
+      "colonne": "C",
+      "etage": "5",
+      "count": 36,
+      "ts": 1784820159471
     }
   ],
   "videShelves": [
@@ -2459,6 +3355,12 @@
       "colonne": "C",
       "etage": "3",
       "ts": 1784816513519
+    },
+    {
+      "travee": "V",
+      "colonne": "E",
+      "etage": "6",
+      "ts": 1784819969891
     }
   ]
 }
