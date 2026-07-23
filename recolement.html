@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Récolement — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="js/reserve-shared.js"></script>
+<style>
+  :root{
+    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0;line-height:1.15}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+
+  .locbar{position:sticky;top:0;z-index:20;background:#F5F5FF;border-bottom:1px solid #ddd;padding:.75rem 0;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .locbar .container{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
+  .loc-kind{display:flex;border:1px solid #ccc;border-radius:8px;overflow:hidden;flex-shrink:0}
+  .loc-kind button{font-family:inherit;font-size:.78rem;padding:.4rem .8rem;border:none;background:#fff;cursor:pointer;color:#555}
+  .loc-kind button.active{background:#12157A;color:#fff}
+  .loc-sel{font-family:inherit;font-size:.85rem;padding:.4rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
+  .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
+  .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
+  .stepper button:hover{background:#e0e0e0}
+  .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#12157A}
+  .loc-readout{margin-left:auto;font-size:.85rem;color:#12157A;font-weight:600;background:#fff;border:1px solid #ccc;border-radius:20px;padding:.4rem 1rem}
+
+  .section{padding:1.5rem 0}
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem}
+  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+  .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1}
+
+  .scan-zone{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
+  .scan-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  #scan-input{flex:1;min-width:220px;font-size:1.2rem;font-family:'DM Mono',monospace,inherit;padding:.75rem 1rem;border:1px solid #ccc;border-radius:8px;outline:none}
+  #scan-input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
+  .sound-toggle{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#666;white-space:nowrap}
+
+  .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9}
+  .feedback.warn{background:#fff8e1;border:1px solid #ffe0b2}
+  .feedback.dup{background:#e3f2fd;border:1px solid #bbdefb}
+  .fb-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
+  .fb-badge{font-size:.68rem;padding:2px 9px;border-radius:20px;font-weight:600}
+  .fb-badge.ok{background:#c8e6c9;color:#1b5e20}
+  .fb-badge.warn{background:#ffe0b2;color:#e65100}
+  .fb-badge.dup{background:#bbdefb;color:#0d47a1}
+  .fb-cote{font-family:monospace;font-weight:700;color:#12157A}
+  .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
+  .fb-meta{font-size:.75rem;color:#888}
+  .fb-manual{margin-top:.5rem;display:flex;gap:.4rem;align-items:center}
+  .fb-manual input{font-size:.8rem;padding:.35rem .6rem;border:1px solid #ccc;border-radius:6px;flex:1;max-width:220px}
+  .fb-manual button{font-size:.78rem;padding:.35rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer}
+
+  .expected-panel{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem;margin-bottom:1.25rem}
+  .expected-title{font-size:.8rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
+  .expected-count{font-weight:400;text-transform:none;letter-spacing:0;color:#888;font-size:.78rem}
+  .exp-list{max-height:220px;overflow-y:auto;font-size:.8rem}
+  .exp-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem;border-bottom:1px solid #f0f0f0}
+  .exp-row:last-child{border-bottom:none}
+  .exp-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .exp-dot.conf{background:var(--ok)}.exp-dot.moved{background:var(--warn)}.exp-dot.missing{background:#ccc}
+  .exp-cote{font-family:monospace;min-width:80px;color:#12157A}
+  .exp-titre{flex:1;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .exp-empty{font-size:.8rem;color:#999;font-style:italic}
+
+  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem}
+  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
+  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:160px}
+  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
+  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0}
+  .log-table td{padding:.35rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .log-table tr:hover td{background:#fafafa}
+  .log-body{max-height:340px;overflow-y:auto}
+  .log-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:.85rem;padding:2px 6px}
+  .log-empty{padding:1rem;text-align:center;color:#bbb;font-style:italic;font-size:.8rem}
+
+  .tools-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem;margin-bottom:2rem}
+  .tool-card{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem}
+  .tool-card h3{font-family:'DM Serif Display',serif;font-weight:400;font-size:1rem;margin:0 0 .5rem;color:#12157A}
+  .tool-card p{font-size:.78rem;color:#888;margin:0 0 .7rem;line-height:1.4}
+  .tool-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #12157A;border-radius:8px;background:#12157A;color:#fff;cursor:pointer;display:inline-block;text-decoration:none}
+  .tool-btn:hover{background:#1c1fa0}
+  .tool-btn.secondary{background:#fff;color:#12157A}
+  .tool-btn.secondary:hover{background:#F5F5FF}
+  .tool-btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
+  .tool-btn.danger:hover{background:#fff5f5}
+  input[type=file]{display:none}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+  @media(max-width:640px){.loc-readout{margin-left:0;order:99;width:100%;text-align:center}}
+</style>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
+      <h1 class="page-title">Récolement</h1>
+    </div>
+    <div class="hero-actions">
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<div class="locbar">
+  <div class="container">
+    <div class="loc-kind">
+      <button type="button" id="kind-travee" class="active">Travée</button>
+      <button type="button" id="kind-armoire">Armoire</button>
+    </div>
+
+    <select class="loc-sel" id="sel-travee"></select>
+    <div class="stepper" id="stp-colonne-wrap">
+      <button type="button" data-step="colonne" data-dir="-1">−</button>
+      <span id="val-colonne">1</span>
+      <button type="button" data-step="colonne" data-dir="1">+</button>
+    </div>
+    <div class="stepper" id="stp-etage-wrap">
+      <button type="button" data-step="etage" data-dir="-1">−</button>
+      <span id="val-etage">1</span>
+      <button type="button" data-step="etage" data-dir="1">+</button>
+    </div>
+
+    <select class="loc-sel" id="sel-armoire" style="display:none"></select>
+    <div class="stepper" id="stp-tiroir-wrap" style="display:none">
+      <button type="button" data-step="tiroir" data-dir="-1">−</button>
+      <span id="val-tiroir">1</span>
+      <button type="button" data-step="tiroir" data-dir="1">+</button>
+    </div>
+
+    <span class="loc-readout" id="loc-readout">—</span>
+  </div>
+</div>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-card-label">Scans enregistrés</div><div class="stat-card-val" id="st-total">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Notices cataloguées</div><div class="stat-card-val" id="st-catalog">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Progression</div><div class="stat-card-val" id="st-progress">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
+      </div>
+
+      <div class="scan-zone">
+        <div class="scan-row">
+          <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
+          <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
+        </div>
+        <div class="feedback" id="feedback"></div>
+      </div>
+
+      <div class="expected-panel">
+        <div class="expected-title">
+          <span>Attendu à cet emplacement <span class="expected-count" id="exp-count"></span></span>
+        </div>
+        <div class="exp-list" id="exp-list"><p class="exp-empty">Aucune donnée de référence importée — chargez un récolement de référence pour comparer.</p></div>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">Scans récents ici</span>
+        </div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Cote</th><th>Titre</th><th>Heure</th><th>Code-barre</th><th></th></tr></thead>
+          <tbody id="log-here"></tbody>
+        </table></div>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">Tous les scans</span>
+          <input type="text" class="log-search" id="log-search" placeholder="Filtrer (cote, titre, code-barre)…">
+        </div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
+          <tbody id="log-all"></tbody>
+        </table></div>
+      </div>
+
+      <div class="tools-row">
+        <div class="tool-card">
+          <h3>Exporter</h3>
+          <p>Télécharge l'ensemble des scans en cours en JSON. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
+          <button type="button" class="tool-btn" id="btn-export">⬇ Exporter le récolement</button>
+        </div>
+        <div class="tool-card">
+          <h3>Reprendre une session</h3>
+          <p>Importe un export JSON précédent et le fusionne avec les scans en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
+          <label class="tool-btn secondary" for="file-resume">⬆ Importer et fusionner</label>
+          <input type="file" id="file-resume" accept="application/json">
+        </div>
+        <div class="tool-card">
+          <h3>Récolement de référence</h3>
+          <p>Charge un export JSON précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher aux scans en cours.</p>
+          <label class="tool-btn secondary" for="file-baseline">⬆ Charger une référence</label>
+          <input type="file" id="file-baseline" accept="application/json">
+        </div>
+        <div class="tool-card">
+          <h3>Réinitialiser</h3>
+          <p>Efface tous les scans enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
+          <button type="button" class="tool-btn danger" id="btn-reset">✕ Tout effacer</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function(){
+/* ════════════ AUTH ════════════ */
+if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+  window.location.href = 'index.html';
+  return;
+}
+document.getElementById('logout-btn').addEventListener('click', function(){
+  sessionStorage.removeItem('rp_admin_auth');
+  window.location.href = 'index.html';
+});
+
+/* ════════════ CONSTANTES / STOCKAGE ════════════
+   TRAVEES, GROUPES, ARMOIRES_TIROIRS, ARMOIRES_BAS, compareCotes, getFondsFromCote
+   viennent de js/reserve-shared.js */
+const ARMOIRES = [...ARMOIRES_TIROIRS, ...ARMOIRES_BAS].filter(a => a.csvId);
+const LS_SCANS = 'rp_recolement_scans';
+const LS_LOC   = 'rp_recolement_loc';
+const LS_BASE  = 'rp_recolement_baseline';
+
+let scans = loadJSON(LS_SCANS, {});           // barcode -> record
+let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
+let loc = loadJSON(LS_LOC, { kind:'travee', travee:'I', colonne:1, etage:1, armoireId:ARMOIRES[0].id, tiroir:1 });
+let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat}
+
+function loadJSON(key, fallback){
+  try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch(e){ return fallback; }
+}
+function saveScans(){ localStorage.setItem(LS_SCANS, JSON.stringify(scans)); }
+function saveLoc(){ localStorage.setItem(LS_LOC, JSON.stringify(loc)); }
+function saveBaseline(){ localStorage.setItem(LS_BASE, baseline ? JSON.stringify(baseline) : ''); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
+fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
+  catalog = {};
+  items.forEach(it=>{
+    const bc = (it['915$b'] || it['995$f'] || '').trim();
+    if(!bc) return;
+    const cote = (it['930$g']||'').trim();
+    catalog[bc] = {
+      cote, titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim(),
+      fonds:getFondsFromCote(cote), etat:(it['316$a']||'').trim()
+    };
+  });
+  document.getElementById('st-catalog').textContent = items.length.toLocaleString('fr-FR');
+  updateStats();
+}).catch(()=>{
+  document.getElementById('st-catalog').textContent = 'indisponible';
+});
+
+/* ════════════ EMPLACEMENT ════════════ */
+const scanInput = document.getElementById('scan-input');
+const selTravee=document.getElementById('sel-travee'), selArmoire=document.getElementById('sel-armoire');
+const kindTraveeBtn=document.getElementById('kind-travee'), kindArmoireBtn=document.getElementById('kind-armoire');
+
+TRAVEES.forEach(t=>{
+  const o=document.createElement('option'); o.value=t.id; o.textContent='Travée '+t.id;
+  selTravee.appendChild(o);
+});
+ARMOIRES.forEach(a=>{
+  const o=document.createElement('option'); o.value=a.id; o.textContent=a.label;
+  selArmoire.appendChild(o);
+});
+selTravee.value = loc.travee;
+selArmoire.value = loc.armoireId;
+
+function currentTraveeDef(){ return TRAVEES.find(t=>t.id===loc.travee) || TRAVEES[0]; }
+function currentArmoireDef(){ return ARMOIRES.find(a=>a.id===loc.armoireId) || ARMOIRES[0]; }
+
+function setKind(kind){
+  loc.kind = kind;
+  kindTraveeBtn.classList.toggle('active', kind==='travee');
+  kindArmoireBtn.classList.toggle('active', kind==='armoire');
+  selTravee.style.display = kind==='travee' ? '' : 'none';
+  document.getElementById('stp-colonne-wrap').style.display = kind==='travee' ? '' : 'none';
+  document.getElementById('stp-etage-wrap').style.display = kind==='travee' ? '' : 'none';
+  selArmoire.style.display = kind==='armoire' ? '' : 'none';
+  document.getElementById('stp-tiroir-wrap').style.display = kind==='armoire' ? '' : 'none';
+  refreshLoc();
+}
+kindTraveeBtn.addEventListener('click', ()=>setKind('travee'));
+kindArmoireBtn.addEventListener('click', ()=>setKind('armoire'));
+
+selTravee.addEventListener('change', ()=>{
+  loc.travee = selTravee.value; loc.colonne = 1; loc.etage = 1;
+  refreshLoc();
+});
+selArmoire.addEventListener('change', ()=>{
+  loc.armoireId = selArmoire.value; loc.tiroir = 1;
+  refreshLoc();
+});
+
+document.querySelectorAll('[data-step]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const field = btn.dataset.step, dir = parseInt(btn.dataset.dir);
+    if(field==='colonne'){
+      const max = currentTraveeDef().nbCols;
+      loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
+    } else if(field==='etage'){
+      const max = currentTraveeDef().maxEt;
+      loc.etage = Math.min(max, Math.max(1, loc.etage + dir));
+    } else if(field==='tiroir'){
+      const max = currentArmoireDef().nb;
+      loc.tiroir = Math.min(max, Math.max(1, loc.tiroir + dir));
+    }
+    refreshLoc();
+  });
+});
+
+function locFieldsOf(l){
+  if(l.kind==='travee') return { travee:l.travee, colonne:String(l.colonne), etage:String(l.etage) };
+  const arm = ARMOIRES.find(a=>a.id===l.armoireId) || ARMOIRES[0];
+  return { travee: arm.csvId, colonne:'', etage:String(l.tiroir) };
+}
+
+function refreshLoc(){
+  saveLoc();
+  document.getElementById('val-colonne').textContent = loc.colonne;
+  document.getElementById('val-etage').textContent = loc.etage;
+  document.getElementById('val-tiroir').textContent = loc.tiroir;
+  const readout = loc.kind==='travee'
+    ? `Travée ${loc.travee} · Col. ${loc.colonne} · Étage ${loc.etage}`
+    : `${currentArmoireDef().label} · N°${loc.tiroir}`;
+  document.getElementById('loc-readout').textContent = readout;
+  renderExpected();
+  renderHereLog();
+  updateStats();
+  scanInput.focus();
+}
+setKind(loc.kind);
+
+/* ════════════ SON ════════════ */
+let audioCtx = null;
+function beep(freq, dur){
+  if(!document.getElementById('sound-toggle').checked) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type='sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime+dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+
+/* ════════════ SCAN ════════════ */
+scanInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    handleScan(scanInput.value.trim());
+    scanInput.value='';
+  }
+});
+document.addEventListener('click', e=>{
+  if(!e.target.closest('input,select,button,a,label')) scanInput.focus();
+});
+
+function handleScan(barcode){
+  if(!barcode) return;
+  const fields = locFieldsOf(loc);
+  const cat = catalog ? catalog[barcode] : null;
+  const prev = scans[barcode];
+
+  const record = {
+    barcode,
+    cote: cat ? cat.cote : (prev ? prev.cote : ''),
+    titre: cat ? cat.titre : (prev ? prev.titre : ''),
+    auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
+    fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
+    etat: cat ? cat.etat : (prev ? prev.etat : ''),
+    kind: loc.kind,
+    travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+    ts: Date.now()
+  };
+
+  let status;
+  if(!cat && !prev) status = 'unknown';
+  else if(prev && prev.travee===fields.travee && prev.colonne===fields.colonne && prev.etage===fields.etage) status = 'dup';
+  else if(prev) status = 'moved';
+  else status = 'ok';
+
+  scans[barcode] = record;
+  saveScans();
+
+  showFeedback(record, status, prev);
+  beep(status==='unknown' ? 220 : 880, status==='unknown' ? .25 : .12);
+
+  renderExpected();
+  renderHereLog();
+  updateStats();
+}
+
+function showFeedback(record, status, prev){
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback show ' + (status==='unknown' ? 'warn' : status==='dup' ? 'dup' : status==='moved' ? 'dup' : 'ok');
+  const badgeTxt = { ok:'✓ Enregistré', dup:'🔁 Déjà scanné ici', moved:'↔ Déplacé depuis un autre emplacement', unknown:'⚠ Code-barre inconnu du catalogue' }[status];
+  const badgeCls = status==='unknown' ? 'warn' : (status==='dup'||status==='moved') ? 'dup' : 'ok';
+  let html = `<div class="fb-top"><span class="fb-badge ${badgeCls}">${badgeTxt}</span>
+    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}</div>`;
+  html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
+  html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
+  if(status==='moved' && prev){
+    html += `<div class="fb-meta">Précédemment : ${esc(prev.travee)}${prev.colonne?' · col. '+esc(prev.colonne):''} · étage/n° ${esc(prev.etage)}</div>`;
+  }
+  if(status==='unknown'){
+    html += `<div class="fb-manual">
+      <input type="text" id="manual-cote" placeholder="Cote (si connue)">
+      <button type="button" id="manual-save">Renseigner</button>
+    </div>`;
+  }
+  fb.innerHTML = html;
+  if(status==='unknown'){
+    document.getElementById('manual-save').addEventListener('click', ()=>{
+      const v = document.getElementById('manual-cote').value.trim();
+      if(v && scans[record.barcode]){
+        scans[record.barcode].cote = v;
+        scans[record.barcode].fonds = getFondsFromCote(v);
+        saveScans(); renderHereLog();
+      }
+      scanInput.focus();
+    });
+  }
+}
+
+/* ════════════ ATTENDU ICI ════════════ */
+function renderExpected(){
+  const list = document.getElementById('exp-list');
+  const countEl = document.getElementById('exp-count');
+  if(!baseline){
+    list.innerHTML = '<p class="exp-empty">Aucune donnée de référence importée — chargez un récolement de référence pour comparer.</p>';
+    countEl.textContent = '';
+    return;
+  }
+  const fields = locFieldsOf(loc);
+  const expected = Object.values(baseline).filter(r =>
+    r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage
+  ).sort((a,b)=>compareCotes(a.cote,b.cote));
+
+  if(!expected.length){
+    list.innerHTML = '<p class="exp-empty">Rien d\'attendu ici d\'après la référence chargée.</p>';
+    countEl.textContent = '';
+    return;
+  }
+
+  let confirmed = 0;
+  const rows = expected.map(r=>{
+    const cur = scans[r.barcode];
+    let cls, label;
+    if(cur && cur.travee===fields.travee && cur.colonne===fields.colonne && cur.etage===fields.etage){
+      cls='conf'; label='confirmé'; confirmed++;
+    } else if(cur){
+      cls='moved'; label='déplacé';
+    } else {
+      cls='missing'; label='manquant';
+    }
+    return `<div class="exp-row"><span class="exp-dot ${cls}" title="${label}"></span>
+      <span class="exp-cote">${esc(r.cote)}</span><span class="exp-titre">${esc(r.titre)}</span></div>`;
+  }).join('');
+  list.innerHTML = rows;
+  countEl.textContent = `(${confirmed} / ${expected.length} confirmés)`;
+}
+
+/* ════════════ LOGS ════════════ */
+function renderHereLog(){
+  const fields = locFieldsOf(loc);
+  const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage)
+    .sort((a,b)=>b.ts-a.ts).slice(0,30);
+  const tbody = document.getElementById('log-here');
+  if(!here.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun scan sur cet emplacement pour l\'instant.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = here.map(r=>`
+    <tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
+}
+
+function renderAllLog(filter){
+  const q = (filter||'').trim().toLowerCase();
+  const all = Object.values(scans).sort((a,b)=>b.ts-a.ts);
+  const filtered = q ? all.filter(r =>
+    (r.cote||'').toLowerCase().includes(q) || (r.titre||'').toLowerCase().includes(q) || (r.barcode||'').toLowerCase().includes(q)
+  ) : all;
+  const tbody = document.getElementById('log-all');
+  if(!filtered.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun scan.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.slice(0,300).map(r=>`
+    <tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${esc(r.travee)}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
+    </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${filtered.length-300} de plus (affinez la recherche)</td></tr>` : '');
+  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
+}
+document.getElementById('log-search').addEventListener('input', function(){ renderAllLog(this.value); });
+
+function deleteScan(barcode){
+  delete scans[barcode];
+  saveScans();
+  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
+}
+
+/* ════════════ STATS ════════════ */
+function updateStats(){
+  const total = Object.keys(scans).length;
+  document.getElementById('st-total').textContent = total.toLocaleString('fr-FR');
+  const fields = locFieldsOf(loc);
+  const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
+  document.getElementById('st-here').textContent = here;
+  if(catalog){
+    const catalogCount = Object.keys(catalog).length;
+    const matched = Object.keys(scans).filter(bc=>catalog[bc]).length;
+    document.getElementById('st-progress').textContent = catalogCount ? Math.round(matched/catalogCount*100)+' %' : '—';
+  }
+}
+
+/* ════════════ EXPORT / IMPORT / RESET ════════════ */
+document.getElementById('btn-export').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(Object.values(scans), null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  a.download = `recolement-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}h${pad(d.getMinutes())}.json`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+});
+
+document.getElementById('file-resume').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const rows = JSON.parse(ev.target.result);
+      let added=0, updated=0;
+      rows.forEach(r=>{
+        if(!r.barcode) return;
+        if(scans[r.barcode]){
+          if(!scans[r.barcode].ts || (r.ts||0) > scans[r.barcode].ts) { scans[r.barcode]=r; updated++; }
+        } else { scans[r.barcode]=r; added++; }
+      });
+      saveScans();
+      alert(`Import terminé : ${added} nouveaux scans, ${updated} mis à jour.`);
+      renderExpected(); renderHereLog(); renderAllLog(''); updateStats();
+    }catch(err){ alert('Fichier invalide : '+err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+});
+
+document.getElementById('file-baseline').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const rows = JSON.parse(ev.target.result);
+      baseline = {};
+      rows.forEach(r=>{ if(r.barcode) baseline[r.barcode]=r; });
+      saveBaseline();
+      alert(`Référence chargée : ${Object.keys(baseline).length} emplacements connus.`);
+      renderExpected();
+    }catch(err){ alert('Fichier invalide : '+err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+});
+
+document.getElementById('btn-reset').addEventListener('click', ()=>{
+  if(!confirm('Effacer tous les scans enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
+  scans = {}; saveScans();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats();
+});
+
+/* ════════════ DÉMARRAGE ════════════ */
+renderAllLog('');
+scanInput.focus();
+})();
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <script src="js/reserve-shared.js"></script>
   <style>
     :root {
       --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
@@ -140,7 +140,7 @@
     <div class="container">
 
       <div class="csv-loader" id="csv-loader">
-        <p>Chargement du récolement depuis <code>csv/inventaire.csv</code>…</p>
+        <p>Chargement du récolement depuis <code>data/recolement.json</code>…</p>
         <div class="spinner-row"><div class="sp"></div><div class="sp"></div><div class="sp"></div><span>Analyse en cours</span></div>
       </div>
 
@@ -186,78 +186,38 @@
 </footer>
 
 <script>
-/* ════════════ STRUCTURE PHYSIQUE ════════════ */
-const TRAVEES = [
-  {id:'I',     nbCols:4, maxEt:5},
-  {id:'II',    nbCols:5, maxEt:5},
-  {id:'III',   nbCols:5, maxEt:5},
-  {id:'IV',    nbCols:5, maxEt:7},
-  {id:'V',     nbCols:5, maxEt:9},
-  {id:'VI',    nbCols:8, maxEt:8},
-  {id:'VII',   nbCols:8, maxEt:5},
-  {id:'VIII',  nbCols:8, maxEt:5},
-  {id:'IX',    nbCols:8, maxEt:5},
-  {id:'X',     nbCols:8, maxEt:9},
-  {id:'XI',    nbCols:8, maxEt:7},
-  {id:'XII',   nbCols:8, maxEt:5},
-  {id:'XIII',  nbCols:8, maxEt:5},
-  {id:'XIV',   nbCols:8, maxEt:5},
-  {id:'XV',    nbCols:8, maxEt:5},
-  {id:'XVI',   nbCols:8, maxEt:5},
-  {id:'XVII',  nbCols:8, maxEt:5},
-  {id:'XVIII', nbCols:8, maxEt:5},
-  {id:'XIX',   nbCols:8, maxEt:5},
-];
-const GROUPES = [
-  ['I'],
-  ['II','III'],
-  ['IV','V','VI','VII','VIII'],
-  ['IX','X','XI','XII','XIII','XIV','XV'],
-  ['XVI','XVII','XVIII','XIX'],
-];
-/* Armoires à tiroirs côté droit (csvId = identifiant dans la colonne "travee" du CSV) */
-const ARMOIRES_TIROIRS = [
-  {id:'TIRB1', label:'Armoire tiroirs 1', type:'tiroir', nb:10, csvId:'T1'},
-  {id:'TIRB2', label:'Armoire tiroirs 2', type:'tiroir', nb:10, csvId:'T2'},
-];
-/* Bas de salle */
-const ARMOIRES_BAS = [
-  {id:'TIRJ1', label:'Armoire 7 tiroirs', type:'tiroir', nb:7,  csvId:'T3'},
-  {id:'BOIS1', label:'Armoire bois 1',    type:'bois',   nb:34, csvId:'AB-1'},
-  {id:'BOIS2', label:'Armoire bois 2',    type:'bois',   nb:34, csvId:'AB-4'},
-  {id:'BOIS3', label:'Armoire bois 3',    type:'bois',   nb:34, csvId:'AB-5'},
-  {id:'BOIS4', label:'Armoire bois 4',    type:'bois',   nb:34, csvId:'AB-6'},
-  {id:'BOIS5', label:'Armoire bois 5',    type:'bois',   nb:34, csvId:null},
-  {id:'BOIS6', label:'Armoire bois 6',    type:'bois',   nb:34, csvId:null},
-];
+/* TRAVEES, GROUPES, ARMOIRES_TIROIRS, ARMOIRES_BAS, parseCote/compareCotes
+   sont définis dans js/reserve-shared.js (partagé avec recolement.html). */
 
 /* ════════════ ÉTAT ════════════ */
 let CNT={}, DET={}, ADET={};
 let selId=null, filter='all', csvLoaded=false;
 
-/* ════════════ CHARGEMENT CSV ════════════ */
-function loadCSV(){
-  Papa.parse('csv/inventaire.csv',{
-    download:true, header:true, delimiter:';', encoding:'ISO-8859-1', skipEmptyLines:true,
-    complete(r){ parseCSV(r.data); },
-    error(err){
+/* ════════════ CHARGEMENT DU RÉCOLEMENT ════════════ */
+function loadRecolement(){
+  fetch('data/recolement.json')
+    .then(r=>{ if(!r.ok) throw new Error('missing'); return r.json(); })
+    .then(rows=>parseRecolement(rows))
+    .catch(()=>{
+      csvLoaded=true;
       document.getElementById('csv-loader').innerHTML=
-        '<p style="color:#c62828">Erreur de chargement : '+err.message+'</p>';
-    }
-  });
+        '<p>Aucun récolement disponible pour le moment. Utilisez l\'outil <a href="recolement.html">Récolement</a> depuis l\'espace professionnel pour commencer à localiser les collections.</p>';
+      document.getElementById('sn').textContent='0';
+      buildPlan();
+    });
 }
 
-function parseCSV(rows){
+function parseRecolement(rows){
   CNT={}; DET={}; ADET={};
   rows.forEach(row=>{
-    const t     =(row['travee'] ||'').trim();
-    const col   =(row['5']      ||'').trim();   // colonne
-    const etage =(row['etage']  ||'').trim();
-    const cote  =(row['930$g']  ||'').trim();
-    const titre =(row['200$a']  ||'').trim().slice(0,80);
-    const auteur=(row['700$a']  ||'').trim().slice(0,40);
-    const fonds =(row['930$e']  ||'').trim();
-    const etat  =(row['316$a']  ||'').trim().slice(0,30);
+    const t     =(row.travee  ||'').trim();
+    const col   =(row.colonne ||'').trim();
+    const etage =(row.etage   ||'').trim();
+    const cote  =(row.cote    ||'').trim();
+    const titre =(row.titre   ||'').trim().slice(0,80);
+    const auteur=(row.auteur  ||'').trim().slice(0,40);
+    const fonds =(row.fonds   ||'').trim();
+    const etat  =(row.etat    ||'').trim().slice(0,30);
     if(!t) return;
     const n={c:cote,t:titre,a:auteur,f:fonds,e:etat};
     if(t.startsWith('AB')||t==='T1'||t==='T2'||t==='T3'){
@@ -282,31 +242,6 @@ function parseCSV(rows){
              +Object.values(ADET).reduce((s,a)=>s+a.length,0);
   document.getElementById('sn').textContent=total.toLocaleString('fr-FR');
   buildPlan();
-}
-
-/* ════════════ TRI DES COTES — identique à js/inventaire.js ════════════ */
-function parseCote(cote){
-  if(!cote) return [];
-  const first=cote.split(',')[0].trim().toLowerCase();
-  const segs=[]; const re=/(\d+)|([^\d\s\-.]+)/g; let m;
-  while((m=re.exec(first))!==null){
-    if(m[1]!==undefined) segs.push({isNum:true, num:parseInt(m[1],10), str:m[1]});
-    else                 segs.push({isNum:false,num:null,               str:m[2]});
-  }
-  return segs;
-}
-function compareCotes(a,b){
-  const sa=parseCote(a),sb=parseCote(b);
-  const len=Math.max(sa.length,sb.length);
-  for(let i=0;i<len;i++){
-    if(i>=sa.length) return -1;
-    if(i>=sb.length) return  1;
-    const pa=sa[i],pb=sb[i];
-    if(pa.isNum&&pb.isNum){if(pa.num!==pb.num) return pa.num-pb.num;}
-    else if(!pa.isNum&&!pb.isNum){const c=pa.str.localeCompare(pb.str,'fr',{sensitivity:'base'});if(c!==0) return c;}
-    else return pa.isNum?1:-1;
-  }
-  return 0;
 }
 
 /* ════════════ HELPERS ════════════ */
@@ -648,12 +583,7 @@ document.addEventListener('click',e=>{
 });
 
 /* ════════════ DÉMARRAGE ════════════ */
-function waitPapa(cb,n){
-  if(typeof Papa!=='undefined'){cb();return;}
-  if((n=n||0)>50){document.getElementById('csv-loader').innerHTML='<p style="color:#c62828">PapaParse non disponible.</p>';return;}
-  setTimeout(()=>waitPapa(cb,n+1),150);
-}
-waitPapa(loadCSV);
+loadRecolement();
 
 </script>
 </body>
