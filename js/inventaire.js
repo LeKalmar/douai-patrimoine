@@ -23,6 +23,7 @@ const FONDS_COLORS = {
   "Livres d'Artiste":             ['#6a3a8b', '#9a5ab0'],
   'Mines':                        ['#5a5a5a', '#8a8a8a'],
   'Réserve Douaisienne':          ['#7a3030', '#a05050'],
+  'Protestantisme':               ['#4a6a3a', '#2a4a1a'],
 };
 const FONDS_COLORS_DEFAULT = ['#b07a20', '#7a4a00'];
 const FONDS_IMAGES = {
@@ -53,6 +54,26 @@ const FONDS_INFO = {
   'Objets': "Divers objets versés à la bibliothèque municipale de Douai.",
   'Manuscrits': "Plus de 2 500 manuscrits, du IX\u1d49 au XIX\u1d49 siècle, dont un grand nombre est enluminé. Provenant principalement des confiscations des collections des abbayes d'Anchin et de Marchiennes lors de la Révolution." 
 };
+
+// Détermination du fonds d'un document à partir du préfixe de sa cote (930$g),
+// plutôt que du champ 930$e (peu renseigné). Les préfixes les plus spécifiques
+// sont testés avant les préfixes courts qu'ils contiennent (ex. "LIVA" avant "L").
+const FONDS_PREFIXES = [
+  { prefix: 'RD',   fonds: 'Réserve Douaisienne' },
+  { prefix: 'LIVA', fonds: "Livres d'Artiste" },
+  { prefix: 'MIN',  fonds: 'Mines' },
+  { prefix: 'D',    fonds: 'Douaisien' },
+  { prefix: 'I',    fonds: 'Imprimés' },
+  { prefix: 'L',    fonds: 'Littérature' },
+  { prefix: 'P',    fonds: 'Protestantisme' },
+];
+
+function getFondsFromCote(record) {
+  const cote = (record['930$g'] || '').split(',')[0].trim().toUpperCase();
+  if (!cote) return '(Sans fonds)';
+  const match = FONDS_PREFIXES.find(({ prefix }) => cote.startsWith(prefix));
+  return match ? match.fonds : '(Sans fonds)';
+}
 
 // Colonnes à afficher
 const COLS = [
@@ -373,7 +394,7 @@ function renderFondsList() {
   // Grouper par fonds
   const groups = {};
   filteredRecords.forEach(r => {
-    const f = r['930$e'] || '(Sans fonds)';
+    const f = getFondsFromCote(r);
     if (!groups[f]) groups[f] = [];
     groups[f].push(r);
   });
@@ -607,7 +628,7 @@ function toggleFonds(fondsName) {
   block.querySelector('.fonds-header').setAttribute('aria-expanded', state.open);
 
   if (state.open) {
-    const records = filteredRecords.filter(r => (r['930$e'] || '(Sans fonds)') === fondsName);
+    const records = filteredRecords.filter(r => getFondsFromCote(r) === fondsName);
     const body = block.querySelector('.fonds-body');
     renderFondsBody(body, records, fondsName, state);
   }
