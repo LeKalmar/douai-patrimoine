@@ -943,6 +943,105 @@ ul { list-style: none; }
 }
 .footer-bottom a { color: var(--warm-dark); }
 
+/* === ESPACE PROFESSIONNEL === */
+.footer-admin-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 1.5rem;
+}
+.admin-trigger {
+  background: none;
+  border: none;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--border);
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  transition: opacity var(--transition), color var(--transition);
+}
+.admin-trigger:hover,
+.admin-trigger:focus-visible {
+  opacity: 1;
+  color: var(--text-light);
+}
+.admin-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,26,46,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 1000;
+}
+.admin-modal-box {
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: var(--shadow-hover);
+}
+.admin-modal-box h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--ink);
+  margin-bottom: 1.25rem;
+}
+.admin-modal-box label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-light);
+  margin-bottom: 0.3rem;
+}
+.admin-modal-box input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: #fff;
+}
+.admin-modal-box input:focus {
+  outline: 2px solid var(--warm);
+  outline-offset: 1px;
+}
+.admin-login-error {
+  font-size: 0.78rem;
+  color: var(--red);
+  margin: -0.5rem 0 1rem;
+}
+.admin-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.admin-btn-primary,
+.admin-btn-secondary {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition);
+}
+.admin-btn-primary {
+  background: var(--ink);
+  color: #fff;
+}
+.admin-btn-primary:hover { background: var(--ink-soft); }
+.admin-btn-secondary {
+  background: none;
+  border-color: var(--border);
+  color: var(--text);
+}
+.admin-btn-secondary:hover { background: var(--cream); }
+
 /* === MOBILE MENU === */
 .mobile-menu-btn {
   display: none;
