@@ -60,6 +60,7 @@
   .vide-btn.active{background:var(--ok);border-color:var(--ok);color:#fff}
   .vide-btn.nonrange.active{background:#8E24AA;border-color:#8E24AA;color:#fff}
   .vide-note{font-size:.75rem;color:#888;flex-basis:100%}
+  .horsreserve-note{font-size:.8rem;color:#7a4a00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;line-height:1.5}
   .noncat-label{font-size:.9rem;color:#333}
   #stp-noncat-wrap{padding:.15rem .3rem}
   #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit}
@@ -198,6 +199,9 @@
       </div>
 
       <div class="scan-zone">
+        <div class="horsreserve-note" id="horsreserve-note" style="display:none">
+          Scannez ici un exemplaire retrouvé hors de la réserve (posé ailleurs dans le bâtiment, par exemple). S'il a déjà été récolé auparavant et qu'un récolement de référence est chargé, son emplacement d'origine s'affichera pour le remettre en place. Sinon, rangez-le à l'emplacement indiqué par sa cote puis rescannez-le une fois en rayon, avec le bon emplacement sélectionné, pour l'ajouter au récolement principal.
+        </div>
         <div id="scan-mode-zone">
           <div class="scan-row">
             <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
@@ -505,19 +509,30 @@ function currentLocDef(){
   return currentTraveeDef();
 }
 
+function updateVideRowVisibility(){
+  // Marquer un emplacement vide/non rangé n'a pas de sens en mode "Non
+  // rangé (hors réserve)" — il n'y a justement pas d'emplacement.
+  document.getElementById('vide-row').style.display = (loc.mode==='scan' && loc.reserve!=='horsreserve') ? '' : 'none';
+}
+
 function setMode(mode, skipRefresh){
   loc.mode = mode;
   modeScanBtn.classList.toggle('active', mode==='scan');
   modeCatalogageBtn.classList.toggle('active', mode==='catalogage');
   document.getElementById('scan-mode-zone').style.display = mode==='catalogage' ? 'none' : '';
   document.getElementById('noncat-mode-zone').style.display = mode==='catalogage' ? '' : 'none';
-  document.getElementById('vide-row').style.display = mode==='scan' ? '' : 'none';
+  updateVideRowVisibility();
   if(!skipRefresh) refreshLoc();
 }
 modeScanBtn.addEventListener('click', ()=>setMode('scan'));
 modeCatalogageBtn.addEventListener('click', ()=>setMode('catalogage'));
 
 function setLocType(type, skipRefresh){
+  if(loc.reserve==='horsreserve'){
+    // Pas de travée/colonne/étage en mode "hors réserve" — rien à calculer.
+    if(!skipRefresh) refreshLoc();
+    return;
+  }
   loc.locType = type;
   document.getElementById('stp-travee-wrap').style.display = type==='etagere' ? '' : 'none';
   const def = currentLocDef();
@@ -528,20 +543,38 @@ function setLocType(type, skipRefresh){
 selLocType.addEventListener('change', ()=>setLocType(selLocType.value));
 
 function applyReserveVisibility(){
+  const isHorsReserve = loc.reserve === 'horsreserve';
   // Les armoires et tiroirs sont physiquement dans la réserve patrimoniale uniquement.
   const hasArmoires = loc.reserve === 'patrimoniale';
   [...selLocType.options].forEach(o=>{ if(o.value!=='etagere') o.disabled = !hasArmoires; });
   if(!hasArmoires && loc.locType!=='etagere'){
     loc.locType='etagere'; selLocType.value='etagere';
   }
+  // Aucun emplacement (travée/colonne/étage) n'a de sens pour des exemplaires
+  // hors réserve — on masque tout ce qui présuppose un emplacement, on
+  // verrouille le mode sur "Code-barre" et on cache le panneau "Attendu à
+  // cet emplacement".
+  selLocType.style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('stp-colonne-wrap').style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('stp-etage-wrap').style.display = isHorsReserve ? 'none' : '';
+  if(isHorsReserve) document.getElementById('stp-travee-wrap').style.display = 'none';
+  modeCatalogageBtn.style.display = isHorsReserve ? 'none' : '';
+  document.querySelector('.expected-panel').style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
+  if(isHorsReserve && loc.mode!=='scan') setMode('scan', true);
+  updateVideRowVisibility();
 }
 
 selReserve.addEventListener('change', ()=>{
   loc.reserve = selReserve.value;
-  const list = activeTravees();
-  loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
   applyReserveVisibility();
-  setLocType(loc.locType);
+  if(loc.reserve==='horsreserve'){
+    refreshLoc();
+  } else {
+    const list = activeTravees();
+    loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
+    setLocType(loc.locType);
+  }
 });
 
 document.querySelectorAll('[data-step]').forEach(btn=>{
@@ -565,19 +598,21 @@ document.querySelectorAll('[data-step]').forEach(btn=>{
 function colLetter(n){ return String.fromCharCode(64+n); }
 
 function locFieldsOf(l){
+  if(l.reserve==='horsreserve') return { travee:'HORS-RESERVE', colonne:'', etage:'' };
   if(l.locType==='armoire') return { travee:'ARMOIRE', colonne:colLetter(l.colonne), etage:String(l.etage) };
   if(l.locType==='tiroir')  return { travee:'TIROIR', colonne:colLetter(l.colonne), etage:String(l.etage) };
   return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
 }
 
 function displayTraveeId(t){
+  if(t==='HORS-RESERVE') return 'Non rangé (hors réserve)';
   if(t==='ARMOIRE') return 'Armoire (bois)';
   if(t==='TIROIR') return 'Armoire à tiroirs';
   return (t||'').replace(/^RD-/, '');
 }
 
 function locLabel(t){
-  if(t==='ARMOIRE' || t==='TIROIR') return displayTraveeId(t);
+  if(t==='HORS-RESERVE' || t==='ARMOIRE' || t==='TIROIR') return displayTraveeId(t);
   return 'Travée '+displayTraveeId(t);
 }
 
@@ -586,6 +621,7 @@ function locSortIndex(t){
   if(i>=0) return i;
   if(t==='ARMOIRE') return 1000;
   if(t==='TIROIR') return 1001;
+  if(t==='HORS-RESERVE') return 1002;
   return 999;
 }
 
@@ -596,7 +632,8 @@ function refreshLoc(){
   if(loc.locType==='etagere') document.getElementById('val-travee').textContent = displayTraveeId(loc.travee);
   const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
   let readout;
-  if(loc.locType==='armoire') readout = `${reserveLabel} · Armoire (bois) · Meuble ${colLetter(loc.colonne)} · Niveau ${loc.etage}`;
+  if(loc.reserve==='horsreserve') readout = reserveLabel;
+  else if(loc.locType==='armoire') readout = `${reserveLabel} · Armoire (bois) · Meuble ${colLetter(loc.colonne)} · Niveau ${loc.etage}`;
   else if(loc.locType==='tiroir') readout = `${reserveLabel} · Armoire à tiroirs · Meuble ${colLetter(loc.colonne)} · Tiroir ${loc.etage}`;
   else readout = `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
   document.getElementById('loc-readout').textContent = readout;
@@ -650,7 +687,8 @@ function beepError(){
 scanInput.addEventListener('keydown', e=>{
   if(e.key==='Enter'){
     e.preventDefault();
-    handleScan(scanInput.value.trim(), damagedToggle.checked);
+    if(loc.reserve==='horsreserve') handleScanHorsReserve(scanInput.value.trim(), damagedToggle.checked);
+    else handleScan(scanInput.value.trim(), damagedToggle.checked);
     scanInput.value='';
     damagedToggle.checked=false;
   }
@@ -726,6 +764,86 @@ function showFeedback(record, status, prev){
         record.fonds = getFondsFromCote(v);
         scans[record.barcode] = record;
         saveScans(); renderExpected(); renderHereLog(); updateStats();
+        queuePatch({type:'scan', record});
+      }
+      scanInput.focus();
+    });
+  }
+}
+
+/* ════════════ SCAN "NON RANGÉ" (exemplaire retrouvé hors réserve) ════════════
+   Distinct du scan normal : pas d'emplacement (travée/colonne/étage), donc
+   pas de notion "ok/dup/déplacé" par rapport à la session en cours — à la
+   place, on consulte le récolement de référence (baseline), s'il y en a un
+   de chargé, pour indiquer où ce livre se trouvait lors du dernier
+   récolement. Le scan est quand même enregistré (travée conventionnelle
+   "HORS-RESERVE", voir locFieldsOf) : ça permet de retrouver ces exemplaires
+   dans "Tous les scans", et si le livre est ensuite rescanné à son vrai
+   emplacement, le scan normal détectera correctement un "déplacement" depuis
+   "Non rangé (hors réserve)". */
+function handleScanHorsReserve(barcode, damaged){
+  if(!barcode) return;
+  const fields = locFieldsOf(loc);
+  const cat = catalog ? catalog[barcode] : null;
+  const prev = scans[barcode];
+  const known = !!(cat || prev);
+
+  const record = {
+    barcode,
+    cote: cat ? cat.cote : (prev ? prev.cote : ''),
+    titre: cat ? cat.titre : (prev ? prev.titre : ''),
+    auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
+    fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
+    etat: cat ? cat.etat : (prev ? prev.etat : ''),
+    kind: 'horsreserve',
+    travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+    barcodeAbime: !!damaged,
+    ts: Date.now()
+  };
+
+  if(known){
+    scans[barcode] = record;
+    saveScans();
+    queuePatch({type:'scan', record});
+  }
+
+  showHorsReserveFeedback(record, !known);
+  if(known) beep(880, .12); else beepError();
+
+  renderHereLog();
+  updateStats();
+}
+
+function showHorsReserveFeedback(record, unknown){
+  const fb = document.getElementById('feedback');
+  const baselineRec = baseline ? baseline[record.barcode] : null;
+  fb.className = 'feedback show ' + (baselineRec ? 'dup' : 'warn');
+  const badgeTxt = baselineRec ? '📍 Déjà récolé — emplacement d\'origine ci-dessous' : '⚠ Hors réserve';
+  let html = `<div class="fb-top"><span class="fb-badge ${baselineRec?'dup':'warn'}">${badgeTxt}</span>
+    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
+    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}</div>`;
+  html += `<div class="fb-titre">${esc(record.titre) || (unknown ? '(non catalogué)' : '(titre inconnu)')}</div>`;
+  html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
+  if(baselineRec){
+    html += `<div class="fb-meta"><strong>Emplacement lors du récolement de référence :</strong> ${esc(locLabel(baselineRec.travee))}${baselineRec.colonne?' · col. '+esc(baselineRec.colonne):''} · étage/n° ${esc(baselineRec.etage)}. Remettez-le à cet emplacement.</div>`;
+  } else {
+    html += `<div class="fb-meta">${baseline ? 'Aucune trace de ce livre dans le récolement de référence chargé.' : 'Aucun récolement de référence chargé.'} Veuillez mettre ce livre à l'emplacement indiqué par sa cote. Une fois cela fait, scannez le code-barre avec le bon emplacement sélectionné pour l'ajouter au récolement principal.</div>`;
+  }
+  if(unknown){
+    html += `<div class="fb-manual">
+      <input type="text" id="manual-cote" placeholder="Cote (si connue)">
+      <button type="button" id="manual-save">Renseigner</button>
+    </div>`;
+  }
+  fb.innerHTML = html;
+  if(unknown){
+    document.getElementById('manual-save').addEventListener('click', ()=>{
+      const v = document.getElementById('manual-cote').value.trim();
+      if(v){
+        record.cote = v;
+        record.fonds = getFondsFromCote(v);
+        scans[record.barcode] = record;
+        saveScans(); updateStats();
         queuePatch({type:'scan', record});
       }
       scanInput.focus();

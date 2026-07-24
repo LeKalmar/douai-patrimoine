@@ -37,9 +37,18 @@ const GROUPES = [
 const TRAVEES_DOUAISIENNE = ['I','II','III','IV','V','VI','VII'].map(id => ({id:'RD-'+id, nbCols:5, maxEt:6}));
 const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE];
 
+/* "horsreserve" est une pseudo-réserve sans travées : sert uniquement à
+   recolement.html pour scanner des exemplaires retrouvés hors de la
+   réserve au moment du récolement (voir handleScanHorsReserve()). Aucun
+   emplacement (travée/colonne/étage) n'a de sens ici — les scans de ce mode
+   sont enregistrés avec la travée conventionnelle "HORS-RESERVE" (voir
+   locFieldsOf()), qui n'apparaît dans aucune LOCATIONS_ALL et n'est donc
+   jamais représentée dans le plan de reserve.html : c'est volontaire, ces
+   exemplaires ne sont par définition sur aucune étagère. */
 const RESERVES = [
   {id:'patrimoniale', label:'Réserve patrimoniale', travees:TRAVEES},
   {id:'douaisienne',  label:'Réserve Douaisienne',  travees:TRAVEES_DOUAISIENNE},
+  {id:'horsreserve',  label:'Non rangé (hors réserve)', travees:[]},
 ];
 function traveesOfReserve(reserveId){
   const r = RESERVES.find(r=>r.id===reserveId);
