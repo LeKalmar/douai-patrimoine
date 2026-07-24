@@ -275,14 +275,18 @@ function authHeaders(){
   return h;
 }
 
+let lastSyncError = null;
+
 function updateSyncIndicator(){
   const el = document.getElementById('sync-status');
   if(!el) return;
   if(pendingSync.length){
-    el.textContent = `⏳ ${pendingSync.length} en attente de synchro`;
+    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
+    el.title = lastSyncError ? `Dernière erreur de synchro : ${lastSyncError}` : 'Synchronisation avec les autres postes (via R2)';
     el.classList.add('pending');
   } else {
     el.textContent = '✓ synchronisé';
+    el.title = 'Synchronisation avec les autres postes (via R2)';
     el.classList.remove('pending');
   }
 }
@@ -305,10 +309,22 @@ async function flushPendingSync(){
       try{
         res = await fetch('/api/spolies', { method:'POST', headers: authHeaders(), body: JSON.stringify(patch) });
       }catch(e){
+        lastSyncError = 'hors ligne ou serveur injoignable';
         break; // réseau indisponible : on retentera plus tard
       }
-      if(res.status===401 || res.status===503) break; // pas authentifié / R2 non configuré
-      if(!res.ok) break; // autre erreur serveur : on retentera plus tard
+      if(res.status===401){
+        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
+        break;
+      }
+      if(res.status===503){
+        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
+        break;
+      }
+      if(!res.ok){
+        lastSyncError = `erreur serveur (${res.status})`;
+        break; // autre erreur serveur : on retentera plus tard
+      }
+      lastSyncError = null;
       pendingSync.shift();
       savePendingSync();
     }

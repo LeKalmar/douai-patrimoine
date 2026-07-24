@@ -185,8 +185,8 @@ cohérent avec le "zéro dépendance npm" du reste du projet. Variables
 d'environnement requises (Vercel + `.env` local, jamais commitées,
 `.env` est dans `.gitignore`) : `R2_ACCOUNT_ID`, `R2_BUCKET`,
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, plus `ADMIN_USER`/`ADMIN_PASS`
-(mêmes valeurs que les constantes en clair dans `index.html`, mais lues
-côté serveur pour authentifier les `POST` — voir Sécurité ci-dessous).
+(utilisées par `/api/login` pour vérifier le formulaire de connexion de
+`index.html`, et pour authentifier les `POST` — voir Sécurité ci-dessous).
 Si ces variables sont absentes, tout le reste du site continue de
 fonctionner à l'identique (repli local partout), seule la synchronisation
 partagée est inactive. `npm run test:r2` permet de vérifier un token sans
@@ -194,27 +194,30 @@ toucher aux données réelles.
 
 ## Sécurité — à savoir avant de toucher à l'espace pro
 
-L'« espace professionnel » n'a **aucune vraie protection serveur au niveau
-des pages** — les pages elles-mêmes restent 100 % statiques :
+L'« espace professionnel » n'a **toujours pas de vraie protection serveur
+au niveau des pages** — les pages elles-mêmes restent 100 % statiques :
 
-- Les identifiants (`ADMIN_USER` / `ADMIN_PASS`) sont **en clair dans le
-  JavaScript de `index.html`**, visibles par n'importe qui via « voir le
-  code source ».
 - Le contrôle d'accès des pages protégées n'est qu'un test
   `sessionStorage.getItem('rp_admin_auth') === '1'` — contournable
-  trivialement dans la console du navigateur, sans même connaître le mot
-  de passe.
+  trivialement dans la console du navigateur (`sessionStorage.setItem(...)`),
+  **sans même connaître le mot de passe**. Une personne qui contourne ce
+  gate peut donc voir l'UI de `recolement.html`, `reserve.html`, etc.
 
-Nuance depuis l'ajout du stockage partagé R2 (voir section ci-dessus) : il
-existe désormais un vrai composant serveur, `api/recolement.mjs` et
-`api/spolies.mjs`, mais son rôle est étroit — il ne protège pas l'accès aux
-*pages*, seulement l'**écriture** dans l'état partagé. Un `POST` vers ces
-endpoints exige un en-tête `Authorization: Basic` vérifié côté serveur
-contre `ADMIN_USER`/`ADMIN_PASS` (variables Vercel, `lib/auth.mjs`) — donc
-contourner le gate client de `sessionStorage` (comme ci-dessus) ne suffit
-plus à corrompre les données partagées, il faut réellement connaître le mot
-de passe. La lecture (`GET`) reste volontairement publique, au même niveau
-d'exposition que `data/recolement.json` aujourd'hui.
+Depuis 2026-07-24, ce qui a changé : les identifiants (`ADMIN_USER` /
+`ADMIN_PASS`) **ne sont plus en clair dans le JavaScript** — le formulaire
+de connexion de `index.html` les envoie à `/api/login`, qui les compare
+côté serveur aux variables d'environnement Vercel (`lib/auth.mjs`,
+`credentialsMatch()`). Un « voir le code source » ne révèle donc plus le
+mot de passe. Ça ne protège pas davantage l'accès aux *pages* (le gate
+`sessionStorage` reste un simple indicateur, toujours contournable comme
+ci-dessus) — seulement le **coût de découverte du mot de passe**, et par
+ricochet l'écriture dans l'état partagé R2 : un `POST` vers
+`/api/recolement` ou `/api/spolies` exige un en-tête `Authorization: Basic`
+vérifié par ce même `credentialsMatch()`, donc contourner le gate client ne
+suffit plus à corrompre les données partagées, il faut réellement
+connaître le mot de passe. La lecture (`GET` de ces deux endpoints) reste
+volontairement publique, au même niveau d'exposition que
+`data/recolement.json` aujourd'hui.
 
 Ce qui a été fait dans le cadre du nettoyage (2026-07-23) : ajout du
 contrôle `sessionStorage` manquant sur `reserve.html`, `scan-docs.html` et
@@ -224,14 +227,15 @@ nofollow">` sur toutes les pages de l'espace pro pour éviter leur
 indexation.
 
 Ce qui n'a **pas** été corrigé, car c'est une décision produit et non un
-simple nettoyage : le mot de passe reste en clair et le "gate" reste
-côté client, donc ce n'est qu'une barrière anti-curieux, pas une vraie
-sécurité. Sur un site 100 % statique, les options réalistes pour une vraie
-protection sont : Vercel Deployment/Password Protection (plan payant), une
-fonction serverless Vercel (`/api/login`) qui vérifie les identifiants
-côté serveur et pose un cookie de session, ou accepter l'état actuel et le
-documenter clairement (ce que fait cette section). Ne pas supposer que
-l'accès à ces pages est sécurisé.
+simple nettoyage : le gate des *pages* reste côté client (sessionStorage),
+donc ce n'est qu'une barrière anti-curieux pour la navigation, pas une
+vraie protection d'accès — même si l'écriture des données partagées est,
+elle, réellement protégée depuis l'ajout de `/api/login`. Pour aller plus
+loin (protéger aussi l'accès aux pages elles-mêmes), les options réalistes
+restent : Vercel Deployment/Password Protection (plan payant), ou un vrai
+cookie de session posé par `/api/login` puis vérifié par un middleware/edge
+function sur chaque page protégée. Ne pas supposer que l'accès à ces pages
+est sécurisé au-delà de ce qui est décrit ici.
 
 ## Pièges connus / historique
 
