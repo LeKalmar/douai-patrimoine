@@ -74,6 +74,32 @@ function applyPatch(state, patch) {
         delete vide[patch.key];
       } else delete nonrange[patch.key];
       break;
+    case 'bulkMerge': {
+      // Fusionne un lot entier (import d'une sauvegarde JSON) dans l'état
+      // partagé — jamais un écrasement : chaque entrée est ajoutée ou mise à
+      // jour (scans : la plus récente par `ts` l'emporte), rien n'est
+      // supprimé. Sert à réamorcer/rattraper R2 avec un historique local qui
+      // n'a jamais été poussé incrément par incrément.
+      if (!patch.data || typeof patch.data !== 'object') throw new BadRequest('bulkMerge : data requis.');
+      const incomingScans = Array.isArray(patch.data.scans) ? patch.data.scans : [];
+      const incomingNonCat = Array.isArray(patch.data.nonCatalogues) ? patch.data.nonCatalogues : [];
+      const incomingVide = Array.isArray(patch.data.videShelves) ? patch.data.videShelves : [];
+      const incomingNonRange = Array.isArray(patch.data.nonRangeShelves) ? patch.data.nonRangeShelves : [];
+
+      incomingScans.forEach(r => {
+        if (!r.barcode) return;
+        const existing = scans[r.barcode];
+        if (!existing || !existing.ts || (r.ts || 0) > existing.ts) scans[r.barcode] = r;
+      });
+      incomingNonCat.forEach(r => { if (r.travee && r.etage !== undefined) nonCat[locKey(r)] = r; });
+      incomingVide.forEach(r => {
+        if (r.travee && r.etage !== undefined) { vide[locKey(r)] = r; delete nonrange[locKey(r)]; }
+      });
+      incomingNonRange.forEach(r => {
+        if (r.travee && r.etage !== undefined) { nonrange[locKey(r)] = r; delete vide[locKey(r)]; }
+      });
+      break;
+    }
     default:
       throw new BadRequest(`Type de patch inconnu : ${patch.type}`);
   }

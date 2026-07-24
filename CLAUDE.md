@@ -192,6 +192,17 @@ fonctionner à l'identique (repli local partout), seule la synchronisation
 partagée est inactive. `npm run test:r2` permet de vérifier un token sans
 toucher aux données réelles.
 
+En plus des patchs unitaires (`scan`, `deleteScan`, `nonCat`, `vide`,
+`nonrange`), `api/recolement.mjs` accepte un patch `bulkMerge` (
+`{type:'bulkMerge', data:{scans, nonCatalogues, videShelves,
+nonRangeShelves}}`) qui fusionne un lot entier avec la même sémantique que
+les patchs unitaires (jamais de suppression, un scan plus récent — `ts` —
+l'emporte sur un plus ancien). C'est ce patch qu'envoie `recolement.html`
+après un import de fichier de sauvegarde (`mergeIncomingData(data,
+{syncToServer:true})`), pour que l'import mette aussi à jour l'état
+partagé R2 et pas seulement le navigateur local qui a fait l'import — voir
+l'incident 2026-07-24 ci-dessous.
+
 ## Sécurité — à savoir avant de toucher à l'espace pro
 
 L'« espace professionnel » n'a **toujours pas de vraie protection serveur
@@ -252,3 +263,18 @@ est sécurisé au-delà de ce qui est décrit ici.
 - `index.html` avait autrefois une section « Collections thématiques »
   (accordéon avec 7 cartes) qui a été retirée ; les pages correspondantes
   sont maintenant dans `_archive/thematiques/`.
+- Incident du 2026-07-24 : le jour même du lancement de la synchro R2 de
+  `recolement.html` (commit `893ab4a`), la clé R2 `recolement.json` a
+  démarré **vide** — aucune étape n'avait jamais réamorcé R2 avec
+  l'historique déjà accumulé en local (ni depuis le `localStorage` d'un
+  poste existant, ni depuis `data/recolement.json` commité). Un collègue
+  ouvrant `recolement.html` sur un nouveau poste a donc reçu cet état
+  partagé vide via `GET /api/recolement`, donnant l'impression que « le
+  nouveau poste avait écrasé l'ancien récolement » — en réalité rien n'a
+  été écrasé (la fusion cliente n'a jamais fait que d'ajouter), c'est l'état
+  partagé qui n'avait simplement jamais été peuplé. Réparé en réécrivant la
+  clé R2 depuis `data/recolement.json`. Root cause corrigée en ajoutant le
+  patch `bulkMerge` (voir « Stockage partagé » ci-dessus) : désormais,
+  importer un fichier de sauvegarde dans `recolement.html` pousse aussi ce
+  lot vers R2, donc réimporter une sauvegarde à jour réamorce l'état
+  partagé pour tout le monde.

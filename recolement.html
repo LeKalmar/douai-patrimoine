@@ -1054,8 +1054,12 @@ document.getElementById('btn-export').addEventListener('click', ()=>{
 
 /* Fusionne un objet {scans,nonCatalogues,videShelves,nonRangeShelves} (ou un
    simple tableau de scans, ancien format) dans l'état local — réutilisé par
-   l'import de fichier ci-dessous et par syncFromServer() (état partagé R2). */
-function mergeIncomingData(data){
+   l'import de fichier ci-dessous et par syncFromServer() (état partagé R2).
+   Avec syncToServer=true (import manuel d'une sauvegarde), le lot est aussi
+   poussé vers /api/recolement (patch 'bulkMerge') pour réamorcer/rattraper
+   l'état partagé — sans ça, un import ne met à jour QUE ce navigateur, et le
+   reste de l'équipe continue de voir un état partagé incomplet. */
+function mergeIncomingData(data, { syncToServer = false } = {}){
   const scanRows = Array.isArray(data) ? data : (data.scans||[]);
   const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
   const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
@@ -1082,6 +1086,10 @@ function mergeIncomingData(data){
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
   renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
 
+  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length)){
+    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows } });
+  }
+
   return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length };
 }
 
@@ -1091,8 +1099,8 @@ document.getElementById('file-resume').addEventListener('change', function(e){
   reader.onload = ev=>{
     try{
       const data = JSON.parse(ev.target.result);
-      const r = mergeIncomingData(data);
-      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s).`);
+      const r = mergeIncomingData(data, { syncToServer:true });
+      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
     }catch(err){ alert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
