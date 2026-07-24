@@ -167,6 +167,15 @@ pour deux choses indépendantes :
   page garde le `localStorage` comme source de vérité locale (fonctionne
   hors ligne, file d'attente `rp_*_pending_sync` rejouée à la reconnexion)
   et envoie en plus chaque changement en arrière-plan.
+- **`recolement-backups/<horodatage>.json`** : instantanés datés et
+  immuables (un objet par sauvegarde, jamais réécrit), distincts de l'état
+  partagé courant ci-dessus. Créés par le bouton « Sauvegarder ce
+  récolement » de `recolement.html` (`api/recolement-backups.mjs`, POST
+  authentifié). La carte « Récolement de référence » de la même page peut
+  lister les 5 plus récents (`GET ?list=1&count=5`, via `r2List` — API S3
+  `ListObjectsV2`, lecture publique comme le reste) et en charger un
+  directement comme référence (`GET ?key=...`), sans passer par un
+  export/import de fichier local.
 
 Deux fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`) servent de
 proxy vers R2 : `GET` renvoie l'état courant (public, même niveau
@@ -181,7 +190,10 @@ instant ne soit pas perdu. `reserve.html` lit `/api/recolement` en priorité
 
 Le client R2/S3 (`lib/r2.mjs`) signe les requêtes en SigV4 à la main avec
 `node:crypto`/`node:https` — pas de `@aws-sdk/client-s3`, pour rester
-cohérent avec le "zéro dépendance npm" du reste du projet. Variables
+cohérent avec le "zéro dépendance npm" du reste du projet (`r2Get`/`r2Put`/
+`r2Delete`/`r2CasUpdate`, plus `r2List` pour `ListObjectsV2` — seule requête
+signée du projet à porter une query string canonique SigV4 ; réponse XML
+S3 parsée à la main par regex, volontairement minimal). Variables
 d'environnement requises (Vercel + `.env` local, jamais commitées,
 `.env` est dans `.gitignore`) : `R2_ACCOUNT_ID`, `R2_BUCKET`,
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, plus `ADMIN_USER`/`ADMIN_PASS`

@@ -117,6 +117,15 @@
   .tool-btn.secondary:hover{background:#F5F5FF}
   .tool-btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
   .tool-btn.danger:hover{background:#fff5f5}
+  .tool-btn:disabled{opacity:.6;cursor:default}
+  .tool-btn-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .backup-list{margin-top:.6rem;border:1px solid #eee;border-radius:8px;overflow:hidden;display:none}
+  .backup-item{padding:.45rem .7rem;font-size:.78rem;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;gap:.5rem;transition:background .1s}
+  .backup-item:last-child{border-bottom:none}
+  .backup-item:hover{background:#F5F5FF}
+  .backup-item.disabled{cursor:default;color:#999}
+  .backup-item.disabled:hover{background:none}
+  .backup-item-arrow{color:#bbb;flex-shrink:0}
   input[type=file]{display:none}
 
   footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
@@ -278,7 +287,10 @@
         <div class="tool-card">
           <h3>Exporter</h3>
           <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués et des emplacements marqués vides ou non rangés. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
-          <button type="button" class="tool-btn" id="btn-export">⬇ Exporter le récolement</button>
+          <div class="tool-btn-row">
+            <button type="button" class="tool-btn" id="btn-export">⬇ Exporter (fichier local)</button>
+            <button type="button" class="tool-btn secondary" id="btn-save-server">☁ Sauvegarder ce récolement</button>
+          </div>
         </div>
         <div class="tool-card">
           <h3>Reprendre une session</h3>
@@ -288,9 +300,13 @@
         </div>
         <div class="tool-card">
           <h3>Récolement de référence</h3>
-          <p>Charge un export JSON précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher à la session en cours.</p>
-          <label class="tool-btn secondary" for="file-baseline">⬆ Charger une référence</label>
-          <input type="file" id="file-baseline" accept="application/json">
+          <p>Charge un récolement précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher à la session en cours — soit un fichier, soit l'une des 5 dernières sauvegardes serveur.</p>
+          <div class="tool-btn-row">
+            <label class="tool-btn secondary" for="file-baseline">⬆ Charger un fichier</label>
+            <input type="file" id="file-baseline" accept="application/json">
+            <button type="button" class="tool-btn secondary" id="btn-backup-list-toggle">🕘 Dernières sauvegardes</button>
+          </div>
+          <div class="backup-list" id="backup-list"></div>
         </div>
         <div class="tool-card">
           <h3>Réinitialiser</h3>
@@ -1050,6 +1066,71 @@ function downloadJSON(data, prefix){
 
 document.getElementById('btn-export').addEventListener('click', ()=>{
   downloadJSON(exportPayload(), 'recolement');
+});
+
+/* ════════════ SAUVEGARDES DATÉES SUR LE SERVEUR (R2, /api/recolement-backups) ════════════
+   Distinct de la synchro incrémentale (/api/recolement) : ici on fige un
+   instantané complet et daté à la demande, pour pouvoir revenir en arrière
+   ou le recharger comme référence — sans avoir à exporter/réimporter un
+   fichier à la main. */
+document.getElementById('btn-save-server').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btn-save-server');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sauvegarde en cours…';
+  try{
+    const res = await fetch('/api/recolement-backups', { method:'POST', headers: authHeaders(), body: JSON.stringify(exportPayload()) });
+    if(res.status===401){ alert('Non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel pour sauvegarder sur le serveur.'); return; }
+    if(res.status===503){ alert('R2 non configuré côté serveur (variables Vercel manquantes).'); return; }
+    if(!res.ok){ const err = await res.json().catch(()=>({})); alert('Erreur lors de la sauvegarde : '+(err.error||res.status)); return; }
+    const data = await res.json();
+    alert('Récolement sauvegardé sur le serveur ('+data.key+').');
+  }catch(e){
+    alert('Sauvegarde impossible : hors ligne ou serveur injoignable.');
+  }finally{
+    btn.disabled=false; btn.textContent=original;
+  }
+});
+
+function formatBackupLabel(item){
+  const d = item.lastModified ? new Date(item.lastModified) : null;
+  if(d && !isNaN(d)) return d.toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  return item.key.replace(/^recolement-backups\//,'').replace(/\.json$/,'');
+}
+
+async function loadBackupAsReference(key){
+  try{
+    const res = await fetch(`/api/recolement-backups?key=${encodeURIComponent(key)}`);
+    if(!res.ok) throw new Error('fetch failed');
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.scans||[]);
+    baseline = {};
+    rows.forEach(r=>{ if(r.barcode) baseline[r.barcode]=r; });
+    saveBaseline();
+    document.getElementById('backup-list').style.display='none';
+    alert(`Référence chargée depuis la sauvegarde du ${formatBackupLabel({key,lastModified:null})} : ${Object.keys(baseline).length} emplacements connus.`);
+    renderExpected();
+  }catch(e){
+    alert('Impossible de charger cette sauvegarde (hors ligne ou serveur injoignable).');
+  }
+}
+
+document.getElementById('btn-backup-list-toggle').addEventListener('click', async ()=>{
+  const box = document.getElementById('backup-list');
+  if(box.style.display==='block'){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML = '<div class="backup-item disabled">Chargement…</div>';
+  try{
+    const res = await fetch('/api/recolement-backups?list=1&count=5');
+    if(!res.ok) throw new Error('liste indisponible');
+    const items = await res.json();
+    if(!items.length){ box.innerHTML='<div class="backup-item disabled">Aucune sauvegarde disponible pour le moment.</div>'; return; }
+    box.innerHTML = items.map(it=>`<div class="backup-item" data-key="${esc(it.key)}"><span>${esc(formatBackupLabel(it))}</span><span class="backup-item-arrow">charger →</span></div>`).join('');
+    box.querySelectorAll('.backup-item[data-key]').forEach(el=>{
+      el.addEventListener('click', ()=>loadBackupAsReference(el.dataset.key));
+    });
+  }catch(e){
+    box.innerHTML = '<div class="backup-item disabled">Liste indisponible (hors ligne ou serveur injoignable).</div>';
+  }
 });
 
 /* Fusionne un objet {scans,nonCatalogues,videShelves,nonRangeShelves} (ou un
