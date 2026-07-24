@@ -219,6 +219,11 @@
 let CNT={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={};
 let selId=null, filter='all', csvLoaded=false;
 
+/* Hauteur de référence (en "nombre d'étages") partagée par toutes les
+   travées dans le plan miniature — 6 est la valeur la plus fréquente parmi
+   TRAVEES/TRAVEES_DOUAISIENNE. Voir makeTraveeEl(). */
+const TRAVEE_REF_MAXET=6;
+
 function travTitle(tid){
   if(tid==='ARMOIRE') return 'Armoires (bois)';
   if(tid==='TIROIR') return 'Armoires à tiroirs';
@@ -481,16 +486,22 @@ function makeTraveeEl(tid,tDef,cols){
   wrap.setAttribute('role','button');wrap.setAttribute('tabindex','0');
   const box=document.createElement('div');box.className='tv-box';
   const known=hasData(tid);
-  // Hauteur totale de référence pour une colonne de cette travée : basée sur
-  // le nombre d'étages nominal (tDef.maxEt), pas sur le nombre observé pour
-  // CETTE colonne — pour qu'une colonne à 3 étages et une à 4 étages, dans la
-  // même travée, occupent exactement la même hauteur totale (étages +
-  // interstices), avec des étages proportionnellement plus grands ou plus
-  // petits selon leur nombre. Ça aligne aussi les libellés de colonne sur une
-  // même ligne de base, puisque toutes les colonnes finissent à la même
-  // hauteur.
+  // Hauteur totale de référence pour une colonne : dans la réalité, toutes
+  // les travées (réserve patrimoniale et Douaisienne confondues) font la
+  // même hauteur physique, peu importe leur nombre d'étages déclaré — donc
+  // une seule référence partagée par toutes (TRAVEE_REF_MAXET), pas une par
+  // travée (sinon une travée à 9 étages paraîtrait plus haute qu'une à 6, ce
+  // qui ne correspond pas au terrain). Armoires et tiroirs gardent leur
+  // propre référence (tDef.maxEt) : ce sont des meubles différents, et il
+  // n'y en a qu'un seul de chaque de toute façon (pas de risque
+  // d'incohérence entre plusieurs armoires). Pour une même travée, une
+  // colonne à 3 étages et une à 4 occupent ainsi toujours la même hauteur
+  // totale (étages + interstices), avec des étages proportionnellement plus
+  // grands ou plus petits selon leur nombre — ce qui aligne aussi les
+  // libellés de colonne sur une même ligne de base.
   const GAP=1.5, BASE_SLOT_H=9;
-  const targetH=tDef.maxEt*BASE_SLOT_H+(tDef.maxEt-1)*GAP;
+  const refMaxEt=(tid==='ARMOIRE'||tid==='TIROIR')?tDef.maxEt:TRAVEE_REF_MAXET;
+  const targetH=refMaxEt*BASE_SLOT_H+(refMaxEt-1)*GAP;
   cols.forEach(col=>{
     const maxE=maxEtageOf(tid,col);
     const cd=document.createElement('div');cd.className='tv-col';
