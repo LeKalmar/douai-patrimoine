@@ -56,7 +56,8 @@
   .vide-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#555;cursor:pointer;transition:all .15s}
   .vide-btn:hover{background:#f5f5f5}
   .vide-btn.active{background:var(--ok);border-color:var(--ok);color:#fff}
-  .vide-note{font-size:.75rem;color:#888}
+  .vide-btn.nonrange.active{background:#8E24AA;border-color:#8E24AA;color:#fff}
+  .vide-note{font-size:.75rem;color:#888;flex-basis:100%}
   .noncat-label{font-size:.9rem;color:#333}
   #stp-noncat-wrap{padding:.15rem .3rem}
   #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit}
@@ -180,6 +181,7 @@
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Emplacements vides</div><div class="stat-card-val" id="st-vide">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Emplacements non rangés</div><div class="stat-card-val" id="st-nonrange">0</div></div>
       </div>
 
       <div class="scan-zone">
@@ -192,7 +194,8 @@
         </div>
         <div class="vide-row" id="vide-row">
           <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cet emplacement comme vide</button>
-          <span class="vide-note">À utiliser quand un emplacement (étagère, niveau, tiroir) ne contient aucun livre (catalogué ou non), y compris entre des emplacements remplis.</span>
+          <button type="button" class="vide-btn nonrange" id="btn-nonrange">☐ Marquer comme non rangé</button>
+          <span class="vide-note">Vide : ne contient aucun livre (catalogué ou non). Non rangé : documents de natures différentes en désordre, impossibles à compter facilement. Les deux sont exclusifs.</span>
         </div>
         <div id="noncat-mode-zone" style="display:none">
           <div class="scan-row">
@@ -256,15 +259,25 @@
         </table></div>
       </div>
 
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">Emplacements marqués non rangés</span>
+        </div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Travée</th><th>Colonne</th><th>Étage</th><th>Marquée le</th><th></th></tr></thead>
+          <tbody id="log-nonrange"></tbody>
+        </table></div>
+      </div>
+
       <div class="tools-row">
         <div class="tool-card">
           <h3>Exporter</h3>
-          <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués et des étagères marquées vides. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
+          <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués et des emplacements marqués vides ou non rangés. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
           <button type="button" class="tool-btn" id="btn-export">⬇ Exporter le récolement</button>
         </div>
         <div class="tool-card">
           <h3>Reprendre une session</h3>
-          <p>Importe un export JSON précédent (scans, non-catalogués, étagères vides) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
+          <p>Importe un export JSON précédent (scans, non-catalogués, emplacements vides ou non rangés) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
           <label class="tool-btn secondary" for="file-resume">⬆ Importer et fusionner</label>
           <input type="file" id="file-resume" accept="application/json">
         </div>
@@ -276,7 +289,7 @@
         </div>
         <div class="tool-card">
           <h3>Réinitialiser</h3>
-          <p>Efface tous les scans, tous les comptages de livres non catalogués et toutes les étagères marquées vides enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
+          <p>Efface tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
           <button type="button" class="tool-btn danger" id="btn-reset">✕ Tout effacer</button>
         </div>
       </div>
@@ -311,6 +324,7 @@ const LS_LOC    = 'rp_recolement_loc';
 const LS_BASE   = 'rp_recolement_baseline';
 const LS_NONCAT = 'rp_recolement_noncat';
 const LS_VIDE   = 'rp_recolement_vide';
+const LS_NONRANGE = 'rp_recolement_nonrange';
 
 let scans = loadJSON(LS_SCANS, {});           // barcode -> record
 let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
@@ -321,6 +335,7 @@ loc.mode = loc.mode || 'scan';
 let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat}
 let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
 let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
+let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 
 function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -331,6 +346,7 @@ function saveLoc(){ localStorage.setItem(LS_LOC, JSON.stringify(loc)); }
 function saveBaseline(){ localStorage.setItem(LS_BASE, baseline ? JSON.stringify(baseline) : ''); }
 function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); }
 function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShelves)); }
+function saveNonRangeShelves(){ localStorage.setItem(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
@@ -479,6 +495,8 @@ function refreshLoc(){
   renderNonCatLog();
   updateVideUI();
   renderVideLog();
+  updateNonRangeUI();
+  renderNonRangeLog();
   if(loc.mode==='catalogage') noncatInput.focus(); else scanInput.focus();
 }
 applyReserveVisibility();
@@ -673,10 +691,14 @@ function renderNonCatLog(){
   }));
 }
 
-/* ════════════ ÉTAGÈRES VIDES ════════════ */
-function videKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.etage}`; }
+/* ════════════ ÉTAGÈRES VIDES / NON RANGÉES ════════════
+   Deux marquages mutuellement exclusifs sur un même emplacement (même clé
+   travee|colonne|etage) : "vide" (aucun livre) et "non rangé" (documents de
+   natures différentes en désordre, impossibles à compter facilement). */
+function emplacementKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.etage}`; }
 
-function isCurrentVide(){ return !!videShelves[videKey(locFieldsOf(loc))]; }
+function isCurrentVide(){ return !!videShelves[emplacementKey(locFieldsOf(loc))]; }
+function isCurrentNonRange(){ return !!nonRangeShelves[emplacementKey(locFieldsOf(loc))]; }
 
 function updateVideUI(){
   const btn = document.getElementById('btn-vide');
@@ -685,21 +707,49 @@ function updateVideUI(){
   btn.classList.toggle('active', marked);
 }
 
+function updateNonRangeUI(){
+  const btn = document.getElementById('btn-nonrange');
+  const marked = isCurrentNonRange();
+  btn.textContent = marked ? '☑ Emplacement marqué non rangé' : '☐ Marquer comme non rangé';
+  btn.classList.toggle('active', marked);
+}
+
 document.getElementById('btn-vide').addEventListener('click', ()=>{
   const fields = locFieldsOf(loc);
-  const key = videKey(fields);
+  const key = emplacementKey(fields);
   if(!videShelves[key]){
     const hereCount = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
     if(hereCount>0 && !confirm(`${hereCount} scan(s) déjà enregistré(s) sur cet emplacement. Marquer quand même comme vide ?`)) return;
     videShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    if(nonRangeShelves[key]){ delete nonRangeShelves[key]; saveNonRangeShelves(); }
     beep(660,.1);
   } else {
     delete videShelves[key];
   }
   saveVideShelves();
   updateVideUI();
+  updateNonRangeUI();
   updateStats();
   renderVideLog();
+  renderNonRangeLog();
+});
+
+document.getElementById('btn-nonrange').addEventListener('click', ()=>{
+  const fields = locFieldsOf(loc);
+  const key = emplacementKey(fields);
+  if(!nonRangeShelves[key]){
+    nonRangeShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    if(videShelves[key]){ delete videShelves[key]; saveVideShelves(); }
+    beep(560,.1);
+  } else {
+    delete nonRangeShelves[key];
+  }
+  saveNonRangeShelves();
+  updateVideUI();
+  updateNonRangeUI();
+  updateStats();
+  renderVideLog();
+  renderNonRangeLog();
 });
 
 function renderVideLog(){
@@ -720,7 +770,7 @@ function renderVideLog(){
       <td>Col. ${esc(r.colonne)}</td>
       <td>Étage ${esc(r.etage)}</td>
       <td>${new Date(r.ts).toLocaleString('fr-FR')}</td>
-      <td><button class="log-del" data-key="${esc(videKey(r))}">✕</button></td>
+      <td><button class="log-del" data-key="${esc(emplacementKey(r))}">✕</button></td>
     </tr>`).join('');
   tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>{
     delete videShelves[b.dataset.key];
@@ -728,6 +778,35 @@ function renderVideLog(){
     updateStats();
     updateVideUI();
     renderVideLog();
+  }));
+}
+
+function renderNonRangeLog(){
+  const tbody = document.getElementById('log-nonrange');
+  const rows = Object.values(nonRangeShelves).sort((a,b)=>{
+    const c = locSortIndex(a.travee)-locSortIndex(b.travee);
+    if(c!==0) return c;
+    if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
+    return parseInt(a.etage,10)-parseInt(b.etage,10);
+  });
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucun emplacement marqué non rangé pour l\'instant.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r=>`
+    <tr>
+      <td>${esc(locLabel(r.travee))}</td>
+      <td>Col. ${esc(r.colonne)}</td>
+      <td>Étage ${esc(r.etage)}</td>
+      <td>${new Date(r.ts).toLocaleString('fr-FR')}</td>
+      <td><button class="log-del" data-key="${esc(emplacementKey(r))}">✕</button></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>{
+    delete nonRangeShelves[b.dataset.key];
+    saveNonRangeShelves();
+    updateStats();
+    updateNonRangeUI();
+    renderNonRangeLog();
   }));
 }
 
@@ -834,14 +913,21 @@ function updateStats(){
   const nonCatTotal = Object.values(nonCat).reduce((s,r)=>s+r.count, 0);
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
   document.getElementById('st-vide').textContent = Object.keys(videShelves).length.toLocaleString('fr-FR');
+  document.getElementById('st-nonrange').textContent = Object.keys(nonRangeShelves).length.toLocaleString('fr-FR');
 }
 
 /* ════════════ EXPORT / IMPORT / RESET ════════════
-   Un seul fichier JSON regroupe scans, non-catalogués et étagères vides :
-   { scans:[...], nonCatalogues:[...], videShelves:[...] }.
+   Un seul fichier JSON regroupe scans, non-catalogués, étagères vides et
+   emplacements non rangés :
+   { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...] }.
    Les anciens exports (simple tableau de scans) restent importables. */
 function exportPayload(){
-  return { scans: Object.values(scans), nonCatalogues: Object.values(nonCat), videShelves: Object.values(videShelves) };
+  return {
+    scans: Object.values(scans),
+    nonCatalogues: Object.values(nonCat),
+    videShelves: Object.values(videShelves),
+    nonRangeShelves: Object.values(nonRangeShelves)
+  };
 }
 function downloadJSON(data, prefix){
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -867,6 +953,7 @@ document.getElementById('file-resume').addEventListener('change', function(e){
       const scanRows = Array.isArray(data) ? data : (data.scans||[]);
       const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
       const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+      const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
 
       let added=0, updated=0;
       scanRows.forEach(r=>{
@@ -880,11 +967,14 @@ document.getElementById('file-resume').addEventListener('change', function(e){
       nonCatRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonCat[nonCatKey(r)] = r; });
       saveNonCat();
 
-      videRows.forEach(r=>{ if(r.travee && r.etage!==undefined) videShelves[videKey(r)] = r; });
+      videRows.forEach(r=>{ if(r.travee && r.etage!==undefined) videShelves[emplacementKey(r)] = r; });
       saveVideShelves();
 
-      alert(`Import terminé : ${added} nouveaux scans, ${updated} mis à jour, ${nonCatRows.length} emplacement(s) non catalogué(s) fusionné(s), ${videRows.length} étagère(s) vide(s) fusionnée(s).`);
-      renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog();
+      nonRangeRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonRangeShelves[emplacementKey(r)] = r; });
+      saveNonRangeShelves();
+
+      alert(`Import terminé : ${added} nouveaux scans, ${updated} mis à jour, ${nonCatRows.length} emplacement(s) non catalogué(s) fusionné(s), ${videRows.length} étagère(s) vide(s) fusionnée(s), ${nonRangeRows.length} emplacement(s) non rangé(s) fusionné(s).`);
+      renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
     }catch(err){ alert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
@@ -910,11 +1000,12 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
 });
 
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  if(!confirm('Effacer tous les scans, tous les comptages de livres non catalogués et toutes les étagères marquées vides enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
+  if(!confirm('Effacer tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
   scans = {}; saveScans();
   nonCat = {}; saveNonCat();
   videShelves = {}; saveVideShelves();
-  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog();
+  nonRangeShelves = {}; saveNonRangeShelves();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
 });
 
 /* ════════════ DÉMARRAGE ════════════ */

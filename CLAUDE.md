@@ -96,27 +96,33 @@ recommencez pas à ajouter un système de meubles nommés séparé sans relire
 d'abord cette partie du code (uniquement dans la réserve patrimoniale ; le
 menu déroulant se désactive automatiquement sur « Réserve Douaisienne »).
 
-`data/recolement.json` regroupe en un seul fichier trois catégories de
+`data/recolement.json` regroupe en un seul fichier quatre catégories de
 données produites par `recolement.html` (un seul bouton « Exporter le
 récolement », un seul export/import à gérer) :
-`{ scans:[...], nonCatalogues:[...], videShelves:[...] }`. `videShelves`
-sert à marquer explicitement qu'une étagère est vide (aucun livre,
-catalogué ou non) — utile car le nombre d'étagères réelles par colonne
-varie (jusqu'à `maxEt` défini par travée dans `js/reserve-shared.js`, mais
-pas toujours atteint) et une étagère vide peut se trouver au milieu
-d'étagères remplies ; sans ce marquage, une étagère sans aucun scan
-au-delà du dernier scan serait simplement absente du calcul de `maxEt` par
-colonne dans `reserve.html`. Les anciens exports au format « tableau plat
-de scans » restent lus correctement (import et chargement dans
-`reserve.html`), pour ne pas casser d'anciens fichiers en circulation.
+`{ scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...] }`.
+`videShelves` sert à marquer explicitement qu'une étagère est vide (aucun
+livre, catalogué ou non) — utile car le nombre d'étagères réelles par
+colonne varie (jusqu'à `maxEt` défini par travée dans
+`js/reserve-shared.js`, mais pas toujours atteint) et une étagère vide peut
+se trouver au milieu d'étagères remplies ; sans ce marquage, une étagère
+sans aucun scan au-delà du dernier scan serait simplement absente du
+calcul de `maxEt` par colonne dans `reserve.html`. `nonRangeShelves` sert à
+marquer un emplacement contenant des documents de natures différentes en
+désordre, impossibles à compter facilement — distinct de « vide » (les
+deux boutons dans `recolement.html` sont mutuellement exclusifs : marquer
+l'un efface l'autre sur le même emplacement). Les anciens exports au
+format « tableau plat de scans » restent lus correctement (import et
+chargement dans `reserve.html`), pour ne pas casser d'anciens fichiers en
+circulation.
 
 Le code couleur du plan (`reserve.html`) est catégoriel, pas un dégradé de
 densité : chaque emplacement (travée/colonne/étage, ou meuble/étage pour
 armoires et tiroirs) est classé en **catalogué** (bleu, au moins un
 exemplaire catalogué via `scans`), **non catalogué** (ambre, aucun
-catalogué mais un comptage `nonCatalogues` > 0), **vide confirmé** (vert,
-marqué via `videShelves`) ou **non inventorié** (gris, aucune des trois
-données ci-dessus) — dans cet ordre de priorité (`slotState()` dans
+catalogué mais un comptage `nonCatalogues` > 0), **non rangé** (violet,
+marqué via `nonRangeShelves`), **vide confirmé** (vert, marqué via
+`videShelves`) ou **non inventorié** (gris, aucune des quatre données
+ci-dessus) — dans cet ordre de priorité (`slotState()` dans
 `reserve.html`). Il n'y a volontairement pas de code couleur par quantité
 de livres (impossible à estimer sans mesurer chaque reliure) ; la quantité
 reste visible via la largeur des barres et les compteurs dans le panneau
