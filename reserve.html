@@ -60,16 +60,18 @@
     .room-section-title{font-family:'DM Serif Display',serif;font-size:1.15rem;font-weight:400;margin:0 0 .75rem;color:#333;display:flex;align-items:center;gap:.6rem}
     .room-section-title::after{content:'';flex:1;height:1px;background:#e0e0e0}
     .room-plan{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem 1rem;overflow-x:auto}
-    .room-inner{display:flex;flex-wrap:nowrap;gap:.6rem;align-items:flex-end;min-width:max-content}
-    .travee-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
-    .travee-wrap:hover .tv-box{border-color:#555}
+    .room-inner{display:flex;flex-wrap:nowrap;gap:.9rem;align-items:flex-end;min-width:max-content}
+    .travee-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+    .travee-wrap:hover .tv-box{border-color:#555;box-shadow:0 2px 6px rgba(0,0,0,.08)}
     .travee-wrap.sel .tv-box{border:2px solid var(--red)!important}
-    .tv-box{border:1px solid #ccc;border-radius:var(--radius-sm);padding:2px;background:#fff;display:flex;flex-direction:row;gap:1px;transition:border-color .15s}
-    .tv-col{display:flex;flex-direction:column;gap:1px}
-    .tv-slot{border-radius:1px}
-    .tv-label{font-size:9px;color:#888;text-align:center;white-space:nowrap;line-height:1}
-    .tv-sublabel{font-size:8px;color:#bbb;text-align:center;white-space:nowrap;line-height:1}
-    .vsep{width:1px;background:#ddd;min-height:60px;margin:0 .25rem;align-self:center;flex-shrink:0}
+    .tv-box{border:1px solid #ccc;border-radius:var(--radius-sm);padding:3px;background:#fff;display:flex;flex-direction:row;gap:3px;transition:border-color .15s,box-shadow .15s}
+    .tv-col{display:flex;flex-direction:column;gap:1.5px;align-items:center}
+    .tv-slot{border-radius:1px;transition:transform .1s,outline-color .1s}
+    .tv-slot:hover{outline:2px solid #1a1a1a;outline-offset:-1px;position:relative;z-index:2;transform:scale(1.1)}
+    .tv-label{font-size:11px;font-weight:600;color:#555;text-align:center;white-space:nowrap;line-height:1.3}
+    .tv-sublabel{font-size:9.5px;color:#888;text-align:center;white-space:nowrap;line-height:1.3}
+    .tv-col-lbl{font-size:8px;color:#aaa;text-align:center;white-space:nowrap;line-height:1;margin-top:3px}
+    .vsep{width:1px;background:#ddd;min-height:60px;margin:0 .4rem;align-self:center;flex-shrink:0}
     .detail-panel{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-top:1rem}
     .detail-panel-title{font-family:'DM Serif Display',serif;font-size:1.1rem;font-weight:400;margin:0 0 .75rem;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}
     .detail-badge{font-family:'DM Sans',sans-serif;font-size:.7rem;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
@@ -132,7 +134,7 @@
     <div class="container">
 
       <div class="csv-loader" id="csv-loader">
-        <p>Chargement du récolement depuis <code>data/recolement.json</code>…</p>
+        <p>Chargement du récolement…</p>
         <div class="spinner-row"><div class="sp"></div><div class="sp"></div><div class="sp"></div><span>Analyse en cours</span></div>
       </div>
 
@@ -152,6 +154,7 @@
         <div class="leg"><div class="leg-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></div><span>Vide (confirmé)</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-nonrange)"></div><span>Non rangé</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></div><span>Non inventorié</span></div>
+        <div class="leg" style="color:#aaa;font-style:italic;margin-left:auto">Survolez une étagère pour son détail, cliquez sur une travée pour l'ouvrir</div>
       </div>
 
       <div class="search-results" id="sres"></div>
@@ -370,6 +373,41 @@ function slotColor(t,c,e,state){
   }
   return stateColor(state);
 }
+function stateLabel(state){
+  if(state==='cat') return 'catalogué';
+  if(state==='noncat') return 'non catalogué';
+  if(state==='nonrange') return 'non rangé';
+  if(state==='vide') return 'vide (confirmé)';
+  return 'non inventorié';
+}
+/* Texte d'infobulle d'une case du plan miniature — affiché au survol pour
+   identifier un emplacement sans avoir à cliquer dessus. */
+function slotTitle(tid,col,e){
+  const state=slotState(tid,col,e);
+  const n=cnt(tid,col,e), ncCount=nc(tid,col,e);
+  let detail;
+  if(state==='cat') detail = ncCount>0 ? `${n} catalogué(s) + ${ncCount} non catalogué(s)` : `${n} catalogué(s)`;
+  else if(state==='noncat') detail = `${ncCount} non catalogué(s) estimé(s)`;
+  else detail = stateLabel(state);
+  const spec=isNaN(parseInt(e));
+  const elbl=spec?e:`${etageWordFor(tid)} ${e}`;
+  return `${travTitle(tid)} · col. ${col}, ${elbl} — ${detail}`;
+}
+/* Taux d'occupation d'une travée (catalogué + non catalogué + non rangé, sur
+   le total d'emplacements) — affiché sous son étiquette pour donner un
+   aperçu sans avoir à cliquer. */
+function traveeOccupancy(tid,cols){
+  let total=0, filled=0;
+  cols.forEach(col=>{
+    const maxE=maxEtageOf(tid,col);
+    for(let e=1;e<=maxE;e++){
+      total++;
+      const state=slotState(tid,col,String(e));
+      if(state==='cat'||state==='noncat'||state==='nonrange') filled++;
+    }
+  });
+  return total ? Math.round(filled/total*100) : 0;
+}
 
 function colsOf(tDef){
   const from=new Set();
@@ -446,16 +484,21 @@ function makeTraveeEl(tid,tDef,cols){
   cols.forEach(col=>{
     const maxE=maxEtageOf(tid,col);
     const cd=document.createElement('div');cd.className='tv-col';
+    const w=tDef.nbCols<=5?11:9, h=Math.max(8,Math.round(64/maxE));
     for(let e=maxE;e>=1;e--){
       const state=slotState(tid,col,String(e));
       const s=document.createElement('div');s.className='tv-slot';
-      const w=tDef.nbCols<=5?9:7, h=Math.max(7,Math.round(56/maxE));
       const bg=slotColor(tid,col,String(e),state);
       let op='1';
       if(filter==='occ'&&!(state==='cat'||state==='noncat'||state==='nonrange')) op='.15';
       if(filter==='free'&&state!=='vide') op='.15';
       s.style.cssText=`width:${w}px;height:${h}px;background:${bg};opacity:${op}`;
+      s.title=slotTitle(tid,col,String(e));
       cd.appendChild(s);
+    }
+    if(known||!csvLoaded){
+      const colLbl=document.createElement('div');colLbl.className='tv-col-lbl';colLbl.textContent=col;
+      cd.appendChild(colLbl);
     }
     box.appendChild(cd);
   });
@@ -463,7 +506,13 @@ function makeTraveeEl(tid,tDef,cols){
   const lbl=document.createElement('div');lbl.className='tv-label';
   lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'');
   wrap.appendChild(lbl);
-  if(csvLoaded&&!known){const sub=document.createElement('div');sub.className='tv-sublabel';sub.textContent='—';wrap.appendChild(sub);}
+  if(csvLoaded){
+    const sub=document.createElement('div');sub.className='tv-sublabel';
+    if(known){ sub.textContent=traveeOccupancy(tid,cols)+'% occupé'; }
+    else { sub.textContent='—'; }
+    wrap.appendChild(sub);
+  }
+  wrap.title=`${travTitle(tid)}${known?` — ${traveeOccupancy(tid,cols)}% occupé`:' — non inventoriée'}`;
   wrap.addEventListener('click',()=>selectTravee(tid,tDef,cols));
   wrap.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')selectTravee(tid,tDef,cols);});
   return wrap;
