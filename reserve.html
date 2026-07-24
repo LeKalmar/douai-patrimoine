@@ -481,10 +481,21 @@ function makeTraveeEl(tid,tDef,cols){
   wrap.setAttribute('role','button');wrap.setAttribute('tabindex','0');
   const box=document.createElement('div');box.className='tv-box';
   const known=hasData(tid);
+  // Hauteur totale de référence pour une colonne de cette travée : basée sur
+  // le nombre d'étages nominal (tDef.maxEt), pas sur le nombre observé pour
+  // CETTE colonne — pour qu'une colonne à 3 étages et une à 4 étages, dans la
+  // même travée, occupent exactement la même hauteur totale (étages +
+  // interstices), avec des étages proportionnellement plus grands ou plus
+  // petits selon leur nombre. Ça aligne aussi les libellés de colonne sur une
+  // même ligne de base, puisque toutes les colonnes finissent à la même
+  // hauteur.
+  const GAP=1.5, BASE_SLOT_H=9;
+  const targetH=tDef.maxEt*BASE_SLOT_H+(tDef.maxEt-1)*GAP;
   cols.forEach(col=>{
     const maxE=maxEtageOf(tid,col);
     const cd=document.createElement('div');cd.className='tv-col';
-    const w=tDef.nbCols<=5?11:9, h=Math.max(8,Math.round(64/maxE));
+    const w=tDef.nbCols<=5?11:9;
+    const h=Math.max(4,(targetH-(maxE-1)*GAP)/maxE);
     for(let e=maxE;e>=1;e--){
       const state=slotState(tid,col,String(e));
       const s=document.createElement('div');s.className='tv-slot';
