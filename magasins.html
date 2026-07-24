@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Magasins 2e/5e étage — Réserve patrimoniale</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <style>
+    :root { --warm: #c9a96e; --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
+    body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+    .page-hero{background:#12157A;color:#fff;padding:2.5rem 1.5rem 2rem}
+    .page-hero .container{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.75rem;letter-spacing:.04em}
+    .breadcrumb a{color:rgba(255,255,255,0.7);text-decoration:none}
+    .breadcrumb a:hover{color:#fff}
+    .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:400;margin:0 0 .5rem;line-height:1.15}
+    .page-lead{font-size:.9rem;color:rgba(255,255,255,0.7);margin:0;max-width:620px;line-height:1.6}
+    .hero-actions a{font-family:inherit;font-size:.82rem;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s}
+    .hero-actions a:hover{background:rgba(255,255,255,0.2);color:#fff}
+    .container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
+
+    .mg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;margin:1.5rem 0}
+    .mstat{background:#F5F5FF;border:1px solid #e8e8f0;border-radius:8px;padding:.75rem .9rem}
+    .mstat-lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#999;margin-bottom:.25rem}
+    .mstat-val{font-family:'DM Serif Display',serif;font-size:1.5rem;line-height:1;color:#12157A}
+
+    .mg-toolbar{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;padding:.85rem 1rem;background:#fafafa;border:1px solid #e8e8f0;border-radius:8px}
+    .mg-search{display:flex;align-items:center;gap:.4rem;background:#fff;border:1px solid #ddd;border-radius:6px;padding:.4rem .7rem;flex:1;min-width:220px}
+    .mg-search input{border:none;outline:none;font-size:.85rem;background:transparent;width:100%;font-family:inherit;color:#333}
+    .mg-select{font-family:inherit;font-size:.8rem;border:1px solid #ddd;border-radius:6px;padding:.4rem .6rem;background:#fff;color:#555;cursor:pointer}
+    .mg-count{font-size:.78rem;color:#888;white-space:nowrap}
+
+    .mg-table-wrap{border:1px solid #e8e8f0;border-radius:8px;overflow:hidden}
+    table.mg-table{width:100%;border-collapse:collapse;font-size:.82rem}
+    .mg-table th{position:sticky;top:0;background:#F5F5FF;padding:.5rem .75rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#888;border-bottom:1px solid #e8e8f0;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+    .mg-table th:hover{color:#12157A}
+    .mg-table th .arrow{font-size:.65rem;margin-left:.2rem;color:#c9a96e}
+    .mg-table td{padding:.45rem .75rem;border-bottom:1px solid #f5f5f5;vertical-align:top}
+    .mg-table tr:last-child td{border-bottom:none}
+    .mg-table tr:hover td{background:#fafafa}
+    .mg-cote{font-family:'DM Mono',monospace;font-weight:600;color:#12157A;white-space:nowrap}
+    .mg-titre{max-width:380px}
+    .mg-titre a{color:#1a1a1a;text-decoration:none}
+    .mg-titre a:hover{color:#12157A;text-decoration:underline}
+    .mg-auteur{color:#555;white-space:nowrap}
+    .mg-meta{color:#999;font-size:.76rem;white-space:nowrap}
+    .mg-empty{padding:2rem;text-align:center;color:#bbb;font-size:.85rem;font-style:italic}
+
+    .mg-pagination{display:flex;align-items:center;justify-content:space-between;padding:.55rem .75rem;border-top:1px solid #e8e8f0;background:#fafafa;flex-wrap:wrap;gap:.5rem}
+    .pag-info{font-size:.72rem;color:#888}
+    .pag-controls{display:flex;align-items:center;gap:.25rem}
+    .pag-btn{font-family:inherit;font-size:.72rem;padding:.2rem .55rem;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;color:#555;transition:all .12s;min-width:28px;text-align:center;line-height:1.4}
+    .pag-btn:hover:not(:disabled){background:#e8e8f0;border-color:#aaa}
+    .pag-btn:disabled{opacity:.35;cursor:default}
+    .pag-btn.active{background:#12157A;color:#fff;border-color:#12157A;font-weight:600}
+    .pag-ellipsis{font-size:.72rem;color:#bbb;padding:0 .15rem}
+
+    footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:3rem;font-size:.8rem;text-align:center}
+    footer a{color: var(--warm);text-decoration:none}
+  </style>
+</head>
+<body>
+
+<div class="page-hero">
+  <div class="container">
+    <div>
+      <div class="breadcrumb"><a href="admin.html">Espace professionnel</a> / Magasins</div>
+      <h1 class="page-title">Magasins — 2e &amp; 5e étage</h1>
+      <p class="page-lead">Catalogue des exemplaires du 2e et 5e étage, extrait de l'export Syracuse des magasins. Les ouvrages du 6e étage (cotes littérales type « R FON » ou Dewey type « 934.5 LUI ») sont automatiquement écartés — cf. <a href="data/magasins-build-report.json" download style="color:inherit">rapport de build</a>.</p>
+    </div>
+    <div class="hero-actions">
+      <a href="admin.html">← Espace professionnel</a>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="mg-stats" id="mg-stats">
+    <div class="mstat"><div class="mstat-lbl">Chargement…</div></div>
+  </div>
+
+  <div class="mg-toolbar">
+    <div class="mg-search">
+      <span>🔎</span>
+      <input type="text" id="mg-search-input" placeholder="Rechercher un titre, un auteur, une cote, un code-barre…">
+    </div>
+    <select class="mg-select" id="mg-perpage">
+      <option value="25">25 / page</option>
+      <option value="50" selected>50 / page</option>
+      <option value="100">100 / page</option>
+      <option value="200">200 / page</option>
+    </select>
+    <span class="mg-count" id="mg-count"></span>
+  </div>
+
+  <div class="mg-table-wrap">
+    <table class="mg-table">
+      <thead>
+        <tr>
+          <th data-sort="cote">Cote<span class="arrow" data-arrow="cote"></span></th>
+          <th data-sort="titre">Titre<span class="arrow" data-arrow="titre"></span></th>
+          <th data-sort="auteur">Auteur<span class="arrow" data-arrow="auteur"></span></th>
+          <th data-sort="editeur">Éditeur / Année<span class="arrow" data-arrow="editeur"></span></th>
+          <th data-sort="date">Entrée<span class="arrow" data-arrow="date"></span></th>
+          <th data-sort="barcode">Code-barre<span class="arrow" data-arrow="barcode"></span></th>
+        </tr>
+      </thead>
+      <tbody id="mg-tbody">
+        <tr><td colspan="6" class="mg-empty">Chargement du catalogue…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mg-pagination">
+    <span class="pag-info" id="pag-info"></span>
+    <div class="pag-controls" id="pag-controls"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+let ROWS = [];        // toutes les entrées, normalisées pour l'affichage/tri
+let FILTERED = [];     // après recherche
+let sortKey = 'cote';
+let sortDir = 1;       // 1 asc, -1 desc
+let page = 1;
+let perPage = 50;
+
+function normalize(rec) {
+  const g = rec['930$g'] || '';
+  const h = rec['930$h'] || '';
+  const cote = [g, h].filter(Boolean).join(' ');
+  const coteNum = parseInt(rec._coteDigitRun || '', 10) || 0;
+  const multi = s => (s || '').split('§').join(' / ');
+  const titre = multi(rec['200$a']) || '(Sans titre)';
+  const sousTitre = multi(rec['200$e']);
+  const auteur = rec['700$a']
+    ? [multi(rec['700$a']), multi(rec['700$b'])].filter(Boolean).join(' ')
+    : multi(rec['200$f']);
+  const editeur = rec['210$c'] || '';
+  const annee = rec['210$d'] || '';
+  const dateEntree = rec['920$d'] || '';
+  const barcode = rec['915$b'] || '';
+  return { rec, cote, coteNum, titre, sousTitre, auteur, editeur, annee, dateEntree, barcode };
+}
+
+function dateEntreeSortKey(s) {
+  // format attendu JJ/MM/AAAA -> AAAAMMJJ pour un tri chronologique simple
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || '');
+  return m ? m[3] + m[2] + m[1] : '';
+}
+
+const SORTERS = {
+  cote:    (a, b) => (a.coteNum - b.coteNum) || a.cote.localeCompare(b.cote),
+  titre:   (a, b) => a.titre.localeCompare(b.titre),
+  auteur:  (a, b) => a.auteur.localeCompare(b.auteur),
+  editeur: (a, b) => (a.editeur + a.annee).localeCompare(b.editeur + b.annee),
+  date:    (a, b) => dateEntreeSortKey(a.dateEntree).localeCompare(dateEntreeSortKey(b.dateEntree)),
+  barcode: (a, b) => a.barcode.localeCompare(b.barcode),
+};
+
+function applySearch() {
+  const q = (document.getElementById('mg-search-input').value || '').trim().toLowerCase();
+  if (!q) { FILTERED = ROWS; return; }
+  FILTERED = ROWS.filter(r =>
+    r.titre.toLowerCase().includes(q) ||
+    r.auteur.toLowerCase().includes(q) ||
+    r.cote.toLowerCase().includes(q) ||
+    r.barcode.toLowerCase().includes(q)
+  );
+}
+
+function applySort() {
+  const fn = SORTERS[sortKey] || SORTERS.cote;
+  FILTERED = FILTERED.slice().sort((a, b) => sortDir * fn(a, b));
+}
+
+function render() {
+  applySearch();
+  applySort();
+
+  const total = FILTERED.length;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  if (page > totalPages) page = totalPages;
+  const start = (page - 1) * perPage;
+  const pageRows = FILTERED.slice(start, start + perPage);
+
+  document.getElementById('mg-count').textContent =
+    total.toLocaleString('fr-FR') + ' notice' + (total > 1 ? 's' : '') +
+    (total !== ROWS.length ? ' (sur ' + ROWS.length.toLocaleString('fr-FR') + ')' : '');
+
+  const tbody = document.getElementById('mg-tbody');
+  if (!pageRows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="mg-empty">Aucun résultat.</td></tr>';
+  } else {
+    tbody.innerHTML = pageRows.map(r => `
+      <tr>
+        <td class="mg-cote">${esc(r.cote)}</td>
+        <td class="mg-titre">
+          ${r.rec.lien_num ? `<a href="${esc(r.rec.lien_num)}" target="_blank" rel="noopener">${esc(r.titre)}</a>` : esc(r.titre)}
+          ${r.sousTitre ? `<div class="mg-meta">${esc(r.sousTitre)}</div>` : ''}
+        </td>
+        <td class="mg-auteur">${esc(r.auteur) || '—'}</td>
+        <td class="mg-meta">${esc([r.editeur, r.annee].filter(Boolean).join(', ')) || '—'}</td>
+        <td class="mg-meta">${esc(r.dateEntree) || '—'}</td>
+        <td class="mg-meta">${esc(r.barcode) || '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  renderPagination(total, totalPages);
+  document.querySelectorAll('.mg-table th .arrow').forEach(el => {
+    const key = el.dataset.arrow;
+    el.textContent = key === sortKey ? (sortDir === 1 ? '▲' : '▼') : '';
+  });
+}
+
+function renderPagination(total, totalPages) {
+  document.getElementById('pag-info').textContent =
+    total ? `Page ${page} / ${totalPages}` : '';
+
+  const controls = document.getElementById('pag-controls');
+  const btn = (label, target, disabled, active) =>
+    `<button class="pag-btn${active ? ' active' : ''}" data-page="${target}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+
+  let html = btn('«', 1, page === 1, false) + btn('‹', page - 1, page === 1, false);
+  const windowSize = 2;
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - page) <= windowSize) {
+      html += btn(String(p), p, false, p === page);
+    } else if (Math.abs(p - page) === windowSize + 1) {
+      html += '<span class="pag-ellipsis">…</span>';
+    }
+  }
+  html += btn('›', page + 1, page === totalPages, false) + btn('»', totalPages, page === totalPages, false);
+  controls.innerHTML = html;
+
+  controls.querySelectorAll('.pag-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      page = parseInt(b.dataset.page, 10);
+      render();
+    });
+  });
+}
+
+document.getElementById('mg-search-input').addEventListener('input', () => { page = 1; render(); });
+document.getElementById('mg-perpage').addEventListener('change', (e) => {
+  perPage = parseInt(e.target.value, 10);
+  page = 1;
+  render();
+});
+document.querySelectorAll('.mg-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+    render();
+  });
+});
+
+fetch('data/magasins.json')
+  .then(res => res.json())
+  .then(data => {
+    ROWS = data.map(normalize);
+    FILTERED = ROWS;
+    render();
+  })
+  .catch(err => {
+    document.getElementById('mg-tbody').innerHTML =
+      '<tr><td colspan="6" class="mg-empty">Impossible de charger data/magasins.json — lancez `npm run build:magasins`.</td></tr>';
+    console.error(err);
+  });
+
+fetch('data/magasins-build-report.json')
+  .then(res => res.json())
+  .then(report => {
+    const s = report.stats || {};
+    const date = report.generatedAt ? new Date(report.generatedAt).toLocaleString('fr-FR') : '—';
+    document.getElementById('mg-stats').innerHTML = `
+      <div class="mstat"><div class="mstat-lbl">Gardés (2e/5e)</div><div class="mstat-val">${(s.kept ?? '—').toLocaleString?.('fr-FR') ?? s.kept}</div></div>
+      <div class="mstat"><div class="mstat-lbl">Exclus (6e étage)</div><div class="mstat-val">${(s.excluded ?? '—').toLocaleString?.('fr-FR') ?? s.excluded}</div></div>
+      <div class="mstat"><div class="mstat-lbl">Total exemplaires</div><div class="mstat-val">${(s.items ?? '—').toLocaleString?.('fr-FR') ?? s.items}</div></div>
+      <div class="mstat"><div class="mstat-lbl">Dernier build</div><div class="mstat-val" style="font-size:.95rem">${date}</div></div>
+    `;
+  })
+  .catch(() => {
+    document.getElementById('mg-stats').innerHTML = '<div class="mstat"><div class="mstat-lbl">Rapport indisponible</div></div>';
+  });
+</script>
+
+</body>
+</html>

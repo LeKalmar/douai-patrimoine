@@ -29,6 +29,12 @@ bas, section « Stockage partagé »).
   Syracuse, pour ne pas avoir à committer ces fichiers de plusieurs dizaines
   de Mo). `npm run test:r2` vérifie qu'un token R2 fonctionne (PUT/GET/DELETE
   sur une clé de test), sans toucher aux données réelles.
+- `npm run build:magasins` — régénère `data/magasins.json` et
+  `data/magasins-build-report.json` à partir d'un export Syracuse séparé
+  (magasins du 2e/5e étage), toujours récupéré depuis R2 (pas de repli
+  local committé, contrairement à `npm run build`). Voir « Magasins 2e/5e
+  étage » plus bas. Le parseur MARC-XML est partagé entre les deux scripts
+  de build via `scripts/lib/marc-xml.mjs`.
 - Aucun serveur de dev fourni — ouvrir les `.html` directement ou servir le
   dossier avec n'importe quel serveur statique (`python3 -m http.server`,
   etc.). Attention : les pages qui font `fetch()` (quasiment toutes) ont
@@ -45,6 +51,7 @@ bas, section « Stockage partagé »).
 | `recolement.html` | Outil de scan de codes-barres pour localiser les documents (travée/colonne/étage) dans la réserve. Partage `js/reserve-shared.js` avec `reserve.html` | **Protégé** |
 | `reserve.html` | Plan interactif de la réserve (travées/colonnes/armoires) avec taux d'occupation calculé depuis `data/recolement.json` | **Protégé** |
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |
+| `magasins.html` | Catalogue des exemplaires du 2e/5e étage (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e étage » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
@@ -148,6 +155,51 @@ de détail, mais jamais via la couleur.
 propres CSV (`csv/Professionnels.csv`, `Individus.csv`, `Documents.csv`,
 `Lieux.csv`, `Imprimeries.csv`, `periodiques.csv`, `auteurs.csv`) via
 `js/main.js` pour peupler la carte MapLibre.
+
+## Magasins 2e/5e étage (catalogue filtré)
+
+`magasins.html` (2026-07-24) donne un catalogue navigable (recherche, tri,
+pagination) des collections des magasins du 2e et 5e étage, à partir d'un
+export Syracuse séparé de celui de la réserve (`xml/magasin/notices.xml.xml`
+et `xml/magasin/exemplaires.xml.xml` sur R2, récupérés par
+`scripts/build-magasins.mjs` → `data/magasins.json` +
+`data/magasins-build-report.json`). Ce flux est indépendant de
+`npm run build` / `data/inventaire.json` : lancez `npm run build:magasins`
+séparément après un nouvel export.
+
+Problème d'origine : cet export mélange dans les mêmes fichiers XML les
+ouvrages du 2e/5e étage **et** ceux du 6e étage — impossible à distinguer à
+l'export. `build-magasins.mjs` les sépare a posteriori à partir de la cote
+de l'exemplaire (`930$g`, éventuellement suivi de `930$h`) :
+
+- **2e/5e étage** (à garder) : cotes à numérotation séquentielle de 5 ou 6
+  chiffres — `100350`, `156235` — parfois avec un zéro de tête
+  (`0100011` → `100011`), parfois suivies d'un tiret et d'un complément de
+  volume/tome (`104391-182 JOR` → le numéro reste `104391`), parfois
+  écrites avec un point comme séparateur de milliers pour un nombre à 5
+  chiffres (`12.352` = 12352).
+- **6e étage** (à exclure) : cotes purement littérales (`R FON`, `BD TSI`)
+  ou indices Dewey classiques à 3 chiffres avant le point (`940.21 BER`,
+  `330.122 KER` — le préfixe à 3 chiffres est justement ce qui les
+  distingue du séparateur de milliers ci-dessus : un vrai numéro
+  d'enregistrement à 5 chiffres n'a jamais 3 chiffres avant le point).
+
+Algorithme retenu (`magasinDigitRun()` dans `scripts/build-magasins.mjs`) :
+fusionner un éventuel point « 1-2 chiffres.3 chiffres » en un seul nombre,
+puis chercher un groupe de chiffres consécutifs de longueur 5 ou 6 (zéro de
+tête sur un groupe de 7 retiré avant de mesurer) n'importe où dans la cote.
+Un groupe trouvé → gardé (2e/5e étage) ; sinon → exclu (6e étage). Validé
+à la main sur les 38 236 exemplaires réels de l'export (2026-07-24) : 12 609
+gardés, 25 627 exclus — voir `data/magasins-build-report.json` pour les
+compteurs et des échantillons (`excludedSample`, `keptEdgeSample`) à relire
+en cas de doute après un nouvel export. Cette règle repose sur la forme
+observée de cet export précis ; si un futur export introduit un format de
+cote nouveau (nouveau préfixe lettré combiné à des chiffres, etc.), relire
+`keptEdgeSample`/`excludedSample` avant de faire confiance au tri.
+
+`data/xml/magasin/` (fichiers bruts, 125 Mo + 37 Mo) est gitignored — pas de
+repli local committé pour ce jeu de données, contrairement à
+`data/xml/notices.xml`/`exemplaires.xml` de la réserve.
 
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
