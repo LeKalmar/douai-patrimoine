@@ -237,25 +237,35 @@ function etageLabelPrefix(tid){
    emplacements non rangés :
    { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...] }.
    Les anciens exports (simple tableau de scans) restent lisibles. */
+function applyRecolementData(data){
+  const rows = Array.isArray(data) ? data : (data.scans||[]);
+  const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+  const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
+  const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
+  parseVide(videRows);
+  parseNonCat(nonCatRows);
+  parseNonRange(nonRangeRows);
+  parseRecolement(rows);
+}
+
+/* Priorité à /api/recolement (état partagé R2, à jour en direct pour tous
+   les collègues) ; repli sur data/recolement.json (snapshot committé) si
+   l'API échoue — R2 non configuré, page servie hors Vercel, etc. */
 function loadRecolement(){
-  fetch('data/recolement.json')
-    .then(r=>{ if(!r.ok) throw new Error('missing'); return r.json(); })
-    .then(data=>{
-      const rows = Array.isArray(data) ? data : (data.scans||[]);
-      const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
-      const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
-      const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
-      parseVide(videRows);
-      parseNonCat(nonCatRows);
-      parseNonRange(nonRangeRows);
-      parseRecolement(rows);
-    })
+  fetch('/api/recolement')
+    .then(r=>{ if(!r.ok) throw new Error('api-unavailable'); return r.json(); })
+    .then(applyRecolementData)
     .catch(()=>{
-      csvLoaded=true;
-      document.getElementById('csv-loader').innerHTML=
-        '<p>Aucun récolement disponible pour le moment. Utilisez l\'outil <a href="recolement.html">Récolement</a> depuis l\'espace professionnel pour commencer à localiser les collections.</p>';
-      document.getElementById('sn').textContent='0';
-      buildPlan();
+      fetch('data/recolement.json')
+        .then(r=>{ if(!r.ok) throw new Error('missing'); return r.json(); })
+        .then(applyRecolementData)
+        .catch(()=>{
+          csvLoaded=true;
+          document.getElementById('csv-loader').innerHTML=
+            '<p>Aucun récolement disponible pour le moment. Utilisez l\'outil <a href="recolement.html">Récolement</a> depuis l\'espace professionnel pour commencer à localiser les collections.</p>';
+          document.getElementById('sn').textContent='0';
+          buildPlan();
+        });
     });
 }
 
@@ -646,6 +656,7 @@ document.addEventListener('click',e=>{
 
 /* ════════════ DÉMARRAGE ════════════ */
 loadRecolement();
+setInterval(loadRecolement, 25000);
 
 </script>
 </body>

@@ -9,6 +9,8 @@
   },
   "scripts": {
     "build": "node scripts/build-inventory.mjs",
-    "build:force": "SYRACUSE_FORCE=1 node scripts/build-inventory.mjs"
+    "build:force": "SYRACUSE_FORCE=1 node scripts/build-inventory.mjs",
+    "upload:xml": "node scripts/upload-xml-to-r2.mjs",
+    "test:r2": "node scripts/test-r2.mjs"
   }
 }

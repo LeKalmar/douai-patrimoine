@@ -475,6 +475,9 @@ document.addEventListener('DOMContentLoaded', function() {
     e.preventDefault();
     if (userField.value.trim() === ADMIN_USER && passField.value === ADMIN_PASS) {
       sessionStorage.setItem('rp_admin_auth', '1');
+      // Utilisé par récolement.html / livres-spolies.html pour authentifier
+      // leurs appels vers /api/recolement et /api/spolies (écriture R2).
+      sessionStorage.setItem('rp_admin_token', btoa(ADMIN_USER + ':' + ADMIN_PASS));
       window.location.href = 'admin.html';
     } else {
       errorMsg.hidden = false;

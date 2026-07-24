@@ -27,6 +27,8 @@
     padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
   }
   .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
   .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
 
   .locbar{position:sticky;top:0;z-index:20;background:#F5F5FF;border-bottom:1px solid #ddd;padding:.75rem 0;box-shadow:0 2px 8px rgba(0,0,0,.05)}
@@ -73,6 +75,7 @@
   .fb-badge.ok{background:#c8e6c9;color:#1b5e20}
   .fb-badge.warn{background:#ffe0b2;color:#e65100}
   .fb-badge.dup{background:#bbdefb;color:#0d47a1}
+  .fb-badge.abime{background:#f3e5f5;color:#6a1b9a}
   .fb-cote{font-family:monospace;font-weight:700;color:#12157A}
   .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
   .fb-meta{font-size:.75rem;color:#888}
@@ -130,6 +133,7 @@
       <h1 class="page-title">Récolement</h1>
     </div>
     <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
       <a href="admin.html">← Espace professionnel</a>
       <button type="button" id="logout-btn">Se déconnecter</button>
     </div>
@@ -188,6 +192,7 @@
         <div id="scan-mode-zone">
           <div class="scan-row">
             <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
+            <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
             <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
           </div>
           <div class="feedback" id="feedback"></div>
@@ -313,6 +318,7 @@ if (sessionStorage.getItem('rp_admin_auth') !== '1') {
 }
 document.getElementById('logout-btn').addEventListener('click', function(){
   sessionStorage.removeItem('rp_admin_auth');
+  sessionStorage.removeItem('rp_admin_token');
   window.location.href = 'index.html';
 });
 
@@ -325,6 +331,7 @@ const LS_BASE   = 'rp_recolement_baseline';
 const LS_NONCAT = 'rp_recolement_noncat';
 const LS_VIDE   = 'rp_recolement_vide';
 const LS_NONRANGE = 'rp_recolement_nonrange';
+const LS_PENDING = 'rp_recolement_pending_sync';
 
 let scans = loadJSON(LS_SCANS, {});           // barcode -> record
 let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
@@ -336,6 +343,7 @@ let catalog = null;                           // barcode -> {cote,titre,auteur,f
 let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
 let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
+let pendingSync = loadJSON(LS_PENDING, []);   // patches en attente d'envoi à /api/recolement
 
 function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -347,7 +355,82 @@ function saveBaseline(){ localStorage.setItem(LS_BASE, baseline ? JSON.stringify
 function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); }
 function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShelves)); }
 function saveNonRangeShelves(){ localStorage.setItem(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
+function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ════════════ SYNCHRONISATION PARTAGÉE (R2 via /api/recolement) ════════════
+   Le localStorage reste la source de vérité locale (fonctionne hors ligne) ;
+   chaque mutation est en plus envoyée en arrière-plan vers /api/recolement,
+   qui la fusionne côté serveur (compare-and-swap) dans l'état partagé lu par
+   tous les collègues et par reserve.html. Si la requête échoue (hors ligne,
+   R2 non configuré), le patch reste dans une file locale et sera retenté —
+   rien n'est jamais perdu, seulement pas encore visible par les autres. */
+function authHeaders(){
+  const token = sessionStorage.getItem('rp_admin_token');
+  const h = { 'Content-Type': 'application/json' };
+  if(token) h['Authorization'] = 'Basic ' + token;
+  return h;
+}
+
+function updateSyncIndicator(){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  if(pendingSync.length){
+    el.textContent = `⏳ ${pendingSync.length} en attente de synchro`;
+    el.classList.add('pending');
+  } else {
+    el.textContent = '✓ synchronisé';
+    el.classList.remove('pending');
+  }
+}
+
+function queuePatch(patch){
+  pendingSync.push(patch);
+  savePendingSync();
+  updateSyncIndicator();
+  flushPendingSync();
+}
+
+let flushingSync = false;
+async function flushPendingSync(){
+  if(flushingSync) return;
+  flushingSync = true;
+  try{
+    while(pendingSync.length){
+      const patch = pendingSync[0];
+      let res;
+      try{
+        res = await fetch('/api/recolement', { method:'POST', headers: authHeaders(), body: JSON.stringify(patch) });
+      }catch(e){
+        break; // réseau indisponible : on retentera plus tard
+      }
+      if(res.status===401 || res.status===503){
+        break; // pas authentifié ou R2 non configuré : inutile de boucler
+      }
+      if(!res.ok){
+        break; // autre erreur serveur : on retentera plus tard
+      }
+      pendingSync.shift();
+      savePendingSync();
+    }
+  } finally {
+    flushingSync = false;
+    updateSyncIndicator();
+  }
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/recolement');
+    if(!res.ok) return;
+    const data = await res.json();
+    mergeIncomingData(data);
+  }catch(e){ /* hors ligne ou API non disponible : on reste sur le cache local */ }
+}
+
+window.addEventListener('online', flushPendingSync);
+setInterval(flushPendingSync, 20000);
+setInterval(syncFromServer, 20000);
 
 /* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
 fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
@@ -374,6 +457,7 @@ fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
    colonne+étage seuls, sur les pseudo-travées EMPLACEMENTS_ARMOIRE /
    EMPLACEMENTS_TIROIR définies dans js/reserve-shared.js). */
 const scanInput = document.getElementById('scan-input');
+const damagedToggle = document.getElementById('damaged-toggle');
 const noncatInput = document.getElementById('noncat-input');
 const selReserve=document.getElementById('sel-reserve'), selLocType=document.getElementById('sel-loctype');
 const modeScanBtn=document.getElementById('mode-scan'), modeCatalogageBtn=document.getElementById('mode-catalogage');
@@ -538,15 +622,16 @@ function beepError(){
 scanInput.addEventListener('keydown', e=>{
   if(e.key==='Enter'){
     e.preventDefault();
-    handleScan(scanInput.value.trim());
+    handleScan(scanInput.value.trim(), damagedToggle.checked);
     scanInput.value='';
+    damagedToggle.checked=false;
   }
 });
 document.addEventListener('click', e=>{
   if(!e.target.closest('input,select,button,a,label')) scanInput.focus();
 });
 
-function handleScan(barcode){
+function handleScan(barcode, damaged){
   if(!barcode) return;
   const fields = locFieldsOf(loc);
   const cat = catalog ? catalog[barcode] : null;
@@ -561,6 +646,7 @@ function handleScan(barcode){
     etat: cat ? cat.etat : (prev ? prev.etat : ''),
     kind: loc.locType,
     travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+    barcodeAbime: !!damaged,
     ts: Date.now()
   };
 
@@ -573,6 +659,7 @@ function handleScan(barcode){
   if(status!=='unknown'){
     scans[barcode] = record;
     saveScans();
+    queuePatch({type:'scan', record});
   }
 
   showFeedback(record, status, prev);
@@ -589,7 +676,8 @@ function showFeedback(record, status, prev){
   const badgeTxt = { ok:'✓ Enregistré', dup:'🔁 Déjà scanné ici', moved:'↔ Déplacé depuis un autre emplacement', unknown:'⚠ Code-barre inconnu du catalogue' }[status];
   const badgeCls = status==='unknown' ? 'warn' : (status==='dup'||status==='moved') ? 'dup' : 'ok';
   let html = `<div class="fb-top"><span class="fb-badge ${badgeCls}">${badgeTxt}</span>
-    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}</div>`;
+    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
+    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}</div>`;
   html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
   if(status==='moved' && prev){
@@ -610,6 +698,7 @@ function showFeedback(record, status, prev){
         record.fonds = getFondsFromCote(v);
         scans[record.barcode] = record;
         saveScans(); renderExpected(); renderHereLog(); updateStats();
+        queuePatch({type:'scan', record});
       }
       scanInput.focus();
     });
@@ -641,6 +730,7 @@ function saveNonCatCount(){
   beep(880, .12);
   updateStats();
   renderNonCatLog();
+  queuePatch({type:'nonCat', key, record: nonCat[key] || null});
 }
 
 function showNonCatFeedback(count){
@@ -688,6 +778,7 @@ function renderNonCatLog(){
     updateStats();
     renderNonCatLog();
     updateNonCatInput();
+    queuePatch({type:'nonCat', key:b.dataset.key, record:null});
   }));
 }
 
@@ -732,6 +823,7 @@ document.getElementById('btn-vide').addEventListener('click', ()=>{
   updateStats();
   renderVideLog();
   renderNonRangeLog();
+  queuePatch({type:'vide', key, record: videShelves[key] || null});
 });
 
 document.getElementById('btn-nonrange').addEventListener('click', ()=>{
@@ -750,6 +842,7 @@ document.getElementById('btn-nonrange').addEventListener('click', ()=>{
   updateStats();
   renderVideLog();
   renderNonRangeLog();
+  queuePatch({type:'nonrange', key, record: nonRangeShelves[key] || null});
 });
 
 function renderVideLog(){
@@ -778,6 +871,7 @@ function renderVideLog(){
     updateStats();
     updateVideUI();
     renderVideLog();
+    queuePatch({type:'vide', key:b.dataset.key, record:null});
   }));
 }
 
@@ -807,6 +901,7 @@ function renderNonRangeLog(){
     updateStats();
     updateNonRangeUI();
     renderNonRangeLog();
+    queuePatch({type:'nonrange', key:b.dataset.key, record:null});
   }));
 }
 
@@ -863,7 +958,7 @@ function renderHereLog(){
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}</td>
       <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
     </tr>`).join('');
   tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
@@ -885,7 +980,7 @@ function renderAllLog(filter){
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}</td>
       <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
     </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${filtered.length-300} de plus (affinez la recherche)</td></tr>` : '');
   tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
@@ -896,6 +991,7 @@ function deleteScan(barcode){
   delete scans[barcode];
   saveScans();
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
+  queuePatch({type:'deleteScan', barcode});
 }
 
 /* ════════════ STATS ════════════ */
@@ -944,37 +1040,47 @@ document.getElementById('btn-export').addEventListener('click', ()=>{
   downloadJSON(exportPayload(), 'recolement');
 });
 
+/* Fusionne un objet {scans,nonCatalogues,videShelves,nonRangeShelves} (ou un
+   simple tableau de scans, ancien format) dans l'état local — réutilisé par
+   l'import de fichier ci-dessous et par syncFromServer() (état partagé R2). */
+function mergeIncomingData(data){
+  const scanRows = Array.isArray(data) ? data : (data.scans||[]);
+  const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
+  const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+  const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
+
+  let added=0, updated=0;
+  scanRows.forEach(r=>{
+    if(!r.barcode) return;
+    if(scans[r.barcode]){
+      if(!scans[r.barcode].ts || (r.ts||0) > scans[r.barcode].ts) { scans[r.barcode]=r; updated++; }
+    } else { scans[r.barcode]=r; added++; }
+  });
+  saveScans();
+
+  nonCatRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonCat[nonCatKey(r)] = r; });
+  saveNonCat();
+
+  videRows.forEach(r=>{ if(r.travee && r.etage!==undefined) videShelves[emplacementKey(r)] = r; });
+  saveVideShelves();
+
+  nonRangeRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonRangeShelves[emplacementKey(r)] = r; });
+  saveNonRangeShelves();
+
+  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
+  renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
+
+  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length };
+}
+
 document.getElementById('file-resume').addEventListener('change', function(e){
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = ev=>{
     try{
       const data = JSON.parse(ev.target.result);
-      const scanRows = Array.isArray(data) ? data : (data.scans||[]);
-      const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
-      const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
-      const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
-
-      let added=0, updated=0;
-      scanRows.forEach(r=>{
-        if(!r.barcode) return;
-        if(scans[r.barcode]){
-          if(!scans[r.barcode].ts || (r.ts||0) > scans[r.barcode].ts) { scans[r.barcode]=r; updated++; }
-        } else { scans[r.barcode]=r; added++; }
-      });
-      saveScans();
-
-      nonCatRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonCat[nonCatKey(r)] = r; });
-      saveNonCat();
-
-      videRows.forEach(r=>{ if(r.travee && r.etage!==undefined) videShelves[emplacementKey(r)] = r; });
-      saveVideShelves();
-
-      nonRangeRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonRangeShelves[emplacementKey(r)] = r; });
-      saveNonRangeShelves();
-
-      alert(`Import terminé : ${added} nouveaux scans, ${updated} mis à jour, ${nonCatRows.length} emplacement(s) non catalogué(s) fusionné(s), ${videRows.length} étagère(s) vide(s) fusionnée(s), ${nonRangeRows.length} emplacement(s) non rangé(s) fusionné(s).`);
-      renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
+      const r = mergeIncomingData(data);
+      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s).`);
     }catch(err){ alert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
@@ -1000,17 +1106,21 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
 });
 
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  if(!confirm('Effacer tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant.')) return;
+  if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
   scans = {}; saveScans();
   nonCat = {}; saveNonCat();
   videShelves = {}; saveVideShelves();
   nonRangeShelves = {}; saveNonRangeShelves();
+  pendingSync = []; savePendingSync(); updateSyncIndicator();
   renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
 });
 
 /* ════════════ DÉMARRAGE ════════════ */
 renderAllLog('');
 scanInput.focus();
+updateSyncIndicator();
+syncFromServer();
+flushPendingSync();
 })();
 </script>
 </body>

@@ -24,6 +24,8 @@
       transition:all .15s;
     }
     .hero-actions a:hover, .hero-actions button:hover { background:rgba(255,255,255,0.2); color:#fff; }
+    .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+    .sync-status.pending{color:#ffcc80}
     .container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
     .loader{background:#F5F5FF;border:1px dashed #ccc;border-radius:var(--radius-md);padding:1.5rem;text-align:center;margin:2rem auto;max-width:1200px}
     .loader p{font-size:.85rem;color:#666;margin:0 0 .5rem}
@@ -125,6 +127,7 @@
       <p class="page-lead">Recherche croisée entre la liste des ouvrages spoliés à retrouver et le catalogue numérisé, avec suivi du récolement (retrouvé, ex-libris, ancien possesseur).</p>
     </div>
     <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
       <a href="admin.html">← Espace professionnel</a>
     </div>
   </div>
@@ -144,9 +147,9 @@
       recherche filtre aussi le tableau des livres spoliés. Tout n'étant pas catalogué, pensez aussi aux fiches
       papier. Cochez <strong>Retrouvé</strong> une fois l'ouvrage localisé, <strong>Ex-libris</strong> s'il porte une
       marque de provenance, et notez le nom de l'ancien possesseur dès qu'il est identifié. Les modifications sont
-      enregistrées automatiquement dans ce navigateur — pensez à cliquer sur « Exporter le JSON » régulièrement et à
-      déposer le fichier sous <code>data/livres-spolies.json</code> pour que le suivi soit partagé avec le reste de
-      l'équipe.
+      enregistrées dans ce navigateur et synchronisées automatiquement avec le reste de l'équipe (voir l'indicateur
+      en haut de page). « Exporter le JSON » reste utile pour figer une version datée dans
+      <code>data/livres-spolies.json</code>.
     </p>
 
     <div class="ls-stats" id="ls-stats"></div>
@@ -255,6 +258,99 @@ function saveOverrides(){
   localStorage.setItem(LS_KEY, JSON.stringify(OVERRIDES));
 }
 
+/* ════ Synchronisation partagée (R2 via /api/spolies) ════
+   Même principe que recolement.html : le localStorage reste la source de
+   vérité locale, chaque changement de champ est en plus envoyé en
+   arrière-plan vers /api/spolies (fusion côté serveur par compare-and-swap).
+   En cas d'échec (hors ligne, R2 non configuré), le patch reste dans une
+   file locale et sera retenté — rien n'est jamais perdu. */
+const LS_PENDING = 'rp_livres_spolies_pending_sync';
+let pendingSync = (function(){ try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch(e){ return []; } })();
+function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
+
+function authHeaders(){
+  const token = sessionStorage.getItem('rp_admin_token');
+  const h = { 'Content-Type': 'application/json' };
+  if(token) h['Authorization'] = 'Basic ' + token;
+  return h;
+}
+
+function updateSyncIndicator(){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  if(pendingSync.length){
+    el.textContent = `⏳ ${pendingSync.length} en attente de synchro`;
+    el.classList.add('pending');
+  } else {
+    el.textContent = '✓ synchronisé';
+    el.classList.remove('pending');
+  }
+}
+
+function queuePatch(patch){
+  pendingSync.push(patch);
+  savePendingSync();
+  updateSyncIndicator();
+  flushPendingSync();
+}
+
+let flushingSync = false;
+async function flushPendingSync(){
+  if(flushingSync) return;
+  flushingSync = true;
+  try{
+    while(pendingSync.length){
+      const patch = pendingSync[0];
+      let res;
+      try{
+        res = await fetch('/api/spolies', { method:'POST', headers: authHeaders(), body: JSON.stringify(patch) });
+      }catch(e){
+        break; // réseau indisponible : on retentera plus tard
+      }
+      if(res.status===401 || res.status===503) break; // pas authentifié / R2 non configuré
+      if(!res.ok) break; // autre erreur serveur : on retentera plus tard
+      pendingSync.shift();
+      savePendingSync();
+    }
+  } finally {
+    flushingSync = false;
+    updateSyncIndicator();
+  }
+}
+
+// Fusionne l'état partagé reçu du serveur, sans écraser un champ pour
+// lequel on a un patch local pas encore confirmé (évite qu'une saisie en
+// cours ne soit effacée par un rafraîchissement périodique).
+function mergeIncomingOverrides(serverOverrides){
+  Object.keys(serverOverrides || {}).forEach(id => {
+    const incoming = serverOverrides[id] || {};
+    const localForId = OVERRIDES[id] || {};
+    const pendingFieldsForId = new Set(pendingSync.filter(p => String(p.id) === id).map(p => p.field));
+    const merged = { ...localForId };
+    Object.keys(incoming).forEach(field => {
+      if(!pendingFieldsForId.has(field)) merged[field] = incoming[field];
+    });
+    OVERRIDES[id] = merged;
+  });
+  saveOverrides();
+  mergeRows();
+  renderStats();
+  applyFilter(document.getElementById('search-input').value.trim());
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/spolies');
+    if(!res.ok) return;
+    const data = await res.json();
+    mergeIncomingOverrides(data);
+  }catch(e){ /* hors ligne ou API non disponible : on reste sur le cache local */ }
+}
+
+window.addEventListener('online', flushPendingSync);
+setInterval(flushPendingSync, 20000);
+setInterval(syncFromServer, 20000);
+
 function mergeRows(){
   ROWS = BASE.map(r => {
     const o = OVERRIDES[r.id] || {};
@@ -276,6 +372,7 @@ function setOverride(id, field, value){
   const row = ROWS.find(r => r.id === id);
   if(row) row[field] = value;
   renderStats();
+  queuePatch({id, field, value});
 }
 
 /* ════ Stats ════ */
@@ -467,9 +564,10 @@ document.getElementById('btn-export').addEventListener('click', function(){
 });
 
 document.getElementById('btn-reset').addEventListener('click', function(){
-  if(!confirm('Effacer toutes les modifications enregistrées dans ce navigateur (retrouvé, ex-libris, cote BM, possesseur) ? Cette action ne peut pas être annulée. Pensez à exporter le JSON avant si besoin.')) return;
+  if(!confirm("Effacer toutes les modifications enregistrées dans ce navigateur (retrouvé, ex-libris, cote BM, possesseur) ? Cette action ne peut pas être annulée. Pensez à exporter le JSON avant si besoin. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
   localStorage.removeItem(LS_KEY);
   OVERRIDES = {};
+  pendingSync = []; savePendingSync(); updateSyncIndicator();
   mergeRows();
   applyFilter(document.getElementById('search-input').value.trim());
   renderStats();
@@ -499,6 +597,10 @@ Promise.all([
 
   renderStats();
   applyFilter('');
+
+  updateSyncIndicator();
+  syncFromServer();
+  flushPendingSync();
 }).catch(err => {
   document.getElementById('loader').innerHTML =
     `<p style="color:#c62828">Erreur de chargement : ${err.message}</p>`;

@@ -8,6 +8,13 @@
  *   - data/xml/notices.xml       ← export "MarcXChange (avec recommandation 995)"
  *   - data/xml/exemplaires.xml   ← export "MarcXChange" (sans 995)
  *
+ *   Si les variables R2_ACCOUNT_ID / R2_BUCKET / R2_ACCESS_KEY_ID /
+ *   R2_SECRET_ACCESS_KEY sont définies (via .env en local, ou variables
+ *   d'environnement Vercel), ces deux fichiers sont d'abord téléchargés
+ *   depuis R2 (clés xml/notices.xml, xml/exemplaires.xml) et écrasent les
+ *   fichiers locaux — voir `npm run upload:xml`. Sinon, comportement
+ *   d'origine : lecture des fichiers locaux tels quels.
+ *
  * Jointure :
  *   1. Principale : item.$915$b === notice.$995$f
  *   2. Secours    : notice.$940$s (liste des cotes du multi-exemplaire) mappé
@@ -31,6 +38,10 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { loadDotEnv } from './lib/dotenv.mjs';
+import { r2Get, r2Configured } from '../lib/r2.mjs';
+
+loadDotEnv();
 
 // ── Config ─────────────────────────────────────────────────────────────────
 const CONFIG = {
@@ -272,10 +283,40 @@ function assertQuality(index, buildResult) {
   return errors;
 }
 
+// ── Récupération des XML depuis R2 (si configuré) ──────────────────────────
+// But : ne plus committer notices.xml/exemplaires.xml (61 Mo + 14 Mo) dans
+// git à chaque refresh Syracuse. Si les variables R2_* sont absentes (dev
+// local sans .env), on garde le comportement d'origine : lecture des
+// fichiers locaux, échec strict s'ils manquent.
+async function syncXmlFromR2() {
+  if (!r2Configured()) return;
+  console.log('  · R2 configuré : récupération de xml/notices.xml et xml/exemplaires.xml…');
+  const targets = [
+    { key: 'xml/notices.xml', local: CONFIG.input.notices },
+    { key: 'xml/exemplaires.xml', local: CONFIG.input.exemplaires },
+  ];
+  for (const t of targets) {
+    try {
+      const obj = await r2Get(t.key);
+      if (!obj) {
+        console.warn(`  ⚠ ${t.key} absent de R2 — on garde le fichier local existant (${t.local}) s'il y en a un.`);
+        continue;
+      }
+      mkdirSync(dirname(resolve(t.local)), { recursive: true });
+      writeFileSync(t.local, obj.body, 'utf-8');
+      console.log(`    → ${t.local} mis à jour depuis R2 (${(obj.body.length / 1e6).toFixed(1)} Mo)`);
+    } catch (err) {
+      console.warn(`  ⚠ Échec de récupération de ${t.key} depuis R2 : ${err.message} — on garde le fichier local existant.`);
+    }
+  }
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
-function main() {
+async function main() {
   const startedAt = Date.now();
   console.log('▶ build-inventory: démarrage');
+
+  await syncXmlFromR2();
 
   // Contrôle d'existence des entrées
   for (const [role, path] of Object.entries(CONFIG.input)) {
@@ -359,4 +400,4 @@ function writeReport(payload) {
   console.log(`  · écrit ${CONFIG.output.report}`);
 }
 
-main();
+await main();
