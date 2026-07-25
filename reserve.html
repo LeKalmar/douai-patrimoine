@@ -101,6 +101,13 @@
     .notice-more{font-size:.75rem;color:rgba(255,255,255,0.5);text-align:center;padding:.5rem;font-style:italic}
     .placeholder-msg{font-size:.875rem;color:rgba(255,255,255,0.5);padding:.5rem 0;font-style:italic}
     .detail-meta{font-size:.75rem;color:#888;border-top:1px solid #f0f0f0;padding-top:.75rem;margin-top:.75rem}
+    .shelf-hover{position:fixed;z-index:80;background:#fff;border:1px solid #ddd;border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.6rem .75rem;font-size:.72rem;width:280px;pointer-events:none}
+    .sh-title{font-size:.74rem;font-weight:700;color:#1a1a1a;margin-bottom:.4rem;padding-bottom:.35rem;border-bottom:1px solid #f0f0f0}
+    .sh-row{display:flex;align-items:flex-start;gap:.4rem;padding:.2rem 0}
+    .sh-cote{font-family:monospace;font-size:.66rem;color:#12157A;font-weight:700;white-space:nowrap;flex-shrink:0;padding-top:1px}
+    .sh-titre{flex:1;color:#333;line-height:1.3}
+    .sh-empty{color:#888;font-style:italic}
+    .sh-more{font-size:.68rem;color:#999;font-style:italic;margin-top:.2rem;text-align:center}
     footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:3rem;font-size:.8rem;text-align:center}
     footer a{color: var(--warm);text-decoration:none}
     @media(max-width:600px){.stats-row{grid-template-columns:repeat(2,1fr)}.detail-cols{flex-direction:column}}
@@ -194,6 +201,8 @@
     </div>
   </div>
 </main>
+
+<div id="shelf-hover" class="shelf-hover" style="display:none" aria-hidden="true"></div>
 
 <footer>
   <div class="container">
@@ -515,7 +524,8 @@ function makeTraveeEl(tid,tDef,cols){
       if(filter==='occ'&&!(state==='cat'||state==='noncat'||state==='nonrange')) op='.15';
       if(filter==='free'&&state!=='vide') op='.15';
       s.style.cssText=`width:${w}px;height:${h}px;background:${bg};opacity:${op}`;
-      s.title=slotTitle(tid,col,String(e));
+      s.setAttribute('aria-label',slotTitle(tid,col,String(e)));
+      s.dataset.tid=tid; s.dataset.col=col; s.dataset.etage=String(e);
       cd.appendChild(s);
     }
     if(known||!csvLoaded){
@@ -669,6 +679,65 @@ function noticeRows(notices,sort){
   if(sorted.length>MAX) html+=`<div class="notice-more">… et ${sorted.length-MAX} notices supplémentaires</div>`;
   return html;
 }
+
+/* ════════════ MODALE AU SURVOL D'UNE ÉTAGÈRE ════════════
+   Écoute déléguée sur document (plutôt qu'un listener par case, il y en a
+   des milliers) : fonctionne même après un buildPlan() qui recrée tout le
+   DOM des cases. Réutilise DET (mêmes données que showNotices) pour afficher
+   la liste des livres de l'emplacement survolé, positionnée près du curseur. */
+let hoverSlot=null;
+function shelfHoverContent(tid,col,etage){
+  const key=`${tid}|${col}|${etage}`;
+  const notices=DET[key]||[];
+  const ncCount=NONCAT[key]||0;
+  const spec=isNaN(parseInt(etage));
+  const lbl=spec?etage:`${etageWordFor(tid)} ${etage}`;
+  let html=`<div class="sh-title">${esc(travTitle(tid))} · col. ${esc(col)}, ${esc(lbl)}</div>`;
+  if(!notices.length){
+    let msg;
+    if(ncCount) msg=`${ncCount} livre(s) non catalogué(s) estimé(s) — aucune notice cataloguée.`;
+    else if(NONRANGE[key]) msg='Marqué non rangé lors du récolement — documents en désordre, non comptés.';
+    else if(VIDE[key]) msg='Confirmé vide lors du récolement.';
+    else msg='Aucune donnée pour cet emplacement.';
+    return html+`<div class="sh-empty">${msg}</div>`;
+  }
+  const MAX=15;
+  const sorted=[...notices].sort((a,b)=>compareCotes(a.c,b.c));
+  html+=sorted.slice(0,MAX).map(n=>`<div class="sh-row"><span class="sh-cote">${esc(n.c)}</span><span class="sh-titre">${esc(n.t)}</span></div>`).join('');
+  if(sorted.length>MAX) html+=`<div class="sh-more">… et ${sorted.length-MAX} de plus</div>`;
+  if(ncCount) html+=`<div class="sh-more">+ ${ncCount} non catalogué(s) estimé(s)</div>`;
+  return html;
+}
+function positionShelfHover(e){
+  const el=document.getElementById('shelf-hover');
+  const pad=16;
+  let x=e.clientX+pad, y=e.clientY+pad;
+  const rect=el.getBoundingClientRect();
+  if(x+rect.width>window.innerWidth-8) x=e.clientX-rect.width-pad;
+  if(y+rect.height>window.innerHeight-8) y=e.clientY-rect.height-pad;
+  el.style.left=Math.max(8,x)+'px';
+  el.style.top=Math.max(8,y)+'px';
+}
+document.addEventListener('mouseover',e=>{
+  const s=e.target.closest('.tv-slot');
+  if(!s) return;
+  if(s!==hoverSlot){
+    hoverSlot=s;
+    const el=document.getElementById('shelf-hover');
+    el.innerHTML=shelfHoverContent(s.dataset.tid,s.dataset.col,s.dataset.etage);
+    el.style.display='block';
+  }
+  positionShelfHover(e);
+});
+document.addEventListener('mousemove',e=>{
+  if(hoverSlot && e.target.closest('.tv-slot')===hoverSlot) positionShelfHover(e);
+});
+document.addEventListener('mouseout',e=>{
+  if(e.target.closest('.tv-slot')===hoverSlot){
+    document.getElementById('shelf-hover').style.display='none';
+    hoverSlot=null;
+  }
+});
 
 /* ════════════ FILTRE ════════════ */
 function setFilter(f){

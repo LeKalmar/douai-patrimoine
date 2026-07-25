@@ -40,12 +40,11 @@ function fromMap(m) {
   return Object.values(m);
 }
 
-function applyPatch(state, patch) {
-  const scans = toMap(state.scans, r => r.barcode);
-  const nonCat = toMap(state.nonCatalogues, locKey);
-  const vide = toMap(state.videShelves, locKey);
-  const nonrange = toMap(state.nonRangeShelves, locKey);
-
+// Applique un patch unitaire sur les maps mutables (scans/nonCat/vide/nonrange
+// tirées de l'état courant) — factorisé pour être rejoué plusieurs fois de
+// suite par le cas 'batch' ci-dessous sans relire/réécrire R2 à chaque fois.
+function applyOne(maps, patch) {
+  const { scans, nonCat, vide, nonrange } = maps;
   switch (patch.type) {
     case 'scan':
       if (!patch.record || !patch.record.barcode) throw new BadRequest('scan : record.barcode requis.');
@@ -100,15 +99,36 @@ function applyPatch(state, patch) {
       });
       break;
     }
+    // 'batch' n'est volontairement pas accepté ici : il n'est traité qu'au
+    // niveau de applyPatch (un seul niveau d'imbrication).
     default:
       throw new BadRequest(`Type de patch inconnu : ${patch.type}`);
   }
+}
+
+function applyPatch(state, patch) {
+  const maps = {
+    scans: toMap(state.scans, r => r.barcode),
+    nonCat: toMap(state.nonCatalogues, locKey),
+    vide: toMap(state.videShelves, locKey),
+    nonrange: toMap(state.nonRangeShelves, locKey),
+  };
+
+  if (patch.type === 'batch') {
+    // Rejoue une file de patches individuels (scans faits hors ligne, par
+    // exemple) en une seule lecture/écriture R2 au lieu d'un aller-retour
+    // par patch — voir flushPendingSync() dans recolement.html.
+    if (!Array.isArray(patch.patches)) throw new BadRequest('batch : patches (tableau) requis.');
+    patch.patches.forEach(p => applyOne(maps, p));
+  } else {
+    applyOne(maps, patch);
+  }
 
   return {
-    scans: fromMap(scans),
-    nonCatalogues: fromMap(nonCat),
-    videShelves: fromMap(vide),
-    nonRangeShelves: fromMap(nonrange),
+    scans: fromMap(maps.scans),
+    nonCatalogues: fromMap(maps.nonCat),
+    videShelves: fromMap(maps.vide),
+    nonRangeShelves: fromMap(maps.nonrange),
   };
 }
 

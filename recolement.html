@@ -415,16 +415,23 @@ function queuePatch(patch){
   flushPendingSync();
 }
 
+const SYNC_BATCH_SIZE = 200; // patches par requête — voir 'batch' côté api/recolement.mjs
+
 let flushingSync = false;
 async function flushPendingSync(){
   if(flushingSync) return;
   flushingSync = true;
   try{
     while(pendingSync.length){
-      const patch = pendingSync[0];
+      // Regroupe jusqu'à SYNC_BATCH_SIZE patches en attente dans une seule
+      // requête ('batch' côté serveur = une seule lecture/écriture R2) au
+      // lieu d'un aller-retour réseau par scan — sinon vider une longue
+      // session hors ligne peut prendre plusieurs minutes une fois reconnecté.
+      const chunk = pendingSync.slice(0, SYNC_BATCH_SIZE);
+      const body = chunk.length === 1 ? chunk[0] : { type:'batch', patches: chunk };
       let res;
       try{
-        res = await fetch('/api/recolement', { method:'POST', headers: authHeaders(), body: JSON.stringify(patch) });
+        res = await fetch('/api/recolement', { method:'POST', headers: authHeaders(), body: JSON.stringify(body) });
       }catch(e){
         lastSyncError = 'hors ligne ou serveur injoignable';
         break; // réseau indisponible : on retentera plus tard
@@ -442,8 +449,9 @@ async function flushPendingSync(){
         break; // autre erreur serveur : on retentera plus tard
       }
       lastSyncError = null;
-      pendingSync.shift();
+      pendingSync.splice(0, chunk.length);
       savePendingSync();
+      updateSyncIndicator();
     }
   } finally {
     flushingSync = false;
