@@ -61,6 +61,7 @@
     .catalog-result .cr-main{flex:1;min-width:0}
     .catalog-result .cr-titre{font-size:.85rem;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .catalog-result .cr-meta{font-size:.72rem;color:#888;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .catalog-result .cr-source{flex-shrink:0;font-size:.68rem;color:#888;white-space:nowrap}
     .catalog-result .cr-cote{flex-shrink:0;font-family:monospace;font-size:.78rem;font-weight:700;color:#12157A;background:#eef0ff;padding:2px 8px;border-radius:5px}
     .catalog-empty{padding:.75rem;text-align:center;color:#bbb;font-size:.8rem;font-style:italic}
     .catalog-more{padding:.4rem;text-align:center;font-size:.7rem;color:#999;font-style:italic}
@@ -160,7 +161,7 @@
         <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#999" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l2.5 2.5"/></svg>
         <input type="text" id="search-input" placeholder="Titre, auteur ou cote…" autocomplete="off">
       </div>
-      <p class="catalog-search-hint">La recherche porte sur le titre, l'auteur et la cote, à la fois dans le catalogue et dans la liste des livres spoliés ci-dessous.</p>
+      <p class="catalog-search-hint">La recherche porte sur le titre, l'auteur et la cote, à la fois dans le catalogue (réserve et magasins 2e/5e étage) et dans la liste des livres spoliés ci-dessous.</p>
       <div class="catalog-results" id="catalog-results"></div>
     </div>
 
@@ -411,19 +412,26 @@ function renderStats(){
   `;
 }
 
-/* ════ Recherche catalogue (data/inventaire.json) ════ */
-function buildCatalogIndex(rows){
-  CATALOG = rows.map(r => {
+/* ════ Recherche catalogue (data/inventaire.json + data/magasins.json) ════ */
+function indexCatalogRows(rows, source){
+  return rows.map(r => {
     const titre = r['200$a'] || '';
     const auteur = [r['700$a'], r['700$b']].filter(Boolean).join(' ');
     const cote = r['930$g'] || '';
     const annee = r['210$d'] || '';
     const type = r['200$b'] || '';
     return {
-      titre, auteur, cote, annee, type,
+      titre, auteur, cote, annee, type, source,
       _search: norm([titre, auteur, cote].join(' ')),
     };
   });
+}
+
+function buildCatalogIndex(inventaire, magasins){
+  CATALOG = [
+    ...indexCatalogRows(inventaire, 'Réserve'),
+    ...indexCatalogRows(magasins, 'Magasins 2e/5e'),
+  ];
 }
 
 function renderCatalogResults(query){
@@ -446,6 +454,7 @@ function renderCatalogResults(query){
         <div class="cr-titre">${esc(r.titre || '(sans titre)')}</div>
         <div class="cr-meta">${esc(r.auteur || 'Auteur inconnu')}${r.annee ? ' · ' + esc(r.annee) : ''}</div>
       </div>
+      <span class="cr-source">${esc(r.source)}</span>
       <span class="cr-cote">${esc(r.cote || '—')}</span>
     </div>
   `).join('') + (matches.length > shown.length
@@ -607,11 +616,12 @@ document.getElementById('search-input').addEventListener('input', function(){
 Promise.all([
   fetch('data/livres-spolies.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (livres-spolies.json)'); return r.json(); }),
   fetch('data/inventaire.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (inventaire.json)'); return r.json(); }),
-]).then(([spolies, inventaire]) => {
+  fetch('data/magasins.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (magasins.json)'); return r.json(); }),
+]).then(([spolies, inventaire, magasins]) => {
   BASE = spolies;
   OVERRIDES = loadOverrides();
   mergeRows();
-  buildCatalogIndex(inventaire);
+  buildCatalogIndex(inventaire, magasins);
 
   document.getElementById('loader').style.display = 'none';
   document.getElementById('ls-main').style.display = '';
