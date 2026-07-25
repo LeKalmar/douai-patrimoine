@@ -365,7 +365,12 @@ async function syncFromServer(){
 
 window.addEventListener('online', flushPendingSync);
 setInterval(flushPendingSync, 20000);
-setInterval(syncFromServer, 20000);
+// Lecture seule (GET) : espacée à 45s et suspendue pendant que l'onglet est en
+// arrière-plan, pour ne pas cumuler des requêtes R2 inutiles sur des postes
+// laissés ouverts toute la journée — avec un rafraîchissement immédiat au
+// retour sur l'onglet pour ne pas perdre en fraîcheur perçue.
+setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
 
 function mergeRows(){
   ROWS = BASE.map(r => {

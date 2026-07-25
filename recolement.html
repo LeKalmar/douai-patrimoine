@@ -257,34 +257,17 @@
         </table></div>
       </div>
 
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title">Livres non catalogués par emplacement</span>
+      <div class="expected-panel">
+        <div class="expected-title"><span>Statistiques avancées du récolement</span></div>
+        <div class="stats-row" style="margin-bottom:0">
+          <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime">0</div></div>
+          <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start" style="font-size:1rem">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last" style="font-size:1rem">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Durée écoulée (calendaire)</div><div class="stat-card-val" id="st-span" style="font-size:1.2rem">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Temps de travail réel (estimé)</div><div class="stat-card-val" id="st-realtime" style="font-size:1.2rem">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Sessions de travail détectées</div><div class="stat-card-val" id="st-sessions">—</div></div>
         </div>
-        <div class="log-body"><table class="log-table">
-          <thead><tr><th>Travée</th><th>Colonne</th><th>Étage</th><th>Nombre estimé</th><th></th></tr></thead>
-          <tbody id="log-noncat"></tbody>
-        </table></div>
-      </div>
-
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title">Emplacements marqués vides</span>
-        </div>
-        <div class="log-body"><table class="log-table">
-          <thead><tr><th>Travée</th><th>Colonne</th><th>Étage</th><th>Marquée le</th><th></th></tr></thead>
-          <tbody id="log-vide"></tbody>
-        </table></div>
-      </div>
-
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title">Emplacements marqués non rangés</span>
-        </div>
-        <div class="log-body"><table class="log-table">
-          <thead><tr><th>Travée</th><th>Colonne</th><th>Étage</th><th>Marquée le</th><th></th></tr></thead>
-          <tbody id="log-nonrange"></tbody>
-        </table></div>
+        <p style="font-size:.75rem;color:#888;margin:.75rem 0 0;line-height:1.5">Le temps de travail réel additionne les intervalles entre deux scans consécutifs, sauf si l'écart dépasse 1 h : ces trous (pauses, changements de jour…) ne sont pas comptés dans la durée réelle. Le nombre de sessions correspond au nombre de fois où un tel écart d'au moins 1 h a été détecté, plus une.</p>
       </div>
 
       <div class="tools-row">
@@ -470,7 +453,12 @@ async function syncFromServer(){
 
 window.addEventListener('online', flushPendingSync);
 setInterval(flushPendingSync, 20000);
-setInterval(syncFromServer, 20000);
+// Lecture seule (GET) : espacée à 45s et suspendue pendant que l'onglet est en
+// arrière-plan, pour ne pas cumuler des requêtes R2 inutiles sur des postes
+// laissés ouverts toute la journée — avec un rafraîchissement immédiat au
+// retour sur l'onglet pour ne pas perdre en fraîcheur perçue.
+setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
 
 /* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
 fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
@@ -649,11 +637,8 @@ function refreshLoc(){
   renderHereLog();
   updateStats();
   updateNonCatInput();
-  renderNonCatLog();
   updateVideUI();
-  renderVideLog();
   updateNonRangeUI();
-  renderNonRangeLog();
   if(loc.mode==='catalogage') noncatInput.focus(); else scanInput.focus();
 }
 applyReserveVisibility();
@@ -883,7 +868,6 @@ function saveNonCatCount(){
   showNonCatFeedback(count);
   beep(880, .12);
   updateStats();
-  renderNonCatLog();
   queuePatch({type:'nonCat', key, record: nonCat[key] || null});
 }
 
@@ -905,36 +889,6 @@ document.getElementById('noncat-minus').addEventListener('click', ()=>{
 document.getElementById('noncat-plus').addEventListener('click', ()=>{
   noncatInput.value = (parseInt(noncatInput.value,10)||0) + 1;
 });
-
-function renderNonCatLog(){
-  const tbody = document.getElementById('log-noncat');
-  const rows = Object.values(nonCat).sort((a,b)=>{
-    const c = locSortIndex(a.travee)-locSortIndex(b.travee);
-    if(c!==0) return c;
-    if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
-    return parseInt(a.etage,10)-parseInt(b.etage,10);
-  });
-  if(!rows.length){
-    tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun emplacement avec livres non catalogués pour l\'instant.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = rows.map(r=>`
-    <tr>
-      <td>${esc(locLabel(r.travee))}</td>
-      <td>Col. ${esc(r.colonne)}</td>
-      <td>Étage ${esc(r.etage)}</td>
-      <td style="font-weight:600;color:#12157A">${r.count}</td>
-      <td><button class="log-del" data-key="${esc(nonCatKey(r))}">✕</button></td>
-    </tr>`).join('');
-  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>{
-    delete nonCat[b.dataset.key];
-    saveNonCat();
-    updateStats();
-    renderNonCatLog();
-    updateNonCatInput();
-    queuePatch({type:'nonCat', key:b.dataset.key, record:null});
-  }));
-}
 
 /* ════════════ ÉTAGÈRES VIDES / NON RANGÉES ════════════
    Deux marquages mutuellement exclusifs sur un même emplacement (même clé
@@ -975,8 +929,6 @@ document.getElementById('btn-vide').addEventListener('click', ()=>{
   updateVideUI();
   updateNonRangeUI();
   updateStats();
-  renderVideLog();
-  renderNonRangeLog();
   queuePatch({type:'vide', key, record: videShelves[key] || null});
 });
 
@@ -994,70 +946,8 @@ document.getElementById('btn-nonrange').addEventListener('click', ()=>{
   updateVideUI();
   updateNonRangeUI();
   updateStats();
-  renderVideLog();
-  renderNonRangeLog();
   queuePatch({type:'nonrange', key, record: nonRangeShelves[key] || null});
 });
-
-function renderVideLog(){
-  const tbody = document.getElementById('log-vide');
-  const rows = Object.values(videShelves).sort((a,b)=>{
-    const c = locSortIndex(a.travee)-locSortIndex(b.travee);
-    if(c!==0) return c;
-    if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
-    return parseInt(a.etage,10)-parseInt(b.etage,10);
-  });
-  if(!rows.length){
-    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucun emplacement marqué vide pour l\'instant.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = rows.map(r=>`
-    <tr>
-      <td>${esc(locLabel(r.travee))}</td>
-      <td>Col. ${esc(r.colonne)}</td>
-      <td>Étage ${esc(r.etage)}</td>
-      <td>${new Date(r.ts).toLocaleString('fr-FR')}</td>
-      <td><button class="log-del" data-key="${esc(emplacementKey(r))}">✕</button></td>
-    </tr>`).join('');
-  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>{
-    delete videShelves[b.dataset.key];
-    saveVideShelves();
-    updateStats();
-    updateVideUI();
-    renderVideLog();
-    queuePatch({type:'vide', key:b.dataset.key, record:null});
-  }));
-}
-
-function renderNonRangeLog(){
-  const tbody = document.getElementById('log-nonrange');
-  const rows = Object.values(nonRangeShelves).sort((a,b)=>{
-    const c = locSortIndex(a.travee)-locSortIndex(b.travee);
-    if(c!==0) return c;
-    if(a.colonne!==b.colonne) return a.colonne.localeCompare(b.colonne);
-    return parseInt(a.etage,10)-parseInt(b.etage,10);
-  });
-  if(!rows.length){
-    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucun emplacement marqué non rangé pour l\'instant.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = rows.map(r=>`
-    <tr>
-      <td>${esc(locLabel(r.travee))}</td>
-      <td>Col. ${esc(r.colonne)}</td>
-      <td>Étage ${esc(r.etage)}</td>
-      <td>${new Date(r.ts).toLocaleString('fr-FR')}</td>
-      <td><button class="log-del" data-key="${esc(emplacementKey(r))}">✕</button></td>
-    </tr>`).join('');
-  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>{
-    delete nonRangeShelves[b.dataset.key];
-    saveNonRangeShelves();
-    updateStats();
-    updateNonRangeUI();
-    renderNonRangeLog();
-    queuePatch({type:'nonrange', key:b.dataset.key, record:null});
-  }));
-}
 
 /* ════════════ ATTENDU ICI ════════════ */
 function renderExpected(){
@@ -1164,6 +1054,57 @@ function updateStats(){
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
   document.getElementById('st-vide').textContent = Object.keys(videShelves).length.toLocaleString('fr-FR');
   document.getElementById('st-nonrange').textContent = Object.keys(nonRangeShelves).length.toLocaleString('fr-FR');
+  updateTimeStats();
+}
+
+/* ════════════ STATISTIQUES AVANCÉES (temps) ════════════
+   "Temps réel" : somme des écarts entre scans consécutifs, sauf si l'écart
+   dépasse GAP_MS (1 h) — ces trous (pause, nuit, changement de jour lors
+   d'un récolement étalé sur plusieurs jours) ne sont pas comptés comme du
+   temps de travail. Basé uniquement sur scans[] (comptage code-barre), pas
+   sur nonCat/videShelves/nonRangeShelves. */
+const GAP_MS = 60*60*1000;
+
+function formatDateTimeFR(ts){
+  return new Date(ts).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function formatDuration(ms){
+  if(!ms || ms<=0) return '0 min';
+  const totalMin = Math.round(ms/60000);
+  const days = Math.floor(totalMin/1440);
+  const hours = Math.floor((totalMin%1440)/60);
+  const mins = totalMin%60;
+  const parts = [];
+  if(days) parts.push(days+' j');
+  if(hours) parts.push(hours+' h');
+  if(mins || !parts.length) parts.push(mins+' min');
+  return parts.join(' ');
+}
+
+function updateTimeStats(){
+  const abimeCount = Object.values(scans).filter(r=>r.barcodeAbime).length;
+  document.getElementById('st-abime').textContent = abimeCount.toLocaleString('fr-FR');
+
+  const list = Object.values(scans).map(r=>r.ts).filter(t=>t).sort((a,b)=>a-b);
+  const elStart=document.getElementById('st-start'), elLast=document.getElementById('st-last'),
+        elSpan=document.getElementById('st-span'), elReal=document.getElementById('st-realtime'),
+        elSessions=document.getElementById('st-sessions');
+  if(!list.length){
+    elStart.textContent='—'; elLast.textContent='—'; elSpan.textContent='—'; elReal.textContent='—'; elSessions.textContent='—';
+    return;
+  }
+  const startTs = list[0], lastTs = list[list.length-1];
+  elStart.textContent = formatDateTimeFR(startTs);
+  elLast.textContent = formatDateTimeFR(lastTs);
+  elSpan.textContent = formatDuration(lastTs-startTs);
+
+  let real = 0, sessions = 1;
+  for(let i=1;i<list.length;i++){
+    const gap = list[i]-list[i-1];
+    if(gap < GAP_MS) real += gap; else sessions++;
+  }
+  elReal.textContent = formatDuration(real);
+  elSessions.textContent = sessions.toLocaleString('fr-FR');
 }
 
 /* ════════════ EXPORT / IMPORT / RESET ════════════
@@ -1291,7 +1232,7 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   saveNonRangeShelves();
 
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
-  renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
+  updateNonCatInput(); updateVideUI(); updateNonRangeUI();
 
   if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length)){
     queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows } });
@@ -1339,7 +1280,7 @@ document.getElementById('btn-reset').addEventListener('click', ()=>{
   videShelves = {}; saveVideShelves();
   nonRangeShelves = {}; saveNonRangeShelves();
   pendingSync = []; savePendingSync(); updateSyncIndicator();
-  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); renderNonCatLog(); updateNonCatInput(); updateVideUI(); renderVideLog(); updateNonRangeUI(); renderNonRangeLog();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI();
 });
 
 /* ════════════ DÉMARRAGE ════════════ */

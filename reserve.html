@@ -796,7 +796,11 @@ document.addEventListener('click',e=>{
 
 /* ════════════ DÉMARRAGE ════════════ */
 loadRecolement();
-setInterval(loadRecolement, 25000);
+// Suspendu pendant que l'onglet est en arrière-plan (voir même logique côté
+// recolement.html/livres-spolies.html) — un rafraîchissement immédiat a lieu
+// au retour sur l'onglet.
+setInterval(()=>{ if(!document.hidden) loadRecolement(); }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadRecolement(); });
 
 </script>
 </body>
