@@ -11,19 +11,29 @@
   <link rel="stylesheet" href="style.css">
   <style>
     body { background: var(--cream); }
-    .admin-page { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .admin-page { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
     .admin-topbar {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border);
+      flex-wrap: wrap; gap: 1rem;
     }
     .admin-topbar h1 {
-      font-family: var(--font-display); font-size: 1.6rem; color: var(--ink);
+      font-family: var(--font-display); font-size: 1.9rem; color: var(--ink);
     }
     .admin-topbar .admin-actions { display: flex; gap: 0.6rem; }
-    .admin-section { margin-bottom: 2.5rem; }
-    .admin-section h2 {
-      font-family: var(--font-display); font-size: 1.15rem; color: var(--ink);
-      margin-bottom: 1rem;
+    .admin-intro {
+      font-size: 1rem; color: var(--text-light); line-height: 1.6;
+      margin: -1.25rem 0 2.25rem;
+    }
+    .admin-section { margin-bottom: 3rem; }
+    .admin-section-head { margin-bottom: 1.1rem; }
+    .admin-section-head h2 {
+      font-family: var(--font-display); font-size: 1.35rem; color: var(--ink);
+      display: flex; align-items: center; gap: 0.55rem;
+    }
+    .admin-section-head .admin-section-icon { font-size: 1.3rem; }
+    .admin-section-head p {
+      font-size: 0.9rem; color: var(--text-light); margin-top: 0.3rem; max-width: 60ch;
     }
     .admin-stats-grid {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -44,29 +54,25 @@
     }
     .admin-tools-grid {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
+      gap: 1.1rem;
     }
     .admin-tool-card {
-      display: block; background: #fff; border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1.25rem; text-decoration: none;
+      display: flex; align-items: flex-start; gap: 0.9rem;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.4rem; text-decoration: none;
       box-shadow: var(--shadow); transition: box-shadow var(--transition), transform var(--transition);
     }
     .admin-tool-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+    .admin-tool-card .admin-tool-icon {
+      flex-shrink: 0; font-size: 1.6rem; line-height: 1;
+      width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
+      background: var(--accent-light); border-radius: 50%;
+    }
     .admin-tool-card h3 {
-      font-family: var(--font-body); font-weight: 700; font-size: 0.98rem; color: var(--ink);
-      margin-bottom: 0.4rem;
+      font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; color: var(--ink);
+      margin-bottom: 0.35rem;
     }
-    .admin-tool-card p { font-size: 0.82rem; color: var(--text-light); line-height: 1.5; }
-    .admin-files-list {
-      list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 0.5rem;
-    }
-    .admin-files-list a {
-      display: block; background: #fff; border: 1px solid var(--border); border-radius: 8px;
-      padding: 0.6rem 0.85rem; font-size: 0.82rem; color: var(--text); text-decoration: none;
-      font-family: 'DM Mono', monospace;
-    }
-    .admin-files-list a:hover { border-color: var(--warm); color: var(--warm-dark); }
+    .admin-tool-card p { font-size: 0.88rem; color: var(--text-light); line-height: 1.55; }
   </style>
 </head>
 <body>
@@ -80,62 +86,84 @@
     </div>
   </div>
 
+  <p class="admin-intro">Bienvenue ! Retrouvez ici les outils utilisés par l'équipe pour la réserve patrimoniale et les magasins 2e/5e étage.</p>
+
   <section class="admin-section">
-    <h2>État de l'inventaire</h2>
+    <div class="admin-section-head">
+      <h2>État de l'inventaire</h2>
+    </div>
     <div id="admin-stats" class="admin-stats-grid">
       <p class="admin-stat-note">Chargement du dernier rapport de build…</p>
     </div>
   </section>
 
   <section class="admin-section">
-    <h2>Outils</h2>
+    <div class="admin-section-head">
+      <h2><span class="admin-section-icon">🗂️</span> Récolement &amp; plan de la réserve</h2>
+      <p>Pour localiser les collections dans la réserve patrimoniale et visualiser où elles se trouvent.</p>
+    </div>
     <div class="admin-tools-grid">
       <a href="recolement.html" class="admin-tool-card">
-        <h3>Récolement</h3>
-        <p>Scanne les codes-barres avec une scannette et enregistre leur travée, colonne et étage pour localiser précisément les collections.</p>
+        <span class="admin-tool-icon">📷</span>
+        <span>
+          <h3>Récolement</h3>
+          <p>Scannez les codes-barres avec une scannette pour enregistrer la travée, la colonne et l'étage de chaque document.</p>
+        </span>
       </a>
       <a href="reserve.html" class="admin-tool-card">
-        <h3>Plan de la Réserve</h3>
-        <p>Plan interactif des travées, colonnes et armoires, avec taux d'occupation d'après le récolement.</p>
-      </a>
-      <a href="scan-docs.html" class="admin-tool-card">
-        <h3>ScanDocs — Rognage &amp; Renommage</h3>
-        <p>Prépare les images scannées (rognage, renommage par cote) avant intégration au fonds numérisé.</p>
-      </a>
-      <a href="analyse-cotes.html" class="admin-tool-card">
-        <h3>Analyse des cotes</h3>
-        <p>Trous intercalaires, disponibilités et doublons de cotes, calculés à partir du récolement.</p>
-      </a>
-      <a href="livres-spolies.html" class="admin-tool-card">
-        <h3>Livres spoliés</h3>
-        <p>Recherche croisée avec le catalogue et suivi (retrouvé, ex-libris, ancien possesseur) des ouvrages à restituer.</p>
-      </a>
-      <a href="magasins.html" class="admin-tool-card">
-        <h3>Magasins 2e/5e étage</h3>
-        <p>Catalogue des exemplaires du 2e et 5e étage, extrait de l'export Syracuse des magasins (les cotes du 6e étage sont filtrées automatiquement).</p>
+        <span class="admin-tool-icon">🗺️</span>
+        <span>
+          <h3>Plan de la Réserve</h3>
+          <p>Le plan des travées, colonnes et armoires, avec le taux d'occupation calculé d'après le récolement.</p>
+        </span>
       </a>
     </div>
   </section>
 
   <section class="admin-section">
-    <h2>Fichiers sources</h2>
-    <ul class="admin-files-list">
-      <li><a href="data/inventaire.json" download>inventaire.json</a></li>
-      <li><a href="data/recolement.json" download>recolement.json</a></li>
-      <li><a href="data/livres-spolies.json" download>livres-spolies.json</a></li>
-      <li><a href="data/build-report.json" download>build-report.json</a></li>
-      <li><a href="data/xml/notices.xml" download>notices.xml</a></li>
-      <li><a href="data/xml/exemplaires.xml" download>exemplaires.xml</a></li>
-      <li><a href="data/magasins.json" download>magasins.json</a></li>
-      <li><a href="data/magasins-build-report.json" download>magasins-build-report.json</a></li>
-      <li><a href="csv/auteurs.csv" download>auteurs.csv</a></li>
-      <li><a href="csv/Documents.csv" download>Documents.csv</a></li>
-      <li><a href="csv/Individus.csv" download>Individus.csv</a></li>
-      <li><a href="csv/Lieux.csv" download>Lieux.csv</a></li>
-      <li><a href="csv/Professionnels.csv" download>Professionnels.csv</a></li>
-      <li><a href="csv/Imprimeries.csv" download>Imprimeries.csv</a></li>
-      <li><a href="csv/periodiques.csv" download>periodiques.csv</a></li>
-    </ul>
+    <div class="admin-section-head">
+      <h2><span class="admin-section-icon">🔎</span> Autres outils réserve</h2>
+      <p>Analyse du classement, préparation des scans et suivi des ouvrages à restituer.</p>
+    </div>
+    <div class="admin-tools-grid">
+      <a href="analyse-cotes.html" class="admin-tool-card">
+        <span class="admin-tool-icon">📐</span>
+        <span>
+          <h3>Analyse des cotes</h3>
+          <p>Repère les trous, les disponibilités et les doublons de cotes, calculés à partir du récolement.</p>
+        </span>
+      </a>
+      <a href="livres-spolies.html" class="admin-tool-card">
+        <span class="admin-tool-icon">📖</span>
+        <span>
+          <h3>Livres spoliés</h3>
+          <p>Recherche croisée avec le catalogue et suivi (retrouvé, ex-libris, ancien possesseur) des ouvrages à restituer.</p>
+        </span>
+      </a>
+      <a href="scan-docs.html" class="admin-tool-card">
+        <span class="admin-tool-icon">🖼️</span>
+        <span>
+          <h3>ScanDocs — Rognage &amp; renommage</h3>
+          <p>Prépare les images scannées (rognage, renommage par cote) avant intégration au fonds numérisé.</p>
+        </span>
+      </a>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2><span class="admin-section-icon">📦</span> Magasins 2e/5e étage</h2>
+      <p>Le catalogue, séparé de la réserve patrimoniale, des collections conservées aux 2e et 5e étages.</p>
+    </div>
+    <div class="admin-tools-grid">
+      <a href="magasins.html" class="admin-tool-card">
+        <span class="admin-tool-icon">📚</span>
+        <span>
+          <h3>Catalogue des magasins</h3>
+          <p>Recherchez, triez et parcourez les exemplaires du 2e et 5e étage (les cotes du 6e étage sont automatiquement écartées).</p>
+        </span>
+      </a>
+    </div>
   </section>
 </div>
 
