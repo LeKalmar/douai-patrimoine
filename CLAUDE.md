@@ -25,10 +25,16 @@ bas, section « Stockage partagé »).
   anomalies. Si les variables R2 sont configurées (voir plus bas), ces deux
   fichiers XML sont d'abord rapatriés depuis R2 avant le build. Les stats du
   rapport incluent `reservePatrimoniale`/`reserveDouaisienne` (répartition
-  des exemplaires par réserve physique, déterminée par le préfixe de cote
-  `930$g` — `RD` = Réserve Douaisienne, tout le reste = Réserve
-  patrimoniale, même convention que `FONDS_PREFIXES` dans
-  `js/inventaire.js`).
+  des exemplaires par réserve **physique**, déterminée par le préfixe de
+  cote `930$g`, même ordre de test que `FONDS_PREFIXES` dans
+  `js/inventaire.js` mais avec un mapping différent et contre-intuitif :
+  sont physiquement en Réserve Douaisienne les fonds Douaisien (`D`),
+  Littérature (`L`), Protestantisme (`P`) et Mines (`MIN`) — le fonds
+  *nommé* « Réserve Douaisienne » (préfixe `RD`) n'y est **pas** physiquement
+  ; il est en Réserve patrimoniale avec Livres d'Artiste (`LIVA`), Imprimés
+  (`I`) et tout le reste. Voir `PHYSICAL_RESERVE_PREFIXES` dans
+  `scripts/build-inventory.mjs` — ne pas se fier au nom du fonds pour
+  déduire l'emplacement physique.
 - `npm run upload:xml` — pousse `data/xml/notices.xml` et
   `data/xml/exemplaires.xml` vers R2 (à lancer après chaque nouvel export
   Syracuse, pour ne pas avoir à committer ces fichiers de plusieurs dizaines

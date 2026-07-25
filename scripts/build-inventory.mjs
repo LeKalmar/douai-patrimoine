@@ -113,14 +113,31 @@ function indexNotices(xml) {
 }
 
 // ── Étape 2 : itérer les exemplaires et faire la jointure ──────────────────
-// Un exemplaire est physiquement en Réserve Douaisienne si sa cote (930$g)
-// commence par le préfixe "RD" — même convention que FONDS_PREFIXES dans
-// js/inventaire.js. Tout le reste de data/inventaire.json est physiquement
-// en Réserve patrimoniale (les magasins 2e/5e étage sont un export distinct,
-// voir build-magasins.mjs).
+// Réserve physique d'un exemplaire à partir du préfixe de sa cote (930$g).
+// Même ordre de test que FONDS_PREFIXES dans js/inventaire.js (les préfixes
+// les plus spécifiques d'abord, pour éviter qu'un préfixe court comme "L" ne
+// capture à tort une cote "LIVA…" ou "RD…") — mais un mapping différent :
+// le fonds *nommé* "Réserve Douaisienne" (préfixe RD) n'est PAS la réserve
+// physique du même nom. Sont physiquement en Réserve Douaisienne les fonds
+// Douaisien (D), Littérature (L), Protestantisme (P) et Mines (MIN). Tout le
+// reste (RD, LIVA, I, cotes sans préfixe reconnu) est physiquement en
+// Réserve patrimoniale. Les magasins 2e/5e étage sont un export distinct
+// (voir build-magasins.mjs), sans lien avec ce classement.
+const PHYSICAL_RESERVE_PREFIXES = [
+  { prefix: 'RD',   physical: 'patrimoniale' },
+  { prefix: 'LIVA', physical: 'patrimoniale' },
+  { prefix: 'MIN',  physical: 'douaisienne' },
+  { prefix: 'D',    physical: 'douaisienne' },
+  { prefix: 'I',    physical: 'patrimoniale' },
+  { prefix: 'L',    physical: 'douaisienne' },
+  { prefix: 'P',    physical: 'douaisienne' },
+];
+
 function isReserveDouaisienne(coteG) {
   if (!coteG) return false;
-  return coteG.split(',')[0].trim().toUpperCase().startsWith('RD');
+  const cote = coteG.split(',')[0].trim().toUpperCase();
+  const match = PHYSICAL_RESERVE_PREFIXES.find(({ prefix }) => cote.startsWith(prefix));
+  return match ? match.physical === 'douaisienne' : false;
 }
 
 function buildItems(xml, index) {

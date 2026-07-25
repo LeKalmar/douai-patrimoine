@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-25T17:29:38.191Z",
-  "durationMs": 4119,
+  "generatedAt": "2026-07-25T17:38:26.946Z",
+  "durationMs": 3078,
   "status": "ok",
   "warnings": [],
   "stats": {
@@ -10,8 +10,8 @@
     "joinedByCote": 0,
     "orphans": 0,
     "joinRate": 100,
-    "reserveDouaisienne": 151,
-    "reservePatrimoniale": 15117
+    "reserveDouaisienne": 6452,
+    "reservePatrimoniale": 8816
   },
   "orphansSample": []
 }
