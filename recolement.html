@@ -195,8 +195,7 @@
         <div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-notices-scanned" style="font-size:1.2rem">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Emplacements vides</div><div class="stat-card-val" id="st-vide">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Emplacements non rangés</div><div class="stat-card-val" id="st-nonrange">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Emplacements récolés</div><div class="stat-card-val" id="st-recoled">0</div></div>
       </div>
 
       <div class="scan-zone">
@@ -261,6 +260,8 @@
       <div class="expected-panel">
         <div class="expected-title"><span>Statistiques avancées du récolement</span></div>
         <div class="stats-row" style="margin-bottom:0">
+          <div class="stat-card"><div class="stat-card-label">Emplacements vides</div><div class="stat-card-val" id="st-vide">0</div></div>
+          <div class="stat-card"><div class="stat-card-label">Emplacements non rangés</div><div class="stat-card-val" id="st-nonrange">0</div></div>
           <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime">0</div></div>
           <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start" style="font-size:1rem">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last" style="font-size:1rem">—</div></div>
@@ -1073,7 +1074,23 @@ function updateStats(){
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
   document.getElementById('st-vide').textContent = Object.keys(videShelves).length.toLocaleString('fr-FR');
   document.getElementById('st-nonrange').textContent = Object.keys(nonRangeShelves).length.toLocaleString('fr-FR');
+  document.getElementById('st-recoled').textContent = countRecoledEmplacements().toLocaleString('fr-FR');
   updateTimeStats();
+}
+
+// Emplacements distincts (étagère/armoire/tiroir) déjà traités : au moins un
+// scan (hors "Non rangé (hors réserve)", qui n'est pas un vrai emplacement),
+// un comptage de non-catalogués, ou marqué vide/non rangé.
+function countRecoledEmplacements(){
+  const keys = new Set();
+  Object.values(scans).forEach(r=>{
+    if(r.kind==='horsreserve') return;
+    keys.add(`${r.travee}|${r.colonne}|${r.etage}`);
+  });
+  Object.keys(nonCat).forEach(k=>keys.add(k));
+  Object.keys(videShelves).forEach(k=>keys.add(k));
+  Object.keys(nonRangeShelves).forEach(k=>keys.add(k));
+  return keys.size;
 }
 
 /* ════════════ STATISTIQUES AVANCÉES (temps) ════════════
