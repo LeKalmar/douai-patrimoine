@@ -96,6 +96,24 @@
   .exp-titre{flex:1;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .exp-empty{font-size:.8rem;color:#999;font-style:italic}
 
+  .shelf-bar-block{margin-bottom:1.1rem}
+  .shelf-bar-heading{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap}
+  .shelf-bar-heading-label{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .shelf-bar-heading-total{font-size:.78rem;color:#999}
+  .shelf-bar{display:flex;height:16px;border-radius:20px;overflow:hidden;background:#eceef7;box-shadow:inset 0 0 0 1px #e2e2ee}
+  .shelf-bar-seg{height:100%;min-width:0;transition:width .4s cubic-bezier(.4,0,.2,1);position:relative}
+  .shelf-bar-seg.recoled{background:linear-gradient(90deg,#12157A,#2b30c9)}
+  .shelf-bar-seg.vide{background:linear-gradient(90deg,#2e7d32,#4caf50)}
+  .shelf-bar-seg.nonrange{background:linear-gradient(90deg,#6a1b9a,#8E24AA)}
+  .shelf-legend{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;margin-top:.65rem}
+  .shelf-legend-item{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#555}
+  .shelf-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .shelf-legend-dot.recoled{background:#12157A}
+  .shelf-legend-dot.vide{background:var(--ok)}
+  .shelf-legend-dot.nonrange{background:#8E24AA}
+  .shelf-legend-val{font-weight:700;color:#1a1a1a}
+  .shelf-legend-pct{color:#999}
+
   .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem}
   .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
   .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
@@ -195,7 +213,6 @@
         <div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-notices-scanned" style="font-size:1.2rem">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Emplacements récolés</div><div class="stat-card-val" id="st-recoled">0</div></div>
       </div>
 
       <div class="scan-zone">
@@ -259,9 +276,25 @@
 
       <div class="expected-panel">
         <div class="expected-title"><span>Statistiques avancées du récolement</span></div>
+
+        <div class="shelf-bar-block">
+          <div class="shelf-bar-heading">
+            <span class="shelf-bar-heading-label">Répartition des emplacements traités</span>
+            <span class="shelf-bar-heading-total" id="shelf-bar-total"></span>
+          </div>
+          <div class="shelf-bar" id="shelf-bar">
+            <div class="shelf-bar-seg recoled" id="seg-recoled" style="width:0%" title="Récolés"></div>
+            <div class="shelf-bar-seg vide" id="seg-vide" style="width:0%" title="Vides"></div>
+            <div class="shelf-bar-seg nonrange" id="seg-nonrange" style="width:0%" title="Non rangés"></div>
+          </div>
+          <div class="shelf-legend" id="shelf-legend">
+            <span class="shelf-legend-item"><span class="shelf-legend-dot recoled"></span>Récolés : <span class="shelf-legend-val" id="leg-recoled">0</span> <span class="shelf-legend-pct" id="leg-recoled-pct"></span></span>
+            <span class="shelf-legend-item"><span class="shelf-legend-dot vide"></span>Vides : <span class="shelf-legend-val" id="leg-vide">0</span> <span class="shelf-legend-pct" id="leg-vide-pct"></span></span>
+            <span class="shelf-legend-item"><span class="shelf-legend-dot nonrange"></span>Non rangés : <span class="shelf-legend-val" id="leg-nonrange">0</span> <span class="shelf-legend-pct" id="leg-nonrange-pct"></span></span>
+          </div>
+        </div>
+
         <div class="stats-row" style="margin-bottom:0">
-          <div class="stat-card"><div class="stat-card-label">Emplacements vides</div><div class="stat-card-val" id="st-vide">0</div></div>
-          <div class="stat-card"><div class="stat-card-label">Emplacements non rangés</div><div class="stat-card-val" id="st-nonrange">0</div></div>
           <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime">0</div></div>
           <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start" style="font-size:1rem">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last" style="font-size:1rem">—</div></div>
@@ -1072,25 +1105,49 @@ function updateStats(){
   }
   const nonCatTotal = Object.values(nonCat).reduce((s,r)=>s+r.count, 0);
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
-  document.getElementById('st-vide').textContent = Object.keys(videShelves).length.toLocaleString('fr-FR');
-  document.getElementById('st-nonrange').textContent = Object.keys(nonRangeShelves).length.toLocaleString('fr-FR');
-  document.getElementById('st-recoled').textContent = countRecoledEmplacements().toLocaleString('fr-FR');
+  updateShelfBar();
   updateTimeStats();
 }
 
 // Emplacements distincts (étagère/armoire/tiroir) déjà traités : au moins un
 // scan (hors "Non rangé (hors réserve)", qui n'est pas un vrai emplacement),
 // un comptage de non-catalogués, ou marqué vide/non rangé.
-function countRecoledEmplacements(){
-  const keys = new Set();
+// Classe chaque emplacement touché dans une seule des 3 catégories (priorité
+// contenu > non rangé > vide, comme le code couleur de reserve.html), pour
+// que la barre empilée totalise toujours exactement 100 % sans double compte
+// — même dans le cas marginal où un emplacement a été scanné puis marqué
+// vide après coup (les scans n'y sont jamais effacés automatiquement).
+function computeShelfBreakdown(){
+  const contentKeys = new Set();
   Object.values(scans).forEach(r=>{
     if(r.kind==='horsreserve') return;
-    keys.add(`${r.travee}|${r.colonne}|${r.etage}`);
+    contentKeys.add(`${r.travee}|${r.colonne}|${r.etage}`);
   });
-  Object.keys(nonCat).forEach(k=>keys.add(k));
-  Object.keys(videShelves).forEach(k=>keys.add(k));
-  Object.keys(nonRangeShelves).forEach(k=>keys.add(k));
-  return keys.size;
+  Object.keys(nonCat).forEach(k=>contentKeys.add(k));
+
+  const allKeys = new Set([...contentKeys, ...Object.keys(videShelves), ...Object.keys(nonRangeShelves)]);
+  let recoled=0, vide=0, nonrange=0;
+  allKeys.forEach(k=>{
+    if(contentKeys.has(k)) recoled++;
+    else if(nonRangeShelves[k]) nonrange++;
+    else if(videShelves[k]) vide++;
+  });
+  return { recoled, vide, nonrange, total: allKeys.size };
+}
+
+function updateShelfBar(){
+  const { recoled, vide, nonrange, total } = computeShelfBreakdown();
+  const pct = n => total ? Math.round(n/total*100) : 0;
+  document.getElementById('seg-recoled').style.width = pct(recoled)+'%';
+  document.getElementById('seg-vide').style.width = pct(vide)+'%';
+  document.getElementById('seg-nonrange').style.width = pct(nonrange)+'%';
+  document.getElementById('leg-recoled').textContent = recoled.toLocaleString('fr-FR');
+  document.getElementById('leg-vide').textContent = vide.toLocaleString('fr-FR');
+  document.getElementById('leg-nonrange').textContent = nonrange.toLocaleString('fr-FR');
+  document.getElementById('leg-recoled-pct').textContent = total ? `(${pct(recoled)} %)` : '';
+  document.getElementById('leg-vide-pct').textContent = total ? `(${pct(vide)} %)` : '';
+  document.getElementById('leg-nonrange-pct').textContent = total ? `(${pct(nonrange)} %)` : '';
+  document.getElementById('shelf-bar-total').textContent = total ? `${total.toLocaleString('fr-FR')} au total` : 'aucun emplacement traité pour l\'instant';
 }
 
 /* ════════════ STATISTIQUES AVANCÉES (temps) ════════════
