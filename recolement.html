@@ -192,6 +192,7 @@
         <div class="stat-card"><div class="stat-card-label">Scans enregistrés</div><div class="stat-card-val" id="st-total">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Notices cataloguées</div><div class="stat-card-val" id="st-catalog">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Progression</div><div class="stat-card-val" id="st-progress">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-notices-scanned" style="font-size:1.2rem">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Emplacements vides</div><div class="stat-card-val" id="st-vide">0</div></div>
@@ -343,7 +344,8 @@ let loc = loadJSON(LS_LOC, { mode:'scan', locType:'etagere', reserve:'patrimonia
 loc.reserve = loc.reserve || 'patrimoniale';  // compat anciennes sessions sans champ "reserve"
 loc.locType = loc.locType || 'etagere';       // compat anciennes sessions (ex-loc.kind)
 loc.mode = loc.mode || 'scan';
-let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat}
+let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat,noticeId}
+let catalogNoticeCount = 0;                   // nombre de notices distinctes (une notice peut avoir plusieurs exemplaires/barcodes)
 let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
 let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
@@ -464,16 +466,24 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFro
 /* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
 fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
   catalog = {};
+  const noticeIds = new Set();
   items.forEach(it=>{
     const bc = (it['915$b'] || it['995$f'] || '').trim();
     if(!bc) return;
     const cote = (it['930$g']||'').trim();
+    const noticeId = it._noticeId || null;
     catalog[bc] = {
       cote, titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim(),
-      fonds:getFondsFromCote(cote), etat:(it['316$a']||'').trim()
+      fonds:getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId
     };
+    if(noticeId) noticeIds.add(noticeId);
   });
-  document.getElementById('st-catalog').textContent = items.length.toLocaleString('fr-FR');
+  // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
+  // le compteur et la progression se basent sur des notices distinctes, pas
+  // sur des scans bruts, pour qu'un même exemplaire rescanné par erreur ou
+  // pour vérification ne compte jamais deux fois.
+  catalogNoticeCount = noticeIds.size;
+  document.getElementById('st-catalog').textContent = catalogNoticeCount.toLocaleString('fr-FR');
   updateStats();
 }).catch(()=>{
   document.getElementById('st-catalog').textContent = 'indisponible';
@@ -1047,9 +1057,17 @@ function updateStats(){
   const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
   document.getElementById('st-here').textContent = here;
   if(catalog){
-    const catalogCount = Object.keys(catalog).length;
-    const matched = Object.keys(scans).filter(bc=>catalog[bc]).length;
-    document.getElementById('st-progress').textContent = catalogCount ? Math.round(matched/catalogCount*100)+' %' : '—';
+    // Basé sur des notices distinctes, pas sur le nombre brut de scans : une
+    // notice avec plusieurs exemplaires ne compte qu'une fois dès qu'un de
+    // ses exemplaires est récolé, et un même exemplaire rescanné plusieurs
+    // fois (vérification, erreur) ne gonfle jamais la progression.
+    const noticesScanned = new Set(
+      Object.keys(scans).map(bc=>catalog[bc] && catalog[bc].noticeId).filter(Boolean)
+    );
+    document.getElementById('st-progress').textContent = catalogNoticeCount ? Math.round(noticesScanned.size/catalogNoticeCount*100)+' %' : '—';
+    document.getElementById('st-notices-scanned').textContent = catalogNoticeCount
+      ? `${noticesScanned.size.toLocaleString('fr-FR')} / ${catalogNoticeCount.toLocaleString('fr-FR')}`
+      : noticesScanned.size.toLocaleString('fr-FR');
   }
   const nonCatTotal = Object.values(nonCat).reduce((s,r)=>s+r.count, 0);
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
