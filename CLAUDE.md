@@ -23,7 +23,12 @@ bas, section « Stockage partagé »).
   ou si le taux de jointure notice/exemplaire est catastrophique.
   `npm run build:force` (`SYRACUSE_FORCE=1`) pour forcer malgré les
   anomalies. Si les variables R2 sont configurées (voir plus bas), ces deux
-  fichiers XML sont d'abord rapatriés depuis R2 avant le build.
+  fichiers XML sont d'abord rapatriés depuis R2 avant le build. Les stats du
+  rapport incluent `reservePatrimoniale`/`reserveDouaisienne` (répartition
+  des exemplaires par réserve physique, déterminée par le préfixe de cote
+  `930$g` — `RD` = Réserve Douaisienne, tout le reste = Réserve
+  patrimoniale, même convention que `FONDS_PREFIXES` dans
+  `js/inventaire.js`).
 - `npm run upload:xml` — pousse `data/xml/notices.xml` et
   `data/xml/exemplaires.xml` vers R2 (à lancer après chaque nouvel export
   Syracuse, pour ne pas avoir à committer ces fichiers de plusieurs dizaines
@@ -35,6 +40,11 @@ bas, section « Stockage partagé »).
   local committé, contrairement à `npm run build`). Voir « Magasins 2e/5e
   étage » plus bas. Le parseur MARC-XML est partagé entre les deux scripts
   de build via `scripts/lib/marc-xml.mjs`.
+- Avant d'écraser `data/build-report.json` ou `data/magasins-build-report.json`,
+  chaque script archive la version précédente dans un fichier `-previous.json`
+  du même nom (un seul niveau d'historique, écrasé au build suivant). Sert à
+  afficher dans `admin.html` un delta de documents (« +N depuis l'export
+  précédent ») entre les deux derniers exports Syracuse de chaque source.
 - Aucun serveur de dev fourni — ouvrir les `.html` directement ou servir le
   dossier avec n'importe quel serveur statique (`python3 -m http.server`,
   etc.). Attention : les pages qui font `fetch()` (quasiment toutes) ont
@@ -47,7 +57,7 @@ bas, section « Stockage partagé »).
 | `index.html` | Page d'accueil — hero, carrousel d'expositions, accordéon (Venir consulter / Trouver un document), modale de connexion espace pro | Public |
 | `histoire-du-livre.html` | Exposition cartographique interactive « 500 ans d'histoire des métiers du livre » (utilise `js/main.js` + `css/main.css`, MapLibre 3.6.2) | Public |
 | `visionneuse.html` | Visionneuse de documents numérisés, pilotée par `js/manifest.json` (générée par `generer_manifest.html`). Accessible via `?dossier=...` depuis l'inventaire | Public |
-| `admin.html` | Tableau de bord de l'espace professionnel (stats de build, liens vers les outils et fichiers sources) | **Protégé** (voir Sécurité) |
+| `admin.html` | Tableau de bord de l'espace professionnel (état de l'inventaire par réserve, liens vers les outils regroupés par thème) — pas de téléchargement de fichiers sources depuis cette page | **Protégé** (voir Sécurité) |
 | `recolement.html` | Outil de scan de codes-barres pour localiser les documents (travée/colonne/étage) dans la réserve. Partage `js/reserve-shared.js` avec `reserve.html` | **Protégé** |
 | `reserve.html` | Plan interactif de la réserve (travées/colonnes/armoires) avec taux d'occupation calculé depuis `data/recolement.json` | **Protégé** |
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |

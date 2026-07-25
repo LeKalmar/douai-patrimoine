@@ -238,6 +238,15 @@ async function main() {
   writeFileSync(CONFIG.output.magasins, JSON.stringify(buildResult.items), 'utf-8');
   console.log(`  · écrit ${CONFIG.output.magasins} (${buildResult.items.length} entrées)`);
 
+  // Archive le rapport précédent avant de l'écraser (même mécanique que
+  // build-inventory.mjs) — permet à l'espace pro de comparer export actuel
+  // et export précédent (date + delta de documents).
+  if (existsSync(CONFIG.output.report)) {
+    const previousPath = CONFIG.output.report.replace(/\.json$/, '-previous.json');
+    writeFileSync(previousPath, readFileSync(CONFIG.output.report, 'utf-8'), 'utf-8');
+    console.log(`  · archivé ${CONFIG.output.report} → ${previousPath}`);
+  }
+
   const report = {
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,

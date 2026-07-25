@@ -113,6 +113,16 @@ function indexNotices(xml) {
 }
 
 // ── Étape 2 : itérer les exemplaires et faire la jointure ──────────────────
+// Un exemplaire est physiquement en Réserve Douaisienne si sa cote (930$g)
+// commence par le préfixe "RD" — même convention que FONDS_PREFIXES dans
+// js/inventaire.js. Tout le reste de data/inventaire.json est physiquement
+// en Réserve patrimoniale (les magasins 2e/5e étage sont un export distinct,
+// voir build-magasins.mjs).
+function isReserveDouaisienne(coteG) {
+  if (!coteG) return false;
+  return coteG.split(',')[0].trim().toUpperCase().startsWith('RD');
+}
+
 function buildItems(xml, index) {
   const items = [];
   const stats = {
@@ -121,6 +131,8 @@ function buildItems(xml, index) {
     joinedByCote: 0,
     orphans: 0,
     orphansSample: [],
+    reserveDouaisienne: 0,
+    reservePatrimoniale: 0,
   };
 
   for (const recXml of iterateRecords(xml)) {
@@ -129,6 +141,10 @@ function buildItems(xml, index) {
 
     const itemFlat = flatten(rec, CONFIG.itemFieldsWhitelist);
     const itemId = rec.controlfields['001'] ?? null;
+    const g930 = getSubfield(rec, '930', 'g');
+
+    if (isReserveDouaisienne(g930)) stats.reserveDouaisienne++;
+    else stats.reservePatrimoniale++;
 
     // Tenter la jointure principale
     const b915 = getSubfield(rec, '915', 'b');
@@ -139,7 +155,6 @@ function buildItems(xml, index) {
       joinType = 'primary';
     } else {
       // Secours : tenter par $930$g
-      const g930 = getSubfield(rec, '930', 'g');
       if (g930) noticeId = index.coteToNotice.get(g930.trim());
       if (noticeId) {
         stats.joinedByCote++;
@@ -147,7 +162,7 @@ function buildItems(xml, index) {
       } else {
         stats.orphans++;
         if (stats.orphansSample.length < 10) {
-          stats.orphansSample.push({ itemId, b915, g930: getSubfield(rec, '930', 'g') });
+          stats.orphansSample.push({ itemId, b915, g930 });
         }
       }
     }
@@ -293,6 +308,8 @@ async function main() {
       joinedByCote: s.joinedByCote,
       orphans: s.orphans,
       joinRate: Number((rate * 100).toFixed(2)),
+      reserveDouaisienne: s.reserveDouaisienne,
+      reservePatrimoniale: s.reservePatrimoniale,
     },
     orphansSample: s.orphansSample,
   });
@@ -301,8 +318,19 @@ async function main() {
   console.log(`✓ build-inventory: terminé en ${dur}s`);
 }
 
+// Archive le rapport du build précédent avant de le remplacer, pour que
+// l'espace pro puisse afficher « export actuel vs export précédent » et un
+// delta de documents. Un seul niveau d'historique (écrasé au build suivant).
+function archivePreviousReport() {
+  if (!existsSync(CONFIG.output.report)) return;
+  const previousPath = CONFIG.output.report.replace(/\.json$/, '-previous.json');
+  writeFileSync(previousPath, readFileSync(CONFIG.output.report, 'utf-8'), 'utf-8');
+  console.log(`  · archivé ${CONFIG.output.report} → ${previousPath}`);
+}
+
 function writeReport(payload) {
   mkdirSync(dirname(resolve(CONFIG.output.report)), { recursive: true });
+  archivePreviousReport();
   const report = {
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - (payload.startedAt ?? Date.now()),

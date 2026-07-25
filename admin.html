@@ -52,6 +52,42 @@
     .admin-stat-note {
       font-size: 0.8rem; color: var(--text-light); margin-top: 0.75rem;
     }
+    .admin-total-card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
+      padding: 1.5rem 1.75rem; box-shadow: var(--shadow); margin-bottom: 1rem;
+      display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap;
+    }
+    .admin-total-card .value {
+      font-family: var(--font-display); font-size: 2.4rem; color: var(--accent);
+      line-height: 1;
+    }
+    .admin-total-card .label {
+      font-size: 1rem; color: var(--text-light);
+    }
+    .admin-delta { font-size: 0.85rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; }
+    .admin-delta.up { background: var(--accent-light); color: var(--accent); }
+    .admin-delta.down { background: #fbe9e7; color: #a04030; }
+    .admin-delta.flat { background: var(--border); color: var(--text-light); }
+    .admin-branch-card .label { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .admin-export-dates {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem; margin-top: 1.25rem;
+    }
+    .admin-export-card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1rem 1.15rem; box-shadow: var(--shadow);
+    }
+    .admin-export-card h4 {
+      font-size: 0.85rem; font-weight: 700; color: var(--ink); margin-bottom: 0.5rem;
+    }
+    .admin-export-card .row {
+      display: flex; justify-content: space-between; gap: 0.5rem;
+      font-size: 0.82rem; color: var(--text-light); padding: 0.15rem 0;
+    }
+    .admin-export-card .row strong { color: var(--ink); font-weight: 600; }
+    .admin-tech-note {
+      font-size: 0.75rem; color: var(--text-light); margin-top: 1rem;
+    }
     .admin-tools-grid {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 1.1rem;
@@ -91,9 +127,10 @@
   <section class="admin-section">
     <div class="admin-section-head">
       <h2>État de l'inventaire</h2>
+      <p>Le nombre de documents connus, réparti par réserve, avec l'évolution depuis le dernier export Syracuse.</p>
     </div>
-    <div id="admin-stats" class="admin-stats-grid">
-      <p class="admin-stat-note">Chargement du dernier rapport de build…</p>
+    <div id="admin-inventory">
+      <p class="admin-stat-note">Chargement des rapports de build…</p>
     </div>
   </section>
 
@@ -180,28 +217,99 @@
     window.location.href = 'index.html';
   });
 
-  fetch('data/build-report.json')
-    .then(function(res) { return res.json(); })
-    .then(function(report) {
-      var stats = report.stats || {};
-      var date = report.generatedAt ? new Date(report.generatedAt).toLocaleString('fr-FR') : '—';
-      var html = '';
-      html += statCard(stats.notices, 'Notices');
-      html += statCard(stats.items, 'Exemplaires');
-      html += statCard(stats.joinRate != null ? stats.joinRate + ' %' : '—', 'Taux de jointure');
-      html += statCard(stats.orphans, 'Orphelins');
-      document.getElementById('admin-stats').innerHTML =
-        html + '<p class="admin-stat-note" style="grid-column:1/-1;">Dernier build : ' + date +
-        (report.status ? ' — statut : ' + report.status : '') + '</p>';
-    })
-    .catch(function() {
-      document.getElementById('admin-stats').innerHTML =
-        '<p class="admin-stat-note">Rapport de build indisponible.</p>';
-    });
+  function fetchJsonOrNull(path) {
+    return fetch(path)
+      .then(function(res) { return res.ok ? res.json() : null; })
+      .catch(function() { return null; });
+  }
 
-  function statCard(value, label) {
-    return '<div class="admin-stat-card"><div class="value">' + (value != null ? value : '—') +
-      '</div><div class="label">' + label + '</div></div>';
+  function formatDate(iso) {
+    return iso ? new Date(iso).toLocaleString('fr-FR') : '—';
+  }
+
+  function deltaBadge(current, previous) {
+    if (current == null || previous == null) return '';
+    var diff = current - previous;
+    if (diff === 0) return '<span class="admin-delta flat">= inchangé</span>';
+    var cls = diff > 0 ? 'up' : 'down';
+    var sign = diff > 0 ? '+' : '';
+    return '<span class="admin-delta ' + cls + '">' + sign + diff + ' depuis l\'export précédent</span>';
+  }
+
+  Promise.all([
+    fetchJsonOrNull('data/build-report.json'),
+    fetchJsonOrNull('data/build-report-previous.json'),
+    fetchJsonOrNull('data/magasins-build-report.json'),
+    fetchJsonOrNull('data/magasins-build-report-previous.json'),
+  ]).then(function(results) {
+    var current = results[0], previous = results[1];
+    var magCurrent = results[2], magPrevious = results[3];
+
+    if (!current && !magCurrent) {
+      document.getElementById('admin-inventory').innerHTML =
+        '<p class="admin-stat-note">Rapports de build indisponibles.</p>';
+      return;
+    }
+
+    var s = (current && current.stats) || {};
+    var sp = (previous && previous.stats) || {};
+    var ms = (magCurrent && magCurrent.stats) || {};
+    var msp = (magPrevious && magPrevious.stats) || {};
+
+    var patrimoniale = s.reservePatrimoniale;
+    var douaisienne = s.reserveDouaisienne;
+    var magasins = ms.kept;
+    var total = (patrimoniale != null && douaisienne != null && magasins != null)
+      ? patrimoniale + douaisienne + magasins : null;
+
+    var patrimonialePrev = sp.reservePatrimoniale;
+    var douaisiennePrev = sp.reserveDouaisienne;
+    var magasinsPrev = msp.kept;
+    var totalPrev = (patrimonialePrev != null && douaisiennePrev != null && magasinsPrev != null)
+      ? patrimonialePrev + douaisiennePrev + magasinsPrev : null;
+
+    var html = '';
+    html += '<div class="admin-total-card">' +
+      '<div class="value">' + (total != null ? total.toLocaleString('fr-FR') : '—') + '</div>' +
+      '<div class="label">documents au total</div>' +
+      deltaBadge(total, totalPrev) +
+      '</div>';
+
+    html += '<div class="admin-stats-grid">';
+    html += branchCard('Réserve patrimoniale', patrimoniale, patrimonialePrev);
+    html += branchCard('Réserve Douaisienne', douaisienne, douaisiennePrev);
+    html += branchCard('Magasins 2e/5e étage', magasins, magasinsPrev);
+    html += '</div>';
+
+    html += '<div class="admin-export-dates">';
+    html += exportCard('Réserve (patrimoniale + Douaisienne)', current, previous);
+    html += exportCard('Magasins 2e/5e étage', magCurrent, magPrevious);
+    html += '</div>';
+
+    if (s.joinRate != null || ms.excluded != null) {
+      html += '<p class="admin-tech-note">Détails techniques : ' +
+        (s.joinRate != null ? 'taux de jointure réserve ' + s.joinRate + '% (' + (s.orphans || 0) + ' orphelins)' : '') +
+        (s.joinRate != null && ms.excluded != null ? ' — ' : '') +
+        (ms.excluded != null ? ms.excluded + ' exemplaires du 6e étage écartés des magasins' : '') +
+        '.</p>';
+    }
+
+    document.getElementById('admin-inventory').innerHTML = html;
+  });
+
+  function branchCard(label, value, previousValue) {
+    return '<div class="admin-stat-card admin-branch-card">' +
+      '<div class="value">' + (value != null ? value.toLocaleString('fr-FR') : '—') + '</div>' +
+      '<div class="label">' + label + ' ' + deltaBadge(value, previousValue) + '</div>' +
+      '</div>';
+  }
+
+  function exportCard(label, current, previous) {
+    return '<div class="admin-export-card">' +
+      '<h4>' + label + '</h4>' +
+      '<div class="row"><span>Export Syracuse actuel</span><strong>' + formatDate(current && current.generatedAt) + '</strong></div>' +
+      '<div class="row"><span>Export précédent</span><strong>' + formatDate(previous && previous.generatedAt) + '</strong></div>' +
+      '</div>';
   }
 })();
 </script>
