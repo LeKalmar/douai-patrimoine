@@ -335,6 +335,7 @@ const LS_NONCAT = 'rp_recolement_noncat';
 const LS_VIDE   = 'rp_recolement_vide';
 const LS_NONRANGE = 'rp_recolement_nonrange';
 const LS_PENDING = 'rp_recolement_pending_sync';
+const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "temps réel" arrête de comptabiliser (voir updateTimeStats)
 
 let scans = loadJSON(LS_SCANS, {});           // barcode -> record
 let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
@@ -1063,8 +1064,6 @@ function updateStats(){
    d'un récolement étalé sur plusieurs jours) ne sont pas comptés comme du
    temps de travail. Basé uniquement sur scans[] (comptage code-barre), pas
    sur nonCat/videShelves/nonRangeShelves. */
-const GAP_MS = 60*60*1000;
-
 function formatDateTimeFR(ts){
   return new Date(ts).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
