@@ -1,7 +1,7 @@
 /**
  * État partagé du récolement, stocké dans R2 sous la clé "recolement.json"
  * (même forme que l'export de recolement.html : {scans, nonCatalogues,
- * videShelves, nonRangeShelves}, chaque valeur un tableau).
+ * videShelves, nonRangeShelves, lastShelves}, chaque valeur un tableau).
  *
  * GET  → l'état courant (accessible sans authentification : mêmes données
  *        que celles déjà lisibles via data/recolement.json committé).
@@ -22,11 +22,18 @@ class BadRequest extends Error {
 }
 
 function emptyState() {
-  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [] };
+  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [] };
 }
 
 function locKey(row) {
   return `${row.travee}|${row.colonne}|${row.etage}`;
+}
+
+// lastShelves marque une propriété de la colonne entière (elle s'arrête à
+// tel étage), pas un emplacement précis : clé sans étage, contrairement à
+// locKey ci-dessus.
+function colKey(row) {
+  return `${row.travee}|${row.colonne}`;
 }
 
 function toMap(arr, keyFn) {
@@ -44,7 +51,7 @@ function fromMap(m) {
 // tirées de l'état courant) — factorisé pour être rejoué plusieurs fois de
 // suite par le cas 'batch' ci-dessous sans relire/réécrire R2 à chaque fois.
 function applyOne(maps, patch) {
-  const { scans, nonCat, vide, nonrange } = maps;
+  const { scans, nonCat, vide, nonrange, lastShelf } = maps;
   switch (patch.type) {
     case 'scan':
       if (!patch.record || !patch.record.barcode) throw new BadRequest('scan : record.barcode requis.');
@@ -73,6 +80,11 @@ function applyOne(maps, patch) {
         delete vide[patch.key];
       } else delete nonrange[patch.key];
       break;
+    case 'lastShelf':
+      if (!patch.key) throw new BadRequest('lastShelf : key requis.');
+      if (patch.record) lastShelf[patch.key] = patch.record;
+      else delete lastShelf[patch.key];
+      break;
     case 'bulkMerge': {
       // Fusionne un lot entier (import d'une sauvegarde JSON) dans l'état
       // partagé — jamais un écrasement : chaque entrée est ajoutée ou mise à
@@ -84,6 +96,7 @@ function applyOne(maps, patch) {
       const incomingNonCat = Array.isArray(patch.data.nonCatalogues) ? patch.data.nonCatalogues : [];
       const incomingVide = Array.isArray(patch.data.videShelves) ? patch.data.videShelves : [];
       const incomingNonRange = Array.isArray(patch.data.nonRangeShelves) ? patch.data.nonRangeShelves : [];
+      const incomingLastShelves = Array.isArray(patch.data.lastShelves) ? patch.data.lastShelves : [];
 
       incomingScans.forEach(r => {
         if (!r.barcode) return;
@@ -96,6 +109,9 @@ function applyOne(maps, patch) {
       });
       incomingNonRange.forEach(r => {
         if (r.travee && r.etage !== undefined) { nonrange[locKey(r)] = r; delete vide[locKey(r)]; }
+      });
+      incomingLastShelves.forEach(r => {
+        if (r.travee && r.colonne !== undefined && r.etage !== undefined) lastShelf[colKey(r)] = r;
       });
       break;
     }
@@ -112,6 +128,7 @@ function applyPatch(state, patch) {
     nonCat: toMap(state.nonCatalogues, locKey),
     vide: toMap(state.videShelves, locKey),
     nonrange: toMap(state.nonRangeShelves, locKey),
+    lastShelf: toMap(state.lastShelves, colKey),
   };
 
   if (patch.type === 'batch') {
@@ -129,6 +146,7 @@ function applyPatch(state, patch) {
     nonCatalogues: fromMap(maps.nonCat),
     videShelves: fromMap(maps.vide),
     nonRangeShelves: fromMap(maps.nonrange),
+    lastShelves: fromMap(maps.lastShelf),
   };
 }
 

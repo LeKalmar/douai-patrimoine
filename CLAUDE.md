@@ -132,10 +132,11 @@ recommencez pas à ajouter un système de meubles nommés séparé sans relire
 d'abord cette partie du code (uniquement dans la réserve patrimoniale ; le
 menu déroulant se désactive automatiquement sur « Réserve Douaisienne »).
 
-`data/recolement.json` regroupe en un seul fichier quatre catégories de
+`data/recolement.json` regroupe en un seul fichier cinq catégories de
 données produites par `recolement.html` (un seul bouton « Exporter le
 récolement », un seul export/import à gérer) :
-`{ scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...] }`.
+`{ scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
+lastShelves:[...] }`.
 `videShelves` sert à marquer explicitement qu'une étagère est vide (aucun
 livre, catalogué ou non) — utile car le nombre d'étagères réelles par
 colonne varie (jusqu'à `maxEt` défini par travée dans
@@ -146,13 +147,22 @@ calcul de `maxEt` par colonne dans `reserve.html`. `nonRangeShelves` sert à
 marquer un emplacement contenant des documents de natures différentes en
 désordre, impossibles à compter facilement — distinct de « vide » (les
 deux boutons dans `recolement.html` sont mutuellement exclusifs : marquer
-l'un efface l'autre sur le même emplacement). Les anciens exports au
-format « tableau plat de scans » restent lus correctement (import et
-chargement dans `reserve.html`), pour ne pas casser d'anciens fichiers en
-circulation. C'est exactement cette même forme qui est stockée dans R2 sous
-la clé `recolement.json` (voir « Stockage partagé » ci-dessous) — l'export
-manuel produit toujours un fichier au même format, utile pour figer un
-instantané daté.
+l'un efface l'autre sur le même emplacement). `lastShelves` (bouton
+« Marquer comme dernière étagère de cette colonne ») marque, par colonne
+et non par étage (clé `travee|colonne`, sans étage), que la colonne
+s'arrête réellement à l'étage courant — sert de plancher à `maxEtageOf()`
+dans `reserve.html` à la place du `maxEt` par défaut de la travée, pour
+qu'une colonne physiquement plus courte que les autres n'affiche plus de
+placeholder « non inventorié » au-delà de son dernier étage réel ; si des
+données réelles (scan, non-catalogué, vide, non rangé) existent malgré
+tout au-delà de l'étage marqué, `maxEtageOf()` s'étend quand même jusqu'à
+elles plutôt que de les faire disparaître. Les anciens exports au
+format « tableau plat de scans », ou sans `lastShelves`, restent lus
+correctement (import et chargement dans `reserve.html`), pour ne pas
+casser d'anciens fichiers en circulation. C'est exactement cette même
+forme qui est stockée dans R2 sous la clé `recolement.json` (voir
+« Stockage partagé » ci-dessous) — l'export manuel produit toujours un
+fichier au même format, utile pour figer un instantané daté.
 
 Le code couleur du plan (`reserve.html`) est catégoriel, pas un dégradé de
 densité : chaque emplacement (travée/colonne/étage, ou meuble/étage pour
@@ -273,11 +283,12 @@ partagée est inactive. `npm run test:r2` permet de vérifier un token sans
 toucher aux données réelles.
 
 En plus des patchs unitaires (`scan`, `deleteScan`, `nonCat`, `vide`,
-`nonrange`), `api/recolement.mjs` accepte un patch `bulkMerge` (
+`nonrange`, `lastShelf`), `api/recolement.mjs` accepte un patch `bulkMerge` (
 `{type:'bulkMerge', data:{scans, nonCatalogues, videShelves,
-nonRangeShelves}}`) qui fusionne un lot entier avec la même sémantique que
-les patchs unitaires (jamais de suppression, un scan plus récent — `ts` —
-l'emporte sur un plus ancien). C'est ce patch qu'envoie `recolement.html`
+nonRangeShelves, lastShelves}}`) qui fusionne un lot entier avec la même
+sémantique que les patchs unitaires (jamais de suppression, un scan plus
+récent — `ts` — l'emporte sur un plus ancien). C'est ce patch qu'envoie
+`recolement.html`
 après un import de fichier de sauvegarde (`mergeIncomingData(data,
 {syncToServer:true})`), pour que l'import mette aussi à jour l'état
 partagé R2 et pas seulement le navigateur local qui a fait l'import — voir
@@ -358,3 +369,18 @@ est sécurisé au-delà de ce qui est décrit ici.
   importer un fichier de sauvegarde dans `recolement.html` pousse aussi ce
   lot vers R2, donc réimporter une sauvegarde à jour réamorce l'état
   partagé pour tout le monde.
+- Corrigé (2026-08-11) dans `reserve.html` : les étages s'affichaient dans
+  l'ordre décroissant (étage 1 en bas) dans le plan miniature et le
+  panneau de détail — inversé pour que l'étage 1 soit en haut. Corrigé
+  aussi un bug plus sérieux dans `colsOf()`/`maxEtageOf()`/`allEtagesOf()` :
+  ces fonctions ne montraient que les colonnes/étages présents dans les
+  données dès qu'*une seule* donnée existait pour la travée, au lieu de
+  toujours partir de l'ensemble par défaut (`nbCols`/`maxEt`) complété par
+  les données réelles — conséquence concrète : dès qu'une colonne recevait
+  un scan catalogué, les autres colonnes de la même travée n'ayant que des
+  non-catalogués/vide/non rangé (ou rien) disparaissaient purement et
+  simplement du plan plutôt que de s'afficher en placeholder « non
+  inventorié ». Les trois fonctions font maintenant l'union du défaut et
+  des données réelles. À cette occasion, ajout de la catégorie
+  `lastShelves` (voir plus haut) pour le cas inverse : marquer qu'une
+  colonne s'arrête réellement avant le `maxEt` par défaut de sa travée.

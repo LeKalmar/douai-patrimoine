@@ -225,7 +225,7 @@
    (CNT/DET/colsOf/maxEtageOf) que les travées classiques. */
 
 /* ════════════ ÉTAT ════════════ */
-let CNT={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={};
+let CNT={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={}, LASTSHELF={};
 let selId=null, filter='all', csvLoaded=false;
 
 /* Hauteur de référence (en "nombre d'étages") partagée par toutes les
@@ -250,18 +250,22 @@ function etageLabelPrefix(tid){
 }
 
 /* ════════════ CHARGEMENT DU RÉCOLEMENT ════════════
-   data/recolement.json regroupe scans, non-catalogués, étagères vides et
-   emplacements non rangés :
-   { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...] }.
-   Les anciens exports (simple tableau de scans) restent lisibles. */
+   data/recolement.json regroupe scans, non-catalogués, étagères vides,
+   emplacements non rangés et dernières étagères de colonne marquées :
+   { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
+   lastShelves:[...] }.
+   Les anciens exports (simple tableau de scans, ou sans lastShelves) restent
+   lisibles. */
 function applyRecolementData(data){
   const rows = Array.isArray(data) ? data : (data.scans||[]);
   const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
   const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
   const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
+  const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
   parseVide(videRows);
   parseNonCat(nonCatRows);
   parseNonRange(nonRangeRows);
+  parseLastShelf(lastShelfRows);
   parseRecolement(rows);
 }
 
@@ -314,6 +318,19 @@ function parseNonRange(rows){
   });
 }
 
+/* Marque, par colonne (pas par étage), le dernier étage réel — clé sans
+   étage puisque c'est une propriété de la colonne entière. Consommé par
+   maxEtageOf() pour arrêter d'afficher des placeholders "non inventorié"
+   au-delà de cet étage. */
+function parseLastShelf(rows){
+  LASTSHELF={};
+  (rows||[]).forEach(row=>{
+    const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
+    if(!t||!col||!etage) return;
+    LASTSHELF[`${t}|${col}`]=etage;
+  });
+}
+
 function parseRecolement(rows){
   CNT={}; DET={};
   rows.forEach(row=>{
@@ -351,7 +368,8 @@ function hasData(tid){
   return Object.keys(CNT).some(k=>k.startsWith(tid+'|'))
     || Object.keys(VIDE).some(k=>k.startsWith(tid+'|'))
     || Object.keys(NONCAT).some(k=>k.startsWith(tid+'|'))
-    || Object.keys(NONRANGE).some(k=>k.startsWith(tid+'|'));
+    || Object.keys(NONRANGE).some(k=>k.startsWith(tid+'|'))
+    || Object.keys(LASTSHELF).some(k=>k.startsWith(tid+'|'));
 }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -436,6 +454,7 @@ function colsOf(tDef){
   [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
     Object.keys(dict).forEach(k=>{const[t,c]=k.split('|');if(t===tDef.id) from.add(c);});
   });
+  Object.keys(LASTSHELF).forEach(k=>{const[t,c]=k.split('|');if(t===tDef.id) from.add(c);});
   return [...from].sort((a,b)=>{
     const na=parseInt(a),nb=parseInt(b);
     if(!isNaN(na)&&!isNaN(nb)) return na-nb;
@@ -446,10 +465,15 @@ function colsOf(tDef){
 /* Idem pour le nombre d'étages d'une colonne : au moins la valeur par
    défaut de la travée (maxEt), étendue si des données réelles vont plus
    loin — jamais réduite en dessous du défaut sous prétexte que seuls
-   quelques étages ont été scannés. */
+   quelques étages ont été scannés. Exception : si la colonne a une
+   "dernière étagère" marquée (LASTSHELF, voir recolement.html), c'est elle
+   qui sert de base au lieu du défaut de la travée — la colonne s'arrête
+   réellement là, donc plus de placeholder au-delà — tout en restant
+   étendue si des données réelles vont malgré tout plus loin. */
 function maxEtageOf(tid,col){
   const d=LOCATIONS_ALL.find(x=>x.id===tid);
-  let m=d?d.maxEt:5;
+  const marked=parseInt(LASTSHELF[`${tid}|${col}`],10);
+  let m=!isNaN(marked)?marked:(d?d.maxEt:5);
   [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
     Object.keys(dict).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
   });

@@ -59,6 +59,7 @@
   .vide-btn:hover{background:#f5f5f5}
   .vide-btn.active{background:var(--ok);border-color:var(--ok);color:#fff}
   .vide-btn.nonrange.active{background:#8E24AA;border-color:#8E24AA;color:#fff}
+  .vide-btn.lastshelf.active{background:#455A64;border-color:#455A64;color:#fff}
   .vide-note{font-size:.75rem;color:#888;flex-basis:100%}
   .horsreserve-note{font-size:.8rem;color:#7a4a00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;line-height:1.5}
   .noncat-label{font-size:.9rem;color:#333}
@@ -230,7 +231,8 @@
         <div class="vide-row" id="vide-row">
           <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cet emplacement comme vide</button>
           <button type="button" class="vide-btn nonrange" id="btn-nonrange">☐ Marquer comme non rangé</button>
-          <span class="vide-note">Vide : ne contient aucun livre (catalogué ou non). Non rangé : documents de natures différentes en désordre, impossibles à compter facilement. Les deux sont exclusifs.</span>
+          <button type="button" class="vide-btn lastshelf" id="btn-lastshelf">☐ Marquer comme dernière étagère de cette colonne</button>
+          <span class="vide-note">Vide : ne contient aucun livre (catalogué ou non). Non rangé : documents de natures différentes en désordre, impossibles à compter facilement. Les deux sont exclusifs. Dernière étagère : la colonne s'arrête réellement ici — le plan de la réserve n'affichera plus d'étagère "non inventoriée" au-delà.</span>
         </div>
         <div id="noncat-mode-zone" style="display:none">
           <div class="scan-row">
@@ -308,7 +310,7 @@
       <div class="tools-row">
         <div class="tool-card">
           <h3>Exporter</h3>
-          <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués et des emplacements marqués vides ou non rangés. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
+          <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués, des emplacements marqués vides ou non rangés et des dernières étagères de colonne marquées. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
           <div class="tool-btn-row">
             <button type="button" class="tool-btn" id="btn-export">⬇ Exporter (fichier local)</button>
             <button type="button" class="tool-btn secondary" id="btn-save-server">☁ Sauvegarder ce récolement</button>
@@ -316,7 +318,7 @@
         </div>
         <div class="tool-card">
           <h3>Reprendre une session</h3>
-          <p>Importe un export JSON précédent (scans, non-catalogués, emplacements vides ou non rangés) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
+          <p>Importe un export JSON précédent (scans, non-catalogués, emplacements vides ou non rangés, dernières étagères de colonne) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
           <label class="tool-btn secondary" for="file-resume">⬆ Importer et fusionner</label>
           <input type="file" id="file-resume" accept="application/json">
         </div>
@@ -369,6 +371,7 @@ const LS_BASE   = 'rp_recolement_baseline';
 const LS_NONCAT = 'rp_recolement_noncat';
 const LS_VIDE   = 'rp_recolement_vide';
 const LS_NONRANGE = 'rp_recolement_nonrange';
+const LS_LASTSHELF = 'rp_recolement_lastshelf';
 const LS_PENDING = 'rp_recolement_pending_sync';
 const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "temps réel" arrête de comptabiliser (voir updateTimeStats)
 
@@ -383,6 +386,7 @@ let catalogNoticeCount = 0;                   // nombre de notices distinctes (u
 let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
 let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
+let lastShelves = loadJSON(LS_LASTSHELF, {});  // "travee|colonne" -> {travee,colonne,etage,ts} (dernière étagère réelle de la colonne)
 let pendingSync = loadJSON(LS_PENDING, []);   // patches en attente d'envoi à /api/recolement
 
 function loadJSON(key, fallback){
@@ -395,6 +399,7 @@ function saveBaseline(){ localStorage.setItem(LS_BASE, baseline ? JSON.stringify
 function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); }
 function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShelves)); }
 function saveNonRangeShelves(){ localStorage.setItem(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
+function saveLastShelves(){ localStorage.setItem(LS_LASTSHELF, JSON.stringify(lastShelves)); }
 function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -684,6 +689,7 @@ function refreshLoc(){
   updateNonCatInput();
   updateVideUI();
   updateNonRangeUI();
+  updateLastShelfUI();
   if(loc.mode==='catalogage') noncatInput.focus(); else scanInput.focus();
 }
 applyReserveVisibility();
@@ -994,6 +1000,44 @@ document.getElementById('btn-nonrange').addEventListener('click', ()=>{
   queuePatch({type:'nonrange', key, record: nonRangeShelves[key] || null});
 });
 
+/* ════════════ DERNIÈRE ÉTAGÈRE D'UNE COLONNE ════════════
+   Distinct de vide/non rangé : ne marque pas un emplacement précis mais une
+   propriété de la colonne entière ("elle s'arrête à l'étage N"), donc clé
+   travee|colonne (sans étage) plutôt que travee|colonne|etage. Consommé par
+   maxEtageOf() dans reserve.html pour arrêter d'afficher des placeholders
+   "non inventorié" au-delà de l'étage marqué. */
+function lastShelfKey(fields){ return `${fields.travee}|${fields.colonne}`; }
+
+function currentLastShelfRecord(){ return lastShelves[lastShelfKey(locFieldsOf(loc))] || null; }
+
+function updateLastShelfUI(){
+  const btn = document.getElementById('btn-lastshelf');
+  const rec = currentLastShelfRecord();
+  const markedHere = rec && String(rec.etage) === String(loc.etage);
+  btn.classList.toggle('active', markedHere);
+  if(markedHere) btn.textContent = '☑ Dernière étagère de cette colonne';
+  else if(rec) btn.textContent = `☐ Marquer comme dernière étagère (actuellement : étage ${rec.etage})`;
+  else btn.textContent = '☐ Marquer comme dernière étagère de cette colonne';
+}
+
+document.getElementById('btn-lastshelf').addEventListener('click', ()=>{
+  const fields = locFieldsOf(loc);
+  const key = lastShelfKey(fields);
+  const rec = lastShelves[key];
+  const markedHere = rec && String(rec.etage) === String(fields.etage);
+  if(markedHere){
+    delete lastShelves[key];
+    beep(560,.1);
+  } else {
+    lastShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    beep(660,.1);
+  }
+  saveLastShelves();
+  updateLastShelfUI();
+  updateStats();
+  queuePatch({type:'lastShelf', key, record: lastShelves[key] || null});
+});
+
 /* ════════════ ATTENDU ICI ════════════ */
 function renderExpected(){
   const list = document.getElementById('exp-list');
@@ -1199,16 +1243,19 @@ function updateTimeStats(){
 }
 
 /* ════════════ EXPORT / IMPORT / RESET ════════════
-   Un seul fichier JSON regroupe scans, non-catalogués, étagères vides et
-   emplacements non rangés :
-   { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...] }.
-   Les anciens exports (simple tableau de scans) restent importables. */
+   Un seul fichier JSON regroupe scans, non-catalogués, étagères vides,
+   emplacements non rangés et dernières étagères de colonne marquées :
+   { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
+   lastShelves:[...] }.
+   Les anciens exports (simple tableau de scans, ou sans lastShelves) restent
+   importables. */
 function exportPayload(){
   return {
     scans: Object.values(scans),
     nonCatalogues: Object.values(nonCat),
     videShelves: Object.values(videShelves),
-    nonRangeShelves: Object.values(nonRangeShelves)
+    nonRangeShelves: Object.values(nonRangeShelves),
+    lastShelves: Object.values(lastShelves)
   };
 }
 function downloadJSON(data, prefix){
@@ -1303,6 +1350,7 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
   const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
   const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
+  const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
 
   let added=0, updated=0;
   scanRows.forEach(r=>{
@@ -1322,14 +1370,17 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   nonRangeRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonRangeShelves[emplacementKey(r)] = r; });
   saveNonRangeShelves();
 
-  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
-  updateNonCatInput(); updateVideUI(); updateNonRangeUI();
+  lastShelfRows.forEach(r=>{ if(r.travee && r.colonne!==undefined && r.etage!==undefined) lastShelves[lastShelfKey(r)] = r; });
+  saveLastShelves();
 
-  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length)){
-    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows } });
+  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
+  updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI();
+
+  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length)){
+    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows } });
   }
 
-  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length };
+  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length };
 }
 
 document.getElementById('file-resume').addEventListener('change', function(e){
@@ -1339,7 +1390,7 @@ document.getElementById('file-resume').addEventListener('change', function(e){
     try{
       const data = JSON.parse(ev.target.result);
       const r = mergeIncomingData(data, { syncToServer:true });
-      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
+      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s), ${r.lastShelf} dernière(s) étagère(s) de colonne fusionnée(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
     }catch(err){ alert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
@@ -1365,13 +1416,14 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
 });
 
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
+  if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués, tous les emplacements marqués vides ou non rangés et toutes les dernières étagères de colonne marquées sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
   scans = {}; saveScans();
   nonCat = {}; saveNonCat();
   videShelves = {}; saveVideShelves();
   nonRangeShelves = {}; saveNonRangeShelves();
+  lastShelves = {}; saveLastShelves();
   pendingSync = []; savePendingSync(); updateSyncIndicator();
-  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI();
 });
 
 /* ════════════ DÉMARRAGE ════════════ */
