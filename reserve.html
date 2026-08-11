@@ -423,32 +423,46 @@ function traveeOccupancy(tid,cols){
   return total ? Math.round(filled/total*100) : 0;
 }
 
+/* Colonnes affichées pour une travée : toujours l'ensemble par défaut
+   (A..nbCols), complété par toute colonne présente dans les données
+   (scans, non-catalogués, vide, non rangé) mais absente du défaut. Union et
+   non filtrage : sinon, dès qu'une seule colonne recevait un scan catalogué,
+   les autres colonnes (mêmes déjà connues via non-catalogués/vide/non
+   rangé, ou simplement pas encore visitées) disparaissaient du plan au lieu
+   d'apparaître en placeholder "non inventorié". */
 function colsOf(tDef){
   const from=new Set();
-  Object.keys(CNT).forEach(k=>{const[t,c]=k.split('|');if(t===tDef.id) from.add(c);});
-  if(from.size>0) return [...from].sort((a,b)=>{
+  for(let i=1;i<=tDef.nbCols;i++) from.add(String.fromCharCode(64+i));
+  [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
+    Object.keys(dict).forEach(k=>{const[t,c]=k.split('|');if(t===tDef.id) from.add(c);});
+  });
+  return [...from].sort((a,b)=>{
     const na=parseInt(a),nb=parseInt(b);
     if(!isNaN(na)&&!isNaN(nb)) return na-nb;
     return a.localeCompare(b,'fr');
   });
-  const c=[]; for(let i=1;i<=tDef.nbCols;i++) c.push(String.fromCharCode(64+i)); return c;
 }
 
+/* Idem pour le nombre d'étages d'une colonne : au moins la valeur par
+   défaut de la travée (maxEt), étendue si des données réelles vont plus
+   loin — jamais réduite en dessous du défaut sous prétexte que seuls
+   quelques étages ont été scannés. */
 function maxEtageOf(tid,col){
-  let m=0;
+  const d=LOCATIONS_ALL.find(x=>x.id===tid);
+  let m=d?d.maxEt:5;
   [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
     Object.keys(dict).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
   });
-  if(!m){const d=LOCATIONS_ALL.find(x=>x.id===tid);m=d?d.maxEt:5;}
   return m;
 }
 
 function allEtagesOf(tid,col){
   const s=new Set();
+  const m=maxEtageOf(tid,col);
+  for(let i=1;i<=m;i++) s.add(String(i));
   [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
     Object.keys(dict).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col) s.add(e);});
   });
-  if(!s.size){const m=maxEtageOf(tid,col);for(let i=1;i<=m;i++) s.add(String(i));}
   return [...s].sort((a,b)=>{const na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb)) return na-nb;if(!isNaN(na)) return -1;if(!isNaN(nb)) return 1;return a.localeCompare(b,'fr');});
 }
 
@@ -516,7 +530,7 @@ function makeTraveeEl(tid,tDef,cols){
     const cd=document.createElement('div');cd.className='tv-col';
     const w=tDef.nbCols<=5?11:9;
     const h=Math.max(4,(targetH-(maxE-1)*GAP)/maxE);
-    for(let e=maxE;e>=1;e--){
+    for(let e=1;e<=maxE;e++){
       const state=slotState(tid,col,String(e));
       const s=document.createElement('div');s.className='tv-slot';
       const bg=slotColor(tid,col,String(e),state);
@@ -599,7 +613,7 @@ function selectTravee(tid,tDef,cols){
   cols.forEach(col=>{
     const etages=allEtagesOf(tid,col);
     let colTotal=0, rows='';
-    [...etages].reverse().forEach(e=>{
+    etages.forEach(e=>{
       const n=cnt(tid,col,e); colTotal+=n;
       const ncCount=nc(tid,col,e);
       const state=slotState(tid,col,e);
