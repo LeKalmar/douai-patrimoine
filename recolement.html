@@ -14,6 +14,12 @@
   :root{
     --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
     --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+    /* Mêmes couleurs que le code couleur catégoriel de reserve.html (voir
+       CLAUDE.md), pour que le mini-plan ci-dessous se lise de façon
+       cohérente avec le plan complet. */
+    --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
+    --plan-cat:#1A1E99; --plan-noncat:#F9A825; --plan-nonrange:#8E24AA;
+    --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
   }
   body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
   .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
@@ -48,6 +54,24 @@
   .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
   .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
   .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1}
+
+  .scan-layout{display:flex;gap:1.25rem;align-items:stretch;flex-wrap:wrap;margin-bottom:1.25rem}
+  .scan-layout .scan-zone{flex:2 1 340px;margin-bottom:0}
+  .travee-mini-panel{flex:1 1 230px;max-width:320px;background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1rem;display:flex;flex-direction:column}
+  .mp-header{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.75rem}
+  .mp-title{font-family:'DM Serif Display',serif;font-weight:400;font-size:1rem;color:#12157A;line-height:1.25}
+  .mp-occ{font-size:.75rem;color:#888;white-space:nowrap}
+  .mp-room{flex:1;display:flex;align-items:center;justify-content:center;overflow-x:auto;min-height:120px;padding-bottom:.25rem}
+  .mp-box{border:1px solid #ccc;border-radius:var(--radius-sm);padding:4px;background:#fafafa;display:flex;flex-direction:row;gap:4px}
+  .mp-col{display:flex;flex-direction:column;gap:2px;align-items:center}
+  .mp-slot{border-radius:1px}
+  .mp-slot.cur{outline:2px solid var(--red);outline-offset:1px;position:relative;z-index:2}
+  .mp-collbl{font-size:8px;color:#aaa;text-align:center;margin-top:3px;line-height:1}
+  .mp-collbl.cur{color:var(--red);font-weight:700}
+  .mp-legend{display:flex;flex-wrap:wrap;gap:.35rem .7rem;font-size:.64rem;color:#666;margin-top:.75rem}
+  .mp-leg{display:flex;align-items:center;gap:.3rem}
+  .mp-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+  .mp-hint{font-size:.72rem;color:#999;font-style:italic;margin:.5rem 0 0;text-align:center}
 
   .scan-zone{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
   .scan-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
@@ -150,7 +174,7 @@
 
   footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
   footer a{color:#c9a96e;text-decoration:none}
-  @media(max-width:640px){.loc-readout{margin-left:0;order:99;width:100%;text-align:center}}
+  @media(max-width:640px){.loc-readout{margin-left:0;order:99;width:100%;text-align:center}.travee-mini-panel{max-width:none}}
 </style>
 </head>
 <body>
@@ -216,35 +240,53 @@
         <div class="stat-card"><div class="stat-card-label">Non catalogués (total estimé)</div><div class="stat-card-val" id="st-noncat">0</div></div>
       </div>
 
-      <div class="scan-zone">
-        <div class="horsreserve-note" id="horsreserve-note" style="display:none">
-          Scannez ici un exemplaire retrouvé hors de la réserve (posé ailleurs dans le bâtiment, par exemple). S'il a déjà été récolé auparavant et qu'un récolement de référence est chargé, son emplacement d'origine s'affichera pour le remettre en place. Sinon, rangez-le à l'emplacement indiqué par sa cote puis rescannez-le une fois en rayon, avec le bon emplacement sélectionné, pour l'ajouter au récolement principal.
-        </div>
-        <div id="scan-mode-zone">
-          <div class="scan-row">
-            <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
-            <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
-            <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
+      <div class="scan-layout">
+        <div class="scan-zone">
+          <div class="horsreserve-note" id="horsreserve-note" style="display:none">
+            Scannez ici un exemplaire retrouvé hors de la réserve (posé ailleurs dans le bâtiment, par exemple). S'il a déjà été récolé auparavant et qu'un récolement de référence est chargé, son emplacement d'origine s'affichera pour le remettre en place. Sinon, rangez-le à l'emplacement indiqué par sa cote puis rescannez-le une fois en rayon, avec le bon emplacement sélectionné, pour l'ajouter au récolement principal.
           </div>
-          <div class="feedback" id="feedback"></div>
-        </div>
-        <div class="vide-row" id="vide-row">
-          <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cet emplacement comme vide</button>
-          <button type="button" class="vide-btn nonrange" id="btn-nonrange">☐ Marquer comme non rangé</button>
-          <button type="button" class="vide-btn lastshelf" id="btn-lastshelf">☐ Marquer comme dernière étagère de cette colonne</button>
-          <span class="vide-note">Vide : ne contient aucun livre (catalogué ou non). Non rangé : documents de natures différentes en désordre, impossibles à compter facilement. Les deux sont exclusifs. Dernière étagère : la colonne s'arrête réellement ici — le plan de la réserve n'affichera plus d'étagère "non inventoriée" au-delà.</span>
-        </div>
-        <div id="noncat-mode-zone" style="display:none">
-          <div class="scan-row">
-            <span class="noncat-label">Livres non catalogués sur cette étagère :</span>
-            <div class="stepper" id="stp-noncat-wrap">
-              <button type="button" id="noncat-minus">−</button>
-              <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric">
-              <button type="button" id="noncat-plus">+</button>
+          <div id="scan-mode-zone">
+            <div class="scan-row">
+              <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
+              <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
+              <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
             </div>
-            <button type="button" class="tool-btn" id="noncat-save">Enregistrer</button>
+            <div class="feedback" id="feedback"></div>
           </div>
-          <div class="feedback" id="noncat-feedback"></div>
+          <div class="vide-row" id="vide-row">
+            <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cet emplacement comme vide</button>
+            <button type="button" class="vide-btn nonrange" id="btn-nonrange">☐ Marquer comme non rangé</button>
+            <button type="button" class="vide-btn lastshelf" id="btn-lastshelf">☐ Marquer comme dernière étagère de cette colonne</button>
+            <span class="vide-note">Vide : ne contient aucun livre (catalogué ou non). Non rangé : documents de natures différentes en désordre, impossibles à compter facilement. Les deux sont exclusifs. Dernière étagère : la colonne s'arrête réellement ici — le plan de la réserve n'affichera plus d'étagère "non inventoriée" au-delà.</span>
+          </div>
+          <div id="noncat-mode-zone" style="display:none">
+            <div class="scan-row">
+              <span class="noncat-label">Livres non catalogués sur cette étagère :</span>
+              <div class="stepper" id="stp-noncat-wrap">
+                <button type="button" id="noncat-minus">−</button>
+                <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric">
+                <button type="button" id="noncat-plus">+</button>
+              </div>
+              <button type="button" class="tool-btn" id="noncat-save">Enregistrer</button>
+            </div>
+            <div class="feedback" id="noncat-feedback"></div>
+          </div>
+        </div>
+
+        <div class="travee-mini-panel" id="travee-mini-panel">
+          <div class="mp-header">
+            <span class="mp-title" id="mp-title">—</span>
+            <span class="mp-occ" id="mp-occ"></span>
+          </div>
+          <div class="mp-room" id="mp-room"></div>
+          <div class="mp-legend" id="mp-legend">
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-cat)"></span>Catalogué</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-noncat)"></span>Non catalogué</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></span>Vide</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-nonrange)"></span>Non rangé</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></span>Non inventorié</span>
+          </div>
+          <p class="mp-hint" id="mp-hint" style="display:none"></p>
         </div>
       </div>
 
@@ -690,6 +732,7 @@ function refreshLoc(){
   updateVideUI();
   updateNonRangeUI();
   updateLastShelfUI();
+  buildMiniPlan();
   if(loc.mode==='catalogage') noncatInput.focus(); else scanInput.focus();
 }
 applyReserveVisibility();
@@ -778,6 +821,7 @@ function handleScan(barcode, damaged){
   renderExpected();
   renderHereLog();
   updateStats();
+  buildMiniPlan();
 }
 
 function showFeedback(record, status, prev){
@@ -807,7 +851,7 @@ function showFeedback(record, status, prev){
         record.cote = v;
         record.fonds = getFondsFromCote(v);
         scans[record.barcode] = record;
-        saveScans(); renderExpected(); renderHereLog(); updateStats();
+        saveScans(); renderExpected(); renderHereLog(); updateStats(); buildMiniPlan();
         queuePatch({type:'scan', record});
       }
       scanInput.focus();
@@ -919,6 +963,7 @@ function saveNonCatCount(){
   showNonCatFeedback(count);
   beep(880, .12);
   updateStats();
+  buildMiniPlan();
   queuePatch({type:'nonCat', key, record: nonCat[key] || null});
 }
 
@@ -980,6 +1025,7 @@ document.getElementById('btn-vide').addEventListener('click', ()=>{
   updateVideUI();
   updateNonRangeUI();
   updateStats();
+  buildMiniPlan();
   queuePatch({type:'vide', key, record: videShelves[key] || null});
 });
 
@@ -997,6 +1043,7 @@ document.getElementById('btn-nonrange').addEventListener('click', ()=>{
   updateVideUI();
   updateNonRangeUI();
   updateStats();
+  buildMiniPlan();
   queuePatch({type:'nonrange', key, record: nonRangeShelves[key] || null});
 });
 
@@ -1035,8 +1082,183 @@ document.getElementById('btn-lastshelf').addEventListener('click', ()=>{
   saveLastShelves();
   updateLastShelfUI();
   updateStats();
+  buildMiniPlan();
   queuePatch({type:'lastShelf', key, record: lastShelves[key] || null});
 });
+
+/* ════════════ MINI-PLAN DE LA TRAVÉE ACTIVE ════════════
+   Aperçu du même code couleur catégoriel que reserve.html (voir CLAUDE.md),
+   mais limité à la seule travée/armoire/tiroir actuellement sélectionnée
+   (pas tout le plan, pour ne pas surcharger l'affichage) et recalculé
+   directement depuis l'état local (scans/nonCat/videShelves/nonRangeShelves/
+   lastShelves), pas depuis /api/recolement — donc à jour à l'instant même
+   où l'on scanne, sans attendre un aller-retour réseau. Logique dupliquée
+   (et non factorisée avec reserve.html) volontairement : les deux pages
+   partent de représentations différentes des mêmes données (reserve.html
+   lit un JSON déjà agrégé par emplacement ; ici on part de `scans`, indexé
+   par code-barre, avec dédoublonnage par cote comme le fait
+   parseRecolement() côté reserve.html). */
+function etageWordForMini(tid){
+  if(tid==='ARMOIRE') return 'niveau';
+  if(tid==='TIROIR') return 'tiroir';
+  return 'étage';
+}
+
+function travMiniTitle(tid){
+  if(tid==='ARMOIRE') return 'Armoires (bois)';
+  if(tid==='TIROIR') return 'Armoires à tiroirs';
+  const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
+  return `${reserveLabel} · Travée ${displayTraveeId(tid)}`;
+}
+
+// Reconstruit, pour la seule travée tid, les mêmes maps que CNT/NONCAT/VIDE/
+// NONRANGE dans reserve.html — dédoublonnage par cote identique à
+// parseRecolement() là-bas, pour qu'un même exemplaire rescanné plusieurs
+// fois ne gonfle jamais le compteur "catalogué" de la case.
+function buildLocalSlotState(tid){
+  const cnt={}, seenCotes={};
+  Object.values(scans).forEach(r=>{
+    if(r.kind==='horsreserve' || r.travee!==tid) return;
+    const key=`${r.travee}|${r.colonne}|${r.etage}`;
+    if(!seenCotes[key]) seenCotes[key]=new Set();
+    const cote=(r.cote||'').trim();
+    if(cote){
+      if(seenCotes[key].has(cote)) return;
+      seenCotes[key].add(cote);
+    }
+    cnt[key]=(cnt[key]||0)+1;
+  });
+  const nc={};
+  Object.values(nonCat).forEach(r=>{ if(r.travee===tid) nc[`${r.travee}|${r.colonne}|${r.etage}`]=r.count; });
+  const vide={};
+  Object.values(videShelves).forEach(r=>{ if(r.travee===tid) vide[`${r.travee}|${r.colonne}|${r.etage}`]=true; });
+  const nonrange={};
+  Object.values(nonRangeShelves).forEach(r=>{ if(r.travee===tid) nonrange[`${r.travee}|${r.colonne}|${r.etage}`]=true; });
+  return {cnt, nc, vide, nonrange};
+}
+
+// Colonnes/étages affichés : toujours l'ensemble par défaut de la travée,
+// complété par les données réelles — même logique que colsOf()/maxEtageOf()
+// dans reserve.html (voir CLAUDE.md, correctif du 2026-08-11).
+function miniColsOf(tDef, maps){
+  const from=new Set();
+  for(let i=1;i<=tDef.nbCols;i++) from.add(String.fromCharCode(64+i));
+  [maps.cnt,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
+    Object.keys(dict).forEach(k=>{ from.add(k.split('|')[1]); });
+  });
+  Object.keys(lastShelves).forEach(k=>{const[t,c]=k.split('|'); if(t===tDef.id) from.add(c);});
+  return [...from].sort((a,b)=>{
+    const na=parseInt(a),nb=parseInt(b);
+    if(!isNaN(na)&&!isNaN(nb)) return na-nb;
+    return a.localeCompare(b,'fr');
+  });
+}
+
+function miniMaxEtageOf(tDef, col, maps){
+  const rec=lastShelves[`${tDef.id}|${col}`];
+  const marked=rec?parseInt(rec.etage,10):NaN;
+  let m=!isNaN(marked)?marked:tDef.maxEt;
+  [maps.cnt,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
+    Object.keys(dict).forEach(k=>{
+      const parts=k.split('|');
+      if(parts[1]!==col) return;
+      const n=parseInt(parts[2],10);
+      if(!isNaN(n)&&n>m) m=n;
+    });
+  });
+  return m;
+}
+
+function miniSlotState(maps,tid,col,e){
+  const key=`${tid}|${col}|${e}`;
+  if((maps.cnt[key]||0)>0) return 'cat';
+  if((maps.nc[key]||0)>0) return 'noncat';
+  if(maps.nonrange[key]) return 'nonrange';
+  if(maps.vide[key]) return 'vide';
+  return 'unknown';
+}
+function miniStateColor(state){
+  if(state==='cat') return 'var(--plan-cat)';
+  if(state==='noncat') return 'var(--plan-noncat)';
+  if(state==='nonrange') return 'var(--plan-nonrange)';
+  if(state==='vide') return 'var(--plan-free)';
+  return 'var(--plan-unknown)';
+}
+function miniSlotColor(maps,tid,col,e,state){
+  if(state==='cat'){
+    const key=`${tid}|${col}|${e}`;
+    const n=maps.cnt[key]||0, ncCount=maps.nc[key]||0;
+    if(ncCount>0){
+      const pct=Math.round(n/(n+ncCount)*100);
+      return `linear-gradient(to right, var(--plan-cat) ${pct}%, var(--plan-noncat) ${pct}%)`;
+    }
+  }
+  return miniStateColor(state);
+}
+function miniSlotTitle(tDef,col,e,state,maps){
+  const key=`${tDef.id}|${col}|${e}`;
+  const n=maps.cnt[key]||0, ncCount=maps.nc[key]||0;
+  let detail;
+  if(state==='cat') detail = ncCount>0 ? `${n} catalogué(s) + ${ncCount} non catalogué(s)` : `${n} catalogué(s)`;
+  else if(state==='noncat') detail = `${ncCount} non catalogué(s) estimé(s)`;
+  else if(state==='nonrange') detail = 'non rangé';
+  else if(state==='vide') detail = 'vide (confirmé)';
+  else detail = 'non inventorié';
+  return `Col. ${col}, ${etageWordForMini(tDef.id)} ${e} — ${detail}`;
+}
+
+function buildMiniPlan(){
+  const titleEl=document.getElementById('mp-title'), occEl=document.getElementById('mp-occ'),
+        room=document.getElementById('mp-room'), legend=document.getElementById('mp-legend'),
+        hintEl=document.getElementById('mp-hint');
+
+  if(loc.reserve==='horsreserve'){
+    titleEl.textContent='Non rangé (hors réserve)';
+    occEl.textContent='';
+    room.innerHTML='';
+    legend.style.display='none';
+    hintEl.style.display='';
+    hintEl.textContent='Pas de plan pour les documents hors réserve — aucun emplacement associé.';
+    return;
+  }
+  legend.style.display='';
+  hintEl.style.display='none';
+
+  const tDef=currentLocDef(), tid=tDef.id;
+  const maps=buildLocalSlotState(tid);
+  const cols=miniColsOf(tDef,maps);
+  const curCol=colLetter(loc.colonne);
+
+  titleEl.textContent=travMiniTitle(tid);
+
+  const GAP=2, BASE_SLOT_H=10;
+  const targetH=tDef.maxEt*BASE_SLOT_H+(tDef.maxEt-1)*GAP;
+  const w=tDef.nbCols<=5?14:11;
+
+  let total=0, filled=0;
+  const box=document.createElement('div'); box.className='mp-box';
+  cols.forEach(col=>{
+    const maxE=miniMaxEtageOf(tDef,col,maps);
+    const cd=document.createElement('div'); cd.className='mp-col';
+    const h=Math.max(5,(targetH-(maxE-1)*GAP)/maxE);
+    for(let e=1;e<=maxE;e++){
+      total++;
+      const state=miniSlotState(maps,tid,col,String(e));
+      if(state==='cat'||state==='noncat'||state==='nonrange') filled++;
+      const isCur = col===curCol && e===loc.etage;
+      const s=document.createElement('div'); s.className='mp-slot'+(isCur?' cur':'');
+      s.style.cssText=`width:${w}px;height:${h}px;background:${miniSlotColor(maps,tid,col,String(e),state)}`;
+      s.title=miniSlotTitle(tDef,col,e,state,maps);
+      cd.appendChild(s);
+    }
+    const lbl=document.createElement('div'); lbl.className='mp-collbl'+(col===curCol?' cur':''); lbl.textContent=col;
+    cd.appendChild(lbl);
+    box.appendChild(cd);
+  });
+  room.innerHTML='';
+  room.appendChild(box);
+  occEl.textContent = total ? Math.round(filled/total*100)+'% occupé' : '';
+}
 
 /* ════════════ ATTENDU ICI ════════════ */
 function renderExpected(){
@@ -1123,7 +1345,7 @@ document.getElementById('log-search').addEventListener('input', function(){ rend
 function deleteScan(barcode){
   delete scans[barcode];
   saveScans();
-  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
+  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats(); buildMiniPlan();
   queuePatch({type:'deleteScan', barcode});
 }
 
@@ -1374,7 +1596,7 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   saveLastShelves();
 
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
-  updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI();
+  updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 
   if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length)){
     queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows } });
@@ -1423,7 +1645,7 @@ document.getElementById('btn-reset').addEventListener('click', ()=>{
   nonRangeShelves = {}; saveNonRangeShelves();
   lastShelves = {}; saveLastShelves();
   pendingSync = []; savePendingSync(); updateSyncIndicator();
-  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 });
 
 /* ════════════ DÉMARRAGE ════════════ */
