@@ -229,9 +229,10 @@ let CNT={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={}, LASTSHELF={};
 let selId=null, filter='all', csvLoaded=false;
 
 /* Hauteur de référence (en "nombre d'étages") partagée par toutes les
-   travées dans le plan miniature — 6 est la valeur la plus fréquente parmi
-   TRAVEES/TRAVEES_DOUAISIENNE. Voir makeTraveeEl(). */
-const TRAVEE_REF_MAXET=6;
+   travées dans le plan miniature — DEFAULT_MAX_ETAGE (js/reserve-shared.js),
+   la valeur par défaut désormais commune à toutes les travées tant qu'aucune
+   dernière étagère n'y est marquée. Voir makeTraveeEl(). */
+const TRAVEE_REF_MAXET=DEFAULT_MAX_ETAGE;
 
 function travTitle(tid){
   if(tid==='ARMOIRE') return 'Armoires (bois)';
@@ -473,7 +474,7 @@ function colsOf(tDef){
 function maxEtageOf(tid,col){
   const d=LOCATIONS_ALL.find(x=>x.id===tid);
   const marked=parseInt(LASTSHELF[`${tid}|${col}`],10);
-  let m=!isNaN(marked)?marked:(d?d.maxEt:5);
+  let m=!isNaN(marked)?marked:defaultMaxEtageOf(d);
   [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
     Object.keys(dict).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
   });

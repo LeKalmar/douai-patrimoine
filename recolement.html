@@ -625,7 +625,10 @@ function setLocType(type, skipRefresh){
   document.getElementById('stp-travee-wrap').style.display = type==='etagere' ? '' : 'none';
   const def = currentLocDef();
   loc.colonne = Math.min(def.nbCols, Math.max(1, loc.colonne||1));
-  loc.etage = Math.min(def.maxEt, Math.max(1, loc.etage||1));
+  // Les travées n'ont pas de plafond fixe (voir DEFAULT_MAX_ETAGE côté
+  // reserve-shared.js) : seules les armoires/tiroirs, à capacité physique
+  // réellement fixe, sont bornées ici.
+  loc.etage = type==='etagere' ? Math.max(1, loc.etage||1) : Math.min(def.maxEt, Math.max(1, loc.etage||1));
   if(!skipRefresh) refreshLoc();
 }
 selLocType.addEventListener('change', ()=>setLocType(selLocType.value));
@@ -676,7 +679,10 @@ document.querySelectorAll('[data-step]').forEach(btn=>{
       const max = currentLocDef().nbCols;
       loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
     } else if(field==='etage'){
-      const max = currentLocDef().maxEt;
+      // Pas de plafond pour les travées (nombre d'étagères variable, voir
+      // DEFAULT_MAX_ETAGE / bouton "dernière étagère de cette colonne") ;
+      // seules les armoires/tiroirs ont une capacité physique réellement fixe.
+      const max = loc.locType==='etagere' ? Infinity : currentLocDef().maxEt;
       loc.etage = Math.min(max, Math.max(1, loc.etage + dir));
     }
     refreshLoc();
@@ -1157,7 +1163,7 @@ function miniColsOf(tDef, maps){
 function miniMaxEtageOf(tDef, col, maps){
   const rec=lastShelves[`${tDef.id}|${col}`];
   const marked=rec?parseInt(rec.etage,10):NaN;
-  let m=!isNaN(marked)?marked:tDef.maxEt;
+  let m=!isNaN(marked)?marked:defaultMaxEtageOf(tDef);
   [maps.cnt,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
     Object.keys(dict).forEach(k=>{
       const parts=k.split('|');
@@ -1232,7 +1238,8 @@ function buildMiniPlan(){
   titleEl.textContent=travMiniTitle(tid);
 
   const GAP=2, BASE_SLOT_H=10;
-  const targetH=tDef.maxEt*BASE_SLOT_H+(tDef.maxEt-1)*GAP;
+  const refMaxEt=defaultMaxEtageOf(tDef);
+  const targetH=refMaxEt*BASE_SLOT_H+(refMaxEt-1)*GAP;
   const w=tDef.nbCols<=5?14:11;
 
   let total=0, filled=0;

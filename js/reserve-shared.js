@@ -1,26 +1,40 @@
 /* Structure physique de la réserve et utilitaires de tri/classement des cotes,
    partagés entre reserve.html et recolement.html. */
 
+/* Nombre d'étagères par défaut pour une travée classique (réserve
+   patrimoniale ou Douaisienne), tant qu'aucune "dernière étagère" n'a été
+   marquée pour la colonne concernée (bouton "Marquer comme dernière
+   étagère de cette colonne" dans recolement.html, donnée `lastShelves`).
+   Remplace un ancien maxEt codé en dur et différent par travée (6 à 9
+   selon la travée) : ça empêchait de scanner/marquer au-delà de la valeur
+   codée en dur dès qu'une colonne avait en réalité plus d'étagères que
+   prévu. maxEtageOf()/miniMaxEtageOf() étendent ce défaut dès qu'une
+   colonne a une dernière étagère marquée plus haute (ou des données réelles
+   allant plus loin) — voir reserve.html et recolement.html. N'affecte que
+   les travées ; les armoires et tiroirs (EMPLACEMENTS_ARMOIRE/TIROIR plus
+   bas) gardent leur propre maxEt, ce sont des meubles à capacité fixe. */
+const DEFAULT_MAX_ETAGE = 8;
+
 const TRAVEES = [
-  {id:'I',     nbCols:4, maxEt:6},
-  {id:'II',    nbCols:5, maxEt:6},
-  {id:'III',   nbCols:5, maxEt:6},
-  {id:'IV',    nbCols:5, maxEt:7},
-  {id:'V',     nbCols:5, maxEt:9},
-  {id:'VI',    nbCols:8, maxEt:8},
-  {id:'VII',   nbCols:8, maxEt:6},
-  {id:'VIII',  nbCols:8, maxEt:6},
-  {id:'IX',    nbCols:8, maxEt:6},
-  {id:'X',     nbCols:8, maxEt:9},
-  {id:'XI',    nbCols:8, maxEt:7},
-  {id:'XII',   nbCols:8, maxEt:6},
-  {id:'XIII',  nbCols:8, maxEt:6},
-  {id:'XIV',   nbCols:8, maxEt:6},
-  {id:'XV',    nbCols:8, maxEt:6},
-  {id:'XVI',   nbCols:8, maxEt:6},
-  {id:'XVII',  nbCols:8, maxEt:6},
-  {id:'XVIII', nbCols:8, maxEt:6},
-  {id:'XIX',   nbCols:8, maxEt:6},
+  {id:'I',     nbCols:4},
+  {id:'II',    nbCols:5},
+  {id:'III',   nbCols:5},
+  {id:'IV',    nbCols:5},
+  {id:'V',     nbCols:5},
+  {id:'VI',    nbCols:8},
+  {id:'VII',   nbCols:8},
+  {id:'VIII',  nbCols:8},
+  {id:'IX',    nbCols:8},
+  {id:'X',     nbCols:8},
+  {id:'XI',    nbCols:8},
+  {id:'XII',   nbCols:8},
+  {id:'XIII',  nbCols:8},
+  {id:'XIV',   nbCols:8},
+  {id:'XV',    nbCols:8},
+  {id:'XVI',   nbCols:8},
+  {id:'XVII',  nbCols:8},
+  {id:'XVIII', nbCols:8},
+  {id:'XIX',   nbCols:8},
 ];
 const GROUPES = [
   ['I'],
@@ -34,7 +48,7 @@ const GROUPES = [
    patrimoniale ci-dessus. Identifiants de travée préfixés "RD-" pour ne pas
    entrer en collision avec les travées I à VII de la réserve patrimoniale
    (les deux locaux numérotent leurs travées en chiffres romains à partir de I). */
-const TRAVEES_DOUAISIENNE = ['I','II','III','IV','V','VI','VII'].map(id => ({id:'RD-'+id, nbCols:5, maxEt:6}));
+const TRAVEES_DOUAISIENNE = ['I','II','III','IV','V','VI','VII'].map(id => ({id:'RD-'+id, nbCols:5}));
 const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE];
 
 /* "horsreserve" est une pseudo-réserve sans travées : sert uniquement à
@@ -68,6 +82,10 @@ function traveesOfReserve(reserveId){
 const EMPLACEMENTS_ARMOIRE = [{id:'ARMOIRE', label:'Armoires (bois)',     nbCols:6, maxEt:34}];
 const EMPLACEMENTS_TIROIR  = [{id:'TIROIR',  label:'Armoires à tiroirs',  nbCols:3, maxEt:10}];
 const LOCATIONS_ALL = [...TRAVEES_ALL, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_TIROIR];
+
+/* maxEt par défaut d'un emplacement : la valeur propre au meuble si elle
+   existe (armoires/tiroirs), sinon DEFAULT_MAX_ETAGE pour une travée. */
+function defaultMaxEtageOf(def){ return (def && def.maxEt!=null) ? def.maxEt : DEFAULT_MAX_ETAGE; }
 
 /* ════════════ TRI DES COTES (ex. "D104214" < "D104273") ════════════ */
 function parseCote(cote){
