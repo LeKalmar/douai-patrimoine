@@ -633,7 +633,7 @@ function photoRemove(){
   photoEditor.classList.remove('show');
 }
 
-/* ── Recadrage (poignées + drag), identique à scan-docs.html/vignettes.html ── */
+/* ── Recadrage (poignées + drag), identique à scan-docs.html ── */
 function photoPosFromEvent(e){
   const r = photoOverlayEl.getBoundingClientRect();
   const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;

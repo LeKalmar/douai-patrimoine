@@ -1,6 +1,7 @@
 /**
- * Upload d'une vignette (photo rognée d'un exemplaire, voir vignettes.html)
- * vers R2, sous la clé "vignette/<code-barre>.jpg". Écrase silencieusement
+ * Upload d'une vignette (photo rognée d'un exemplaire, voir la section
+ * "Photo" du formulaire d'exemplarisation.html) vers R2, sous la clé
+ * "vignette/<code-barre>.jpg". Écrase silencieusement
  * une vignette existante pour le même code-barre (permet de reprendre une
  * photo ratée sans étape de suppression).
  *

@@ -388,9 +388,9 @@ pour trois choses indépendantes :
   directement comme référence (`GET ?key=...`), sans passer par un
   export/import de fichier local.
 - **`vignette/<code-barre>.jpg`** : photos rognées attachées aux exemplaires
-  créés via `exemplarisation.html`, envoyées par `vignettes.html` — voir
-  « Exemplarisation rapide » plus haut. Contrairement aux deux catégories
-  ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
+  créés via `exemplarisation.html` (import/rognage intégré à son formulaire)
+  — voir « Exemplarisation rapide » plus haut. Contrairement aux deux
+  catégories ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
   dans le site ne relit ces images pour l'instant.
 
 Quatre fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
