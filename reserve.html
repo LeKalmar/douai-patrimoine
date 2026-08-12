@@ -47,7 +47,7 @@
     .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
     .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.75rem;line-height:1}
     .stat-card-val.green{color:#2e7d32}.stat-card-val.red{color:#c62828}
-    .stat-card-val.cat{color:var(--plan-cat)}.stat-card-val.noncat{color:var(--plan-noncat)}
+    .stat-card-val.cat{color:var(--plan-cat)}.stat-card-val.manuel{color:var(--plan-manuel)}.stat-card-val.noncat{color:var(--plan-noncat)}
     .stat-card-val.nonrange{color:var(--plan-nonrange)}
     .legend-row{display:flex;flex-wrap:wrap;gap:.75rem;font-size:.75rem;color:#555;margin-bottom:1rem;align-items:center}
     .leg{display:flex;align-items:center;gap:.35rem}
@@ -149,7 +149,8 @@
         <div class="stat-card"><div class="stat-card-label">Notices localisées</div><div class="stat-card-val" id="sn">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Emplacements totaux</div><div class="stat-card-val" id="st">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Catalogués</div><div class="stat-card-val cat" id="so">—</div></div>
-        <div class="stat-card"><div class="stat-card-label">Non catalogués</div><div class="stat-card-val noncat" id="so-noncat">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Exemplarisés rapidement</div><div class="stat-card-val manuel" id="so-manuel">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Non catalogués (estimé)</div><div class="stat-card-val noncat" id="so-noncat">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Vides confirmés</div><div class="stat-card-val green" id="sv">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Non rangés</div><div class="stat-card-val nonrange" id="so-nonrange">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Taux de remplissage</div><div class="stat-card-val" id="sr">—</div></div>
@@ -157,7 +158,8 @@
 
       <div class="legend-row">
         <div class="leg"><div class="leg-dot" style="background:var(--plan-cat)"></div><span>Catalogué</span></div>
-        <div class="leg"><div class="leg-dot" style="background:var(--plan-noncat)"></div><span>Non catalogué</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-manuel)"></div><span>Exemplarisé rapide</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-noncat)"></div><span>Non catalogué (estimé)</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></div><span>Vide (confirmé)</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-nonrange)"></div><span>Non rangé</span></div>
         <div class="leg"><div class="leg-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></div><span>Non inventorié</span></div>
@@ -225,7 +227,7 @@
    (CNT/DET/colsOf/maxEtageOf) que les travées classiques. */
 
 /* ════════════ ÉTAT ════════════ */
-let CNT={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={}, LASTSHELF={};
+let CNT={}, CNT_MANUEL={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={}, LASTSHELF={};
 let selId=null, filter='all', csvLoaded=false;
 
 /* Hauteur de référence (en "nombre d'étages") partagée par toutes les
@@ -333,7 +335,7 @@ function parseLastShelf(rows){
 }
 
 function parseRecolement(rows){
-  CNT={}; DET={};
+  CNT={}; CNT_MANUEL={}; DET={};
   rows.forEach(row=>{
     const t     =(row.travee  ||'').trim();
     const col   =(row.colonne ||'').trim();
@@ -343,30 +345,34 @@ function parseRecolement(rows){
     const auteur=(row.auteur  ||'').trim().slice(0,40);
     const fonds =(row.fonds   ||'').trim();
     const etat  =(row.etat    ||'').trim().slice(0,30);
+    const manuel=!!row.manuel;
     if(!t || !etage) return;
-    const n={c:cote,t:titre,a:auteur,f:fonds,e:etat};
+    const n={c:cote,t:titre,a:auteur,f:fonds,e:etat,m:manuel};
     const key = `${t}|${col}|${etage}`;
     if (!DET[key]) DET[key] = [];
 
     // Ne compter et n'ajouter que si la cote est nouvelle pour ce slot
     const coteDejaVue = cote && DET[key].some(x => x.c === cote);
     if (!coteDejaVue) {
-      CNT[key] = (CNT[key] || 0) + 1;
+      if (manuel) CNT_MANUEL[key] = (CNT_MANUEL[key] || 0) + 1;
+      else CNT[key] = (CNT[key] || 0) + 1;
       DET[key].push(n);
     }
   });
   csvLoaded=true;
   document.getElementById('csv-loader').style.display='none';
-  const total=Object.values(CNT).reduce((s,v)=>s+v,0);
+  const total=Object.values(CNT).reduce((s,v)=>s+v,0) + Object.values(CNT_MANUEL).reduce((s,v)=>s+v,0);
   document.getElementById('sn').textContent=total.toLocaleString('fr-FR');
   buildPlan();
 }
 
 /* ════════════ HELPERS ════════════ */
 function cnt(t,c,e){ return CNT[`${t}|${c}|${e}`]||0; }
+function cntManuel(t,c,e){ return CNT_MANUEL[`${t}|${c}|${e}`]||0; }
 function nc(t,c,e){ return NONCAT[`${t}|${c}|${e}`]||0; }
 function hasData(tid){
   return Object.keys(CNT).some(k=>k.startsWith(tid+'|'))
+    || Object.keys(CNT_MANUEL).some(k=>k.startsWith(tid+'|'))
     || Object.keys(VIDE).some(k=>k.startsWith(tid+'|'))
     || Object.keys(NONCAT).some(k=>k.startsWith(tid+'|'))
     || Object.keys(NONRANGE).some(k=>k.startsWith(tid+'|'))
@@ -374,12 +380,14 @@ function hasData(tid){
 }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-/* Catégorie d'un emplacement : catalogué > non catalogué > non rangé > vide
-   confirmé > non inventorié (priorité dans cet ordre si plusieurs sont vrais
-   à la fois — en pratique "vide" et "non rangé" sont mutuellement exclusifs
-   côté récolement.html). */
+/* Catégorie d'un emplacement : catalogué > exemplarisé rapide (créé via
+   exemplarisation.html, pas une vraie notice Syracuse) > non catalogué
+   (estimé) > non rangé > vide confirmé > non inventorié (priorité dans cet
+   ordre si plusieurs sont vrais à la fois — en pratique "vide" et "non
+   rangé" sont mutuellement exclusifs côté récolement.html). */
 function slotState(t,c,e){
   if(cnt(t,c,e)>0) return 'cat';
+  if(cntManuel(t,c,e)>0) return 'manuel';
   if(nc(t,c,e)>0) return 'noncat';
   if(NONRANGE[`${t}|${c}|${e}`]) return 'nonrange';
   if(VIDE[`${t}|${c}|${e}`]) return 'vide';
@@ -387,28 +395,45 @@ function slotState(t,c,e){
 }
 function stateColor(state){
   if(state==='cat') return 'var(--plan-cat)';
+  if(state==='manuel') return 'var(--plan-manuel)';
   if(state==='noncat') return 'var(--plan-noncat)';
   if(state==='nonrange') return 'var(--plan-nonrange)';
   if(state==='vide') return 'var(--plan-free)';
   return 'var(--plan-unknown)';
 }
-/* Couleur d'un emplacement, en tenant compte du mélange catalogué/non
-   catalogué : si les deux coexistent (état "cat" prioritaire mais avec un
-   comptage non-catalogué non nul), le remplissage est réparti au prorata
-   des quantités plutôt que de masquer entièrement la part non cataloguée. */
+/* Dégradé proportionnel quand plusieurs catégories coexistent sur la même
+   case (ex. un exemplaire catalogué + un exemplarisé rapidement + une
+   estimation de non catalogués sur la même étagère), plutôt que de masquer
+   entièrement les parts minoritaires derrière la couleur prioritaire. */
+function gradientOf(segments){
+  const nonZero = segments.filter(s=>s.count>0);
+  if(!nonZero.length) return null;
+  if(nonZero.length===1) return nonZero[0].color;
+  const total = nonZero.reduce((s,x)=>s+x.count,0);
+  let acc=0; const stops=[];
+  nonZero.forEach(seg=>{
+    const from=Math.round(acc/total*100);
+    acc+=seg.count;
+    const to=Math.round(acc/total*100);
+    stops.push(`${seg.color} ${from}%`, `${seg.color} ${to}%`);
+  });
+  return `linear-gradient(to right, ${stops.join(', ')})`;
+}
 function slotColor(t,c,e,state){
-  if(state==='cat'){
-    const n=cnt(t,c,e), ncCount=nc(t,c,e);
-    if(ncCount>0){
-      const pct=Math.round(n/(n+ncCount)*100);
-      return `linear-gradient(to right, var(--plan-cat) ${pct}%, var(--plan-noncat) ${pct}%)`;
-    }
+  if(state==='cat' || state==='manuel'){
+    const g = gradientOf([
+      {color:'var(--plan-cat)', count:cnt(t,c,e)},
+      {color:'var(--plan-manuel)', count:cntManuel(t,c,e)},
+      {color:'var(--plan-noncat)', count:nc(t,c,e)},
+    ]);
+    if(g) return g;
   }
   return stateColor(state);
 }
 function stateLabel(state){
   if(state==='cat') return 'catalogué';
-  if(state==='noncat') return 'non catalogué';
+  if(state==='manuel') return 'exemplarisé rapide (non catalogué)';
+  if(state==='noncat') return 'non catalogué (estimé)';
   if(state==='nonrange') return 'non rangé';
   if(state==='vide') return 'vide (confirmé)';
   return 'non inventorié';
@@ -417,18 +442,24 @@ function stateLabel(state){
    identifier un emplacement sans avoir à cliquer dessus. */
 function slotTitle(tid,col,e){
   const state=slotState(tid,col,e);
-  const n=cnt(tid,col,e), ncCount=nc(tid,col,e);
+  const n=cnt(tid,col,e), mCount=cntManuel(tid,col,e), ncCount=nc(tid,col,e);
   let detail;
-  if(state==='cat') detail = ncCount>0 ? `${n} catalogué(s) + ${ncCount} non catalogué(s)` : `${n} catalogué(s)`;
+  if(state==='cat' || state==='manuel'){
+    const parts=[];
+    if(n>0) parts.push(`${n} catalogué(s)`);
+    if(mCount>0) parts.push(`${mCount} exemplarisé(s) rapidement`);
+    if(ncCount>0) parts.push(`${ncCount} non catalogué(s)`);
+    detail = parts.join(' + ');
+  }
   else if(state==='noncat') detail = `${ncCount} non catalogué(s) estimé(s)`;
   else detail = stateLabel(state);
   const spec=isNaN(parseInt(e));
   const elbl=spec?e:`${etageWordFor(tid)} ${e}`;
   return `${travTitle(tid)} · col. ${col}, ${elbl} — ${detail}`;
 }
-/* Taux d'occupation d'une travée (catalogué + non catalogué + non rangé, sur
-   le total d'emplacements) — affiché sous son étiquette pour donner un
-   aperçu sans avoir à cliquer. */
+/* Taux d'occupation d'une travée (catalogué + exemplarisé rapide + non
+   catalogué + non rangé, sur le total d'emplacements) — affiché sous son
+   étiquette pour donner un aperçu sans avoir à cliquer. */
 function traveeOccupancy(tid,cols){
   let total=0, filled=0;
   cols.forEach(col=>{
@@ -436,7 +467,7 @@ function traveeOccupancy(tid,cols){
     for(let e=1;e<=maxE;e++){
       total++;
       const state=slotState(tid,col,String(e));
-      if(state==='cat'||state==='noncat'||state==='nonrange') filled++;
+      if(state==='cat'||state==='manuel'||state==='noncat'||state==='nonrange') filled++;
     }
   });
   return total ? Math.round(filled/total*100) : 0;
@@ -591,7 +622,7 @@ function makeTraveeEl(tid,tDef,cols){
 
 /* ════════════ STATS ════════════ */
 function updateStats(){
-  let total=0,cat=0,noncat=0,vide=0,nonrange=0;
+  let total=0,cat=0,manuel=0,noncat=0,vide=0,nonrange=0;
   LOCATIONS_ALL.forEach(t=>{
     colsOf(t).forEach(col=>{
       const maxE=maxEtageOf(t.id,col);
@@ -599,6 +630,7 @@ function updateStats(){
         total++;
         const state=slotState(t.id,col,String(e));
         if(state==='cat') cat++;
+        else if(state==='manuel') manuel++;
         else if(state==='noncat') noncat++;
         else if(state==='nonrange') nonrange++;
         else if(state==='vide') vide++;
@@ -607,10 +639,11 @@ function updateStats(){
   });
   document.getElementById('st').textContent=total.toLocaleString('fr-FR');
   document.getElementById('so').textContent=cat.toLocaleString('fr-FR');
+  document.getElementById('so-manuel').textContent=manuel.toLocaleString('fr-FR');
   document.getElementById('so-noncat').textContent=noncat.toLocaleString('fr-FR');
   document.getElementById('sv').textContent=vide.toLocaleString('fr-FR');
   document.getElementById('so-nonrange').textContent=nonrange.toLocaleString('fr-FR');
-  document.getElementById('sr').textContent=total?Math.round((cat+noncat)/total*100)+' %':'—';
+  document.getElementById('sr').textContent=total?Math.round((cat+manuel+noncat)/total*100)+' %':'—';
 }
 
 /* ════════════ DÉTAIL TRAVÉE ════════════ */
@@ -619,7 +652,7 @@ function selectTravee(tid,tDef,cols){
   const panel=document.getElementById('detail');
   const known=hasData(tid);
   let total=0;
-  cols.forEach(col=>allEtagesOf(tid,col).forEach(e=>{total+=cnt(tid,col,e);}));
+  cols.forEach(col=>allEtagesOf(tid,col).forEach(e=>{total+=cnt(tid,col,e)+cntManuel(tid,col,e);}));
 
   const douaisienne=tid.startsWith('RD-');
   let html=`<div class="detail-panel-title">${travTitle(tid)}
@@ -639,13 +672,21 @@ function selectTravee(tid,tDef,cols){
     const etages=allEtagesOf(tid,col);
     let colTotal=0, rows='';
     etages.forEach(e=>{
-      const n=cnt(tid,col,e); colTotal+=n;
+      const n=cnt(tid,col,e), mCount=cntManuel(tid,col,e); colTotal+=n+mCount;
       const ncCount=nc(tid,col,e);
       const state=slotState(tid,col,e);
-      const mixed=state==='cat'&&ncCount>0;
-      const qty=state==='cat'?n+ncCount:(state==='noncat'?ncCount:0);
+      const qty=(state==='cat'||state==='manuel')?n+mCount+ncCount:(state==='noncat'?ncCount:0);
       const pct=Math.min(100,Math.round(qty/200*100));
-      const countLabel=mixed?`${n} + ${ncCount} n.c.`:(state==='cat'?n:(state==='noncat'?ncCount+' n.c.':(state==='nonrange'?'non rangé':(state==='vide'?'vide':''))));
+      let countLabel;
+      if(state==='cat'||state==='manuel'){
+        const parts=[];
+        if(n>0) parts.push(String(n));
+        if(mCount>0) parts.push(`${mCount} rapide`);
+        if(ncCount>0) parts.push(`${ncCount} n.c.`);
+        countLabel=parts.join(' + ');
+      } else {
+        countLabel=state==='noncat'?ncCount+' n.c.':(state==='nonrange'?'non rangé':(state==='vide'?'vide':''));
+      }
       const spec=isNaN(parseInt(e));
       rows+=`<div class="etage-row" onclick="showNotices('${tid}','${col}','${e}')">
         <span class="etage-lbl">${spec?e:etageLabelPrefix(tid)+' '+e}</span>
@@ -711,7 +752,7 @@ function noticeRows(notices,sort){
   let html=sorted.slice(0,MAX).map(n=>`
     <div class="notice-row">
       <span class="notice-cote">${esc(n.c)}</span>
-      <span class="notice-titre">${esc(n.t)}${n.e?`<br><span style="font-size:.62rem;color:#bbb">${esc(n.e)}</span>`:''}</span>
+      <span class="notice-titre">${n.m?`<span style="color:var(--plan-manuel);font-weight:700" title="Exemplarisé rapidement, pas encore catalogué dans Syracuse">⚡</span> `:''}${esc(n.t)}${n.e?`<br><span style="font-size:.62rem;color:#bbb">${esc(n.e)}</span>`:''}</span>
       <span class="notice-auteur" title="${esc(n.a)}">${esc(n.a)}</span>
       <span class="notice-fonds">${esc(n.f)}</span>
     </div>`).join('');
@@ -742,7 +783,7 @@ function shelfHoverContent(tid,col,etage){
   }
   const MAX=15;
   const sorted=[...notices].sort((a,b)=>compareCotes(a.c,b.c));
-  html+=sorted.slice(0,MAX).map(n=>`<div class="sh-row"><span class="sh-cote">${esc(n.c)}</span><span class="sh-titre">${esc(n.t)}</span></div>`).join('');
+  html+=sorted.slice(0,MAX).map(n=>`<div class="sh-row"><span class="sh-cote">${esc(n.c)}</span><span class="sh-titre">${n.m?`<span style="color:var(--plan-manuel);font-weight:700">⚡</span> `:''}${esc(n.t)}</span></div>`).join('');
   if(sorted.length>MAX) html+=`<div class="sh-more">… et ${sorted.length-MAX} de plus</div>`;
   if(ncCount) html+=`<div class="sh-more">+ ${ncCount} non catalogué(s) estimé(s)</div>`;
   return html;

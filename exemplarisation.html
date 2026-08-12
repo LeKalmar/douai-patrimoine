@@ -238,6 +238,15 @@ function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[
 const LS_KEY = 'rp_exemplaires_manuels';
 let EXEMPLAIRES = {};   // { [barcode]: {barcode,titre,auteur,date,cote,ts} }
 let SYRACUSE_BARCODES = {}; // { [barcode]: {titre,cote} } — pour l'avertissement de doublon
+let NONCAT = {}; // { [travee|colonne|etage]: {travee,colonne,etage,count,ts} } — estimation "non catalogués" du récolement partagé
+function nonCatKey(f){ return `${f.travee}|${f.colonne}|${f.etage}`; }
+function loadNonCatFromServer(){
+  return fetch('/api/recolement').then(r => r.ok ? r.json() : null).then(data => {
+    if(!data) return;
+    NONCAT = {};
+    (data.nonCatalogues || []).forEach(r => { if(r.travee && r.etage !== undefined) NONCAT[nonCatKey(r)] = r; });
+  }).catch(() => {});
+}
 
 function loadLocal(){
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
@@ -332,8 +341,8 @@ async function syncFromServer(){
 
 window.addEventListener('online', flushPendingSync);
 setInterval(flushPendingSync, 20000);
-setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
+setInterval(()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } });
 
 /* ════════════════════════════════════════════════════════════
    EMPLACEMENT — même géométrie que recolement.html (js/reserve-shared.js),
@@ -573,6 +582,7 @@ document.getElementById('add-form').addEventListener('submit', function(e){
           auteur: record.auteur,
           fonds: getFondsFromCote(record.cote),
           etat: '',
+          manuel: true,
           kind: loc.locType,
           travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
           barcodeAbime: false,
@@ -580,6 +590,21 @@ document.getElementById('add-form').addEventListener('submit', function(e){
         },
       },
     });
+
+    // Cet exemplaire vient d'être identifié individuellement : il ne doit
+    // plus compter dans l'estimation vague "non catalogués" du même
+    // emplacement (sinon il serait compté deux fois — une fois comme
+    // exemplaire réel, une fois dans l'estimation). Ne change rien si
+    // l'estimation est déjà à 0.
+    const ncKey = nonCatKey(fields);
+    const curNc = NONCAT[ncKey];
+    const curCount = curNc ? curNc.count : 0;
+    if(curCount > 0){
+      const newCount = curCount - 1;
+      const newRecord = newCount > 0 ? { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, count:newCount, ts:Date.now() } : null;
+      if(newRecord) NONCAT[ncKey] = newRecord; else delete NONCAT[ncKey];
+      queuePatch({ endpoint:'recolement', patch:{ type:'nonCat', key:ncKey, record:newRecord } });
+    }
   }
 
   const fb = document.getElementById('feedback');
@@ -609,6 +634,7 @@ fetch('data/inventaire.json').then(r => r.ok ? r.json() : []).then(items => {
 }).catch(() => {});
 
 syncFromServer();
+loadNonCatFromServer();
 flushPendingSync();
 </script>
 </body>

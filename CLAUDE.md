@@ -168,15 +168,36 @@ fichier au même format, utile pour figer un instantané daté.
 Le code couleur du plan (`reserve.html`) est catégoriel, pas un dégradé de
 densité : chaque emplacement (travée/colonne/étage, ou meuble/étage pour
 armoires et tiroirs) est classé en **catalogué** (bleu, au moins un
-exemplaire catalogué via `scans`), **non catalogué** (ambre, aucun
-catalogué mais un comptage `nonCatalogues` > 0), **non rangé** (violet,
-marqué via `nonRangeShelves`), **vide confirmé** (vert, marqué via
-`videShelves`) ou **non inventorié** (gris, aucune des quatre données
-ci-dessus) — dans cet ordre de priorité (`slotState()` dans
-`reserve.html`). Il n'y a volontairement pas de code couleur par quantité
-de livres (impossible à estimer sans mesurer chaque reliure) ; la quantité
-reste visible via la largeur des barres et les compteurs dans le panneau
-de détail, mais jamais via la couleur.
+exemplaire catalogué via `scans` avec une vraie notice Syracuse — voir
+`catalog[bc].manuel` plus bas), **exemplarisé rapide** (orange, aucun
+catalogué mais au moins un scan dont le code-barre vient d'un exemplaire
+créé via `exemplarisation.html`, pas une notice Syracuse), **non catalogué**
+(rouge, ni catalogué ni exemplarisé rapide mais un comptage
+`nonCatalogues` > 0), **non rangé** (violet, marqué via `nonRangeShelves`),
+**vide confirmé** (vert, marqué via `videShelves`) ou **non inventorié**
+(gris, aucune des données ci-dessus) — dans cet ordre de priorité
+(`slotState()` dans `reserve.html`, `miniSlotState()` dans
+`recolement.html` pour le mini-plan). Quand plusieurs catégories coexistent
+sur le même emplacement (ex. un exemplaire catalogué + un exemplarisé
+rapidement + une estimation de non catalogués sur la même étagère), la
+couleur est un dégradé proportionnel aux trois quantités plutôt que de
+masquer entièrement les parts minoritaires (`gradientOf()` /
+`miniGradientOf()`). Il n'y a volontairement pas de code couleur par
+quantité de livres (impossible à estimer sans mesurer chaque reliure) ; la
+quantité reste visible via la largeur des barres et les compteurs dans le
+panneau de détail, mais jamais via la couleur globale d'un emplacement.
+
+Le flag `manuel` qui distingue « exemplarisé rapide » de « catalogué »
+circule ainsi : `js/exemplaires-manuels-shared.js` pose `_manuel:true` sur
+chaque enregistrement converti → le fetch du `catalog` dans
+`recolement.html` le recopie en `catalog[bc].manuel` → `handleScan()` le
+recopie sur chaque `record` de `scans` (`manuel: cat ? !!cat.manuel : …`,
+même logique que pour `cote`/`titre`/`auteur`) → `parseRecolement()` dans
+`reserve.html` (et `buildLocalSlotState()` dans `recolement.html` pour le
+mini-plan) sépare `CNT` (vraiment catalogués) de `CNT_MANUEL` en se basant
+sur ce flag. Un exemplaire créé avec emplacement directement depuis
+`exemplarisation.html` pose aussi `manuel:true` sur le patch `scan` qu'il
+envoie à `/api/recolement`, sans attendre un premier rescan physique.
 
 `histoire-du-livre.html` est indépendante de ce flux : elle charge ses
 propres CSV (`csv/Professionnels.csv`, `Individus.csv`, `Documents.csv`,
@@ -251,16 +272,29 @@ sélecteur d'emplacement de `recolement.html` (travée/colonne/étage ou
 armoire/tiroir, sans le mode « hors réserve » ni « à cataloguer », propres
 au récolement).
 
-À la création, deux écritures indépendantes partent en tâche de fond :
+À la création, jusqu'à trois écritures indépendantes partent en tâche de fond :
 
 - Toujours : un patch `{type:'upsert', record}` vers `/api/exemplaires-manuels`.
 - Si l'emplacement est renseigné (case « J'indique l'emplacement
   maintenant », cochée par défaut) : *en plus*, un patch `{type:'scan',
   record}` vers `/api/recolement` — le même endpoint et la même forme de
-  `record` que `handleScan()` dans `recolement.html`. Ça évite de dupliquer
-  la logique d'emplacement/occupation : l'exemplaire apparaît immédiatement
+  `record` que `handleScan()` dans `recolement.html` (avec `manuel:true`,
+  voir plus haut « Le code couleur du plan »). Ça évite de dupliquer la
+  logique d'emplacement/occupation : l'exemplaire apparaît immédiatement
   dans `reserve.html` et dans le journal de `recolement.html`, sans code
   spécifique dans ces deux pages pour un type d'origine différent.
+- Toujours dans ce même cas (emplacement renseigné), et seulement si
+  l'estimation « non catalogués » de cet emplacement précis (`nonCatalogues`,
+  voir le mode « À cataloguer » de `recolement.html`) est déjà > 0 : un
+  second patch `{type:'nonCat', key, record}` vers `/api/recolement` qui la
+  décrémente de 1 (supprimée si elle retombe à 0). Cet exemplaire vient
+  d'être identifié individuellement — il ne doit plus aussi compter dans
+  l'estimation vague de la même étagère, sinon il serait compté deux fois.
+  `exemplarisation.html` maintient pour ça un cache local `NONCAT` (rafraîchi
+  au chargement et toutes les 45 s via `loadNonCatFromServer()`), dans le
+  même esprit « lecture locale, écriture optimiste » que le reste de la page
+  — pas de décrément atomique côté serveur, `api/recolement.mjs` n'a pas
+  changé pour cette fonctionnalité (le patch `nonCat` existait déjà).
 
 Ces exemplaires sont ensuite fusionnés côté client, via
 `js/exemplaires-manuels-shared.js` (`fetchExemplairesManuelsAsCatalogRows()`,

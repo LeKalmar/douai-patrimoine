@@ -854,6 +854,7 @@ function showFeedback(record, status, prev){
   const badgeCls = status==='unknown' ? 'warn' : (status==='dup'||status==='moved') ? 'dup' : 'ok';
   let html = `<div class="fb-top"><span class="fb-badge ${badgeCls}">${badgeTxt}</span>
     ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
+    ${record.manuel ? `<span class="fb-badge" style="background:var(--plan-manuel);color:#fff" title="Créé via exemplarisation.html, pas encore une vraie notice Syracuse">⚡ Exemplarisé rapide</span>` : ''}
     ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}</div>`;
   html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
