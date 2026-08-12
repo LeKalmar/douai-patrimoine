@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script src="js/reserve-shared.js"></script>
+<script src="js/exemplaires-manuels-shared.js"></script>
 <style>
   :root{
     --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
@@ -544,8 +545,17 @@ setInterval(flushPendingSync, 20000);
 setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
 
-/* ════════════ CATALOGUE (data/inventaire.json) ════════════ */
-fetch('data/inventaire.json').then(r=>r.json()).then(items=>{
+/* ════════════ CATALOGUE (data/inventaire.json) ════════════
+   Fusionné avec les exemplaires créés via exemplarisation.html (état
+   partagé R2) : un code-barre créé là-bas, même sans emplacement renseigné,
+   doit être reconnu ici comme "connu du catalogue" dès le premier scan —
+   sinon handleScan() le traiterait comme inconnu et n'enregistrerait rien
+   (voir status 'unknown' plus bas). */
+Promise.all([
+  fetch('data/inventaire.json').then(r=>r.json()),
+  fetchExemplairesManuelsAsCatalogRows(),
+]).then(([data, manuels])=>{
+  const items = data.concat(manuels);
   catalog = {};
   const noticeIds = new Set();
   items.forEach(it=>{

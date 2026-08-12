@@ -183,13 +183,22 @@ const sousThemeState = {};
 //  Chargement du JSON
 // ══════════════════════════════════════════
 function loadCSV() {                       // gardez le nom, ça évite de toucher au reste
-  fetch(JSON_PATH)
-    .then(r => {
+  Promise.all([
+    fetch(JSON_PATH).then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.json();
-    })
-    .then(data => {
-      allRecords = data;
+    }),
+    // Exemplaires créés via exemplarisation.html (état partagé R2) : fusionnés
+    // ici pour apparaître dans la recherche au même titre qu'une notice
+    // Syracuse — voir js/exemplaires-manuels-shared.js. Échoue silencieusement
+    // (tableau vide) si l'API est indisponible, pour ne jamais bloquer le
+    // reste du catalogue.
+    typeof fetchExemplairesManuelsAsCatalogRows === 'function'
+      ? fetchExemplairesManuelsAsCatalogRows()
+      : Promise.resolve([]),
+  ])
+    .then(([data, manuels]) => {
+      allRecords = data.concat(manuels);
       init();
     })
     .catch(err => {

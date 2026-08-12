@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Analyse des cotes — Réserve patrimoniale</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <script src="js/exemplaires-manuels-shared.js"></script>
   <style>
     :root {
       --warm: #c9a96e;
@@ -663,14 +664,19 @@ window.exportDupsCSV = function(){
 };
 
 /* ════════════ DÉMARRAGE ════════════ */
-fetch('data/inventaire.json')
-  .then(r => {
+Promise.all([
+  fetch('data/inventaire.json').then(r => {
     if(!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
-  })
-  .then(rows => {
+  }),
+  // Exemplaires créés via exemplarisation.html (état partagé R2), fusionnés
+  // pour que leur cote soit prise en compte dans l'analyse des trous/doublons
+  // — voir js/exemplaires-manuels-shared.js.
+  fetchExemplairesManuelsAsCatalogRows(),
+])
+  .then(([rows, manuels]) => {
     document.getElementById('csv-loader').style.display = 'none';
-    buildCotesAnalysis(rows);
+    buildCotesAnalysis(rows.concat(manuels));
   })
   .catch(err => {
     document.getElementById('csv-loader').innerHTML =

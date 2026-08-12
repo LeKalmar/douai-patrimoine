@@ -37,11 +37,10 @@ const TRAVEES = [
   {id:'XIX',   nbCols:8},
 ];
 const GROUPES = [
-  ['I'],
-  ['II','III'],
-  ['IV','V','VI','VII','VIII'],
-  ['IX','X','XI','XII','XIII','XIV','XV'],
-  ['XVI','XVII','XVIII','XIX'],
+  ['I','II','III','IV','V','VI','VII'],
+  ['VIII','IX','X','XI','XII'],
+  ['XIII','XIV','XV','XVI','XVII'],
+  ['XVIII','XIX'],
 ];
 
 /* Réserve Douaisienne — second local physique, distinct de la réserve

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Exemplarisation rapide — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="js/reserve-shared.js"></script>
+<style>
+  :root{
+    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
+  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:600px;line-height:1.6}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
+  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+
+  .section{padding:1.5rem 0 3rem}
+  .ex-note{font-size:.8rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
+  .ex-note strong{color:#665c00}
+
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem}
+  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+  .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#12157A}
+
+  .form-card{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
+  .form-card h2{font-family:'DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 1rem;color:#12157A}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.9rem;margin-bottom:.5rem}
+  .form-field{display:flex;flex-direction:column;gap:.3rem}
+  .form-field label{font-size:.72rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .form-field input{font-family:inherit;font-size:.95rem;padding:.55rem .7rem;border:1px solid #ccc;border-radius:8px;outline:none}
+  .form-field input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
+  .form-field.barcode input{font-family:monospace;font-size:1.05rem}
+  .form-warn{font-size:.78rem;color:#e65100;background:#fff8e1;border:1px solid #ffe0a3;border-radius:6px;padding:.5rem .7rem;margin-top:.3rem;display:none}
+  .form-warn.show{display:block}
+
+  .loc-toggle{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#333;margin:1rem 0 .75rem;padding-top:.9rem;border-top:1px dashed #e0e0e0}
+  .loc-fields{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-bottom:.5rem}
+  .loc-sel{font-family:inherit;font-size:.85rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
+  .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
+  .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
+  .stepper button:hover{background:#e0e0e0}
+  .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#12157A}
+  .loc-readout{font-size:.85rem;color:#12157A;font-weight:600;background:#F5F5FF;border:1px solid #ccc;border-radius:20px;padding:.45rem 1rem}
+
+  .form-submit{display:flex;align-items:center;gap:.75rem;margin-top:1rem}
+  .btn-primary{font-family:inherit;font-size:.9rem;padding:.65rem 1.4rem;border:1px solid #12157A;border-radius:8px;background:#12157A;color:#fff;cursor:pointer}
+  .btn-primary:hover{background:#1c1fa0}
+
+  .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9}
+  .fb-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
+  .fb-badge{font-size:.68rem;padding:2px 9px;border-radius:20px;font-weight:600;background:#c8e6c9;color:#1b5e20}
+  .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
+  .fb-meta{font-size:.75rem;color:#888}
+
+  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.5rem}
+  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
+  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:180px}
+  .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s}
+  .export-btn:hover{background:#f5f5f5;border-color:#999}
+  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
+  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0;white-space:nowrap}
+  .log-table td{padding:.4rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .log-table tr:hover td{background:#fafafa}
+  .log-body{max-height:420px;overflow-y:auto}
+  .log-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:.85rem;padding:2px 6px}
+  .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
+  .log-cote{font-family:monospace;color:#12157A}
+  .log-bc{font-family:monospace;color:#888}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+</style>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
+      <h1 class="page-title">Exemplarisation <em>rapide</em></h1>
+      <p class="page-lead">Créez un exemplaire (titre, auteur, date, cote, code-barre) sans passer par une notice bibliographique complète — utile pour les documents non catalogués en attendant leur vrai traitement dans Syracuse.</p>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <p class="ex-note">
+        <strong>Comment ça marche :</strong> les exemplaires créés ici apparaissent immédiatement dans la recherche du
+        catalogue (page d'accueil, sous un sous-fonds « Exemplarisation rapide ») et dans <a href="analyse-cotes.html">l'analyse des cotes</a>,
+        pour toute l'équipe. Si vous renseignez l'emplacement, il est aussi envoyé au <a href="recolement.html">récolement</a> partagé
+        et apparaît tout de suite sur <a href="reserve.html">le plan de la réserve</a> — le code-barre sera ensuite reconnu
+        si quelqu'un le rescanne. Cet outil ne remplace pas un vrai catalogage Syracuse : c'est un pense-bête partagé, à réconcilier plus tard.
+      </p>
+
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="form-card">
+        <h2>Ajouter un exemplaire</h2>
+        <form id="add-form">
+          <div class="form-grid">
+            <div class="form-field barcode">
+              <label for="f-barcode">Code-barre</label>
+              <input type="text" id="f-barcode" autocomplete="off" autofocus placeholder="Scannez ou saisissez…" required>
+            </div>
+            <div class="form-field">
+              <label for="f-titre">Titre</label>
+              <input type="text" id="f-titre" autocomplete="off" required>
+            </div>
+            <div class="form-field">
+              <label for="f-auteur">Auteur</label>
+              <input type="text" id="f-auteur" autocomplete="off">
+            </div>
+            <div class="form-field">
+              <label for="f-date">Date de publication</label>
+              <input type="text" id="f-date" autocomplete="off" placeholder="ex. 1875 ou [18xx]">
+            </div>
+            <div class="form-field">
+              <label for="f-cote">Cote</label>
+              <input type="text" id="f-cote" autocomplete="off" placeholder="ex. D104214">
+            </div>
+          </div>
+          <div class="form-warn" id="dup-warn"></div>
+
+          <div class="loc-toggle">
+            <label><input type="checkbox" id="loc-enabled" checked> J'indique l'emplacement maintenant</label>
+          </div>
+          <div id="loc-block">
+            <div class="loc-fields">
+              <select class="loc-sel" id="sel-reserve"></select>
+              <select class="loc-sel" id="sel-loctype">
+                <option value="etagere">Étagère</option>
+                <option value="armoire">Armoire</option>
+                <option value="tiroir">Tiroir</option>
+              </select>
+              <div class="stepper" id="stp-travee-wrap">
+                <button type="button" data-step="travee" data-dir="-1">−</button>
+                <span id="val-travee">I</span>
+                <button type="button" data-step="travee" data-dir="1">+</button>
+              </div>
+              <div class="stepper" id="stp-colonne-wrap">
+                <button type="button" data-step="colonne" data-dir="-1">−</button>
+                <span id="val-colonne">1</span>
+                <button type="button" data-step="colonne" data-dir="1">+</button>
+              </div>
+              <div class="stepper" id="stp-etage-wrap">
+                <button type="button" data-step="etage" data-dir="-1">−</button>
+                <span id="val-etage">1</span>
+                <button type="button" data-step="etage" data-dir="1">+</button>
+              </div>
+              <span class="loc-readout" id="loc-readout">—</span>
+            </div>
+          </div>
+
+          <div class="form-submit">
+            <button type="submit" class="btn-primary">Ajouter l'exemplaire</button>
+          </div>
+          <div class="feedback" id="feedback"></div>
+        </form>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title" id="log-title">Exemplaires créés</span>
+          <input type="text" class="log-search" id="log-search" placeholder="Filtrer (titre, cote, code-barre)…">
+          <button type="button" class="export-btn" id="btn-export">Exporter le JSON</button>
+        </div>
+        <div class="log-body">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Code-barre</th><th>Titre</th><th>Auteur</th><th>Date</th><th>Cote</th><th>Emplacement</th><th>Ajouté le</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="log-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+document.getElementById('logout-btn').addEventListener('click', function() {
+  sessionStorage.removeItem('rp_admin_auth');
+  sessionStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+
+/* ════════════════════════════════════════════════════════════
+   ÉTAT PARTAGÉ (R2 via /api/exemplaires-manuels) + code-barres
+   déjà présents dans data/inventaire.json (avertissement de doublon)
+   ════════════════════════════════════════════════════════════ */
+const LS_KEY = 'rp_exemplaires_manuels';
+let EXEMPLAIRES = {};   // { [barcode]: {barcode,titre,auteur,date,cote,ts} }
+let SYRACUSE_BARCODES = {}; // { [barcode]: {titre,cote} } — pour l'avertissement de doublon
+
+function loadLocal(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(EXEMPLAIRES)); }
+
+/* ════ File d'attente de synchro (deux endpoints possibles) ════ */
+const LS_PENDING = 'rp_exemplaires_manuels_pending_sync';
+let pendingSync = (function(){ try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch(e){ return []; } })();
+function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
+
+function authHeaders(){
+  const token = sessionStorage.getItem('rp_admin_token');
+  const h = { 'Content-Type': 'application/json' };
+  if(token) h['Authorization'] = 'Basic ' + token;
+  return h;
+}
+
+let lastSyncError = null;
+function updateSyncIndicator(){
+  const el = document.getElementById('sync-status');
+  if(pendingSync.length){
+    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
+    el.classList.add('pending');
+  } else {
+    el.textContent = '✓ synchronisé';
+    el.classList.remove('pending');
+  }
+}
+
+function queuePatch(item){
+  pendingSync.push(item);
+  savePendingSync();
+  updateSyncIndicator();
+  flushPendingSync();
+}
+
+let flushingSync = false;
+async function flushPendingSync(){
+  if(flushingSync) return;
+  flushingSync = true;
+  try{
+    while(pendingSync.length){
+      const item = pendingSync[0];
+      const url = item.endpoint === 'recolement' ? '/api/recolement' : '/api/exemplaires-manuels';
+      let res;
+      try{
+        res = await fetch(url, { method:'POST', headers: authHeaders(), body: JSON.stringify(item.patch) });
+      }catch(e){
+        lastSyncError = 'hors ligne ou serveur injoignable';
+        break;
+      }
+      if(res.status===401){
+        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
+        break;
+      }
+      if(res.status===503){
+        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
+        break;
+      }
+      if(!res.ok){
+        lastSyncError = `erreur serveur (${res.status})`;
+        break;
+      }
+      lastSyncError = null;
+      pendingSync.shift();
+      savePendingSync();
+    }
+  } finally {
+    flushingSync = false;
+    updateSyncIndicator();
+  }
+}
+
+function mergeIncoming(serverState){
+  const pendingBarcodes = new Set(pendingSync.filter(p => p.endpoint !== 'recolement').map(p => p.patch.record ? p.patch.record.barcode : p.patch.barcode));
+  Object.keys(serverState || {}).forEach(bc => {
+    if(!pendingBarcodes.has(bc)) EXEMPLAIRES[bc] = serverState[bc];
+  });
+  saveLocal();
+  renderAll();
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/exemplaires-manuels');
+    if(!res.ok) return;
+    mergeIncoming(await res.json());
+  }catch(e){ /* hors ligne : on reste sur le cache local */ }
+}
+
+window.addEventListener('online', flushPendingSync);
+setInterval(flushPendingSync, 20000);
+setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
+
+/* ════════════════════════════════════════════════════════════
+   EMPLACEMENT — même géométrie que recolement.html (js/reserve-shared.js),
+   sans le mode "hors réserve" (un exemplaire tout juste créé n'a pas de
+   sens hors réserve) ni le mode "à cataloguer" (propre au récolement).
+   ════════════════════════════════════════════════════════════ */
+const LOC_LS_KEY = 'rp_exemplarisation_loc';
+let loc = (function(){ try { return JSON.parse(localStorage.getItem(LOC_LS_KEY)) || {}; } catch(e){ return {}; } })();
+loc.reserve = loc.reserve || 'patrimoniale';
+loc.locType = loc.locType || 'etagere';
+loc.travee = loc.travee || 'I';
+loc.colonne = loc.colonne || 1;
+loc.etage = loc.etage || 1;
+function saveLoc(){ localStorage.setItem(LOC_LS_KEY, JSON.stringify(loc)); }
+
+const selReserve = document.getElementById('sel-reserve');
+const selLocType = document.getElementById('sel-loctype');
+const locEnabled = document.getElementById('loc-enabled');
+const locBlock = document.getElementById('loc-block');
+
+RESERVES.filter(r => r.id !== 'horsreserve').forEach(r => {
+  const o = document.createElement('option'); o.value = r.id; o.textContent = r.label;
+  selReserve.appendChild(o);
+});
+selReserve.value = loc.reserve;
+selLocType.value = loc.locType;
+
+function activeTravees(){ return traveesOfReserve(loc.reserve); }
+function currentTraveeDef(){ const list = activeTravees(); return list.find(t => t.id === loc.travee) || list[0]; }
+function currentLocDef(){
+  if(loc.locType === 'armoire') return EMPLACEMENTS_ARMOIRE[0];
+  if(loc.locType === 'tiroir') return EMPLACEMENTS_TIROIR[0];
+  return currentTraveeDef();
+}
+function colLetter(n){ return String.fromCharCode(64 + n); }
+function locFieldsOf(l){
+  if(l.locType === 'armoire') return { travee:'ARMOIRE', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  if(l.locType === 'tiroir') return { travee:'TIROIR', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
+}
+function displayTraveeId(t){
+  if(t === 'ARMOIRE') return 'Armoire (bois)';
+  if(t === 'TIROIR') return 'Armoire à tiroirs';
+  return (t || '').replace(/^RD-/, '');
+}
+
+function setLocType(type, skipRefresh){
+  loc.locType = type;
+  document.getElementById('stp-travee-wrap').style.display = type === 'etagere' ? '' : 'none';
+  const def = currentLocDef();
+  loc.colonne = Math.min(def.nbCols, Math.max(1, loc.colonne || 1));
+  loc.etage = type === 'etagere' ? Math.max(1, loc.etage || 1) : Math.min(def.maxEt, Math.max(1, loc.etage || 1));
+  if(!skipRefresh) refreshLoc();
+}
+selLocType.addEventListener('change', () => setLocType(selLocType.value));
+
+function applyReserveVisibility(){
+  const hasArmoires = loc.reserve === 'patrimoniale';
+  [...selLocType.options].forEach(o => { if(o.value !== 'etagere') o.disabled = !hasArmoires; });
+  if(!hasArmoires && loc.locType !== 'etagere'){ loc.locType = 'etagere'; selLocType.value = 'etagere'; }
+}
+
+selReserve.addEventListener('change', () => {
+  loc.reserve = selReserve.value;
+  applyReserveVisibility();
+  const list = activeTravees();
+  loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
+  setLocType(loc.locType);
+});
+
+document.querySelectorAll('[data-step]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const field = btn.dataset.step, dir = parseInt(btn.dataset.dir, 10);
+    if(field === 'travee'){
+      const list = activeTravees();
+      const idx = Math.min(list.length - 1, Math.max(0, list.findIndex(t => t.id === loc.travee) + dir));
+      loc.travee = list[idx].id; loc.colonne = 1; loc.etage = 1;
+    } else if(field === 'colonne'){
+      const max = currentLocDef().nbCols;
+      loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
+    } else if(field === 'etage'){
+      const max = loc.locType === 'etagere' ? Infinity : currentLocDef().maxEt;
+      loc.etage = Math.min(max, Math.max(1, loc.etage + dir));
+    }
+    refreshLoc();
+  });
+});
+
+function refreshLoc(){
+  saveLoc();
+  document.getElementById('val-colonne').textContent = colLetter(loc.colonne);
+  document.getElementById('val-etage').textContent = loc.etage;
+  if(loc.locType === 'etagere') document.getElementById('val-travee').textContent = displayTraveeId(loc.travee);
+  const reserveLabel = (RESERVES.find(r => r.id === loc.reserve) || {}).label || '';
+  let readout;
+  if(loc.locType === 'armoire') readout = `${reserveLabel} · Armoire (bois) · Meuble ${colLetter(loc.colonne)} · Niveau ${loc.etage}`;
+  else if(loc.locType === 'tiroir') readout = `${reserveLabel} · Armoire à tiroirs · Meuble ${colLetter(loc.colonne)} · Tiroir ${loc.etage}`;
+  else readout = `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
+  document.getElementById('loc-readout').textContent = readout;
+}
+
+locEnabled.addEventListener('change', () => {
+  locBlock.style.display = locEnabled.checked ? '' : 'none';
+});
+
+applyReserveVisibility();
+setLocType(loc.locType, true);
+refreshLoc();
+
+/* ════════════════════════════════════════════════════════════
+   STATS, TABLEAU, RECHERCHE
+   ════════════════════════════════════════════════════════════ */
+function renderStats(){
+  const rows = Object.values(EXEMPLAIRES);
+  const avecEmplacement = rows.filter(r => r.location).length;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">Exemplaires créés</div><div class="stat-card-val">${rows.length.toLocaleString('fr-FR')}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Avec emplacement</div><div class="stat-card-val">${avecEmplacement.toLocaleString('fr-FR')}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Sans emplacement</div><div class="stat-card-val">${(rows.length-avecEmplacement).toLocaleString('fr-FR')}</div></div>
+  `;
+}
+
+function locationLabel(l){
+  if(!l) return '<em style="color:#bbb">—</em>';
+  if(l.locType === 'armoire') return `Armoire · ${esc(l.colonne)} · niv. ${esc(l.etage)}`;
+  if(l.locType === 'tiroir') return `Tiroir · ${esc(l.colonne)} · tir. ${esc(l.etage)}`;
+  return `${esc(displayTraveeId(l.travee))} · ${esc(l.colonne)} · ét. ${esc(l.etage)}`;
+}
+
+function renderTable(){
+  const q = norm(document.getElementById('log-search').value.trim());
+  const rows = Object.values(EXEMPLAIRES)
+    .filter(r => !q || norm([r.titre, r.auteur, r.cote, r.barcode].join(' ')).includes(q))
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+  document.getElementById('log-title').textContent = `Exemplaires créés (${Object.keys(EXEMPLAIRES).length})`;
+
+  const tbody = document.getElementById('log-tbody');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="8"><div class="log-empty">Aucun exemplaire${q ? ' pour ce filtre' : ' créé pour le moment'}.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="log-bc">${esc(r.barcode)}</td>
+      <td>${esc(r.titre) || '<em style="color:#bbb">Sans titre</em>'}</td>
+      <td>${esc(r.auteur) || '—'}</td>
+      <td>${esc(r.date) || '—'}</td>
+      <td class="log-cote">${esc(r.cote) || '—'}</td>
+      <td>${locationLabel(r.location)}</td>
+      <td>${r.ts ? new Date(r.ts).toLocaleString('fr-FR') : '—'}</td>
+      <td><button class="log-del" data-bc="${esc(r.barcode)}" title="Supprimer cet exemplaire">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderAll(){ renderStats(); renderTable(); }
+
+document.getElementById('log-tbody').addEventListener('click', function(e){
+  const btn = e.target.closest('.log-del');
+  if(!btn) return;
+  const bc = btn.dataset.bc;
+  const rec = EXEMPLAIRES[bc];
+  if(!confirm(`Supprimer l'exemplaire « ${rec ? rec.titre || bc : bc} » (code-barre ${bc}) ? Cela ne supprime pas un éventuel scan déjà enregistré dans le récolement — gérez-le depuis recolement.html si besoin.`)) return;
+  delete EXEMPLAIRES[bc];
+  saveLocal();
+  renderAll();
+  queuePatch({ endpoint:'exemplaires-manuels', patch:{ type:'delete', barcode:bc } });
+});
+
+document.getElementById('log-search').addEventListener('input', renderTable);
+
+document.getElementById('btn-export').addEventListener('click', function(){
+  const blob = new Blob([JSON.stringify(Object.values(EXEMPLAIRES), null, 2)], { type:'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'exemplaires-manuels.json';
+  a.click();
+});
+
+/* ════════════════════════════════════════════════════════════
+   AJOUT D'UN EXEMPLAIRE
+   ════════════════════════════════════════════════════════════ */
+const fBarcode = document.getElementById('f-barcode');
+const fTitre = document.getElementById('f-titre');
+const fAuteur = document.getElementById('f-auteur');
+const fDate = document.getElementById('f-date');
+const fCote = document.getElementById('f-cote');
+const dupWarn = document.getElementById('dup-warn');
+
+fBarcode.addEventListener('input', function(){
+  const bc = fBarcode.value.trim();
+  const syr = bc ? SYRACUSE_BARCODES[bc] : null;
+  const local = bc ? EXEMPLAIRES[bc] : null;
+  if(syr){
+    dupWarn.textContent = `⚠ Ce code-barre existe déjà dans le catalogue Syracuse : « ${syr.titre || '(sans titre)'} » (cote ${syr.cote || '—'}). Vérifiez qu'il ne s'agit pas d'une erreur de scan avant de continuer.`;
+    dupWarn.classList.add('show');
+  } else if(local){
+    dupWarn.textContent = `ℹ Un exemplaire a déjà été créé ici avec ce code-barre : « ${local.titre || '(sans titre)'} ». Valider le formulaire le mettra à jour.`;
+    dupWarn.classList.add('show');
+  } else {
+    dupWarn.classList.remove('show');
+  }
+});
+
+document.getElementById('add-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const barcode = fBarcode.value.trim();
+  const titre = fTitre.value.trim();
+  if(!barcode || !titre) return;
+
+  const record = {
+    barcode,
+    titre,
+    auteur: fAuteur.value.trim(),
+    date: fDate.value.trim(),
+    cote: fCote.value.trim(),
+    location: locEnabled.checked ? { ...locFieldsOf(loc), locType: loc.locType } : null,
+    ts: Date.now(),
+  };
+
+  EXEMPLAIRES[barcode] = record;
+  saveLocal();
+  renderAll();
+  queuePatch({ endpoint:'exemplaires-manuels', patch:{ type:'upsert', record } });
+
+  if(locEnabled.checked){
+    const fields = locFieldsOf(loc);
+    queuePatch({
+      endpoint: 'recolement',
+      patch: {
+        type: 'scan',
+        record: {
+          barcode,
+          cote: record.cote,
+          titre: record.titre,
+          auteur: record.auteur,
+          fonds: getFondsFromCote(record.cote),
+          etat: '',
+          kind: loc.locType,
+          travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+          barcodeAbime: false,
+          ts: record.ts,
+        },
+      },
+    });
+  }
+
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback show ok';
+  fb.innerHTML = `<div class="fb-top"><span class="fb-badge">✓ Exemplaire ajouté</span></div>
+    <div class="fb-titre">${esc(titre)}</div>
+    <div class="fb-meta">${esc(record.auteur)}${record.auteur && record.cote ? ' · ' : ''}${esc(record.cote)} · code-barre ${esc(barcode)}${locEnabled.checked ? ' · ' + esc(document.getElementById('loc-readout').textContent) : ' · emplacement non renseigné'}</div>`;
+
+  fTitre.value = ''; fAuteur.value = ''; fDate.value = ''; fCote.value = ''; fBarcode.value = '';
+  dupWarn.classList.remove('show');
+  fBarcode.focus();
+});
+
+/* ════════════════════════════════════════════════════════════
+   DÉMARRAGE
+   ════════════════════════════════════════════════════════════ */
+EXEMPLAIRES = loadLocal();
+renderAll();
+updateSyncIndicator();
+
+fetch('data/inventaire.json').then(r => r.ok ? r.json() : []).then(items => {
+  (items || []).forEach(it => {
+    const bc = (it['915$b'] || it['995$f'] || '').trim();
+    if(!bc) return;
+    SYRACUSE_BARCODES[bc] = { titre:(it['200$a']||'').trim(), cote:(it['930$g']||'').trim() };
+  });
+}).catch(() => {});
+
+syncFromServer();
+flushPendingSync();
+</script>
+</body>
+</html>

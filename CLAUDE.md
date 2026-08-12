@@ -68,6 +68,7 @@ bas, section « Stockage partagé »).
 | `reserve.html` | Plan interactif de la réserve (travées/colonnes/armoires) avec taux d'occupation calculé depuis `data/recolement.json` | **Protégé** |
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |
 | `magasins.html` | Catalogue des exemplaires du 2e/5e étage (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e étage » | **Protégé** |
+| `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement optionnel) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
@@ -227,6 +228,61 @@ cote nouveau (nouveau préfixe lettré combiné à des chiffres, etc.), relire
 repli local committé pour ce jeu de données, contrairement à
 `data/xml/notices.xml`/`exemplaires.xml` de la réserve.
 
+## Exemplarisation rapide (catalogage minimal)
+
+`exemplarisation.html` (2026-08-12) permet de créer un exemplaire (titre,
+auteur, date de publication, cote, code-barre, emplacement optionnel) sans
+passer par une notice bibliographique Syracuse complète — pensé pour les
+documents non catalogués qu'il serait trop fastidieux de saisir intégralement
+avant de pouvoir simplement leur attribuer un code-barre et une cote. Ce
+n'est pas un remplacement du catalogage réel : un pense-bête partagé entre
+collègues, à réconcilier plus tard lors d'un vrai export/import Syracuse.
+
+Les enregistrements vivent dans R2 sous la clé `exemplaires-manuels.json`
+(forme `{ [barcode]: {barcode, titre, auteur, date, cote, location, ts} }`,
+`location` étant `null` ou `{travee, colonne, etage}`/`{locType:'armoire'|
+'tiroir', ...}` selon `locFieldsOf()` de `js/reserve-shared.js`), via
+`api/exemplaires-manuels.mjs` — même patron GET public / POST authentifié /
+compare-and-swap que `api/recolement.mjs` et `api/spolies.mjs`. La page
+elle-même reprend le patron de synchronisation de `livres-spolies.html`
+(localStorage comme source de vérité locale, file d'attente
+`rp_exemplaires_manuels_pending_sync` rejouée à la reconnexion) et le
+sélecteur d'emplacement de `recolement.html` (travée/colonne/étage ou
+armoire/tiroir, sans le mode « hors réserve » ni « à cataloguer », propres
+au récolement).
+
+À la création, deux écritures indépendantes partent en tâche de fond :
+
+- Toujours : un patch `{type:'upsert', record}` vers `/api/exemplaires-manuels`.
+- Si l'emplacement est renseigné (case « J'indique l'emplacement
+  maintenant », cochée par défaut) : *en plus*, un patch `{type:'scan',
+  record}` vers `/api/recolement` — le même endpoint et la même forme de
+  `record` que `handleScan()` dans `recolement.html`. Ça évite de dupliquer
+  la logique d'emplacement/occupation : l'exemplaire apparaît immédiatement
+  dans `reserve.html` et dans le journal de `recolement.html`, sans code
+  spécifique dans ces deux pages pour un type d'origine différent.
+
+Ces exemplaires sont ensuite fusionnés côté client, via
+`js/exemplaires-manuels-shared.js` (`fetchExemplairesManuelsAsCatalogRows()`,
+qui convertit chaque enregistrement au même format de champs que
+`data/inventaire.json` — `200$a`/`700$a`/`210$d`/`930$g`/`995$f` — plus un
+`Sous-fonds` dédié `⚡ Exemplarisation rapide (à cataloguer)` pour rester
+visuellement distincts tant qu'ils n'ont pas été réellement catalogués),
+dans trois endroits qui lisaient jusqu'ici uniquement `data/inventaire.json` :
+
+- `js/inventaire.js` (`loadCSV()`) — recherche du catalogue sur `index.html`.
+- `analyse-cotes.html` — détection de trous/doublons de cotes.
+- `recolement.html` (fetch du `catalog` en tout début de script) — pour
+  qu'un code-barre créé ici, même **sans** emplacement renseigné, soit déjà
+  reconnu comme « connu du catalogue » au moment où quelqu'un le scanne
+  physiquement plus tard (sinon `handleScan()` le traiterait comme inconnu
+  et n'enregistrerait rien — voir son statut `unknown`).
+
+Ces trois fusions échouent silencieusement (tableau vide) si l'API est
+indisponible, pour ne jamais bloquer l'affichage du reste du catalogue —
+même philosophie de dégradation que le reste du stockage partagé (voir
+ci-dessous).
+
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
 Bucket R2 `douai-patrimoine` (compte Cloudflare de l'utilisateur), utilisé
@@ -239,12 +295,13 @@ pour deux choses indépendantes :
   `data/xml/` avant de builder si les variables R2 sont présentes ; sinon
   (dev local sans `.env`), comportement d'origine inchangé — lecture des
   fichiers locaux, échec strict s'ils manquent.
-- **`recolement.json`, `livres-spolies-overrides.json`** : état partagé
-  canonique de `recolement.html` / `livres-spolies.html`, pour que plusieurs
-  collègues avancent en même temps sans export/import JSON manuel. Chaque
-  page garde le `localStorage` comme source de vérité locale (fonctionne
-  hors ligne, file d'attente `rp_*_pending_sync` rejouée à la reconnexion)
-  et envoie en plus chaque changement en arrière-plan.
+- **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`** :
+  état partagé canonique de `recolement.html` / `livres-spolies.html` /
+  `exemplarisation.html` (voir « Exemplarisation rapide » plus haut), pour
+  que plusieurs collègues avancent en même temps sans export/import JSON
+  manuel. Chaque page garde le `localStorage` comme source de vérité locale
+  (fonctionne hors ligne, file d'attente `rp_*_pending_sync` rejouée à la
+  reconnexion) et envoie en plus chaque changement en arrière-plan.
 - **`recolement-backups/<horodatage>.json`** : instantanés datés et
   immuables (un objet par sauvegarde, jamais réécrit), distincts de l'état
   partagé courant ci-dessus. Créés par le bouton « Sauvegarder ce
@@ -255,8 +312,9 @@ pour deux choses indépendantes :
   directement comme référence (`GET ?key=...`), sans passer par un
   export/import de fichier local.
 
-Deux fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`) servent de
-proxy vers R2 : `GET` renvoie l'état courant (public, même niveau
+Trois fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
+`api/exemplaires-manuels.mjs`) servent de proxy vers R2 : `GET` renvoie
+l'état courant (public, même niveau
 d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit un
 « patch » unitaire (ex. `{type:'scan', record}` ou `{id, field, value}`) et
 le fusionne côté serveur via lecture+ETag+réécriture conditionnelle
