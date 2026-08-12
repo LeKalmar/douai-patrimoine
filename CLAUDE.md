@@ -69,6 +69,7 @@ bas, section « Stockage partagé »).
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |
 | `magasins.html` | Catalogue des exemplaires du 2e/5e étage (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e étage » | **Protégé** |
 | `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement optionnel) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
+| `vignettes.html` | Import et rognage d'une photo à attacher à un exemplaire créé via `exemplarisation.html`, envoyée vers R2 (`vignette/<code-barre>.jpg`) — voir « Exemplarisation rapide » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
@@ -317,10 +318,41 @@ indisponible, pour ne jamais bloquer l'affichage du reste du catalogue —
 même philosophie de dégradation que le reste du stockage partagé (voir
 ci-dessous).
 
+### Vignettes (photo attachée à un exemplaire)
+
+`vignettes.html` reprend la mécanique de rognage de `scan-docs.html`
+(détection de bords par projection, poignées de recadrage, loupe de
+précision — code dupliqué intentionnellement entre les deux pages, même
+logique que le reste du projet) mais **sans** la lecture de code-barre par
+OCR (zxing-wasm) : ici, le code-barre est saisi ou scanné directement dans
+un champ texte, puisqu'il vient de toute façon d'être scanné à la main pour
+créer l'exemplaire dans `exemplarisation.html` — inutile de le relire depuis
+la photo. Au lieu de télécharger localement les images rognées (comme
+`scan-docs.html`), chaque vignette validée est redimensionnée côté client
+(1600 px max sur le plus grand côté, JPEG qualité 0.85 — une vignette est
+un aperçu, pas un scan d'archive) puis envoyée en base64 à `api/vignette.mjs`
+(`POST` authentifié, corps JSON `{barcode, imageBase64}` plutôt qu'un upload
+multipart, cohérent avec le reste de l'API du projet) qui l'écrit dans R2
+sous la clé `vignette/<code-barre>.jpg` via `r2Put` — écrase silencieusement
+une vignette existante pour le même code-barre (permet de reprendre une
+photo ratée). Le bouton « Envoyer tout » retente uniquement les envois en
+échec (connexion coupée, session expirée) ; ceux qui ont réussi sortent de
+la file.
+
+Ce préfixe `vignette/` est un troisième usage indépendant du bucket R2, en
+plus de `xml/` et de la famille `recolement.json`/`livres-spolies-overrides.json`/
+`exemplaires-manuels.json` (voir « Stockage partagé » ci-dessous). Il n'existe
+actuellement **aucune lecture** de ces images ailleurs dans le site (ni
+proxy `GET` signé, ni URL publique R2 connue) : `vignettes.html` est pour
+l'instant un outil d'écriture seule. Si un affichage de ces vignettes est
+un jour demandé (ex. dans `exemplarisation.html` ou le catalogue), il
+faudra soit un endpoint `GET` signé supplémentaire (le bucket n'est pas
+public), soit activer un accès public R2 sur ce préfixe précis.
+
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
 Bucket R2 `douai-patrimoine` (compte Cloudflare de l'utilisateur), utilisé
-pour deux choses indépendantes :
+pour trois choses indépendantes :
 
 - **`xml/notices.xml`, `xml/exemplaires.xml`** : copie des exports Syracuse
   bruts, poussée par `npm run upload:xml` après chaque nouvel export. But :
@@ -345,10 +377,16 @@ pour deux choses indépendantes :
   `ListObjectsV2`, lecture publique comme le reste) et en charger un
   directement comme référence (`GET ?key=...`), sans passer par un
   export/import de fichier local.
+- **`vignette/<code-barre>.jpg`** : photos rognées attachées aux exemplaires
+  créés via `exemplarisation.html`, envoyées par `vignettes.html` — voir
+  « Exemplarisation rapide » plus haut. Contrairement aux deux catégories
+  ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
+  dans le site ne relit ces images pour l'instant.
 
-Trois fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
-`api/exemplaires-manuels.mjs`) servent de proxy vers R2 : `GET` renvoie
-l'état courant (public, même niveau
+Quatre fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
+`api/exemplaires-manuels.mjs`, `api/vignette.mjs`) servent de proxy vers R2 :
+`GET` (sauf `api/vignette.mjs`, POST uniquement) renvoie l'état courant
+(public, même niveau
 d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit un
 « patch » unitaire (ex. `{type:'scan', record}` ou `{id, field, value}`) et
 le fusionne côté serveur via lecture+ETag+réécriture conditionnelle
