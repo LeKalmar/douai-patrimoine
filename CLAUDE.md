@@ -68,8 +68,7 @@ bas, section « Stockage partagé »).
 | `reserve.html` | Plan interactif de la réserve (travées/colonnes/armoires) avec taux d'occupation calculé depuis `data/recolement.json` | **Protégé** |
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |
 | `magasins.html` | Catalogue des exemplaires du 2e/5e étage (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e étage » | **Protégé** |
-| `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement optionnel) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
-| `vignettes.html` | Import et rognage d'une photo à attacher à un exemplaire créé via `exemplarisation.html`, envoyée vers R2 (`vignette/<code-barre>.jpg`) — voir « Exemplarisation rapide » | **Protégé** |
+| `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement, photo — tout en un seul formulaire) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
@@ -320,33 +319,44 @@ ci-dessous).
 
 ### Vignettes (photo attachée à un exemplaire)
 
-`vignettes.html` reprend la mécanique de rognage de `scan-docs.html`
-(détection de bords par projection, poignées de recadrage, loupe de
-précision — code dupliqué intentionnellement entre les deux pages, même
-logique que le reste du projet) mais **sans** la lecture de code-barre par
-OCR (zxing-wasm) : ici, le code-barre est saisi ou scanné directement dans
-un champ texte, puisqu'il vient de toute façon d'être scanné à la main pour
-créer l'exemplaire dans `exemplarisation.html` — inutile de le relire depuis
-la photo. Au lieu de télécharger localement les images rognées (comme
-`scan-docs.html`), chaque vignette validée est redimensionnée côté client
-(1600 px max sur le plus grand côté, JPEG qualité 0.85 — une vignette est
-un aperçu, pas un scan d'archive) puis envoyée en base64 à `api/vignette.mjs`
-(`POST` authentifié, corps JSON `{barcode, imageBase64}` plutôt qu'un upload
-multipart, cohérent avec le reste de l'API du projet) qui l'écrit dans R2
-sous la clé `vignette/<code-barre>.jpg` via `r2Put` — écrase silencieusement
-une vignette existante pour le même code-barre (permet de reprendre une
-photo ratée). Le bouton « Envoyer tout » retente uniquement les envois en
-échec (connexion coupée, session expirée) ; ceux qui ont réussi sortent de
-la file.
+`exemplarisation.html` intègre directement dans son formulaire (pas une page
+séparée — tout se fait « en un seul geste » avec le titre/auteur/date/cote)
+une mécanique de rognage reprise de `scan-docs.html` (détection de bords par
+projection, poignées de recadrage, loupe de précision — tous les
+identifiants JS/CSS de cette section sont préfixés `photo`, code dupliqué
+intentionnellement plutôt que factorisé, même logique que le reste du
+projet) mais **sans** la lecture de code-barre par OCR (zxing-wasm) : le
+code-barre utilisé pour la photo est celui déjà saisi dans le champ
+`#f-barcode` du formulaire — inutile de le relire depuis l'image.
+
+Au clic sur « Ajouter l'exemplaire », si une photo a été chargée et rognée,
+elle est redimensionnée côté client (1600 px max sur le plus grand côté,
+JPEG qualité 0.85 — une vignette est un aperçu, pas un scan d'archive) puis
+envoyée en base64 à `api/vignette.mjs` (`POST` authentifié, corps JSON
+`{barcode, imageBase64}` plutôt qu'un upload multipart, cohérent avec le
+reste de l'API du projet) qui l'écrit dans R2 sous la clé
+`vignette/<code-barre>.jpg` via `r2Put` — écrase silencieusement une
+vignette existante pour le même code-barre (permet de reprendre une photo
+ratée en recréant/mettant à jour le même exemplaire). L'envoi est
+volontairement découplé de la création de l'exemplaire (qui, elle, reste
+instantanée et passe par la file `pendingSync` habituelle) : `img`/`cropR`/
+`margin` sont capturés en instantané au moment du clic (pas relus depuis les
+variables globales `photoImg`/`photoCropR`) pour que l'envoi de la photo N
+reste correct même si l'utilisateur·rice a déjà chargé la photo de
+l'exemplaire N+1 avant la fin de cet envoi — seul le message de statut
+(`#photo-status`, en dehors du bloc réinitialisé par `photoRemove()` pour
+rester visible) peut se faire écraser dans ce cas précis, sans conséquence
+sur les données envoyées. En cas d'échec, un bouton « Réessayer » apparaît
+dans ce même message et relance l'envoi avec l'instantané déjà capturé.
 
 Ce préfixe `vignette/` est un troisième usage indépendant du bucket R2, en
 plus de `xml/` et de la famille `recolement.json`/`livres-spolies-overrides.json`/
 `exemplaires-manuels.json` (voir « Stockage partagé » ci-dessous). Il n'existe
 actuellement **aucune lecture** de ces images ailleurs dans le site (ni
-proxy `GET` signé, ni URL publique R2 connue) : `vignettes.html` est pour
-l'instant un outil d'écriture seule. Si un affichage de ces vignettes est
-un jour demandé (ex. dans `exemplarisation.html` ou le catalogue), il
-faudra soit un endpoint `GET` signé supplémentaire (le bucket n'est pas
+proxy `GET` signé, ni URL publique R2 connue) : c'est pour l'instant un
+usage en écriture seule. Si un affichage de ces vignettes est un jour
+demandé (ex. dans le tableau des exemplaires créés, ou dans le catalogue),
+il faudra soit un endpoint `GET` signé supplémentaire (le bucket n'est pas
 public), soit activer un accès public R2 sur ce préfixe précis.
 
 ## Stockage partagé (Cloudflare R2) et fonctions serverless

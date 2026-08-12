@@ -61,6 +61,27 @@
   .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#12157A}
   .loc-readout{font-size:.85rem;color:#12157A;font-weight:600;background:#F5F5FF;border:1px solid #ccc;border-radius:20px;padding:.45rem 1rem}
 
+  .photo-toggle{font-size:.85rem;color:#333;margin:1rem 0 .6rem;padding-top:.9rem;border-top:1px dashed #e0e0e0}
+  .photo-dz{border:1.5px dashed #ccc;border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-size:.85rem;color:#777}
+  .photo-dz:hover,.photo-dz.over{border-color:#12157A;background:#F5F5FF}
+  .photo-editor{display:none}
+  .photo-editor.show{display:block}
+  .photo-crow{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.6rem}
+  .photo-cwrap{display:flex;flex-direction:column;gap:.3rem;min-width:0}
+  .photo-clabel{font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#888;display:flex;justify-content:space-between}
+  .photo-cbox{height:220px;background:#111;border:1px solid #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+  .photo-cbox canvas{max-width:100%;max-height:100%;object-fit:contain;display:block}
+  #photo-origbox{cursor:crosshair}
+  #photo-overlay{position:absolute;pointer-events:none}
+  .photo-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;font-size:.75rem;color:#888}
+  .btn-mini{font-family:inherit;font-size:.75rem;padding:.35rem .8rem;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;color:#555}
+  .btn-mini:hover{background:#f5f5f5}
+  .photo-status{font-size:.78rem;margin-top:.5rem}
+  .photo-status.ok{color:#2e7d32}
+  .photo-status.warn{color:#e65100}
+  #photo-loupe{position:fixed;width:170px;height:170px;border-radius:50%;border:2px solid #12157A;box-shadow:0 4px 24px rgba(0,0,0,.4);pointer-events:none;display:none;overflow:hidden;z-index:1000}
+  #photo-loupe canvas{position:absolute;top:0;left:0}
+
   .form-submit{display:flex;align-items:center;gap:.75rem;margin-top:1rem}
   .btn-primary{font-family:inherit;font-size:.9rem;padding:.65rem 1.4rem;border:1px solid #12157A;border-radius:8px;background:#12157A;color:#fff;cursor:pointer}
   .btn-primary:hover{background:#1c1fa0}
@@ -104,7 +125,6 @@
     </div>
     <div class="hero-actions">
       <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
-      <a href="vignettes.html">→ Attacher une photo (Vignettes)</a>
       <a href="admin.html">← Espace professionnel</a>
       <button type="button" id="logout-btn">Se déconnecter</button>
     </div>
@@ -121,7 +141,7 @@
         pour toute l'équipe. Si vous renseignez l'emplacement, il est aussi envoyé au <a href="recolement.html">récolement</a> partagé
         et apparaît tout de suite sur <a href="reserve.html">le plan de la réserve</a> — le code-barre sera ensuite reconnu
         si quelqu'un le rescanne. Cet outil ne remplace pas un vrai catalogage Syracuse : c'est un pense-bête partagé, à réconcilier plus tard.
-        Pour attacher une photo à un exemplaire, utilisez <a href="vignettes.html">Vignettes</a> (import, rognage puis envoi vers R2).
+        Vous pouvez aussi joindre une photo (import, rognage, envoi vers R2) directement depuis le formulaire ci-dessous.
       </p>
 
       <div class="stats-row" id="stats-row"></div>
@@ -183,12 +203,38 @@
             </div>
           </div>
 
+          <div class="photo-toggle">Photo de l'exemplaire (optionnel)</div>
+          <input type="file" id="photo-input" accept="image/*" style="display:none">
+          <div class="photo-dz" id="photo-dz">📷 Cliquez ou déposez une photo ici</div>
+          <div class="photo-editor" id="photo-editor">
+            <div class="photo-crow">
+              <div class="photo-cwrap">
+                <div class="photo-clabel"><span>Originale</span><span id="photo-od"></span></div>
+                <div class="photo-cbox" id="photo-origbox">
+                  <canvas id="photo-co"></canvas>
+                  <canvas id="photo-overlay"></canvas>
+                </div>
+              </div>
+              <div class="photo-cwrap">
+                <div class="photo-clabel"><span>Rognée</span><span id="photo-cd"></span></div>
+                <div class="photo-cbox"><canvas id="photo-cc"></canvas></div>
+              </div>
+            </div>
+            <div class="photo-ctrl">
+              <span>Marge <input type="range" id="photo-ms" min="0" max="80" value="8" step="1" style="vertical-align:middle"> <span id="photo-mv">8</span>px</span>
+              <button type="button" class="btn-mini" id="photo-redetect">🔲 Re-détecter</button>
+              <button type="button" class="btn-mini" id="photo-remove">✕ Retirer la photo</button>
+            </div>
+          </div>
+          <div class="photo-status" id="photo-status"></div>
+
           <div class="form-submit">
             <button type="submit" class="btn-primary">Ajouter l'exemplaire</button>
           </div>
           <div class="feedback" id="feedback"></div>
         </form>
       </div>
+      <div id="photo-loupe"><canvas id="photo-loupe-canvas"></canvas></div>
 
       <div class="log-wrap">
         <div class="log-header">
@@ -526,6 +572,298 @@ document.getElementById('btn-export').addEventListener('click', function(){
 });
 
 /* ════════════════════════════════════════════════════════════
+   PHOTO (import + rognage + envoi R2) — intégré directement dans le
+   formulaire pour créer l'exemplaire et attacher sa photo en un seul
+   geste. Reprend la mécanique de rognage de scan-docs.html (détection de
+   bords par projection, poignées, loupe) sans lecture OCR du code-barre :
+   ici le code-barre est celui déjà saisi dans le champ #f-barcode. Toutes
+   les identifiants sont préfixés "photo" pour ne pas entrer en collision
+   avec le reste de la page.
+   ════════════════════════════════════════════════════════════ */
+let photoImg = null;        // Image() chargée
+let photoCropR = null;      // {x,y,w,h} sans marge
+let photoDisplayScale = 1;
+let photoDragState = null;  // {edge} pendant un drag
+
+const photoInput = document.getElementById('photo-input');
+const photoDz = document.getElementById('photo-dz');
+const photoEditor = document.getElementById('photo-editor');
+const photoCo = document.getElementById('photo-co'), photoCc = document.getElementById('photo-cc');
+const photoOverlayEl = document.getElementById('photo-overlay'), photoOrigbox = document.getElementById('photo-origbox');
+const photoOd = document.getElementById('photo-od'), photoCd = document.getElementById('photo-cd');
+const photoMs = document.getElementById('photo-ms'), photoMv = document.getElementById('photo-mv');
+const photoStatus = document.getElementById('photo-status');
+
+photoDz.addEventListener('click', () => photoInput.click());
+photoDz.addEventListener('dragover', e => { e.preventDefault(); photoDz.classList.add('over'); });
+photoDz.addEventListener('dragleave', () => photoDz.classList.remove('over'));
+photoDz.addEventListener('drop', e => { e.preventDefault(); photoDz.classList.remove('over'); handlePhotoFile(e.dataTransfer.files[0]); });
+photoInput.addEventListener('change', e => { handlePhotoFile(e.target.files[0]); photoInput.value = ''; });
+photoMs.addEventListener('input', () => { photoMv.textContent = photoMs.value; if(photoImg){ photoDrawOverlay(); photoRenderCrop(); } });
+document.getElementById('photo-redetect').addEventListener('click', () => { if(photoImg) photoDoAutoCrop(photoImg); });
+document.getElementById('photo-remove').addEventListener('click', photoRemove);
+
+function handlePhotoFile(file){
+  if(!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      photoImg = img;
+      photoOd.textContent = img.width + '×' + img.height;
+      photoDz.style.display = 'none';
+      photoEditor.classList.add('show');
+      photoDrawOrig(img);
+      photoDoAutoCrop(img);
+      photoStatus.textContent = '';
+      photoStatus.className = 'photo-status';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Ne touche pas #photo-status : appelé juste après avoir lancé l'envoi de la
+// photo courante (voir le submit du formulaire), pour que son statut
+// ("Envoi…" puis succès/échec + bouton "Réessayer") reste visible même une
+// fois l'éditeur réinitialisé pour la photo suivante.
+function photoRemove(){
+  photoImg = null; photoCropR = null;
+  photoDz.style.display = '';
+  photoEditor.classList.remove('show');
+}
+
+/* ── Recadrage (poignées + drag), identique à scan-docs.html/vignettes.html ── */
+function photoPosFromEvent(e){
+  const r = photoOverlayEl.getBoundingClientRect();
+  const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+  return { x: cx, y: cy };
+}
+function photoGetHandles(){
+  if(!photoCropR || !photoImg) return [];
+  const m = parseInt(photoMs.value);
+  const sc = photoDisplayScale;
+  const rx = Math.max(0, photoCropR.x - m) * sc;
+  const ry = Math.max(0, photoCropR.y - m) * sc;
+  const rw = Math.min(photoImg.width, photoCropR.w + m * 2) * sc;
+  const rh = Math.min(photoImg.height, photoCropR.h + m * 2) * sc;
+  return [
+    { x: rx + rw/2, y: ry,        edge: 'top'    },
+    { x: rx + rw/2, y: ry + rh,   edge: 'bottom' },
+    { x: rx,        y: ry + rh/2, edge: 'left'   },
+    { x: rx + rw,   y: ry + rh/2, edge: 'right'  },
+  ];
+}
+photoOrigbox.addEventListener('mousedown', photoStartDrag);
+photoOrigbox.addEventListener('mousemove', e => {
+  if(photoDragState) return photoDoDrag(e);
+  if(!photoCropR) return;
+  const { x, y } = photoPosFromEvent(e);
+  const hit = photoGetHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  photoOrigbox.style.cursor = hit ? (hit.edge === 'top' || hit.edge === 'bottom' ? 'ns-resize' : 'ew-resize') : 'crosshair';
+});
+window.addEventListener('mouseup', photoEndDrag);
+photoOrigbox.addEventListener('touchstart', photoStartDrag, { passive: false });
+photoOrigbox.addEventListener('touchmove', photoDoDrag, { passive: false });
+window.addEventListener('touchend', photoEndDrag);
+
+function photoStartDrag(e){
+  if(!photoCropR) return;
+  const { x, y } = photoPosFromEvent(e);
+  const hit = photoGetHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  if(hit){ e.preventDefault(); photoDragState = { edge: hit.edge }; }
+}
+function photoDoDrag(e){
+  if(!photoDragState || !photoCropR || !photoImg) return;
+  e.preventDefault();
+  const { x, y } = photoPosFromEvent(e);
+  const sc = photoDisplayScale;
+  const m = parseInt(photoMs.value);
+  const imgX = x / sc, imgY = y / sc;
+  const r = photoCropR;
+  const { edge } = photoDragState;
+  if(edge === 'top'){
+    const nt = Math.max(0, Math.min(imgY + m, r.y + r.h - 30));
+    r.h = r.h + (r.y - nt); r.y = nt;
+  } else if(edge === 'bottom'){
+    r.h = Math.max(30, Math.min(imgY - m, photoImg.height) - r.y);
+  } else if(edge === 'left'){
+    const nl = Math.max(0, Math.min(imgX + m, r.x + r.w - 30));
+    r.w = r.w + (r.x - nl); r.x = nl;
+  } else if(edge === 'right'){
+    r.w = Math.max(30, Math.min(imgX - m, photoImg.width) - r.x);
+  }
+  photoDrawOverlay(); photoRenderCrop();
+}
+function photoEndDrag(){ photoDragState = null; }
+
+function photoDrawOrig(img){
+  const box = photoCo.parentElement;
+  const scale = Math.min((box.clientWidth - 2) / img.width, (box.clientHeight - 2) / img.height, 1);
+  photoDisplayScale = scale;
+  const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+  photoCo.width = w; photoCo.height = h;
+  photoOverlayEl.width = w; photoOverlayEl.height = h;
+  photoOverlayEl.style.width = w + 'px'; photoOverlayEl.style.height = h + 'px';
+  const offsetX = (box.clientWidth - w) / 2, offsetY = (box.clientHeight - h) / 2;
+  photoOverlayEl.style.left = offsetX + 'px'; photoOverlayEl.style.top = offsetY + 'px';
+  const ctx = photoCo.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+}
+function photoDrawOverlay(){
+  const ctx = photoOverlayEl.getContext('2d');
+  ctx.clearRect(0, 0, photoOverlayEl.width, photoOverlayEl.height);
+  if(!photoCropR || !photoImg) return;
+  const m = parseInt(photoMs.value);
+  const sc = photoDisplayScale;
+  const rx = Math.max(0, photoCropR.x - m) * sc;
+  const ry = Math.max(0, photoCropR.y - m) * sc;
+  const rw = Math.min(photoImg.width, photoCropR.w + m * 2) * sc;
+  const rh = Math.min(photoImg.height, photoCropR.h + m * 2) * sc;
+  ctx.fillStyle = 'rgba(0,0,0,.5)';
+  ctx.fillRect(0, 0, photoOverlayEl.width, ry);
+  ctx.fillRect(0, ry + rh, photoOverlayEl.width, photoOverlayEl.height - ry - rh);
+  ctx.fillRect(0, ry, rx, rh);
+  ctx.fillRect(rx + rw, ry, photoOverlayEl.width - rx - rw, rh);
+  ctx.strokeStyle = '#12157A'; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.strokeRect(rx, ry, rw, rh);
+  [[rx + rw/2, ry], [rx + rw/2, ry + rh], [rx, ry + rh/2], [rx + rw, ry + rh/2]].forEach(([hx, hy]) => {
+    ctx.fillStyle = '#12157A';
+    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.stroke();
+  });
+}
+function photoDoAutoCrop(img){
+  const MAX = 1400;
+  const sc = Math.min(MAX/img.width, MAX/img.height, 1);
+  const W = Math.round(img.width*sc), H = Math.round(img.height*sc);
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  tmp.getContext('2d').drawImage(img, 0, 0, W, H);
+  const d = tmp.getContext('2d').getImageData(0, 0, W, H).data;
+  const g = new Float32Array(W*H);
+  for(let i = 0; i < W*H; i++) g[i] = .299*d[i*4] + .587*d[i*4+1] + .114*d[i*4+2];
+  const bw = Math.max(6, Math.round(W*.03)), bh = Math.max(6, Math.round(H*.03));
+  const med = arr => { const s = [...arr].sort((a,b)=>a-b); return s[s.length>>1]; };
+  const bgTop = (()=>{const v=[];for(let y=0;y<bh;y++)for(let x=bw;x<W-bw;x++)v.push(g[y*W+x]);return med(v)})();
+  const bgBot = (()=>{const v=[];for(let y=H-bh;y<H;y++)for(let x=bw;x<W-bw;x++)v.push(g[y*W+x]);return med(v)})();
+  const bgL = (()=>{const v=[];for(let x=0;x<bw;x++)for(let y=bh;y<H-bh;y++)v.push(g[y*W+x]);return med(v)})();
+  const bgR = (()=>{const v=[];for(let x=W-bw;x<W;x++)for(let y=bh;y<H-bh;y++)v.push(g[y*W+x]);return med(v)})();
+  const THR = 22, FRAC = 0.18;
+  const rowDiff = (y, bg) => { let n=0; for(let x=0;x<W;x++) if(Math.abs(g[y*W+x]-bg)>THR) n++; return n/W; };
+  const colDiff = (x, bg) => { let n=0; for(let y=0;y<H;y++) if(Math.abs(g[y*W+x]-bg)>THR) n++; return n/H; };
+  let top=0, bot=H-1, left=0, right=W-1;
+  for(let y=0;y<H;y++){if(rowDiff(y,bgTop)>FRAC){top=y;break}}
+  for(let y=H-1;y>=0;y--){if(rowDiff(y,bgBot)>FRAC){bot=y;break}}
+  for(let x=0;x<W;x++){if(colDiff(x,bgL)>FRAC){left=x;break}}
+  for(let x=W-1;x>=0;x--){if(colDiff(x,bgR)>FRAC){right=x;break}}
+  const isc = 1/sc;
+  photoCropR = {
+    x: Math.max(0, Math.round((left-2)*isc)),
+    y: Math.max(0, Math.round((top-2)*isc)),
+    w: Math.round((right-left+4)*isc),
+    h: Math.round((bot-top+4)*isc),
+  };
+  photoCropR.w = Math.min(img.width - photoCropR.x, photoCropR.w);
+  photoCropR.h = Math.min(img.height - photoCropR.y, photoCropR.h);
+  photoDrawOverlay();
+  photoRenderCrop();
+}
+function photoRenderCrop(){
+  if(!photoImg || !photoCropR) return;
+  const m = parseInt(photoMs.value);
+  const x = Math.max(0, photoCropR.x - m);
+  const y = Math.max(0, photoCropR.y - m);
+  const w = Math.min(photoImg.width - x, photoCropR.w + m*2);
+  const h = Math.min(photoImg.height - y, photoCropR.h + m*2);
+  photoCd.textContent = w + '×' + h;
+  const box = photoCc.parentElement;
+  const scale = Math.min((box.clientWidth - 2)/w, (box.clientHeight - 2)/h, 1);
+  photoCc.width = Math.round(w*scale); photoCc.height = Math.round(h*scale);
+  const ctx = photoCc.getContext('2d');
+  ctx.clearRect(0, 0, photoCc.width, photoCc.height);
+  ctx.drawImage(photoImg, x, y, w, h, 0, 0, photoCc.width, photoCc.height);
+}
+
+/* ── Loupe ── */
+const photoLoupe = document.getElementById('photo-loupe');
+const photoLoupeCanvas = document.getElementById('photo-loupe-canvas');
+const PHOTO_LOUPE_SIZE = 170, PHOTO_ZOOM = 0.25;
+photoOrigbox.addEventListener('mousemove', e => {
+  if(photoDragState || !photoImg) return;
+  const rect = photoCo.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  if(mx < 0 || my < 0 || mx > photoCo.width || my > photoCo.height){ photoLoupe.style.display = 'none'; return; }
+  const ix = mx / photoDisplayScale, iy = my / photoDisplayScale;
+  const capture = PHOTO_LOUPE_SIZE / PHOTO_ZOOM;
+  const sx = ix - capture / 2, sy = iy - capture / 2;
+  photoLoupeCanvas.width = PHOTO_LOUPE_SIZE; photoLoupeCanvas.height = PHOTO_LOUPE_SIZE;
+  const ctx = photoLoupeCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#111'; ctx.fillRect(0, 0, PHOTO_LOUPE_SIZE, PHOTO_LOUPE_SIZE);
+  ctx.drawImage(photoImg, sx, sy, capture, capture, 0, 0, PHOTO_LOUPE_SIZE, PHOTO_LOUPE_SIZE);
+  photoLoupe.style.display = 'block';
+  photoLoupe.style.left = (e.clientX + 18) + 'px';
+  photoLoupe.style.top = (e.clientY - PHOTO_LOUPE_SIZE/2) + 'px';
+});
+photoOrigbox.addEventListener('mouseleave', () => { photoLoupe.style.display = 'none'; });
+
+/* ── Envoi vers R2 (vignette/<code-barre>.jpg) ──
+   img/cropR/margin sont capturés en paramètres (pas relus depuis les
+   variables globales photoImg/photoCropR) pour que l'envoi d'une photo
+   reste correct même si l'utilisateur·rice a déjà chargé la photo de
+   l'exemplaire suivant pendant que l'envoi précédent est encore en cours. */
+const PHOTO_UPLOAD_MAX_DIM = 1600, PHOTO_UPLOAD_QUALITY = 0.85;
+function photoCropToUploadBlob(img, cropR, margin){
+  const x = Math.max(0, cropR.x - margin);
+  const y = Math.max(0, cropR.y - margin);
+  const w = Math.min(img.width - x, cropR.w + margin*2);
+  const h = Math.min(img.height - y, cropR.h + margin*2);
+  const sc = Math.min(PHOTO_UPLOAD_MAX_DIM/w, PHOTO_UPLOAD_MAX_DIM/h, 1);
+  const out = document.createElement('canvas');
+  out.width = Math.round(w*sc); out.height = Math.round(h*sc);
+  out.getContext('2d').drawImage(img, x, y, w, h, 0, 0, out.width, out.height);
+  return new Promise(res => out.toBlob(res, 'image/jpeg', PHOTO_UPLOAD_QUALITY));
+}
+function blobToBase64(blob){
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result);
+    reader.onerror = rej;
+    reader.readAsDataURL(blob);
+  });
+}
+async function uploadPhoto(barcode, img, cropR, margin){
+  const blob = await photoCropToUploadBlob(img, cropR, margin);
+  const imageBase64 = await blobToBase64(blob);
+  const res = await fetch('/api/vignette', { method:'POST', headers: authHeaders(), body: JSON.stringify({ barcode, imageBase64 }) });
+  if(!res.ok){
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Erreur serveur (${res.status})`);
+  }
+}
+function attemptPhotoUpload(barcode, img, cropR, margin, statusEl){
+  statusEl.textContent = '⏳ Envoi de la photo…';
+  statusEl.className = 'photo-status';
+  uploadPhoto(barcode, img, cropR, margin).then(() => {
+    statusEl.textContent = `✓ Photo envoyée (${barcode})`;
+    statusEl.className = 'photo-status ok';
+  }).catch(err => {
+    statusEl.innerHTML = `⚠ Échec de l'envoi de la photo (${esc(barcode)}) : ${esc(err.message)} `;
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.className = 'btn-mini';
+    retryBtn.textContent = 'Réessayer';
+    retryBtn.addEventListener('click', () => attemptPhotoUpload(barcode, img, cropR, margin, statusEl));
+    statusEl.appendChild(retryBtn);
+    statusEl.className = 'photo-status warn';
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
    AJOUT D'UN EXEMPLAIRE
    ════════════════════════════════════════════════════════════ */
 const fBarcode = document.getElementById('f-barcode');
@@ -607,6 +945,14 @@ document.getElementById('add-form').addEventListener('submit', function(e){
       if(newRecord) NONCAT[ncKey] = newRecord; else delete NONCAT[ncKey];
       queuePatch({ endpoint:'recolement', patch:{ type:'nonCat', key:ncKey, record:newRecord } });
     }
+  }
+
+  // Envoi de la photo, si une a été chargée — capturée en instantané
+  // (img/cropR/margin) pour continuer correctement même si une photo pour
+  // l'exemplaire suivant est chargée avant la fin de cet envoi.
+  if(photoImg && photoCropR){
+    attemptPhotoUpload(barcode, photoImg, { ...photoCropR }, parseInt(photoMs.value), photoStatus);
+    photoRemove();
   }
 
   const fb = document.getElementById('feedback');
