@@ -282,7 +282,8 @@
           <div class="mp-room" id="mp-room"></div>
           <div class="mp-legend" id="mp-legend">
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-cat)"></span>Catalogué</span>
-            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-noncat)"></span>Non catalogué</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-manuel)"></span>Exemplarisé rapide</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-noncat)"></span>Non catalogué (estimé)</span>
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></span>Vide</span>
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-nonrange)"></span>Non rangé</span>
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></span>Non inventorié</span>
@@ -1139,7 +1140,11 @@ function travMiniTitle(tid){
 // parseRecolement() là-bas, pour qu'un même exemplaire rescanné plusieurs
 // fois ne gonfle jamais le compteur "catalogué" de la case.
 function buildLocalSlotState(tid){
-  const cnt={}, seenCotes={};
+  // cnt = exemplaires réellement catalogués (Syracuse), manuel = exemplaires
+  // créés via exemplarisation.html (voir catalog[bc].manuel plus haut) —
+  // deux compteurs distincts pour que le mini-plan les colore différemment
+  // (bleu vs orange), même logique que parseRecolement() dans reserve.html.
+  const cnt={}, manuel={}, seenCotes={};
   Object.values(scans).forEach(r=>{
     if(r.kind==='horsreserve' || r.travee!==tid) return;
     const key=`${r.travee}|${r.colonne}|${r.etage}`;
@@ -1149,7 +1154,8 @@ function buildLocalSlotState(tid){
       if(seenCotes[key].has(cote)) return;
       seenCotes[key].add(cote);
     }
-    cnt[key]=(cnt[key]||0)+1;
+    if(r.manuel) manuel[key]=(manuel[key]||0)+1;
+    else cnt[key]=(cnt[key]||0)+1;
   });
   const nc={};
   Object.values(nonCat).forEach(r=>{ if(r.travee===tid) nc[`${r.travee}|${r.colonne}|${r.etage}`]=r.count; });
@@ -1157,7 +1163,7 @@ function buildLocalSlotState(tid){
   Object.values(videShelves).forEach(r=>{ if(r.travee===tid) vide[`${r.travee}|${r.colonne}|${r.etage}`]=true; });
   const nonrange={};
   Object.values(nonRangeShelves).forEach(r=>{ if(r.travee===tid) nonrange[`${r.travee}|${r.colonne}|${r.etage}`]=true; });
-  return {cnt, nc, vide, nonrange};
+  return {cnt, manuel, nc, vide, nonrange};
 }
 
 // Colonnes/étages affichés : toujours l'ensemble par défaut de la travée,
@@ -1166,7 +1172,7 @@ function buildLocalSlotState(tid){
 function miniColsOf(tDef, maps){
   const from=new Set();
   for(let i=1;i<=tDef.nbCols;i++) from.add(String.fromCharCode(64+i));
-  [maps.cnt,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
+  [maps.cnt,maps.manuel,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
     Object.keys(dict).forEach(k=>{ from.add(k.split('|')[1]); });
   });
   Object.keys(lastShelves).forEach(k=>{const[t,c]=k.split('|'); if(t===tDef.id) from.add(c);});
@@ -1181,7 +1187,7 @@ function miniMaxEtageOf(tDef, col, maps){
   const rec=lastShelves[`${tDef.id}|${col}`];
   const marked=rec?parseInt(rec.etage,10):NaN;
   let m=!isNaN(marked)?marked:defaultMaxEtageOf(tDef);
-  [maps.cnt,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
+  [maps.cnt,maps.manuel,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
     Object.keys(dict).forEach(k=>{
       const parts=k.split('|');
       if(parts[1]!==col) return;
@@ -1195,6 +1201,7 @@ function miniMaxEtageOf(tDef, col, maps){
 function miniSlotState(maps,tid,col,e){
   const key=`${tid}|${col}|${e}`;
   if((maps.cnt[key]||0)>0) return 'cat';
+  if((maps.manuel[key]||0)>0) return 'manuel';
   if((maps.nc[key]||0)>0) return 'noncat';
   if(maps.nonrange[key]) return 'nonrange';
   if(maps.vide[key]) return 'vide';
@@ -1202,27 +1209,53 @@ function miniSlotState(maps,tid,col,e){
 }
 function miniStateColor(state){
   if(state==='cat') return 'var(--plan-cat)';
+  if(state==='manuel') return 'var(--plan-manuel)';
   if(state==='noncat') return 'var(--plan-noncat)';
   if(state==='nonrange') return 'var(--plan-nonrange)';
   if(state==='vide') return 'var(--plan-free)';
   return 'var(--plan-unknown)';
 }
+// Dégradé proportionnel quand plusieurs catégories coexistent sur la même
+// case (ex. un exemplaire catalogué + un exemplarisé rapidement + une
+// estimation de non catalogués sur la même étagère) — même logique que
+// gradientOf() dans reserve.html.
+function miniGradientOf(segments){
+  const nonZero = segments.filter(s=>s.count>0);
+  if(!nonZero.length) return null;
+  if(nonZero.length===1) return nonZero[0].color;
+  const total = nonZero.reduce((s,x)=>s+x.count,0);
+  let acc=0; const stops=[];
+  nonZero.forEach(seg=>{
+    const from=Math.round(acc/total*100);
+    acc+=seg.count;
+    const to=Math.round(acc/total*100);
+    stops.push(`${seg.color} ${from}%`, `${seg.color} ${to}%`);
+  });
+  return `linear-gradient(to right, ${stops.join(', ')})`;
+}
 function miniSlotColor(maps,tid,col,e,state){
-  if(state==='cat'){
+  if(state==='cat' || state==='manuel'){
     const key=`${tid}|${col}|${e}`;
-    const n=maps.cnt[key]||0, ncCount=maps.nc[key]||0;
-    if(ncCount>0){
-      const pct=Math.round(n/(n+ncCount)*100);
-      return `linear-gradient(to right, var(--plan-cat) ${pct}%, var(--plan-noncat) ${pct}%)`;
-    }
+    const g = miniGradientOf([
+      {color:'var(--plan-cat)', count:maps.cnt[key]||0},
+      {color:'var(--plan-manuel)', count:maps.manuel[key]||0},
+      {color:'var(--plan-noncat)', count:maps.nc[key]||0},
+    ]);
+    if(g) return g;
   }
   return miniStateColor(state);
 }
 function miniSlotTitle(tDef,col,e,state,maps){
   const key=`${tDef.id}|${col}|${e}`;
-  const n=maps.cnt[key]||0, ncCount=maps.nc[key]||0;
+  const n=maps.cnt[key]||0, mCount=maps.manuel[key]||0, ncCount=maps.nc[key]||0;
   let detail;
-  if(state==='cat') detail = ncCount>0 ? `${n} catalogué(s) + ${ncCount} non catalogué(s)` : `${n} catalogué(s)`;
+  if(state==='cat' || state==='manuel'){
+    const parts=[];
+    if(n>0) parts.push(`${n} catalogué(s)`);
+    if(mCount>0) parts.push(`${mCount} exemplarisé(s) rapidement`);
+    if(ncCount>0) parts.push(`${ncCount} non catalogué(s)`);
+    detail = parts.join(' + ');
+  }
   else if(state==='noncat') detail = `${ncCount} non catalogué(s) estimé(s)`;
   else if(state==='nonrange') detail = 'non rangé';
   else if(state==='vide') detail = 'vide (confirmé)';
@@ -1268,7 +1301,7 @@ function buildMiniPlan(){
     for(let e=1;e<=maxE;e++){
       total++;
       const state=miniSlotState(maps,tid,col,String(e));
-      if(state==='cat'||state==='noncat'||state==='nonrange') filled++;
+      if(state==='cat'||state==='manuel'||state==='noncat'||state==='nonrange') filled++;
       const isCur = col===curCol && e===loc.etage;
       const s=document.createElement('div'); s.className='mp-slot'+(isCur?' cur':'');
       s.style.cssText=`width:${w}px;height:${h}px;background:${miniSlotColor(maps,tid,col,String(e),state)}`;
