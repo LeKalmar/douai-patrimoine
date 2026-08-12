@@ -19,7 +19,7 @@
        CLAUDE.md), pour que le mini-plan ci-dessous se lise de façon
        cohérente avec le plan complet. */
     --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
-    --plan-cat:#1A1E99; --plan-noncat:#F9A825; --plan-nonrange:#8E24AA;
+    --plan-cat:#1A1E99; --plan-manuel:#F9A825; --plan-noncat:#c62828; --plan-nonrange:#8E24AA;
     --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
   }
   body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
@@ -565,7 +565,12 @@ Promise.all([
     const noticeId = it._noticeId || null;
     catalog[bc] = {
       cote, titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim(),
-      fonds:getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId
+      fonds:getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId,
+      // Vient d'exemplarisation.html (pas une vraie notice Syracuse) — voir
+      // js/exemplaires-manuels-shared.js. Propagé jusque dans le scan pour
+      // que reserve.html puisse le colorer différemment (orange) d'un
+      // exemplaire réellement catalogué.
+      manuel: !!it._manuel,
     };
     if(noticeId) noticeIds.add(noticeId);
   });
@@ -813,6 +818,7 @@ function handleScan(barcode, damaged){
     auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
     fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
     etat: cat ? cat.etat : (prev ? prev.etat : ''),
+    manuel: cat ? !!cat.manuel : (prev ? !!prev.manuel : false),
     kind: loc.locType,
     travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
     barcodeAbime: !!damaged,
@@ -899,6 +905,7 @@ function handleScanHorsReserve(barcode, damaged){
     auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
     fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
     etat: cat ? cat.etat : (prev ? prev.etat : ''),
+    manuel: cat ? !!cat.manuel : (prev ? !!prev.manuel : false),
     kind: 'horsreserve',
     travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
     barcodeAbime: !!damaged,
