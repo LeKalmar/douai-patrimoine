@@ -139,7 +139,7 @@
   <div class="container">
     <div class="toolbar-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" id="sq" placeholder="Cote, titre, auteur, travée…" autocomplete="off">
+      <input type="text" id="sq" placeholder="Cote, titre, auteur, code-barre, travée…" autocomplete="off">
     </div>
     <div class="toolbar-sep"></div>
     <button class="toolbar-btn active" id="btn-all"  onclick="setFilter('all')">Tout</button>
@@ -363,8 +363,9 @@ function parseRecolement(rows){
     const fonds =(row.fonds   ||'').trim();
     const etat  =(row.etat    ||'').trim().slice(0,30);
     const manuel=!!row.manuel;
+    const barcode=(row.barcode||'').trim();
     if(!t || !etage) return;
-    const n={c:cote,t:titre,a:auteur,f:fonds,e:etat,m:manuel};
+    const n={c:cote,t:titre,a:auteur,f:fonds,e:etat,m:manuel,b:barcode};
     const key = `${t}|${col}|${etage}`;
     if (!DET[key]) DET[key] = [];
 
@@ -861,7 +862,7 @@ document.getElementById('sq').addEventListener('input',function(){
   for(const[key,notices] of Object.entries(DET)){
     if(nc>=8) break;
     for(const n of notices){
-      if((n.c||'').toLowerCase().includes(q)||(n.t||'').toLowerCase().includes(q)||(n.a||'').toLowerCase().includes(q)){
+      if((n.c||'').toLowerCase().includes(q)||(n.t||'').toLowerCase().includes(q)||(n.a||'').toLowerCase().includes(q)||(n.b||'').toLowerCase().includes(q)){
         const[tid,col,etage]=key.split('|');
         hits.push({type:'notice',label:n.t||n.c,sub:`${n.c} — ${travTitle(tid)}, col. ${col}, ${etageWordFor(tid)} ${etage}`,tid,col,etage});
         nc++; break;
