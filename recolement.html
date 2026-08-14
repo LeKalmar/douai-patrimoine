@@ -113,6 +113,13 @@
   .expected-panel{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem;margin-bottom:1.25rem}
   .expected-title{font-size:.8rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
   .expected-count{font-weight:400;text-transform:none;letter-spacing:0;color:#888;font-size:.78rem}
+  .adv-details{border-top:1px solid #e5e5e5;padding-top:.75rem;margin-top:.9rem}
+  .adv-details summary{cursor:pointer;font-size:.82rem;font-weight:600;color:#333;list-style:none}
+  .adv-details summary::-webkit-details-marker{display:none}
+  .adv-details summary::before{content:'▸ ';color:#999}
+  .adv-details[open] summary::before{content:'▾ '}
+  .adv-details summary .adv-count{font-weight:400;color:#888}
+  .adv-details .log-wrap{margin:.6rem 0 0}
   .exp-list{max-height:220px;overflow-y:auto;font-size:.8rem}
   .exp-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem;border-bottom:1px solid #f0f0f0}
   .exp-row:last-child{border-bottom:none}
@@ -342,6 +349,8 @@
 
         <div class="stats-row" style="margin-bottom:0">
           <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime">0</div></div>
+          <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote">0</div></div>
+          <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start" style="font-size:1rem">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last" style="font-size:1rem">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Durée écoulée (calendaire)</div><div class="stat-card-val" id="st-span" style="font-size:1.2rem">—</div></div>
@@ -349,6 +358,48 @@
           <div class="stat-card"><div class="stat-card-label">Sessions de travail détectées</div><div class="stat-card-val" id="st-sessions">—</div></div>
         </div>
         <p style="font-size:.75rem;color:#888;margin:.75rem 0 0;line-height:1.5">Le temps de travail réel additionne les intervalles entre deux scans consécutifs, sauf si l'écart dépasse 1 h : ces trous (pauses, changements de jour…) ne sont pas comptés dans la durée réelle. Le nombre de sessions correspond au nombre de fois où un tel écart d'au moins 1 h a été détecté, plus une.</p>
+
+        <details class="adv-details" id="adv-abime">
+          <summary>Codes-barres endommagés <span class="adv-count">(<span id="sum-abime-count">0</span>)</span></summary>
+          <div class="log-wrap">
+            <div class="log-header">
+              <span class="log-title">Documents dont le code-barre a été saisi à la main (illisible au scanner)</span>
+              <input type="text" class="log-search" id="abime-search" placeholder="Filtrer (cote, titre, code-barre)…">
+            </div>
+            <div class="log-body"><table class="log-table">
+              <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th></tr></thead>
+              <tbody id="log-abime"></tbody>
+            </table></div>
+          </div>
+        </details>
+
+        <details class="adv-details" id="adv-manualcote">
+          <summary>Scannés, non catalogués, cote saisie à la main <span class="adv-count">(<span id="sum-manualcote-count">0</span>)</span></summary>
+          <div class="log-wrap">
+            <div class="log-header">
+              <span class="log-title">Code-barre absent du catalogue au moment du scan : seule la cote a été renseignée à la main, sans titre ni auteur</span>
+              <input type="text" class="log-search" id="manualcote-search" placeholder="Filtrer (cote, code-barre)…">
+            </div>
+            <div class="log-body"><table class="log-table">
+              <thead><tr><th>Cote</th><th>Emplacement</th><th>Code-barre</th></tr></thead>
+              <tbody id="log-manualcote"></tbody>
+            </table></div>
+          </div>
+        </details>
+
+        <details class="adv-details" id="adv-notscanned">
+          <summary>Jamais scannés — dans le catalogue mais pas encore récolés <span class="adv-count">(<span id="sum-notscanned-count">0</span>)</span></summary>
+          <div class="log-wrap">
+            <div class="log-header">
+              <span class="log-title">Codes-barres du catalogue absents des scans : potentiellement perdus, ou récolement pas encore effectué</span>
+              <input type="text" class="log-search" id="notscanned-search" placeholder="Filtrer (cote, titre, auteur, code-barre)…">
+            </div>
+            <div class="log-body"><table class="log-table">
+              <thead><tr><th>Cote</th><th>Titre</th><th>Auteur</th><th>Code-barre</th></tr></thead>
+              <tbody id="log-notscanned"></tbody>
+            </table></div>
+          </div>
+        </details>
       </div>
 
       <div class="tools-row">
@@ -1431,6 +1482,7 @@ function updateStats(){
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
   updateShelfBar();
   updateTimeStats();
+  updateAdvListsCount();
 }
 
 // Emplacements distincts (étagère/armoire/tiroir) déjà traités : au moins un
@@ -1520,6 +1572,101 @@ function updateTimeStats(){
   }
   elReal.textContent = formatDuration(real);
   elSessions.textContent = sessions.toLocaleString('fr-FR');
+}
+
+/* ════════════ LISTES AVANCÉES (endommagés / cote manuelle / jamais scannés) ════════════
+   Les compteurs (stat-card + badge dans le <summary>) sont recalculés à
+   chaque updateStats() : simples filtres sur scans/catalog, coût négligeable
+   même avec un catalogue de plusieurs milliers d'entrées. Les tableaux
+   détaillés, eux, ne sont construits/rendus que si le <details>
+   correspondant est déjà ouvert — reconstruire des milliers de lignes de DOM
+   à chaque scan serait inutile et coûteux tant que le panneau est fermé. */
+function damagedList(){
+  return Object.values(scans).filter(r=>r.barcodeAbime).sort((a,b)=>b.ts-a.ts);
+}
+function manualCoteList(){
+  // Scanné, jamais trouvé dans le catalogue (ni au scan initial ni depuis) :
+  // ni titre ni auteur, mais une cote a été saisie à la main via le champ
+  // "Renseigner" du feedback (voir showFeedback/manual-save). Exclut les
+  // exemplaires "manuel" (créés via exemplarisation.html), qui ont toujours
+  // un titre.
+  return Object.values(scans).filter(r=>!r.manuel && !r.titre && !r.auteur && r.cote).sort((a,b)=>b.ts-a.ts);
+}
+function notScannedList(){
+  if(!catalog) return [];
+  return Object.keys(catalog)
+    .filter(bc=>!scans[bc])
+    .map(bc=>({barcode:bc, cote:catalog[bc].cote, titre:catalog[bc].titre, auteur:catalog[bc].auteur}))
+    .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
+}
+
+function renderAdvTable(tbodyId, rows, filterFields, filter, rowHtml, colspan, emptyMsg){
+  const q = (filter||'').trim().toLowerCase();
+  const filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
+  const tbody = document.getElementById(tbodyId);
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td class="log-empty" colspan="${colspan}">${emptyMsg}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.slice(0,300).map(rowHtml).join('')
+    + (filtered.length>300 ? `<tr><td class="log-empty" colspan="${colspan}">… et ${(filtered.length-300).toLocaleString('fr-FR')} de plus (affinez la recherche)</td></tr>` : '');
+}
+
+function refreshAbimeList(){
+  if(!document.getElementById('adv-abime').open) return;
+  renderAdvTable('log-abime', damagedList(), ['cote','titre','barcode'], document.getElementById('abime-search').value,
+    r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+    </tr>`, 4, 'Aucun code-barre endommagé pour l\'instant.');
+}
+function refreshManualCoteList(){
+  if(!document.getElementById('adv-manualcote').open) return;
+  renderAdvTable('log-manualcote', manualCoteList(), ['cote','barcode'], document.getElementById('manualcote-search').value,
+    r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+    </tr>`, 3, 'Aucun code-barre dans ce cas pour l\'instant.');
+}
+function refreshNotScannedList(){
+  if(!document.getElementById('adv-notscanned').open) return;
+  if(!catalog){
+    document.getElementById('log-notscanned').innerHTML = '<tr><td class="log-empty" colspan="4">Chargement du catalogue…</td></tr>';
+    return;
+  }
+  renderAdvTable('log-notscanned', notScannedList(), ['cote','titre','auteur','barcode'], document.getElementById('notscanned-search').value,
+    r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(titre inconnu)'}</td>
+      <td>${esc(r.auteur)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+    </tr>`, 4, 'Tout le catalogue a été scanné au moins une fois.');
+}
+
+document.getElementById('adv-abime').addEventListener('toggle', refreshAbimeList);
+document.getElementById('adv-manualcote').addEventListener('toggle', refreshManualCoteList);
+document.getElementById('adv-notscanned').addEventListener('toggle', refreshNotScannedList);
+document.getElementById('abime-search').addEventListener('input', refreshAbimeList);
+document.getElementById('manualcote-search').addEventListener('input', refreshManualCoteList);
+document.getElementById('notscanned-search').addEventListener('input', refreshNotScannedList);
+
+function updateAdvListsCount(){
+  document.getElementById('sum-abime-count').textContent = document.getElementById('st-abime').textContent;
+
+  const manualCoteCount = manualCoteList().length;
+  document.getElementById('st-manualcote').textContent = manualCoteCount.toLocaleString('fr-FR');
+  document.getElementById('sum-manualcote-count').textContent = manualCoteCount.toLocaleString('fr-FR');
+
+  if(catalog){
+    const notScannedCount = Object.keys(catalog).filter(bc=>!scans[bc]).length;
+    document.getElementById('st-notscanned').textContent = notScannedCount.toLocaleString('fr-FR');
+    document.getElementById('sum-notscanned-count').textContent = notScannedCount.toLocaleString('fr-FR');
+  }
+
+  refreshAbimeList(); refreshManualCoteList(); refreshNotScannedList();
 }
 
 /* ════════════ EXPORT / IMPORT / RESET ════════════
