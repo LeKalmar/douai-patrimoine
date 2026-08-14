@@ -201,9 +201,11 @@ envoie à `/api/recolement`, sans attendre un premier rescan physique.
 
 Les « Statistiques avancées du récolement » (bas de `recolement.html`)
 listent trois catégories de problèmes, chacune dans un `<details>` repliable
-(rendu paresseux : le tableau détaillé — jusqu'à 300 lignes affichées, le
-reste juste compté — n'est reconstruit que si le panneau est ouvert, pour ne
-pas payer le coût DOM à chaque scan) : **codes-barres endommagés** (`scans`
+(rendu paresseux — le tableau détaillé n'est reconstruit que si le panneau
+est ouvert, pour ne pas payer le coût DOM à chaque scan — et paginé,
+`ADV_PAGE_SIZE` lignes par page avec Précédent/Suivant, plutôt qu'un plafond
+qui tronquerait la liste : la catégorie « jamais scannés » peut compter
+plusieurs milliers d'entrées) : **codes-barres endommagés** (`scans`
 avec `barcodeAbime:true`, saisis à la main faute de pouvoir être scannés),
 **scannés non catalogués** (un scan sans correspondance dans `catalog` au
 moment du scan — repéré a posteriori par `!titre && !auteur && cote`,

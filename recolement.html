@@ -129,6 +129,11 @@
   .log-reopen{background:none;border:1px solid #ddd;color:#888;cursor:pointer;font-size:.68rem;padding:2px 8px;border-radius:12px;white-space:nowrap}
   .log-reopen:hover{background:#f0f0f0}
   .adv-row-resolved td{opacity:.5}
+  .adv-pager{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.5rem .9rem;border-top:1px solid #e8e8e8;font-size:.75rem;color:#777;flex-wrap:wrap}
+  .adv-pager-btns{display:flex;align-items:center;gap:.4rem}
+  .adv-pager button{font-family:inherit;font-size:.75rem;padding:.3rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#333}
+  .adv-pager button:disabled{opacity:.4;cursor:default}
+  .adv-pager button:not(:disabled):hover{background:#f5f5f5}
   .exp-list{max-height:220px;overflow-y:auto;font-size:.8rem}
   .exp-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem;border-bottom:1px solid #f0f0f0}
   .exp-row:last-child{border-bottom:none}
@@ -383,6 +388,7 @@
               <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
               <tbody id="log-abime"></tbody>
             </table></div>
+            <div class="adv-pager" id="abime-pager"></div>
           </div>
         </details>
 
@@ -401,6 +407,7 @@
               <thead><tr><th>Cote</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
               <tbody id="log-manualcote"></tbody>
             </table></div>
+            <div class="adv-pager" id="manualcote-pager"></div>
           </div>
         </details>
 
@@ -419,6 +426,7 @@
               <thead><tr><th>Cote</th><th>Titre</th><th>Auteur</th><th>Code-barre</th><th></th></tr></thead>
               <tbody id="log-notscanned"></tbody>
             </table></div>
+            <div class="adv-pager" id="notscanned-pager"></div>
           </div>
         </details>
       </div>
@@ -878,7 +886,12 @@ scanInput.addEventListener('keydown', e=>{
   }
 });
 document.addEventListener('click', e=>{
-  if(!e.target.closest('input,select,button,a,label')) scanInput.focus();
+  // .adv-details (menus dépliables des statistiques avancées) est exclu :
+  // refocuser scanInput (en haut de la page, hors de vue une fois qu'on a
+  // scrollé jusqu'aux statistiques avancées) forçait le navigateur à faire
+  // défiler la page jusqu'à lui à chaque clic sur un <summary> ou une ligne
+  // de tableau — sensation de "téléportation" en haut de page.
+  if(!e.target.closest('input,select,button,a,label,.adv-details')) scanInput.focus();
 });
 
 function handleScan(barcode, damaged){
@@ -1660,70 +1673,94 @@ function notScannedList(){
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
 
-function renderAdvTable(tbodyId, category, rows, filterFields, filter, showResolved, rowHtml, colspan, emptyMsg){
+// Pagination plutôt qu'un plafond fixe (300) avec message "affinez la
+// recherche" : on veut pouvoir consulter l'intégralité d'une liste, y
+// compris "jamais scannés" qui peut compter plusieurs milliers d'entrées —
+// juste pas toutes rendues dans le DOM d'un coup.
+const ADV_PAGE_SIZE = 150;
+const advPage = { abime:1, manualcote:1, notscanned:1 };
+
+function renderAdvTable(tbodyId, pagerId, category, rows, filterFields, filter, showResolved, rowHtml, colspan, emptyMsg, page, onPageChange){
   const q = (filter||'').trim().toLowerCase();
   let filtered = showResolved ? rows : rows.filter(r=>!r._resolved);
   if(q) filtered = filtered.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q)));
   const tbody = document.getElementById(tbodyId);
+  const pager = document.getElementById(pagerId);
   if(!filtered.length){
     tbody.innerHTML = `<tr><td class="log-empty" colspan="${colspan}">${emptyMsg}</td></tr>`;
+    pager.innerHTML = '';
     return;
   }
-  tbody.innerHTML = filtered.slice(0,300).map(rowHtml).join('')
-    + (filtered.length>300 ? `<tr><td class="log-empty" colspan="${colspan}">… et ${(filtered.length-300).toLocaleString('fr-FR')} de plus (affinez la recherche)</td></tr>` : '');
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ADV_PAGE_SIZE));
+  const curPage = Math.min(Math.max(1, page), totalPages);
+  const start = (curPage-1) * ADV_PAGE_SIZE;
+  tbody.innerHTML = filtered.slice(start, start+ADV_PAGE_SIZE).map(rowHtml).join('');
   tbody.querySelectorAll('[data-resolve]').forEach(b=>b.addEventListener('click', ()=>setIssueResolved(b.dataset.category, b.dataset.resolve, true)));
   tbody.querySelectorAll('[data-reopen]').forEach(b=>b.addEventListener('click', ()=>setIssueResolved(b.dataset.category, b.dataset.reopen, false)));
+
+  pager.innerHTML = `
+    <span>${filtered.length.toLocaleString('fr-FR')} résultat${filtered.length>1?'s':''} — page ${curPage} / ${totalPages}</span>
+    <span class="adv-pager-btns">
+      <button type="button" id="${pagerId}-prev" ${curPage<=1?'disabled':''}>‹ Précédent</button>
+      <button type="button" id="${pagerId}-next" ${curPage>=totalPages?'disabled':''}>Suivant ›</button>
+    </span>`;
+  if(curPage>1) document.getElementById(`${pagerId}-prev`).addEventListener('click', ()=>onPageChange(curPage-1));
+  if(curPage<totalPages) document.getElementById(`${pagerId}-next`).addEventListener('click', ()=>onPageChange(curPage+1));
 }
 
 function refreshAbimeList(){
   if(!document.getElementById('adv-abime').open) return;
   const showResolved = document.getElementById('abime-showresolved').checked;
-  renderAdvTable('log-abime', 'abime', damagedList(), ['cote','titre','barcode'], document.getElementById('abime-search').value, showResolved,
+  renderAdvTable('log-abime', 'abime-pager', 'abime', damagedList(), ['cote','titre','barcode'], document.getElementById('abime-search').value, showResolved,
     r => `<tr class="${r._resolved?'adv-row-resolved':''}">
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${advActionCell('abime', r)}</td>
-    </tr>`, 5, 'Aucun code-barre endommagé pour l\'instant.');
+    </tr>`, 5, 'Aucun code-barre endommagé pour l\'instant.',
+    advPage.abime, p=>{ advPage.abime=p; refreshAbimeList(); });
 }
 function refreshManualCoteList(){
   if(!document.getElementById('adv-manualcote').open) return;
   const showResolved = document.getElementById('manualcote-showresolved').checked;
-  renderAdvTable('log-manualcote', 'manualcote', manualCoteList(), ['cote','barcode'], document.getElementById('manualcote-search').value, showResolved,
+  renderAdvTable('log-manualcote', 'manualcote-pager', 'manualcote', manualCoteList(), ['cote','barcode'], document.getElementById('manualcote-search').value, showResolved,
     r => `<tr class="${r._resolved?'adv-row-resolved':''}">
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${advActionCell('manualcote', r)}</td>
-    </tr>`, 4, 'Aucun code-barre dans ce cas pour l\'instant.');
+    </tr>`, 4, 'Aucun code-barre dans ce cas pour l\'instant.',
+    advPage.manualcote, p=>{ advPage.manualcote=p; refreshManualCoteList(); });
 }
 function refreshNotScannedList(){
   if(!document.getElementById('adv-notscanned').open) return;
   if(!catalog){
     document.getElementById('log-notscanned').innerHTML = '<tr><td class="log-empty" colspan="5">Chargement du catalogue…</td></tr>';
+    document.getElementById('notscanned-pager').innerHTML = '';
     return;
   }
   const showResolved = document.getElementById('notscanned-showresolved').checked;
-  renderAdvTable('log-notscanned', 'notscanned', notScannedList(), ['cote','titre','auteur','barcode'], document.getElementById('notscanned-search').value, showResolved,
+  renderAdvTable('log-notscanned', 'notscanned-pager', 'notscanned', notScannedList(), ['cote','titre','auteur','barcode'], document.getElementById('notscanned-search').value, showResolved,
     r => `<tr class="${r._resolved?'adv-row-resolved':''}">
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
       <td>${esc(r.auteur)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${advActionCell('notscanned', r)}</td>
-    </tr>`, 5, 'Tout le catalogue a été scanné au moins une fois.');
+    </tr>`, 5, 'Tout le catalogue a été scanné au moins une fois.',
+    advPage.notscanned, p=>{ advPage.notscanned=p; refreshNotScannedList(); });
 }
 
 document.getElementById('adv-abime').addEventListener('toggle', refreshAbimeList);
 document.getElementById('adv-manualcote').addEventListener('toggle', refreshManualCoteList);
 document.getElementById('adv-notscanned').addEventListener('toggle', refreshNotScannedList);
-document.getElementById('abime-search').addEventListener('input', refreshAbimeList);
-document.getElementById('manualcote-search').addEventListener('input', refreshManualCoteList);
-document.getElementById('notscanned-search').addEventListener('input', refreshNotScannedList);
-document.getElementById('abime-showresolved').addEventListener('change', refreshAbimeList);
-document.getElementById('manualcote-showresolved').addEventListener('change', refreshManualCoteList);
-document.getElementById('notscanned-showresolved').addEventListener('change', refreshNotScannedList);
+document.getElementById('abime-search').addEventListener('input', function(){ advPage.abime=1; refreshAbimeList(); });
+document.getElementById('manualcote-search').addEventListener('input', function(){ advPage.manualcote=1; refreshManualCoteList(); });
+document.getElementById('notscanned-search').addEventListener('input', function(){ advPage.notscanned=1; refreshNotScannedList(); });
+document.getElementById('abime-showresolved').addEventListener('change', function(){ advPage.abime=1; refreshAbimeList(); });
+document.getElementById('manualcote-showresolved').addEventListener('change', function(){ advPage.manualcote=1; refreshManualCoteList(); });
+document.getElementById('notscanned-showresolved').addEventListener('change', function(){ advPage.notscanned=1; refreshNotScannedList(); });
 
 function updateAdvListsCount(){
   const abimeUnresolved = damagedList().filter(r=>!r._resolved).length;
