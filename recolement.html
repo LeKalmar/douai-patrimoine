@@ -1743,10 +1743,10 @@ function updateAdvListsCount(){
   refreshAbimeList(); refreshManualCoteList(); refreshNotScannedList();
 }
 
-/* Export .txt : codes-barres séparés par des points-virgules, respectant le
-   filtre de recherche et la case "Afficher aussi les réglés" en cours (pas
-   de plafond à 300 lignes ici, contrairement à l'affichage à l'écran — un
-   export doit contenir tout ce qui correspond, pas juste l'aperçu). */
+/* Export .txt : un code-barre par ligne, respectant le filtre de recherche
+   et la case "Afficher aussi les réglés" en cours (pas de plafond à 300
+   lignes ici, contrairement à l'affichage à l'écran — un export doit
+   contenir tout ce qui correspond, pas juste l'aperçu). */
 function downloadTxt(text, filename){
   const blob = new Blob([text], {type:'text/plain'});
   const a = document.createElement('a');
@@ -1761,7 +1761,7 @@ function exportAdvBarcodes(rows, filterFields, filter, showResolved, filenamePre
   if(q) filtered = filtered.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q)));
   if(!filtered.length){ alert('Aucun code-barre à exporter pour ce filtre.'); return; }
   const d = new Date(), pad = n => String(n).padStart(2,'0');
-  downloadTxt(filtered.map(r=>r.barcode).join(';'),
+  downloadTxt(filtered.map(r=>r.barcode).join('\n'),
     `${filenamePrefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
 }
 document.getElementById('abime-export').addEventListener('click', ()=>{

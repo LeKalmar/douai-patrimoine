@@ -212,7 +212,7 @@ feedback — à distinguer des exemplaires `manuel` d'`exemplarisation.html`,
 qui ont toujours un titre) et **jamais scannés** (différence entre les
 codes-barres de `catalog` et ceux de `scans` — potentiellement perdus, ou
 récolement pas encore fait sur cet exemplaire). Chaque panneau a un bouton
-d'export (`.txt`, codes-barres séparés par `;`, respectant la recherche et
+d'export (`.txt`, un code-barre par ligne, respectant la recherche et
 la case « Afficher aussi les réglés » en cours) et, par ligne, un bouton
 ✓ Réglé/↺ Rouvrir qui bascule un flag dans `resolvedIssues` (clé composite
 `categorie|barcode` — un même code-barre peut apparaître réglé dans une
