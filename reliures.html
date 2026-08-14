@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Gestion des reliures — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="js/reserve-shared.js"></script>
+<script src="js/exemplaires-manuels-shared.js"></script>
+<script src="js/reliures-manuelles-shared.js"></script>
+<style>
+  :root{
+    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0;line-height:1.15}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
+  .container{max-width:1000px;margin:0 auto;padding:0 1.5rem}
+  .section{padding:1.5rem 0}
+  .intro{font-size:.88rem;color:#555;line-height:1.6;background:#F5F5FF;border:1px solid #e3e3f5;border-radius:var(--radius-md);padding:1rem 1.25rem;margin-bottom:1.5rem}
+  .intro strong{color:#12157A}
+
+  .scan-zone{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
+  .scan-zone h2{font-family:'DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 .9rem;color:#12157A}
+  .scan-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem}
+  .scan-row input[type=text]{flex:1;min-width:220px;font-size:1.1rem;font-family:'DM Mono',monospace,inherit;padding:.7rem .9rem;border:1px solid #ccc;border-radius:8px;outline:none}
+  .scan-row input[type=text]:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
+  .scan-row input[type=text]:disabled{background:#f5f5f5;color:#aaa}
+  .field-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.3rem}
+
+  .principal-card{background:#F5F5FF;border:1px solid #ddd;border-radius:var(--radius-md);padding:.9rem 1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .principal-card.empty{color:#999;font-style:italic}
+  .principal-info .cote{font-family:monospace;font-weight:700;color:#12157A;margin-right:.5rem}
+  .principal-info .titre{font-size:.85rem;color:#333}
+  .principal-info .meta{font-size:.72rem;color:#888;margin-top:.15rem}
+
+  .feedback{margin-top:.75rem;border-radius:var(--radius-md);padding:.75rem 1rem;display:none;font-size:.85rem}
+  .feedback.show{display:block}
+  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9;color:#1b5e20}
+  .feedback.warn{background:#fff8e1;border:1px solid #ffe0b2;color:#7a4a00}
+  .feedback.err{background:#ffebee;border:1px solid #ffcdd2;color:#b71c1c}
+
+  .members-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.5rem}
+  .members-table th{text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;padding:.4rem .6rem;border-bottom:1px solid #e8e8f0}
+  .members-table td{padding:.4rem .6rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .members-table tr:hover td{background:#fafafa}
+  .members-empty{padding:.75rem;text-align:center;color:#bbb;font-style:italic;font-size:.8rem}
+  .row-del{font-family:inherit;font-size:.75rem;padding:.25rem .55rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#c62828}
+  .row-del:hover{background:#fff5f5}
+  .badge-unknown{font-size:.65rem;padding:1px 7px;border-radius:20px;background:#ffe0b2;color:#e65100;margin-left:.4rem}
+
+  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem}
+  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
+  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .log-body{max-height:420px;overflow-y:auto}
+  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
+  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0}
+  .log-table td{padding:.35rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .log-table tr:hover td{background:#fafafa}
+  .log-empty{padding:1rem;text-align:center;color:#bbb;font-style:italic;font-size:.8rem}
+  .tool-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #12157A;border-radius:8px;background:#12157A;color:#fff;cursor:pointer;display:inline-block;text-decoration:none}
+  .tool-btn:hover{background:#1c1fa0}
+  .tool-btn.secondary{background:#fff;color:#12157A}
+  .tool-btn.secondary:hover{background:#F5F5FF}
+  .tool-btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
+  .tool-btn.danger:hover{background:#fff5f5}
+  .tool-btn:disabled{opacity:.6;cursor:default}
+
+  .conflict-block{border:1px solid #ffcdd2;background:#fff5f5;border-radius:var(--radius-md);padding:.9rem 1rem;margin-bottom:.9rem}
+  .conflict-block h4{margin:0 0 .5rem;font-size:.85rem;color:#b71c1c}
+  .conflict-block ul{margin:0;padding-left:1.1rem;font-size:.8rem;color:#444;line-height:1.7}
+  .conflict-block code{background:#fff;border:1px solid #eee;padding:1px 5px;border-radius:4px}
+
+  .adv-details{border-top:1px solid #e5e5e5;padding-top:.75rem;margin-top:.9rem}
+  .adv-details summary{cursor:pointer;font-size:.82rem;font-weight:600;color:#333;list-style:none}
+  .adv-details summary::-webkit-details-marker{display:none}
+  .adv-details summary::before{content:'▸ ';color:#999}
+  .adv-details[open] summary::before{content:'▾ '}
+  .adv-details summary .adv-count{font-weight:400;color:#888}
+  .log-header-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:200px}
+  .adv-pager{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.6rem .9rem;font-size:.75rem;color:#777;flex-wrap:wrap}
+  .adv-pager-btns{display:flex;align-items:center;gap:.4rem}
+  .adv-pager button{font-family:inherit;font-size:.75rem;padding:.3rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#333}
+  .adv-pager button:disabled{opacity:.4;cursor:default}
+  .adv-pager button:not(:disabled):hover{background:#f5f5f5}
+
+  .suggestion-block{border:1px solid #b2dfdb;background:#e0f2f1;border-radius:var(--radius-md);padding:.9rem 1rem;margin-bottom:.9rem}
+  .suggestion-block h4{margin:0 0 .5rem;font-size:.85rem;color:#00695c;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+  .suggestion-block .base-cote{font-family:monospace;font-weight:700}
+  .suggestion-block ul{margin:0 0 .6rem;padding-left:1.1rem;font-size:.8rem;color:#444;line-height:1.7}
+  .suggestion-block code{background:#fff;border:1px solid #eee;padding:1px 5px;border-radius:4px}
+  .loc-found{color:#00695c;font-weight:600}
+  .loc-missing{color:#999;font-style:italic}
+  .suggestion-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+  .ignored-row{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.4rem .2rem;border-bottom:1px solid #f0f0f0;font-size:.8rem}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+</style>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
+      <h1 class="page-title">Gestion des reliures</h1>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status"></span>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <p class="intro">
+        Certains documents catalogués séparément sont en réalité <strong>reliés dans un même volume physique</strong>
+        (recueils factices). Un premier lot est déjà détecté automatiquement dans Syracuse via les champs $481/$482 —
+        voir CLAUDE.md. Cet outil sert à en ajouter d'autres à la main, quand vous découvrez une reliure en réserve
+        sans attendre un prochain export Syracuse : définissez le <strong>code-barre principal</strong> du volume,
+        puis scannez chacun des autres documents qui y sont reliés. Ensuite, dans <a href="recolement.html">le récolement</a>,
+        scanner n'importe lequel des membres du groupe récole automatiquement tous les autres au même emplacement.
+      </p>
+
+      <div class="scan-zone">
+        <h2>1. Code-barre principal du volume</h2>
+        <div class="field-label">Celui qui « prend en charge » les autres (équivalent $481)</div>
+        <div class="scan-row">
+          <input type="text" id="principal-input" placeholder="Scannez ou tapez le code-barre principal" autocomplete="off" autofocus>
+          <button type="button" class="tool-btn secondary" id="btn-new-group">Nouveau groupe</button>
+        </div>
+        <div class="principal-card empty" id="principal-card">Aucun groupe en cours — scannez un code-barre principal ci-dessus.</div>
+
+        <h2>2. Documents reliés à ce volume</h2>
+        <div class="field-label">Chacun reçoit un lien vers le principal (équivalent $482)</div>
+        <div class="scan-row">
+          <input type="text" id="member-input" placeholder="Scannez un document relié au principal" autocomplete="off" disabled>
+        </div>
+        <div class="feedback" id="member-feedback"></div>
+
+        <table class="members-table" id="members-table" style="display:none">
+          <thead><tr><th>Cote</th><th>Titre</th><th>Code-barre</th><th></th></tr></thead>
+          <tbody id="members-tbody"></tbody>
+        </table>
+        <div class="members-empty" id="members-empty">Aucun document relié pour l'instant.</div>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header"><span class="log-title">Tous les groupes créés manuellement</span></div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Principal</th><th>Membres</th><th>Créé le</th><th></th></tr></thead>
+          <tbody id="log-groups"></tbody>
+        </table></div>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">Groupes en conflit d'emplacement</span>
+          <button type="button" class="tool-btn secondary" id="btn-refresh-analysis">↻ Rafraîchir</button>
+        </div>
+        <div id="conflicts-zone" style="padding:1rem">
+          <p class="log-empty" id="conflicts-empty">Chargement…</p>
+        </div>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header"><span class="log-title" style="text-transform:none;font-weight:400;font-size:.85rem">Groupes potentiels détectés dans les cotes</span></div>
+        <div style="padding:1rem">
+          <p style="font-size:.8rem;color:#666;line-height:1.5;margin:0 0 1rem">
+            Détecté à partir de la forme des cotes (fonds Imprimés notamment : une cote de base
+            <code>I-XX-XXXX-X</code> suivie d'un suffixe <code>-X</code>, <code>-X bis/ter</code> ou <code>-X/X</code>
+            signale souvent un document trouvé ou relié avec un autre portant la même base). C'est un indice, pas une
+            certitude : vérifiez avant de créer le groupe, et écartez ce qui ne correspond à rien de réel — l'écart est
+            mémorisé durablement (survit à un nouveau récolement ou à un nouvel export Syracuse).
+          </p>
+          <details class="adv-details" id="adv-suggestions">
+            <summary>Suggestions à vérifier <span class="adv-count">(<span id="sugg-count">0</span>)</span></summary>
+            <div class="log-header-actions" style="margin:.75rem 0">
+              <input type="text" class="log-search" id="sugg-search" placeholder="Filtrer (cote, code-barre)…">
+            </div>
+            <div id="suggestions-zone"><p class="log-empty">Ouvrez ce panneau pour calculer les suggestions.</p></div>
+            <div class="adv-pager" id="sugg-pager"></div>
+          </details>
+          <details class="adv-details" id="adv-ignored">
+            <summary>Suggestions écartées <span class="adv-count">(<span id="ignored-count">0</span>)</span></summary>
+            <div id="ignored-zone" style="margin-top:.5rem"></div>
+          </details>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function(){
+/* ════════════ AUTH ════════════ */
+if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+  window.location.href = 'index.html';
+  return;
+}
+document.getElementById('logout-btn').addEventListener('click', function(){
+  sessionStorage.removeItem('rp_admin_auth');
+  sessionStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+let audioCtx = null;
+function beep(freq, dur){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type='sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime+dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+function beepError(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    [0, .16].forEach(offset=>{
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type='square'; o.frequency.value=160;
+      g.gain.setValueAtTime(.15, now+offset);
+      g.gain.exponentialRampToValueAtTime(.001, now+offset+.14);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(now+offset); o.stop(now+offset+.14);
+    });
+  }catch(e){}
+}
+
+/* ════════════ SYNCHRONISATION (mêmes principes que recolement.html/exemplarisation.html) ════════════ */
+function authHeaders(){
+  const token = sessionStorage.getItem('rp_admin_token');
+  const h = { 'Content-Type': 'application/json' };
+  if(token) h['Authorization'] = 'Basic ' + token;
+  return h;
+}
+const LS_PENDING = 'rp_reliures_pending_sync';
+let pendingSync = (function(){ try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch(e){ return []; } })();
+function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
+let lastSyncError = null;
+function updateSyncIndicator(){
+  const el = document.getElementById('sync-status');
+  if(pendingSync.length){
+    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
+    el.classList.add('pending');
+  } else {
+    el.textContent = '✓ synchronisé';
+    el.classList.remove('pending');
+  }
+}
+function queuePatch(patch){
+  pendingSync.push(patch);
+  savePendingSync();
+  updateSyncIndicator();
+  flushPendingSync();
+}
+let flushingSync = false;
+async function flushPendingSync(){
+  if(flushingSync) return;
+  flushingSync = true;
+  try{
+    while(pendingSync.length){
+      const patch = pendingSync[0];
+      let res;
+      try{
+        res = await fetch('/api/reliures-manuelles', { method:'POST', headers: authHeaders(), body: JSON.stringify(patch) });
+      }catch(e){
+        lastSyncError = 'hors ligne ou serveur injoignable';
+        break;
+      }
+      if(res.status===401){
+        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
+        break;
+      }
+      if(res.status===503){
+        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
+        break;
+      }
+      if(!res.ok){
+        lastSyncError = `erreur serveur (${res.status})`;
+        break;
+      }
+      lastSyncError = null;
+      pendingSync.shift();
+      savePendingSync();
+    }
+  } finally {
+    flushingSync = false;
+    updateSyncIndicator();
+  }
+}
+window.addEventListener('online', flushPendingSync);
+setInterval(flushPendingSync, 20000);
+
+/* ════════════ CATALOGUE + GROUPES ════════════ */
+let catalog = {};        // barcode -> {cote,titre,auteur}
+let syracuseItems = [];  // data/inventaire.json brut (pour _relies)
+let manualGroups = {};   // principal -> {principal, members, ts}
+let ignoredSuggestions = {}; // signature -> {signature, base, barcodes, ts}
+let currentPrincipal = null;
+
+function loadCatalogRow(it){
+  const bc = (it['915$b'] || it['995$f'] || '').trim();
+  if(!bc) return;
+  catalog[bc] = { cote:(it['930$g']||'').trim(), titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim() };
+}
+
+Promise.all([
+  fetch('data/inventaire.json').then(r=>r.json()),
+  fetchExemplairesManuelsAsCatalogRows(),
+  fetchReliuresManuelles(),
+]).then(([data, manuels, state])=>{
+  syracuseItems = data;
+  data.forEach(loadCatalogRow);
+  manuels.forEach(loadCatalogRow);
+  manualGroups = state.groups || {};
+  ignoredSuggestions = state.ignoredSuggestions || {};
+  renderGroupsTable();
+  refreshAnalysis();
+}).catch(()=>{
+  document.getElementById('conflicts-empty').textContent = 'Catalogue indisponible.';
+});
+
+/* ════════════ GROUPE EN COURS ════════════ */
+const principalInput = document.getElementById('principal-input');
+const memberInput = document.getElementById('member-input');
+const principalCard = document.getElementById('principal-card');
+
+function ensureLocalGroup(principal){
+  if(!manualGroups[principal]) manualGroups[principal] = { principal, members:[], ts: Date.now() };
+  return manualGroups[principal];
+}
+
+function setCurrentPrincipal(bc){
+  currentPrincipal = bc;
+  ensureLocalGroup(bc);
+  queuePatch({ type:'ensureGroup', principal: bc, ts: Date.now() });
+  memberInput.disabled = false;
+  renderPrincipalCard();
+  renderMembersTable();
+  renderGroupsTable();
+  memberInput.focus();
+}
+
+function renderPrincipalCard(){
+  if(!currentPrincipal){
+    principalCard.className = 'principal-card empty';
+    principalCard.innerHTML = 'Aucun groupe en cours — scannez un code-barre principal ci-dessus.';
+    return;
+  }
+  const cat = catalog[currentPrincipal];
+  principalCard.className = 'principal-card';
+  principalCard.innerHTML = `
+    <div class="principal-info">
+      <span class="cote">${esc(cat && cat.cote || '(cote inconnue)')}</span>
+      <span class="titre">${esc(cat && cat.titre || '(non catalogué)')}${!cat ? '<span class="badge-unknown">⚠ inconnu du catalogue</span>' : ''}</span>
+      <div class="meta">code-barre ${esc(currentPrincipal)}</div>
+    </div>`;
+}
+
+document.getElementById('btn-new-group').addEventListener('click', ()=>{
+  currentPrincipal = null;
+  memberInput.disabled = true;
+  principalInput.value = '';
+  memberInput.value = '';
+  document.getElementById('member-feedback').className = 'feedback';
+  renderPrincipalCard();
+  renderMembersTable();
+  principalInput.focus();
+});
+
+principalInput.addEventListener('keydown', e=>{
+  if(e.key !== 'Enter') return;
+  e.preventDefault();
+  const bc = principalInput.value.trim();
+  principalInput.value = '';
+  if(!bc) return;
+  setCurrentPrincipal(bc);
+});
+
+function showMemberFeedback(status, html){
+  const fb = document.getElementById('member-feedback');
+  fb.className = 'feedback show ' + status;
+  fb.innerHTML = html;
+}
+
+memberInput.addEventListener('keydown', e=>{
+  if(e.key !== 'Enter') return;
+  e.preventDefault();
+  const bc = memberInput.value.trim();
+  memberInput.value = '';
+  if(!bc || !currentPrincipal) return;
+
+  if(bc === currentPrincipal){
+    showMemberFeedback('err', 'Un document ne peut pas être relié à lui-même.');
+    beepError();
+    return;
+  }
+  const group = ensureLocalGroup(currentPrincipal);
+  if(group.members.includes(bc)){
+    showMemberFeedback('warn', `Déjà relié à ce groupe : ${esc(bc)}`);
+    beep(880,.12);
+    return;
+  }
+  // Appartenance exclusive : on le retire localement de tout autre groupe
+  // (le serveur fait de même, voir api/reliures-manuelles.mjs).
+  Object.values(manualGroups).forEach(g=>{
+    if(g.principal !== currentPrincipal) g.members = g.members.filter(b=>b!==bc);
+  });
+  group.members.push(bc);
+  queuePatch({ type:'addMember', principal: currentPrincipal, barcode: bc, ts: Date.now() });
+
+  const cat = catalog[bc];
+  showMemberFeedback('ok', `✓ Relié : ${esc(cat && cat.cote || bc)}${!cat ? '<span class="badge-unknown">⚠ inconnu du catalogue</span>' : ''}`);
+  beep(880,.12);
+  renderMembersTable();
+  renderGroupsTable();
+  refreshAnalysis();
+});
+
+function removeMember(principal, barcode){
+  const group = manualGroups[principal];
+  if(!group) return;
+  group.members = group.members.filter(b=>b!==barcode);
+  queuePatch({ type:'removeMember', principal, barcode });
+  renderMembersTable();
+  renderGroupsTable();
+  refreshAnalysis();
+}
+
+function renderMembersTable(){
+  const table = document.getElementById('members-table');
+  const tbody = document.getElementById('members-tbody');
+  const empty = document.getElementById('members-empty');
+  const group = currentPrincipal ? manualGroups[currentPrincipal] : null;
+  const members = group ? group.members : [];
+  if(!members.length){
+    table.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  table.style.display = '';
+  empty.style.display = 'none';
+  tbody.innerHTML = members.map(bc=>{
+    const cat = catalog[bc];
+    return `<tr>
+      <td style="font-family:monospace">${esc(cat && cat.cote || '—')}</td>
+      <td>${esc(cat && cat.titre || '(non catalogué)')}${!cat ? '<span class="badge-unknown">⚠</span>' : ''}</td>
+      <td style="font-family:monospace;color:#888">${esc(bc)}</td>
+      <td><button class="row-del" data-bc="${esc(bc)}">✕</button></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.row-del').forEach(b=>b.addEventListener('click', ()=>removeMember(currentPrincipal, b.dataset.bc)));
+}
+
+/* ════════════ TOUS LES GROUPES CRÉÉS MANUELLEMENT ════════════ */
+function deleteGroup(principal){
+  const cat = catalog[principal];
+  if(!confirm(`Supprimer le groupe reliure « ${cat ? cat.cote || principal : principal} » (${(manualGroups[principal]?.members||[]).length} document(s) relié(s)) ? Cela ne supprime aucun scan déjà enregistré dans le récolement.`)) return;
+  delete manualGroups[principal];
+  queuePatch({ type:'deleteGroup', principal });
+  if(currentPrincipal === principal) document.getElementById('btn-new-group').click();
+  renderGroupsTable();
+  refreshAnalysis();
+}
+
+function renderGroupsTable(){
+  const tbody = document.getElementById('log-groups');
+  const groups = Object.values(manualGroups).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(!groups.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucun groupe créé manuellement pour l\'instant.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = groups.map(g=>{
+    const cat = catalog[g.principal];
+    return `<tr>
+      <td style="font-family:monospace">${esc(cat && cat.cote || g.principal)}<div style="color:#888;font-size:.72rem">${esc(cat && cat.titre || '(non catalogué)')}</div></td>
+      <td>${g.members.length}</td>
+      <td>${g.ts ? new Date(g.ts).toLocaleDateString('fr-FR') : '—'}</td>
+      <td style="white-space:nowrap">
+        <button class="tool-btn secondary" style="padding:.25rem .6rem;font-size:.72rem" data-resume="${esc(g.principal)}">Reprendre</button>
+        <button class="row-del" data-del="${esc(g.principal)}">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('[data-resume]').forEach(b=>b.addEventListener('click', ()=>setCurrentPrincipal(b.dataset.resume)));
+  tbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>deleteGroup(b.dataset.del)));
+}
+
+/* ════════════ GROUPES EN CONFLIT (Syracuse $481/$482 + manuels, croisés avec le récolement) ════════════
+   Même logique que scripts/backfill-reliure.mjs, mais en direct côté
+   client : reconstruit toutes les cliques (union-find sur _relies +
+   manualGroups) puis signale celles dont les membres déjà scannés dans
+   /api/recolement ne sont pas au même emplacement. */
+function buildAllGroups(){
+  const parent = new Map();
+  function find(x){ if(!parent.has(x)) parent.set(x,x); let r=x; while(parent.get(r)!==r) r=parent.get(r); let c=x; while(parent.get(c)!==r){const n=parent.get(c); parent.set(c,r); c=n;} return r; }
+  function union(a,b){ const ra=find(a), rb=find(b); if(ra!==rb) parent.set(ra,rb); }
+  const nodes = new Set();
+  syracuseItems.forEach(it=>{
+    const bc = (it['995$f']||'').trim();
+    if(bc && Array.isArray(it._relies) && it._relies.length){
+      it._relies.forEach(sib=>{ union(bc, sib); nodes.add(bc); nodes.add(sib); });
+    }
+  });
+  Object.values(manualGroups).forEach(g=>{
+    const all = [g.principal, ...(g.members||[])];
+    for(let i=1;i<all.length;i++) union(all[0], all[i]);
+    all.forEach(b=>nodes.add(b));
+  });
+  const groups = new Map();
+  nodes.forEach(bc=>{ const r=find(bc); if(!groups.has(r)) groups.set(r, new Set()); groups.get(r).add(bc); });
+  return [...groups.values()].map(s=>[...s]).filter(g=>g.length>1);
+}
+
+let lastScansByBc = new Map();
+
+function locLabelOf(s){ return `${s.travee} · col. ${s.colonne} · étage/n° ${s.etage}`; }
+
+async function refreshAnalysis(){
+  const zone = document.getElementById('conflicts-zone');
+  zone.innerHTML = '<p class="log-empty">Chargement…</p>';
+  let scans = [];
+  try{
+    const res = await fetch('/api/recolement');
+    if(res.ok){ const data = await res.json(); scans = data.scans || []; }
+  }catch(e){}
+  lastScansByBc = new Map();
+  scans.forEach(r=>{ if(r.barcode) lastScansByBc.set(r.barcode, r); });
+
+  renderConflicts(lastScansByBc);
+  renderSuggestions(lastScansByBc);
+  renderIgnoredSuggestions();
+}
+document.getElementById('btn-refresh-analysis').addEventListener('click', refreshAnalysis);
+
+function renderConflicts(scansByBc){
+  const zone = document.getElementById('conflicts-zone');
+  const groups = buildAllGroups();
+  const conflicts = [];
+  groups.forEach(group=>{
+    const scanned = group.filter(bc=>scansByBc.has(bc));
+    if(scanned.length < 2) return;
+    const locKeys = new Set(scanned.map(bc=>locLabelOf(scansByBc.get(bc))));
+    if(locKeys.size > 1){
+      conflicts.push(scanned.map(bc=>{
+        const s = scansByBc.get(bc);
+        const cat = catalog[bc];
+        return { barcode:bc, cote: cat ? cat.cote : '', titre: cat ? cat.titre : '', loc: locLabelOf(s) };
+      }));
+    }
+  });
+
+  if(!conflicts.length){
+    zone.innerHTML = '<p class="log-empty">Aucun conflit détecté — les membres déjà récolés de chaque groupe sont tous au même emplacement.</p>';
+    return;
+  }
+  zone.innerHTML = conflicts.map(details=>`
+    <div class="conflict-block">
+      <h4>⚠ ${details.length} documents reliés, emplacements différents dans le récolement</h4>
+      <ul>${details.map(d=>`<li><code>${esc(d.barcode)}</code> ${esc(d.cote || '(cote inconnue)')} — ${esc(d.titre || '(non catalogué)')} → <strong>${esc(d.loc)}</strong></li>`).join('')}</ul>
+    </div>`).join('');
+}
+
+/* ════════════ GROUPES POTENTIELS (heuristique sur les cotes) ════════════
+   Une cote de base ("I-d-19-1855") suivie d'un suffixe -N, -N bis/ter ou
+   -N/M signale souvent, dans le fonds Imprimés, un document trouvé ou relié
+   avec un autre document partageant la même base — mais c'est un indice
+   statistique, pas une certitude (beaucoup de cotes se terminent par -N
+   sans que ça implique une reliure commune) : présenté comme une liste à
+   vérifier, jamais créé automatiquement. */
+const COTE_SUFFIX_RE = /-(\d+)\s*(bis|ter|quater|quinquies)?(?:\/(\d+))?$/i;
+function coteBase(cote){
+  const c = (cote||'').trim();
+  if(!c) return null;
+  const m = c.match(COTE_SUFFIX_RE);
+  if(!m) return null;
+  const base = c.slice(0, m.index).trim();
+  return base || null;
+}
+
+function buildCoteSuggestions(){
+  const byBase = new Map();
+  Object.entries(catalog).forEach(([bc,cat])=>{
+    const base = coteBase(cat.cote);
+    if(!base) return;
+    if(!byBase.has(base)) byBase.set(base, []);
+    byBase.get(base).push({ barcode:bc, cote:cat.cote, titre:cat.titre });
+  });
+
+  const groups = buildAllGroups();
+  const componentOf = new Map();
+  groups.forEach((g,i)=>g.forEach(bc=>componentOf.set(bc,i)));
+
+  const suggestions = [];
+  byBase.forEach((entries, base)=>{
+    if(entries.length < 2) return;
+    const comps = new Set(entries.map(e=>componentOf.has(e.barcode) ? componentOf.get(e.barcode) : 'solo:'+e.barcode));
+    const allSame = comps.size===1 && !String([...comps][0]).startsWith('solo:');
+    if(allSame) return; // déjà entièrement capturé par un groupe existant (Syracuse ou manuel)
+    entries.sort((a,b)=>compareCotes(a.cote,b.cote));
+    const signature = entries.map(e=>e.barcode).slice().sort().join('|');
+    if(ignoredSuggestions[signature]) return;
+    suggestions.push({ signature, base, entries });
+  });
+  return suggestions;
+}
+
+let suggestionsCache = [];
+let suggPage = 0;
+const SUGG_PAGE_SIZE = 20;
+
+function renderSuggestions(scansByBc){
+  const details = document.getElementById('adv-suggestions');
+  const raw = buildCoteSuggestions();
+  document.getElementById('sugg-count').textContent = raw.length.toLocaleString('fr-FR');
+  if(!details.open){
+    // Rendu paresseux : ne pas construire la liste tant que le panneau n'est
+    // pas ouvert (peut atteindre plusieurs centaines de suggestions).
+    return;
+  }
+  const q = (document.getElementById('sugg-search').value||'').trim().toLowerCase();
+  suggestionsCache = (q
+    ? raw.filter(s=>s.base.toLowerCase().includes(q) || s.entries.some(e=>(e.cote||'').toLowerCase().includes(q) || e.barcode.includes(q)))
+    : raw
+  ).sort((a,b)=>{
+    const aScan = a.entries.some(e=>scansByBc.has(e.barcode));
+    const bScan = b.entries.some(e=>scansByBc.has(e.barcode));
+    if(aScan !== bScan) return aScan ? -1 : 1;
+    return a.base.localeCompare(b.base);
+  });
+  suggPage = Math.min(suggPage, Math.max(0, Math.ceil(suggestionsCache.length/SUGG_PAGE_SIZE)-1));
+  renderSuggestionsPage(scansByBc);
+}
+
+function renderSuggestionsPage(scansByBc){
+  const zone = document.getElementById('suggestions-zone');
+  const pager = document.getElementById('sugg-pager');
+  if(!suggestionsCache.length){
+    zone.innerHTML = '<p class="log-empty">Aucune suggestion (ou tout a déjà été traité/écarté).</p>';
+    pager.innerHTML = '';
+    return;
+  }
+  const start = suggPage*SUGG_PAGE_SIZE;
+  const page = suggestionsCache.slice(start, start+SUGG_PAGE_SIZE);
+  zone.innerHTML = page.map(s=>{
+    const items = s.entries.map(e=>{
+      const scan = scansByBc.get(e.barcode);
+      const locHtml = scan ? `<span class="loc-found">📍 ${esc(locLabelOf(scan))}</span>` : `<span class="loc-missing">pas encore récolé</span>`;
+      return `<li><code>${esc(e.barcode)}</code> ${esc(e.cote || '(cote inconnue)')} — ${esc(e.titre || '(non catalogué)')} → ${locHtml}</li>`;
+    }).join('');
+    return `<div class="suggestion-block">
+      <h4>🔎 Base <span class="base-cote">${esc(s.base)}</span> — ${s.entries.length} documents</h4>
+      <ul>${items}</ul>
+      <div class="suggestion-actions">
+        <button type="button" class="tool-btn secondary" style="padding:.35rem .8rem;font-size:.75rem" data-create="${esc(s.signature)}">✓ Créer ce groupe</button>
+        <button type="button" class="tool-btn secondary" style="padding:.35rem .8rem;font-size:.75rem;color:#c62828;border-color:#c62828" data-dismiss="${esc(s.signature)}">✕ Ignorer cette suggestion</button>
+      </div>
+    </div>`;
+  }).join('');
+  zone.querySelectorAll('[data-create]').forEach(b=>b.addEventListener('click', ()=>createGroupFromSuggestion(b.dataset.create)));
+  zone.querySelectorAll('[data-dismiss]').forEach(b=>b.addEventListener('click', ()=>dismissSuggestion(b.dataset.dismiss)));
+
+  const totalPages = Math.max(1, Math.ceil(suggestionsCache.length/SUGG_PAGE_SIZE));
+  pager.innerHTML = `
+    <span>${start+1}–${Math.min(start+SUGG_PAGE_SIZE, suggestionsCache.length)} sur ${suggestionsCache.length}</span>
+    <div class="adv-pager-btns">
+      <button type="button" id="sugg-prev" ${suggPage===0?'disabled':''}>← Précédent</button>
+      <span>Page ${suggPage+1}/${totalPages}</span>
+      <button type="button" id="sugg-next" ${suggPage>=totalPages-1?'disabled':''}>Suivant →</button>
+    </div>`;
+  const prevBtn = document.getElementById('sugg-prev');
+  const nextBtn = document.getElementById('sugg-next');
+  if(prevBtn) prevBtn.addEventListener('click', ()=>{ suggPage--; renderSuggestionsPage(scansByBc); });
+  if(nextBtn) nextBtn.addEventListener('click', ()=>{ suggPage++; renderSuggestionsPage(scansByBc); });
+}
+document.getElementById('adv-suggestions').addEventListener('toggle', function(){ if(this.open) renderSuggestions(lastScansByBc); });
+document.getElementById('sugg-search').addEventListener('input', ()=>{ suggPage=0; renderSuggestions(lastScansByBc); });
+
+function findSuggestionBySignature(signature){
+  return suggestionsCache.find(s=>s.signature===signature) || buildCoteSuggestions().find(s=>s.signature===signature);
+}
+
+function createGroupFromSuggestion(signature){
+  const s = findSuggestionBySignature(signature);
+  if(!s) return;
+  const [principalEntry, ...memberEntries] = s.entries;
+  ensureLocalGroup(principalEntry.barcode);
+  queuePatch({ type:'ensureGroup', principal: principalEntry.barcode, ts: Date.now() });
+  memberEntries.forEach(e=>{
+    Object.values(manualGroups).forEach(g=>{
+      if(g.principal !== principalEntry.barcode) g.members = g.members.filter(b=>b!==e.barcode);
+    });
+    const group = manualGroups[principalEntry.barcode];
+    if(!group.members.includes(e.barcode)) group.members.push(e.barcode);
+    queuePatch({ type:'addMember', principal: principalEntry.barcode, barcode: e.barcode, ts: Date.now() });
+  });
+  renderGroupsTable();
+  refreshAnalysis();
+}
+
+function dismissSuggestion(signature){
+  const s = findSuggestionBySignature(signature);
+  const barcodes = s ? s.entries.map(e=>e.barcode) : signature.split('|');
+  const base = s ? s.base : '';
+  ignoredSuggestions[signature] = { signature, base, barcodes, ts: Date.now() };
+  queuePatch({ type:'dismissSuggestion', signature, base, barcodes, ts: Date.now() });
+  renderSuggestions(lastScansByBc);
+  renderIgnoredSuggestions();
+}
+
+function undismissSuggestion(signature){
+  delete ignoredSuggestions[signature];
+  queuePatch({ type:'undismissSuggestion', signature });
+  renderSuggestions(lastScansByBc);
+  renderIgnoredSuggestions();
+}
+
+function renderIgnoredSuggestions(){
+  const zone = document.getElementById('ignored-zone');
+  const list = Object.values(ignoredSuggestions).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  document.getElementById('ignored-count').textContent = list.length.toLocaleString('fr-FR');
+  if(!list.length){
+    zone.innerHTML = '<p class="log-empty">Aucune suggestion écartée.</p>';
+    return;
+  }
+  zone.innerHTML = list.map(s=>`
+    <div class="ignored-row">
+      <span><code>${esc(s.base || '—')}</code> — ${s.barcodes.length} document(s) (${s.barcodes.map(esc).join(', ')})</span>
+      <button type="button" class="tool-btn secondary" style="padding:.25rem .6rem;font-size:.72rem" data-undismiss="${esc(s.signature)}">↺ Réafficher</button>
+    </div>`).join('');
+  zone.querySelectorAll('[data-undismiss]').forEach(b=>b.addEventListener('click', ()=>undismissSuggestion(b.dataset.undismiss)));
+}
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('input,select,button,a,label')) (currentPrincipal ? memberInput : principalInput).focus();
+});
+
+updateSyncIndicator();
+flushPendingSync();
+})();
+</script>
+
+</body>
+</html>

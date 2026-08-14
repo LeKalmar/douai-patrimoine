@@ -69,6 +69,7 @@ bas, section « Stockage partagé »).
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |
 | `magasins.html` | Catalogue des exemplaires du 2e/5e étage (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e étage » | **Protégé** |
 | `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement, photo — tout en un seul formulaire) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
+| `reliures.html` | Création manuelle de groupes de documents reliés ensemble (équivalent $481/$482) et détection des groupes dont les emplacements récolés ne concordent pas — voir « Récolement en cascade des documents reliés » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
@@ -226,6 +227,75 @@ groupe en conflit pour vérification manuelle (lien $481/$482 mal posé côté
 catalogue, ou erreur de récolement/reliure physique changée depuis le
 catalogage). À relancer après tout rattrapage significatif d'un futur export
 Syracuse qui introduirait de nouveaux groupes déjà partiellement récolés.
+Lancé une première fois le 2026-08-14 sur les 178 groupes détectés à cette
+date : 167 scans rétroactifs ajoutés, 11 groupes laissés en conflit (voir
+« Groupes en conflit » sur `reliures.html`, ci-dessous, pour un suivi qui
+reste à jour au lieu d'un rapport figé).
+
+Groupes créés à la main (`reliures.html`, 2026-08-14) : les liens $481/$482
+viennent du SIGB et ne couvrent que ce qui a déjà été exporté — pour relier
+deux documents catalogués séparément qu'on découvre reliés physiquement en
+réserve sans attendre un prochain export Syracuse, `reliures.html` permet de
+créer ces groupes à la main. Stockés dans R2 sous la clé
+`reliures-manuelles.json` (`{ groups: { [principalBarcode]: {principal,
+members:[barcode,...], ts} }, ignoredSuggestions: { [signature]: {signature,
+base, barcodes, ts} } }` — voir « Groupes potentiels » ci-dessous pour
+`ignoredSuggestions` ; `api/reliures-manuelles.mjs` normalise à la volée
+l'ancien format à plat `{ [principal]: group }` s'il en retrouve un — même
+patron GET public/POST authentifié/compare-and-swap que le reste), fusionnés
+côté client dans `catalog[bc].relies` par `js/reliures-manuelles-shared.js`
+(`applyManualReliureGroups()`, lit `state.groups`), en plus des groupes
+Syracuse (`_relies`) déjà présents — sans distinction ensuite entre les deux
+sources : la cascade dans `recolement.html` traite les deux de façon
+identique. Un même barcode n'appartient qu'à un seul groupe à la fois
+(appartenance exclusive, appliquée côté serveur dans `applyPatch()` du patch
+`addMember` : ajouter un membre à un groupe le retire automatiquement de
+tout autre groupe où il figurait déjà). `reliures.html` affiche aussi en
+direct les « groupes en conflit » (membres déjà récolés à des emplacements
+différents, toutes sources confondues, recalculé à chaque scan/suppression
+plutôt que figé comme le rapport du script de rattrapage) — même algorithme
+que `scripts/backfill-reliure.mjs` (union-find sur `_relies` +
+`reliures-manuelles.json`, comparaison des emplacements des membres déjà
+présents dans `/api/recolement`), réimplémenté côté client faute de pouvoir
+partager du code entre un script Node et une page statique sans bundler.
+
+Groupes potentiels détectés dans les cotes (`reliures.html`, 2026-08-14,
+panneau « Groupes potentiels détectés dans les cotes ») : suggère des
+groupes que $481/$482 n'ont pas captés, à partir de la forme de la cote
+plutôt que du catalogage — dans le fonds Imprimés, une cote de base
+(`I-d-19-1855`) suivie d'un suffixe `-N`, `-N bis/ter/quater` ou `-N/M`
+indique souvent (pas toujours) un document trouvé avec un autre document
+partageant la même base. `coteBase()` dans `reliures.html` retire ce dernier
+suffixe (regex `COTE_SUFFIX_RE`) ; tous les barcodes du catalogue partageant
+la même base forment une suggestion, sauf si un groupe existant (Syracuse ou
+manuel) les couvre déjà entièrement. **Compromis précision/rappel assumé et
+mesuré empiriquement (2026-08-14) sur l'export courant** : ce motif capture
+123 des 178 groupes $481/$482 réels (69 % de rappel) mais génère aussi 1399
+suggestions qui n'ont *aujourd'hui* aucun groupe confirmé correspondant — la
+plupart sont probablement du bruit (une cote qui se termine par `-N` est
+aussi, tout simplement, la forme *normale* d'une cote complète, sans que ça
+implique une reliure commune ; une variante restreinte aux seuls suffixes
+bis/ter/fraction tombe à 2/178 de rappel, donc écartée). Volontairement
+traité comme une liste à trier par un humain, pas une détection fiable :
+panneau replié par défaut et rendu paresseux (le calcul ne se fait qu'à
+l'ouverture — inutile de payer le coût pour ~1400 entrées à chaque scan),
+paginé (`SUGG_PAGE_SIZE = 20`), triable/filtrable par cote ou code-barre.
+Chaque suggestion propose soit de créer le groupe (premier membre, trié par
+`compareCotes`, pris comme principal — modifiable ensuite via « Reprendre »
+dans le tableau des groupes), soit de l'écarter (bouton « ✕ Ignorer cette
+suggestion ») : l'écart est mémorisé dans `ignoredSuggestions`, clé =
+barcodes du groupe suggéré triés et joints par `|` — stable d'un rebuild à
+l'autre (indépendant de `_relies`, donc un `npm run build` ou un nouveau
+récolement ne fait pas réapparaître une suggestion déjà écartée), mais si la
+composition du groupe suggéré change (un nouveau document apparaît sous la
+même base), la signature change aussi et la suggestion redevient « neuve »
+volontairement — considéré comme un cas réellement différent à rejuger, pas
+une réapparition d'un bruit déjà tranché. Chaque suggestion affiche, pour
+chacun de ses membres, son emplacement s'il a déjà été scanné dans le
+récolement courant (`/api/recolement`) — sert à aller vérifier physiquement
+le volume repéré plutôt que de le chercher à l'aveugle dans toute la
+réserve ; les suggestions dont au moins un membre est déjà localisé sont
+triées en premier.
 
 Le flag `manuel` qui distingue « exemplarisé rapide » de « catalogué »
 circule ainsi : `js/exemplaires-manuels-shared.js` pose `_manuel:true` sur
@@ -441,13 +511,15 @@ pour trois choses indépendantes :
   `data/xml/` avant de builder si les variables R2 sont présentes ; sinon
   (dev local sans `.env`), comportement d'origine inchangé — lecture des
   fichiers locaux, échec strict s'ils manquent.
-- **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`** :
-  état partagé canonique de `recolement.html` / `livres-spolies.html` /
-  `exemplarisation.html` (voir « Exemplarisation rapide » plus haut), pour
-  que plusieurs collègues avancent en même temps sans export/import JSON
-  manuel. Chaque page garde le `localStorage` comme source de vérité locale
-  (fonctionne hors ligne, file d'attente `rp_*_pending_sync` rejouée à la
-  reconnexion) et envoie en plus chaque changement en arrière-plan.
+- **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`,
+  `reliures-manuelles.json`** : état partagé canonique de `recolement.html` /
+  `livres-spolies.html` / `exemplarisation.html` (voir « Exemplarisation
+  rapide » plus haut) / `reliures.html` (voir « Récolement en cascade des
+  documents reliés » plus haut), pour que plusieurs collègues avancent en
+  même temps sans export/import JSON manuel. Chaque page garde le
+  `localStorage` comme source de vérité locale (fonctionne hors ligne, file
+  d'attente `rp_*_pending_sync` rejouée à la reconnexion) et envoie en plus
+  chaque changement en arrière-plan.
 - **`recolement-backups/<horodatage>.json`** : instantanés datés et
   immuables (un objet par sauvegarde, jamais réécrit), distincts de l'état
   partagé courant ci-dessus. Créés par le bouton « Sauvegarder ce
@@ -463,8 +535,9 @@ pour trois choses indépendantes :
   catégories ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
   dans le site ne relit ces images pour l'instant.
 
-Quatre fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
-`api/exemplaires-manuels.mjs`, `api/vignette.mjs`) servent de proxy vers R2 :
+Cinq fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
+`api/exemplaires-manuels.mjs`, `api/reliures-manuelles.mjs`,
+`api/vignette.mjs`) servent de proxy vers R2 :
 `GET` (sauf `api/vignette.mjs`, POST uniquement) renvoie l'état courant
 (public, même niveau
 d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit un

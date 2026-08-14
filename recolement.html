@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="style.css">
 <script src="js/reserve-shared.js"></script>
 <script src="js/exemplaires-manuels-shared.js"></script>
+<script src="js/reliures-manuelles-shared.js"></script>
 <style>
   :root{
     --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
@@ -628,7 +629,8 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFro
 Promise.all([
   fetch('data/inventaire.json').then(r=>r.json()),
   fetchExemplairesManuelsAsCatalogRows(),
-]).then(([data, manuels])=>{
+  fetchReliuresManuelles(),
+]).then(([data, manuels, reliuresManuelles])=>{
   const items = data.concat(manuels);
   catalog = {};
   const noticeIds = new Set();
@@ -653,6 +655,7 @@ Promise.all([
     };
     if(noticeId) noticeIds.add(noticeId);
   });
+  applyManualReliureGroups(catalog, reliuresManuelles);
   // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
   // le compteur et la progression se basent sur des notices distinctes, pas
   // sur des scans bruts, pour qu'un même exemplaire rescanné par erreur ou
