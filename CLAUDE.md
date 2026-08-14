@@ -133,11 +133,11 @@ recommencez pas à ajouter un système de meubles nommés séparé sans relire
 d'abord cette partie du code (uniquement dans la réserve patrimoniale ; le
 menu déroulant se désactive automatiquement sur « Réserve Douaisienne »).
 
-`data/recolement.json` regroupe en un seul fichier cinq catégories de
+`data/recolement.json` regroupe en un seul fichier six catégories de
 données produites par `recolement.html` (un seul bouton « Exporter le
 récolement », un seul export/import à gérer) :
 `{ scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
-lastShelves:[...] }`.
+lastShelves:[...], resolvedIssues:[...] }`.
 `videShelves` sert à marquer explicitement qu'une étagère est vide (aucun
 livre, catalogué ou non) — utile car le nombre d'étagères réelles par
 colonne varie (jusqu'à `maxEt` défini par travée dans
@@ -198,6 +198,30 @@ mini-plan) sépare `CNT` (vraiment catalogués) de `CNT_MANUEL` en se basant
 sur ce flag. Un exemplaire créé avec emplacement directement depuis
 `exemplarisation.html` pose aussi `manuel:true` sur le patch `scan` qu'il
 envoie à `/api/recolement`, sans attendre un premier rescan physique.
+
+Les « Statistiques avancées du récolement » (bas de `recolement.html`)
+listent trois catégories de problèmes, chacune dans un `<details>` repliable
+(rendu paresseux : le tableau détaillé — jusqu'à 300 lignes affichées, le
+reste juste compté — n'est reconstruit que si le panneau est ouvert, pour ne
+pas payer le coût DOM à chaque scan) : **codes-barres endommagés** (`scans`
+avec `barcodeAbime:true`, saisis à la main faute de pouvoir être scannés),
+**scannés non catalogués** (un scan sans correspondance dans `catalog` au
+moment du scan — repéré a posteriori par `!titre && !auteur && cote`,
+puisque seule la cote a pu être saisie via le champ « Renseigner » du
+feedback — à distinguer des exemplaires `manuel` d'`exemplarisation.html`,
+qui ont toujours un titre) et **jamais scannés** (différence entre les
+codes-barres de `catalog` et ceux de `scans` — potentiellement perdus, ou
+récolement pas encore fait sur cet exemplaire). Chaque panneau a un bouton
+d'export (`.txt`, codes-barres séparés par `;`, respectant la recherche et
+la case « Afficher aussi les réglés » en cours) et, par ligne, un bouton
+✓ Réglé/↺ Rouvrir qui bascule un flag dans `resolvedIssues` (clé composite
+`categorie|barcode` — un même code-barre peut apparaître réglé dans une
+catégorie et pas dans une autre) sans toucher aux données sous-jacentes : ça
+ne fait que retirer l'entrée des compteurs et de la liste par défaut, le
+vrai traitement (rescanner, cataloguer…) reste à faire séparément. Ce flag
+est synchronisé vers R2 comme le reste (patch `resolveIssue` dans
+`api/recolement.mjs`), pour qu'un problème réglé par un·e collègue
+disparaisse aussi chez les autres.
 
 `histoire-du-livre.html` est indépendante de ce flux : elle charge ses
 propres CSV (`csv/Professionnels.csv`, `Individus.csv`, `Documents.csv`,
@@ -423,12 +447,13 @@ partagée est inactive. `npm run test:r2` permet de vérifier un token sans
 toucher aux données réelles.
 
 En plus des patchs unitaires (`scan`, `deleteScan`, `nonCat`, `vide`,
-`nonrange`, `lastShelf`), `api/recolement.mjs` accepte un patch `bulkMerge` (
-`{type:'bulkMerge', data:{scans, nonCatalogues, videShelves,
-nonRangeShelves, lastShelves}}`) qui fusionne un lot entier avec la même
-sémantique que les patchs unitaires (jamais de suppression, un scan plus
-récent — `ts` — l'emporte sur un plus ancien). C'est ce patch qu'envoie
-`recolement.html`
+`nonrange`, `lastShelf`, `resolveIssue` — ce dernier pour les « Statistiques
+avancées », voir plus haut), `api/recolement.mjs` accepte un patch
+`bulkMerge` (`{type:'bulkMerge', data:{scans, nonCatalogues, videShelves,
+nonRangeShelves, lastShelves, resolvedIssues}}`) qui fusionne un lot entier
+avec la même sémantique que les patchs unitaires (jamais de suppression, un
+scan plus récent — `ts` — l'emporte sur un plus ancien). C'est ce patch
+qu'envoie `recolement.html`
 après un import de fichier de sauvegarde (`mergeIncomingData(data,
 {syncToServer:true})`), pour que l'import mette aussi à jour l'état
 partagé R2 et pas seulement le navigateur local qui a fait l'import — voir

@@ -120,6 +120,15 @@
   .adv-details[open] summary::before{content:'▾ '}
   .adv-details summary .adv-count{font-weight:400;color:#888}
   .adv-details .log-wrap{margin:.6rem 0 0}
+  .log-header-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .log-toggle{font-size:.72rem;color:#666;display:flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer}
+  .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s;white-space:nowrap}
+  .export-btn:hover{background:#f5f5f5;border-color:#999}
+  .log-resolve{background:none;border:1px solid #c8e6c9;color:#2e7d32;cursor:pointer;font-size:.68rem;padding:2px 8px;border-radius:12px;white-space:nowrap}
+  .log-resolve:hover{background:#e8f5e9}
+  .log-reopen{background:none;border:1px solid #ddd;color:#888;cursor:pointer;font-size:.68rem;padding:2px 8px;border-radius:12px;white-space:nowrap}
+  .log-reopen:hover{background:#f0f0f0}
+  .adv-row-resolved td{opacity:.5}
   .exp-list{max-height:220px;overflow-y:auto;font-size:.8rem}
   .exp-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem;border-bottom:1px solid #f0f0f0}
   .exp-row:last-child{border-bottom:none}
@@ -364,10 +373,14 @@
           <div class="log-wrap">
             <div class="log-header">
               <span class="log-title">Documents dont le code-barre a été saisi à la main (illisible au scanner)</span>
-              <input type="text" class="log-search" id="abime-search" placeholder="Filtrer (cote, titre, code-barre)…">
+              <div class="log-header-actions">
+                <label class="log-toggle"><input type="checkbox" id="abime-showresolved"> Afficher aussi les réglés</label>
+                <input type="text" class="log-search" id="abime-search" placeholder="Filtrer (cote, titre, code-barre)…">
+                <button type="button" class="export-btn" id="abime-export">⬇ Exporter (.txt)</button>
+              </div>
             </div>
             <div class="log-body"><table class="log-table">
-              <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th></tr></thead>
+              <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
               <tbody id="log-abime"></tbody>
             </table></div>
           </div>
@@ -378,10 +391,14 @@
           <div class="log-wrap">
             <div class="log-header">
               <span class="log-title">Code-barre absent du catalogue au moment du scan : seule la cote a été renseignée à la main, sans titre ni auteur</span>
-              <input type="text" class="log-search" id="manualcote-search" placeholder="Filtrer (cote, code-barre)…">
+              <div class="log-header-actions">
+                <label class="log-toggle"><input type="checkbox" id="manualcote-showresolved"> Afficher aussi les réglés</label>
+                <input type="text" class="log-search" id="manualcote-search" placeholder="Filtrer (cote, code-barre)…">
+                <button type="button" class="export-btn" id="manualcote-export">⬇ Exporter (.txt)</button>
+              </div>
             </div>
             <div class="log-body"><table class="log-table">
-              <thead><tr><th>Cote</th><th>Emplacement</th><th>Code-barre</th></tr></thead>
+              <thead><tr><th>Cote</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
               <tbody id="log-manualcote"></tbody>
             </table></div>
           </div>
@@ -392,10 +409,14 @@
           <div class="log-wrap">
             <div class="log-header">
               <span class="log-title">Codes-barres du catalogue absents des scans : potentiellement perdus, ou récolement pas encore effectué</span>
-              <input type="text" class="log-search" id="notscanned-search" placeholder="Filtrer (cote, titre, auteur, code-barre)…">
+              <div class="log-header-actions">
+                <label class="log-toggle"><input type="checkbox" id="notscanned-showresolved"> Afficher aussi les réglés</label>
+                <input type="text" class="log-search" id="notscanned-search" placeholder="Filtrer (cote, titre, auteur, code-barre)…">
+                <button type="button" class="export-btn" id="notscanned-export">⬇ Exporter (.txt)</button>
+              </div>
             </div>
             <div class="log-body"><table class="log-table">
-              <thead><tr><th>Cote</th><th>Titre</th><th>Auteur</th><th>Code-barre</th></tr></thead>
+              <thead><tr><th>Cote</th><th>Titre</th><th>Auteur</th><th>Code-barre</th><th></th></tr></thead>
               <tbody id="log-notscanned"></tbody>
             </table></div>
           </div>
@@ -467,6 +488,7 @@ const LS_NONCAT = 'rp_recolement_noncat';
 const LS_VIDE   = 'rp_recolement_vide';
 const LS_NONRANGE = 'rp_recolement_nonrange';
 const LS_LASTSHELF = 'rp_recolement_lastshelf';
+const LS_RESOLVED = 'rp_recolement_resolved';
 const LS_PENDING = 'rp_recolement_pending_sync';
 const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "temps réel" arrête de comptabiliser (voir updateTimeStats)
 
@@ -482,6 +504,7 @@ let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {trav
 let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let lastShelves = loadJSON(LS_LASTSHELF, {});  // "travee|colonne" -> {travee,colonne,etage,ts} (dernière étagère réelle de la colonne)
+let resolvedIssues = loadJSON(LS_RESOLVED, {}); // "categorie|barcode" -> {category,barcode,ts} — voir "LISTES AVANCÉES"
 let pendingSync = loadJSON(LS_PENDING, []);   // patches en attente d'envoi à /api/recolement
 
 function loadJSON(key, fallback){
@@ -495,6 +518,7 @@ function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); 
 function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShelves)); }
 function saveNonRangeShelves(){ localStorage.setItem(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
 function saveLastShelves(){ localStorage.setItem(LS_LASTSHELF, JSON.stringify(lastShelves)); }
+function saveResolvedIssues(){ localStorage.setItem(LS_RESOLVED, JSON.stringify(resolvedIssues)); }
 function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -1549,9 +1573,8 @@ function formatDuration(ms){
 }
 
 function updateTimeStats(){
-  const abimeCount = Object.values(scans).filter(r=>r.barcodeAbime).length;
-  document.getElementById('st-abime').textContent = abimeCount.toLocaleString('fr-FR');
-
+  // st-abime est mis à jour par updateAdvListsCount() (compte les seuls
+  // endommagés non réglés — voir "LISTES AVANCÉES" plus bas).
   const list = Object.values(scans).map(r=>r.ts).filter(t=>t).sort((a,b)=>a-b);
   const elStart=document.getElementById('st-start'), elLast=document.getElementById('st-last'),
         elSpan=document.getElementById('st-span'), elReal=document.getElementById('st-realtime'),
@@ -1580,9 +1603,44 @@ function updateTimeStats(){
    même avec un catalogue de plusieurs milliers d'entrées. Les tableaux
    détaillés, eux, ne sont construits/rendus que si le <details>
    correspondant est déjà ouvert — reconstruire des milliers de lignes de DOM
-   à chaque scan serait inutile et coûteux tant que le panneau est fermé. */
+   à chaque scan serait inutile et coûteux tant que le panneau est fermé.
+
+   Chaque ligne peut être marquée "réglée" individuellement (bouton ✓, voir
+   advActionCell) : état partagé (`resolvedIssues`, synchronisé vers R2 comme
+   scans/nonCat/etc. — voir patch 'resolveIssue' dans api/recolement.mjs),
+   indépendant des données elles-mêmes (marquer réglé un "scanné non
+   catalogué" ne modifie pas le scan : le vrai catalogage reste à faire
+   ailleurs, ceci ne fait que retirer l'entrée de la liste des problèmes à
+   traiter). Les lignes réglées restent consultables via la case "Afficher
+   aussi les réglés" de chaque panneau, avec un bouton pour les rouvrir. */
+function issueKey(category, barcode){ return category + '|' + barcode; }
+function isResolved(category, barcode){ return !!resolvedIssues[issueKey(category, barcode)]; }
+
+function setIssueResolved(category, barcode, resolved){
+  const key = issueKey(category, barcode);
+  if(resolved){
+    const record = { category, barcode, ts: Date.now() };
+    resolvedIssues[key] = record;
+    saveResolvedIssues();
+    queuePatch({ type:'resolveIssue', key, record });
+  } else {
+    delete resolvedIssues[key];
+    saveResolvedIssues();
+    queuePatch({ type:'resolveIssue', key, record:null });
+  }
+  updateAdvListsCount();
+}
+
+function advActionCell(category, r){
+  return r._resolved
+    ? `<button type="button" class="log-reopen" data-category="${category}" data-reopen="${esc(r.barcode)}">↺ Rouvrir</button>`
+    : `<button type="button" class="log-resolve" data-category="${category}" data-resolve="${esc(r.barcode)}">✓ Réglé</button>`;
+}
+
 function damagedList(){
-  return Object.values(scans).filter(r=>r.barcodeAbime).sort((a,b)=>b.ts-a.ts);
+  return Object.values(scans).filter(r=>r.barcodeAbime)
+    .map(r=>Object.assign({}, r, { _resolved: isResolved('abime', r.barcode) }))
+    .sort((a,b)=>b.ts-a.ts);
 }
 function manualCoteList(){
   // Scanné, jamais trouvé dans le catalogue (ni au scan initial ni depuis) :
@@ -1590,19 +1648,22 @@ function manualCoteList(){
   // "Renseigner" du feedback (voir showFeedback/manual-save). Exclut les
   // exemplaires "manuel" (créés via exemplarisation.html), qui ont toujours
   // un titre.
-  return Object.values(scans).filter(r=>!r.manuel && !r.titre && !r.auteur && r.cote).sort((a,b)=>b.ts-a.ts);
+  return Object.values(scans).filter(r=>!r.manuel && !r.titre && !r.auteur && r.cote)
+    .map(r=>Object.assign({}, r, { _resolved: isResolved('manualcote', r.barcode) }))
+    .sort((a,b)=>b.ts-a.ts);
 }
 function notScannedList(){
   if(!catalog) return [];
   return Object.keys(catalog)
     .filter(bc=>!scans[bc])
-    .map(bc=>({barcode:bc, cote:catalog[bc].cote, titre:catalog[bc].titre, auteur:catalog[bc].auteur}))
+    .map(bc=>({barcode:bc, cote:catalog[bc].cote, titre:catalog[bc].titre, auteur:catalog[bc].auteur, _resolved: isResolved('notscanned', bc)}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
 
-function renderAdvTable(tbodyId, rows, filterFields, filter, rowHtml, colspan, emptyMsg){
+function renderAdvTable(tbodyId, category, rows, filterFields, filter, showResolved, rowHtml, colspan, emptyMsg){
   const q = (filter||'').trim().toLowerCase();
-  const filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
+  let filtered = showResolved ? rows : rows.filter(r=>!r._resolved);
+  if(q) filtered = filtered.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q)));
   const tbody = document.getElementById(tbodyId);
   if(!filtered.length){
     tbody.innerHTML = `<tr><td class="log-empty" colspan="${colspan}">${emptyMsg}</td></tr>`;
@@ -1610,40 +1671,48 @@ function renderAdvTable(tbodyId, rows, filterFields, filter, rowHtml, colspan, e
   }
   tbody.innerHTML = filtered.slice(0,300).map(rowHtml).join('')
     + (filtered.length>300 ? `<tr><td class="log-empty" colspan="${colspan}">… et ${(filtered.length-300).toLocaleString('fr-FR')} de plus (affinez la recherche)</td></tr>` : '');
+  tbody.querySelectorAll('[data-resolve]').forEach(b=>b.addEventListener('click', ()=>setIssueResolved(b.dataset.category, b.dataset.resolve, true)));
+  tbody.querySelectorAll('[data-reopen]').forEach(b=>b.addEventListener('click', ()=>setIssueResolved(b.dataset.category, b.dataset.reopen, false)));
 }
 
 function refreshAbimeList(){
   if(!document.getElementById('adv-abime').open) return;
-  renderAdvTable('log-abime', damagedList(), ['cote','titre','barcode'], document.getElementById('abime-search').value,
-    r => `<tr>
+  const showResolved = document.getElementById('abime-showresolved').checked;
+  renderAdvTable('log-abime', 'abime', damagedList(), ['cote','titre','barcode'], document.getElementById('abime-search').value, showResolved,
+    r => `<tr class="${r._resolved?'adv-row-resolved':''}">
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-    </tr>`, 4, 'Aucun code-barre endommagé pour l\'instant.');
+      <td>${advActionCell('abime', r)}</td>
+    </tr>`, 5, 'Aucun code-barre endommagé pour l\'instant.');
 }
 function refreshManualCoteList(){
   if(!document.getElementById('adv-manualcote').open) return;
-  renderAdvTable('log-manualcote', manualCoteList(), ['cote','barcode'], document.getElementById('manualcote-search').value,
-    r => `<tr>
+  const showResolved = document.getElementById('manualcote-showresolved').checked;
+  renderAdvTable('log-manualcote', 'manualcote', manualCoteList(), ['cote','barcode'], document.getElementById('manualcote-search').value, showResolved,
+    r => `<tr class="${r._resolved?'adv-row-resolved':''}">
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-    </tr>`, 3, 'Aucun code-barre dans ce cas pour l\'instant.');
+      <td>${advActionCell('manualcote', r)}</td>
+    </tr>`, 4, 'Aucun code-barre dans ce cas pour l\'instant.');
 }
 function refreshNotScannedList(){
   if(!document.getElementById('adv-notscanned').open) return;
   if(!catalog){
-    document.getElementById('log-notscanned').innerHTML = '<tr><td class="log-empty" colspan="4">Chargement du catalogue…</td></tr>';
+    document.getElementById('log-notscanned').innerHTML = '<tr><td class="log-empty" colspan="5">Chargement du catalogue…</td></tr>';
     return;
   }
-  renderAdvTable('log-notscanned', notScannedList(), ['cote','titre','auteur','barcode'], document.getElementById('notscanned-search').value,
-    r => `<tr>
+  const showResolved = document.getElementById('notscanned-showresolved').checked;
+  renderAdvTable('log-notscanned', 'notscanned', notScannedList(), ['cote','titre','auteur','barcode'], document.getElementById('notscanned-search').value, showResolved,
+    r => `<tr class="${r._resolved?'adv-row-resolved':''}">
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
       <td>${esc(r.auteur)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-    </tr>`, 4, 'Tout le catalogue a été scanné au moins une fois.');
+      <td>${advActionCell('notscanned', r)}</td>
+    </tr>`, 5, 'Tout le catalogue a été scanné au moins une fois.');
 }
 
 document.getElementById('adv-abime').addEventListener('toggle', refreshAbimeList);
@@ -1652,22 +1721,61 @@ document.getElementById('adv-notscanned').addEventListener('toggle', refreshNotS
 document.getElementById('abime-search').addEventListener('input', refreshAbimeList);
 document.getElementById('manualcote-search').addEventListener('input', refreshManualCoteList);
 document.getElementById('notscanned-search').addEventListener('input', refreshNotScannedList);
+document.getElementById('abime-showresolved').addEventListener('change', refreshAbimeList);
+document.getElementById('manualcote-showresolved').addEventListener('change', refreshManualCoteList);
+document.getElementById('notscanned-showresolved').addEventListener('change', refreshNotScannedList);
 
 function updateAdvListsCount(){
-  document.getElementById('sum-abime-count').textContent = document.getElementById('st-abime').textContent;
+  const abimeUnresolved = damagedList().filter(r=>!r._resolved).length;
+  document.getElementById('st-abime').textContent = abimeUnresolved.toLocaleString('fr-FR');
+  document.getElementById('sum-abime-count').textContent = abimeUnresolved.toLocaleString('fr-FR');
 
-  const manualCoteCount = manualCoteList().length;
-  document.getElementById('st-manualcote').textContent = manualCoteCount.toLocaleString('fr-FR');
-  document.getElementById('sum-manualcote-count').textContent = manualCoteCount.toLocaleString('fr-FR');
+  const manualCoteUnresolved = manualCoteList().filter(r=>!r._resolved).length;
+  document.getElementById('st-manualcote').textContent = manualCoteUnresolved.toLocaleString('fr-FR');
+  document.getElementById('sum-manualcote-count').textContent = manualCoteUnresolved.toLocaleString('fr-FR');
 
   if(catalog){
-    const notScannedCount = Object.keys(catalog).filter(bc=>!scans[bc]).length;
-    document.getElementById('st-notscanned').textContent = notScannedCount.toLocaleString('fr-FR');
-    document.getElementById('sum-notscanned-count').textContent = notScannedCount.toLocaleString('fr-FR');
+    const notScannedUnresolved = Object.keys(catalog).filter(bc=>!scans[bc] && !isResolved('notscanned', bc)).length;
+    document.getElementById('st-notscanned').textContent = notScannedUnresolved.toLocaleString('fr-FR');
+    document.getElementById('sum-notscanned-count').textContent = notScannedUnresolved.toLocaleString('fr-FR');
   }
 
   refreshAbimeList(); refreshManualCoteList(); refreshNotScannedList();
 }
+
+/* Export .txt : codes-barres séparés par des points-virgules, respectant le
+   filtre de recherche et la case "Afficher aussi les réglés" en cours (pas
+   de plafond à 300 lignes ici, contrairement à l'affichage à l'écran — un
+   export doit contenir tout ce qui correspond, pas juste l'aperçu). */
+function downloadTxt(text, filename){
+  const blob = new Blob([text], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+}
+function exportAdvBarcodes(rows, filterFields, filter, showResolved, filenamePrefix){
+  const q = (filter||'').trim().toLowerCase();
+  let filtered = showResolved ? rows : rows.filter(r=>!r._resolved);
+  if(q) filtered = filtered.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q)));
+  if(!filtered.length){ alert('Aucun code-barre à exporter pour ce filtre.'); return; }
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  downloadTxt(filtered.map(r=>r.barcode).join(';'),
+    `${filenamePrefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+}
+document.getElementById('abime-export').addEventListener('click', ()=>{
+  exportAdvBarcodes(damagedList(), ['cote','titre','barcode'], document.getElementById('abime-search').value,
+    document.getElementById('abime-showresolved').checked, 'codes-barres-endommages');
+});
+document.getElementById('manualcote-export').addEventListener('click', ()=>{
+  exportAdvBarcodes(manualCoteList(), ['cote','barcode'], document.getElementById('manualcote-search').value,
+    document.getElementById('manualcote-showresolved').checked, 'codes-barres-non-catalogues');
+});
+document.getElementById('notscanned-export').addEventListener('click', ()=>{
+  exportAdvBarcodes(notScannedList(), ['cote','titre','auteur','barcode'], document.getElementById('notscanned-search').value,
+    document.getElementById('notscanned-showresolved').checked, 'codes-barres-jamais-scannes');
+});
 
 /* ════════════ EXPORT / IMPORT / RESET ════════════
    Un seul fichier JSON regroupe scans, non-catalogués, étagères vides,
@@ -1682,7 +1790,8 @@ function exportPayload(){
     nonCatalogues: Object.values(nonCat),
     videShelves: Object.values(videShelves),
     nonRangeShelves: Object.values(nonRangeShelves),
-    lastShelves: Object.values(lastShelves)
+    lastShelves: Object.values(lastShelves),
+    resolvedIssues: Object.values(resolvedIssues)
   };
 }
 function downloadJSON(data, prefix){
@@ -1778,6 +1887,7 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
   const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
   const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
+  const resolvedRows = Array.isArray(data) ? [] : (data.resolvedIssues||[]);
 
   let added=0, updated=0;
   scanRows.forEach(r=>{
@@ -1800,14 +1910,21 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   lastShelfRows.forEach(r=>{ if(r.travee && r.colonne!==undefined && r.etage!==undefined) lastShelves[lastShelfKey(r)] = r; });
   saveLastShelves();
 
+  resolvedRows.forEach(r=>{
+    if(!r.category || !r.barcode) return;
+    const key = issueKey(r.category, r.barcode);
+    if(!resolvedIssues[key] || !resolvedIssues[key].ts || (r.ts||0) > resolvedIssues[key].ts) resolvedIssues[key] = r;
+  });
+  saveResolvedIssues();
+
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
   updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 
-  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length)){
-    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows } });
+  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || resolvedRows.length)){
+    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, resolvedIssues:resolvedRows } });
   }
 
-  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length };
+  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length, resolved: resolvedRows.length };
 }
 
 document.getElementById('file-resume').addEventListener('change', function(e){
@@ -1849,6 +1966,7 @@ document.getElementById('btn-reset').addEventListener('click', ()=>{
   videShelves = {}; saveVideShelves();
   nonRangeShelves = {}; saveNonRangeShelves();
   lastShelves = {}; saveLastShelves();
+  resolvedIssues = {}; saveResolvedIssues();
   pendingSync = []; savePendingSync(); updateSyncIndicator();
   renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 });
