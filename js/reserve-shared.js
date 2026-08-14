@@ -47,7 +47,15 @@ const GROUPES = [
    patrimoniale ci-dessus. Identifiants de travée préfixés "RD-" pour ne pas
    entrer en collision avec les travées I à VII de la réserve patrimoniale
    (les deux locaux numérotent leurs travées en chiffres romains à partir de I). */
-const TRAVEES_DOUAISIENNE = ['I','II','III','IV','V','VI','VII'].map(id => ({id:'RD-'+id, nbCols:4}));
+const TRAVEES_DOUAISIENNE = [
+  {id:'RD-I',   nbCols:5},
+  {id:'RD-II',  nbCols:4},
+  {id:'RD-III', nbCols:4},
+  {id:'RD-IV',  nbCols:4},
+  {id:'RD-V',   nbCols:4},
+  {id:'RD-VI',  nbCols:4},
+  {id:'RD-VII', nbCols:4},
+];
 const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE];
 
 /* "horsreserve" est une pseudo-réserve sans travées : sert uniquement à

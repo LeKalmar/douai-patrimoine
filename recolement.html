@@ -19,7 +19,7 @@
        CLAUDE.md), pour que le mini-plan ci-dessous se lise de façon
        cohérente avec le plan complet. */
     --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
-    --plan-cat:#1A1E99; --plan-manuel:#F9A825; --plan-noncat:#c62828; --plan-nonrange:#8E24AA;
+    --plan-cat:#1A1E99; --plan-manuel:#F9A825; --plan-noncat:#c54545; --plan-nonrange:#8E24AA;
     --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
   }
   body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
@@ -824,7 +824,6 @@ refreshLoc();
 /* ════════════ SON ════════════ */
 let audioCtx = null;
 function beep(freq, dur){
-  if(!document.getElementById('sound-toggle').checked) return;
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -836,7 +835,6 @@ function beep(freq, dur){
   }catch(e){}
 }
 function beepError(){
-  if(!document.getElementById('sound-toggle').checked) return;
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
     const now = audioCtx.currentTime;
