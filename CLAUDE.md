@@ -118,12 +118,16 @@ les collègues), avec repli sur le fichier `data/recolement.json` committé
 si l'API est indisponible. Les deux pages partagent la géométrie de la
 réserve (travées, colonnes, armoires) via `js/reserve-shared.js`.
 
-Dans `recolement.html`, le mode (bouton « Code-barre » = scan, ou
-« À cataloguer » = comptage de non-catalogués) et le type d'emplacement
-(menu déroulant « Étagère » / « Armoire » / « Tiroir », juste après le choix
-de réserve) sont deux axes indépendants (`loc.mode` / `loc.locType`) — les
-deux modes sont utilisables sur les trois types d'emplacement. Les armoires
-et les tiroirs sont modélisés dans `js/reserve-shared.js` comme des
+Dans `recolement.html`, le scan de code-barre et le comptage de
+non-catalogués sont affichés ensemble, au même endroit (plus d'onglet à
+basculer entre les deux — supprimé le 2026-08-14 : les deux outils sont
+utilisables sans changer de mode). Seul le type d'emplacement (menu
+déroulant « Étagère » / « Armoire » / « Tiroir », juste après le choix de
+réserve, `loc.locType`) reste un axe séparé de la réserve/travée
+sélectionnée ; le comptage de non-catalogués reste masqué en mode « Non
+rangé (hors réserve) », qui n'a pas d'emplacement précis auquel le
+rattacher. Les armoires et les tiroirs sont modélisés dans
+`js/reserve-shared.js` comme des
 pseudo-travées à une seule entrée (`EMPLACEMENTS_ARMOIRE`,
 `EMPLACEMENTS_TIROIR` — colonne = quel meuble, étage = tiroir/niveau dans ce
 meuble) plutôt que comme des meubles nommés individuellement : ça permet de
@@ -315,7 +319,7 @@ au récolement).
   spécifique dans ces deux pages pour un type d'origine différent.
 - Toujours dans ce même cas (emplacement renseigné), et seulement si
   l'estimation « non catalogués » de cet emplacement précis (`nonCatalogues`,
-  voir le mode « À cataloguer » de `recolement.html`) est déjà > 0 : un
+  voir le comptage de non-catalogués de `recolement.html`) est déjà > 0 : un
   second patch `{type:'nonCat', key, record}` vers `/api/recolement` qui la
   décrémente de 1 (supprimée si elle retombe à 0). Cet exemplaire vient
   d'être identifié individuellement — il ne doit plus aussi compter dans

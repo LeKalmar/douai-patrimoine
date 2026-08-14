@@ -40,9 +40,6 @@
 
   .locbar{position:sticky;top:0;z-index:20;background:#F5F5FF;border-bottom:1px solid #ddd;padding:.75rem 0;box-shadow:0 2px 8px rgba(0,0,0,.05)}
   .locbar .container{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
-  .loc-kind{display:flex;border:1px solid #ccc;border-radius:8px;overflow:hidden;flex-shrink:0}
-  .loc-kind button{font-family:inherit;font-size:.78rem;padding:.4rem .8rem;border:none;background:#fff;cursor:pointer;color:#555}
-  .loc-kind button.active{background:#12157A;color:#fff}
   .loc-sel{font-family:inherit;font-size:.85rem;padding:.4rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
   .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
   .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
@@ -87,6 +84,7 @@
   .vide-btn.lastshelf.active{background:#455A64;border-color:#455A64;color:#fff}
   .vide-note{font-size:.75rem;color:#888;flex-basis:100%}
   .horsreserve-note{font-size:.8rem;color:#7a4a00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;line-height:1.5}
+  #noncat-mode-zone{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0}
   .noncat-label{font-size:.9rem;color:#333}
   #stp-noncat-wrap{padding:.15rem .3rem}
   #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit}
@@ -217,11 +215,6 @@
 
 <div class="locbar">
   <div class="container">
-    <div class="loc-kind">
-      <button type="button" id="mode-scan" class="active">Code-barre</button>
-      <button type="button" id="mode-catalogage">À cataloguer</button>
-    </div>
-
     <select class="loc-sel" id="sel-reserve"></select>
     <select class="loc-sel" id="sel-loctype">
       <option value="etagere">Étagère</option>
@@ -269,19 +262,17 @@
           </div>
           <div id="scan-mode-zone">
             <div class="scan-row">
-              <input type="text" id="scan-input" placeholder="Scannez un code-barre ou saisissez-le puis Entrée…" autocomplete="off" autofocus>
+              <input type="text" id="scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
               <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
-              <label class="sound-toggle"><input type="checkbox" id="sound-toggle" checked> Son</label>
             </div>
             <div class="feedback" id="feedback"></div>
           </div>
           <div class="vide-row" id="vide-row">
-            <button type="button" class="vide-btn" id="btn-vide">☐ Marquer cet emplacement comme vide</button>
-            <button type="button" class="vide-btn nonrange" id="btn-nonrange">☐ Marquer comme non rangé</button>
-            <button type="button" class="vide-btn lastshelf" id="btn-lastshelf">☐ Marquer comme dernière étagère de cette colonne</button>
-            <span class="vide-note">Vide : ne contient aucun livre (catalogué ou non). Non rangé : documents de natures différentes en désordre, impossibles à compter facilement. Les deux sont exclusifs. Dernière étagère : la colonne s'arrête réellement ici — le plan de la réserve n'affichera plus d'étagère "non inventoriée" au-delà.</span>
+            <button type="button" class="vide-btn" id="btn-vide">☐ Emplacement vide</button>
+            <button type="button" class="vide-btn nonrange" id="btn-nonrange">☐ Emplacement non rangé</button>
+            <button type="button" class="vide-btn lastshelf" id="btn-lastshelf">☐ Dernière étagère de cette colonne</button>
           </div>
-          <div id="noncat-mode-zone" style="display:none">
+          <div id="noncat-mode-zone">
             <div class="scan-row">
               <span class="noncat-label">Livres non catalogués sur cette étagère :</span>
               <div class="stepper" id="stp-noncat-wrap">
@@ -502,10 +493,9 @@ const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "t
 
 let scans = loadJSON(LS_SCANS, {});           // barcode -> record
 let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
-let loc = loadJSON(LS_LOC, { mode:'scan', locType:'etagere', reserve:'patrimoniale', travee:'I', colonne:1, etage:1 });
+let loc = loadJSON(LS_LOC, { locType:'etagere', reserve:'patrimoniale', travee:'I', colonne:1, etage:1 });
 loc.reserve = loc.reserve || 'patrimoniale';  // compat anciennes sessions sans champ "reserve"
 loc.locType = loc.locType || 'etagere';       // compat anciennes sessions (ex-loc.kind)
-loc.mode = loc.mode || 'scan';
 let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat,noticeId}
 let catalogNoticeCount = 0;                   // nombre de notices distinctes (une notice peut avoir plusieurs exemplaires/barcodes)
 let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
@@ -670,16 +660,16 @@ Promise.all([
 });
 
 /* ════════════ EMPLACEMENT ════════════
-   Deux axes indépendants : le mode (loc.mode : "scan" pour le code-barre,
-   "catalogage" pour les livres à cataloguer) et le type d'emplacement
-   (loc.locType : "etagere" = travée+colonne+étage, "armoire"/"tiroir" =
-   colonne+étage seuls, sur les pseudo-travées EMPLACEMENTS_ARMOIRE /
-   EMPLACEMENTS_TIROIR définies dans js/reserve-shared.js). */
+   Le scan code-barre et le comptage des non-catalogués sont deux outils
+   affichés ensemble au même endroit (plus d'onglet à basculer entre les
+   deux) ; seul le type d'emplacement reste un axe séparé (loc.locType :
+   "etagere" = travée+colonne+étage, "armoire"/"tiroir" = colonne+étage
+   seuls, sur les pseudo-travées EMPLACEMENTS_ARMOIRE / EMPLACEMENTS_TIROIR
+   définies dans js/reserve-shared.js). */
 const scanInput = document.getElementById('scan-input');
 const damagedToggle = document.getElementById('damaged-toggle');
 const noncatInput = document.getElementById('noncat-input');
 const selReserve=document.getElementById('sel-reserve'), selLocType=document.getElementById('sel-loctype');
-const modeScanBtn=document.getElementById('mode-scan'), modeCatalogageBtn=document.getElementById('mode-catalogage');
 
 RESERVES.forEach(r=>{
   const o=document.createElement('option'); o.value=r.id; o.textContent=r.label;
@@ -697,22 +687,10 @@ function currentLocDef(){
 }
 
 function updateVideRowVisibility(){
-  // Marquer un emplacement vide/non rangé n'a pas de sens en mode "Non
-  // rangé (hors réserve)" — il n'y a justement pas d'emplacement.
-  document.getElementById('vide-row').style.display = (loc.mode==='scan' && loc.reserve!=='horsreserve') ? '' : 'none';
+  // Marquer un emplacement vide/non rangé n'a pas de sens en "Non rangé
+  // (hors réserve)" — il n'y a justement pas d'emplacement.
+  document.getElementById('vide-row').style.display = loc.reserve!=='horsreserve' ? '' : 'none';
 }
-
-function setMode(mode, skipRefresh){
-  loc.mode = mode;
-  modeScanBtn.classList.toggle('active', mode==='scan');
-  modeCatalogageBtn.classList.toggle('active', mode==='catalogage');
-  document.getElementById('scan-mode-zone').style.display = mode==='catalogage' ? 'none' : '';
-  document.getElementById('noncat-mode-zone').style.display = mode==='catalogage' ? '' : 'none';
-  updateVideRowVisibility();
-  if(!skipRefresh) refreshLoc();
-}
-modeScanBtn.addEventListener('click', ()=>setMode('scan'));
-modeCatalogageBtn.addEventListener('click', ()=>setMode('catalogage'));
 
 function setLocType(type, skipRefresh){
   if(loc.reserve==='horsreserve'){
@@ -741,17 +719,16 @@ function applyReserveVisibility(){
     loc.locType='etagere'; selLocType.value='etagere';
   }
   // Aucun emplacement (travée/colonne/étage) n'a de sens pour des exemplaires
-  // hors réserve — on masque tout ce qui présuppose un emplacement, on
-  // verrouille le mode sur "Code-barre" et on cache le panneau "Attendu à
-  // cet emplacement".
+  // hors réserve — on masque tout ce qui présuppose un emplacement (dont le
+  // comptage de non-catalogués, forcément lié à une étagère précise) et on
+  // cache le panneau "Attendu à cet emplacement".
   selLocType.style.display = isHorsReserve ? 'none' : '';
   document.getElementById('stp-colonne-wrap').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('stp-etage-wrap').style.display = isHorsReserve ? 'none' : '';
   if(isHorsReserve) document.getElementById('stp-travee-wrap').style.display = 'none';
-  modeCatalogageBtn.style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('noncat-mode-zone').style.display = isHorsReserve ? 'none' : '';
   document.querySelector('.expected-panel').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
-  if(isHorsReserve && loc.mode!=='scan') setMode('scan', true);
   updateVideRowVisibility();
 }
 
@@ -838,10 +815,9 @@ function refreshLoc(){
   updateNonRangeUI();
   updateLastShelfUI();
   buildMiniPlan();
-  if(loc.mode==='catalogage') noncatInput.focus(); else scanInput.focus();
+  scanInput.focus();
 }
 applyReserveVisibility();
-setMode(loc.mode, true);
 setLocType(loc.locType, true);
 refreshLoc();
 
@@ -1061,7 +1037,7 @@ function currentNonCatCount(){
 }
 
 function updateNonCatInput(){
-  if(loc.mode==='catalogage') noncatInput.value = currentNonCatCount();
+  noncatInput.value = currentNonCatCount();
 }
 
 function saveNonCatCount(){
