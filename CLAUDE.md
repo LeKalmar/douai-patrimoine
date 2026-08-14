@@ -191,6 +191,42 @@ quantité de livres (impossible à estimer sans mesurer chaque reliure) ; la
 quantité reste visible via la largeur des barres et les compteurs dans le
 panneau de détail, mais jamais via la couleur globale d'un emplacement.
 
+Récolement en cascade des documents reliés ensemble (2026-08-14) : certains
+exemplaires catalogués séparément (barcode et cote propres) sont en réalité
+reliés dans un même volume physique (recueils factices — courant pour les
+brochures/édits anciens, ex. un groupe de 111 édits et arrêts royaux du
+XVIIIe reliés en un seul volume). Syracuse encode ce lien via les champs
+MARC `$481` (« aussi relié dans ce volume ») et `$482` (« relié à la suite
+de »), sous-champ `$3` = numéro de contrôle (`001`) de l'autre notice.
+`indexNotices()` dans `scripts/build-inventory.mjs` construit un graphe non
+orienté à partir de ces deux champs (peu importe le sens — en pratique les
+deux ne sont pas symétriques : la plupart des notices ne portent que l'un
+des deux) et calcule ses composantes connexes (Union-Find), pour regrouper
+même des reliures à plus de deux documents. Chaque exemplaire d'un groupe
+de ≥ 2 barcodes reçoit un champ `_relies` (liste des autres barcodes du même
+volume) dans `data/inventaire.json`. Côté `recolement.html`, `catalog[bc].relies`
+reprend ce champ, et `handleScan()` appelle `applyReliureCascade()` juste
+après avoir enregistré le scan principal : elle récole automatiquement tous
+les barcodes de `relies` au même emplacement (même `travee`/`colonne`/`etage`),
+sans attendre qu'on les scanne un par un — chaque scan synthétique porte un
+champ `viaReliure:<barcode scanné>` pour rester distinguable d'un vrai scan
+physique (badge 🔗 dans les logs « ici »/« tous les scans », note dans le
+panneau de feedback). Scanner N'IMPORTE LEQUEL des membres d'un groupe
+récole tout le groupe — pas besoin d'identifier lequel est le « principal ».
+
+Rattrapage rétroactif : `scripts/backfill-reliure.mjs` (`--apply` pour
+écrire, sinon dry-run) applique la même logique a posteriori sur l'état
+partagé R2 déjà accumulé avant l'introduction de la cascade — pour chaque
+groupe, si au moins un membre est déjà récolé et que d'autres membres ne le
+sont pas encore, ces derniers reçoivent un scan synthétique au même
+emplacement (patch `bulkMerge` vers `recolement.json`, jamais d'écrasement
+d'un scan existant). Si les membres déjà scannés d'un même groupe sont à des
+emplacements DIFFÉRENTS, le script ne tranche pas tout seul : il liste le
+groupe en conflit pour vérification manuelle (lien $481/$482 mal posé côté
+catalogue, ou erreur de récolement/reliure physique changée depuis le
+catalogage). À relancer après tout rattrapage significatif d'un futur export
+Syracuse qui introduirait de nouveaux groupes déjà partiellement récolés.
+
 Le flag `manuel` qui distingue « exemplarisé rapide » de « catalogué »
 circule ainsi : `js/exemplaires-manuels-shared.js` pose `_manuel:true` sur
 chaque enregistrement converti → le fetch du `catalog` dans

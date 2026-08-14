@@ -645,6 +645,11 @@ Promise.all([
       // que reserve.html puisse le colorer différemment (orange) d'un
       // exemplaire réellement catalogué.
       manuel: !!it._manuel,
+      // Reliures ($481/$482 → _relies, voir build-inventory.mjs) : autres
+      // codes-barres physiquement dans le même volume que celui-ci. Utilisé
+      // par handleScan() pour récoler tout le groupe d'un coup — voir
+      // applyReliureCascade().
+      relies: Array.isArray(it._relies) ? it._relies : [],
     };
     if(noticeId) noticeIds.add(noticeId);
   });
@@ -900,7 +905,16 @@ function handleScan(barcode, damaged){
     queuePatch({type:'scan', record});
   }
 
-  showFeedback(record, status, prev);
+  // Reliures : cat.relies liste les codes-barres des autres documents
+  // catalogués physiquement dans le même volume (voir _relies dans
+  // build-inventory.mjs, à partir des champs $481/$482) — on les récole
+  // automatiquement au même emplacement, pour ne pas avoir à les scanner un
+  // par un.
+  const reliureRecords = (status!=='unknown' && cat && cat.relies && cat.relies.length)
+    ? applyReliureCascade(barcode, cat.relies, fields)
+    : [];
+
+  showFeedback(record, status, prev, reliureRecords);
   if(status==='unknown') beepError(); else beep(880, .12);
 
   renderExpected();
@@ -909,7 +923,38 @@ function handleScan(barcode, damaged){
   buildMiniPlan();
 }
 
-function showFeedback(record, status, prev){
+function applyReliureCascade(sourceBarcode, siblingBarcodes, fields){
+  const results = [];
+  siblingBarcodes.forEach(sibBarcode=>{
+    if(sibBarcode === sourceBarcode) return;
+    const sibCat = catalog ? catalog[sibBarcode] : null;
+    const sibPrev = scans[sibBarcode];
+    const sibRecord = {
+      barcode: sibBarcode,
+      cote: sibCat ? sibCat.cote : (sibPrev ? sibPrev.cote : ''),
+      titre: sibCat ? sibCat.titre : (sibPrev ? sibPrev.titre : ''),
+      auteur: sibCat ? sibCat.auteur : (sibPrev ? sibPrev.auteur : ''),
+      fonds: sibCat ? sibCat.fonds : (sibPrev ? sibPrev.fonds : ''),
+      etat: sibCat ? sibCat.etat : (sibPrev ? sibPrev.etat : ''),
+      manuel: sibCat ? !!sibCat.manuel : (sibPrev ? !!sibPrev.manuel : false),
+      kind: loc.locType,
+      travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+      barcodeAbime: sibPrev ? !!sibPrev.barcodeAbime : false,
+      // Marque que ce scan n'est pas un scan physique mais une propagation
+      // automatique depuis le code-barre effectivement scanné — voir le
+      // badge 🔗 dans renderHereLog()/renderAllLog().
+      viaReliure: sourceBarcode,
+      ts: Date.now(),
+    };
+    scans[sibBarcode] = sibRecord;
+    queuePatch({type:'scan', record: sibRecord});
+    results.push(sibRecord);
+  });
+  if(results.length) saveScans();
+  return results;
+}
+
+function showFeedback(record, status, prev, reliureRecords){
   const fb = document.getElementById('feedback');
   fb.className = 'feedback show ' + (status==='unknown' ? 'warn' : status==='dup' ? 'dup' : status==='moved' ? 'dup' : 'ok');
   const badgeTxt = { ok:'✓ Enregistré', dup:'🔁 Déjà scanné ici', moved:'↔ Déplacé depuis un autre emplacement', unknown:'⚠ Code-barre inconnu du catalogue' }[status];
@@ -922,6 +967,9 @@ function showFeedback(record, status, prev){
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
   if(status==='moved' && prev){
     html += `<div class="fb-meta">Précédemment : ${esc(locLabel(prev.travee))}${prev.colonne?' · col. '+esc(prev.colonne):''} · étage/n° ${esc(prev.etage)}</div>`;
+  }
+  if(reliureRecords && reliureRecords.length){
+    html += `<div class="fb-meta" style="color:#00897b">🔗 Relié avec ${reliureRecords.length} autre(s) document(s), récolé(s) automatiquement au même emplacement : ${reliureRecords.map(r=>esc(r.cote||r.barcode)).join(', ')}</div>`;
   }
   if(status==='unknown'){
     html += `<div class="fb-manual">
@@ -1433,7 +1481,7 @@ function renderHereLog(){
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}</td>
       <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
     </tr>`).join('');
   tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
@@ -1455,7 +1503,7 @@ function renderAllLog(filter){
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}</td>
       <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
     </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${filtered.length-300} de plus (affinez la recherche)</td></tr>` : '');
   tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));

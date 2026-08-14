@@ -79,11 +79,43 @@ const CONFIG = {
   force: process.env.SYRACUSE_FORCE === '1',
 };
 
+// ── Reliures ($481 « aussi relié dans ce volume » / $482 « relié à la suite
+// de ») ──────────────────────────────────────────────────────────────────
+// Ces deux champs référencent (sous-champ $3) une AUTRE notice du même
+// fichier par son numéro de contrôle ($001) : deux notices reliées dans un
+// même volume physique se trouvent forcément au même emplacement en
+// réserve. On construit un graphe non orienté (peu importe si le lien n'est
+// enregistré que dans un sens — observé en pratique : 82 notices portent un
+// $481, 487 portent un $482, seulement 32 portent les deux) et on calcule
+// ses composantes connexes via Union-Find, pour regrouper même des reliures
+// à plus de deux documents. Sert ensuite (voir buildItems) à propager
+// automatiquement un scan à tout le groupe quand recolement.html en scanne
+// un seul membre.
+function makeUnionFind() {
+  const parent = new Map();
+  function find(x) {
+    if (!parent.has(x)) parent.set(x, x);
+    let root = x;
+    while (parent.get(root) !== root) root = parent.get(root);
+    let cur = x;
+    while (parent.get(cur) !== root) { const next = parent.get(cur); parent.set(cur, root); cur = next; }
+    return root;
+  }
+  function union(a, b) {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+  return { find, union };
+}
+
 // ── Étape 1 : indexer les notices ──────────────────────────────────────────
 function indexNotices(xml) {
   const notices = new Map();               // noticeId -> flattened data
   const primaryItemToNotice = new Map();   // $995$f  -> noticeId
   const coteToNotice = new Map();          // cote    -> noticeId (via $940$s)
+  const barcodeByNotice = new Map();       // noticeId -> $995$f (barcode propre à la notice)
+  const uf = makeUnionFind();
+  const reliureNodes = new Set();          // noticeId ayant au moins un lien $481/$482
 
   let count = 0;
   for (const recXml of iterateRecords(xml)) {
@@ -98,7 +130,10 @@ function indexNotices(xml) {
 
     // Lien principal : $995$f
     const f995 = getSubfield(rec, '995', 'f');
-    if (f995) primaryItemToNotice.set(f995.trim(), noticeId);
+    if (f995) {
+      primaryItemToNotice.set(f995.trim(), noticeId);
+      barcodeByNotice.set(noticeId, f995.trim());
+    }
 
     // Lien de secours : $940$s (multi-exemplaires)
     for (const s of getAllSubfields(rec, '940', 's')) {
@@ -106,10 +141,38 @@ function indexNotices(xml) {
       if (key) coteToNotice.set(key, noticeId);
     }
 
+    // Reliures : $481$3 et $482$3 pointent tous les deux vers un $001 d'une
+    // autre notice, peu importe le sens de la relation pour notre usage.
+    for (const targetId of [...getAllSubfields(rec, '481', '3'), ...getAllSubfields(rec, '482', '3')]) {
+      const t = targetId.trim();
+      if (!t || t === noticeId) continue;
+      uf.union(noticeId, t);
+      reliureNodes.add(noticeId);
+      reliureNodes.add(t);
+    }
+
     count++;
   }
 
-  return { notices, primaryItemToNotice, coteToNotice, count };
+  // Regroupe les noticeId par composante connexe, puis convertit chaque
+  // groupe en liste de barcodes (une notice sans $995$f ne contribue aucun
+  // barcode au groupe — elle n'a simplement pas d'exemplaire propre connu).
+  const groupsByRoot = new Map(); // root -> Set(noticeId)
+  for (const id of reliureNodes) {
+    const root = uf.find(id);
+    if (!groupsByRoot.has(root)) groupsByRoot.set(root, new Set());
+    groupsByRoot.get(root).add(id);
+  }
+  const reliureSiblings = new Map(); // barcode -> [barcodes des autres documents du même volume]
+  let reliureGroupCount = 0;
+  for (const members of groupsByRoot.values()) {
+    const barcodes = [...new Set([...members].map(id => barcodeByNotice.get(id)).filter(Boolean))];
+    if (barcodes.length < 2) continue; // groupe sans au moins 2 exemplaires identifiés : rien à propager
+    reliureGroupCount++;
+    for (const bc of barcodes) reliureSiblings.set(bc, barcodes.filter(b => b !== bc));
+  }
+
+  return { notices, primaryItemToNotice, coteToNotice, count, reliureSiblings, reliureGroupCount };
 }
 
 // ── Étape 2 : itérer les exemplaires et faire la jointure ──────────────────
@@ -150,6 +213,7 @@ function buildItems(xml, index) {
     orphansSample: [],
     reserveDouaisienne: 0,
     reservePatrimoniale: 0,
+    reliureItems: 0,
   };
 
   for (const recXml of iterateRecords(xml)) {
@@ -200,6 +264,15 @@ function buildItems(xml, index) {
     if (barcode) {
       merged.lien_num = `${CONFIG.vignetteBaseUrl}${barcode}.jpg`;
       merged['995$f'] = barcode;
+
+      // Reliures ($481/$482, voir indexNotices) : autres barcodes physiquement
+      // dans le même volume — consommé par recolement.html pour récoler tout
+      // le groupe d'un coup quand un seul de ses membres est scanné.
+      const siblings = index.reliureSiblings.get(barcode);
+      if (siblings && siblings.length) {
+        merged._relies = siblings;
+        stats.reliureItems++;
+      }
     }
 
     items.push(merged);
@@ -288,6 +361,7 @@ async function main() {
   console.log('  · indexation des notices');
   const index = indexNotices(noticesXml);
   console.log(`     ${index.count} notices, ${index.primaryItemToNotice.size} liens $995$f, ${index.coteToNotice.size} cotes de secours ($940$s)`);
+  console.log(`     ${index.reliureGroupCount} groupe(s) de documents reliés ($481/$482), ${index.reliureSiblings.size} exemplaires concernés`);
 
   // Construction des items
   console.log('  · construction de l\'inventaire (un enregistrement par exemplaire)');
@@ -327,6 +401,8 @@ async function main() {
       joinRate: Number((rate * 100).toFixed(2)),
       reserveDouaisienne: s.reserveDouaisienne,
       reservePatrimoniale: s.reservePatrimoniale,
+      reliureGroups: index.reliureGroupCount,
+      reliureItems: s.reliureItems,
     },
     orphansSample: s.orphansSample,
   });
