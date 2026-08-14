@@ -363,7 +363,7 @@
 
         <div class="stats-row" style="margin-bottom:0">
           <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime">0</div></div>
-          <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote">0</div></div>
+          <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start" style="font-size:1rem">—</div></div>
           <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last" style="font-size:1rem">—</div></div>
@@ -1656,12 +1656,19 @@ function damagedList(){
     .sort((a,b)=>b.ts-a.ts);
 }
 function manualCoteList(){
-  // Scanné, jamais trouvé dans le catalogue (ni au scan initial ni depuis) :
-  // ni titre ni auteur, mais une cote a été saisie à la main via le champ
-  // "Renseigner" du feedback (voir showFeedback/manual-save). Exclut les
-  // exemplaires "manuel" (créés via exemplarisation.html), qui ont toujours
-  // un titre.
-  return Object.values(scans).filter(r=>!r.manuel && !r.titre && !r.auteur && r.cote)
+  // Scanné, mais absent du catalogue *actuel* (comparaison en direct contre
+  // `catalog`, pas figée sur les titre/auteur enregistrés au moment du
+  // scan) : la cote a été saisie à la main via le champ "Renseigner" du
+  // feedback (voir showFeedback/manual-save) parce que le code-barre était
+  // introuvable dans le catalogue à ce moment-là. Comparer au catalogue
+  // courant plutôt qu'au scan figé permet à un exemplaire de sortir tout
+  // seul de cette liste dès qu'un nouvel export Syracuse le fait apparaître
+  // (ex. correction d'une mauvaise localisation côté SIGB), sans avoir à le
+  // rescanner physiquement. Exclut les exemplaires "manuel" (créés via
+  // exemplarisation.html), qui sont dans `catalog` mais pas une vraie
+  // notice Syracuse.
+  if(!catalog) return [];
+  return Object.values(scans).filter(r=>!r.manuel && r.cote && !catalog[r.barcode])
     .map(r=>Object.assign({}, r, { _resolved: isResolved('manualcote', r.barcode) }))
     .sort((a,b)=>b.ts-a.ts);
 }
@@ -1723,6 +1730,11 @@ function refreshAbimeList(){
 }
 function refreshManualCoteList(){
   if(!document.getElementById('adv-manualcote').open) return;
+  if(!catalog){
+    document.getElementById('log-manualcote').innerHTML = '<tr><td class="log-empty" colspan="4">Chargement du catalogue…</td></tr>';
+    document.getElementById('manualcote-pager').innerHTML = '';
+    return;
+  }
   const showResolved = document.getElementById('manualcote-showresolved').checked;
   renderAdvTable('log-manualcote', 'manualcote-pager', 'manualcote', manualCoteList(), ['cote','barcode'], document.getElementById('manualcote-search').value, showResolved,
     r => `<tr class="${r._resolved?'adv-row-resolved':''}">
@@ -1767,11 +1779,11 @@ function updateAdvListsCount(){
   document.getElementById('st-abime').textContent = abimeUnresolved.toLocaleString('fr-FR');
   document.getElementById('sum-abime-count').textContent = abimeUnresolved.toLocaleString('fr-FR');
 
-  const manualCoteUnresolved = manualCoteList().filter(r=>!r._resolved).length;
-  document.getElementById('st-manualcote').textContent = manualCoteUnresolved.toLocaleString('fr-FR');
-  document.getElementById('sum-manualcote-count').textContent = manualCoteUnresolved.toLocaleString('fr-FR');
-
   if(catalog){
+    const manualCoteUnresolved = manualCoteList().filter(r=>!r._resolved).length;
+    document.getElementById('st-manualcote').textContent = manualCoteUnresolved.toLocaleString('fr-FR');
+    document.getElementById('sum-manualcote-count').textContent = manualCoteUnresolved.toLocaleString('fr-FR');
+
     const notScannedUnresolved = Object.keys(catalog).filter(bc=>!scans[bc] && !isResolved('notscanned', bc)).length;
     document.getElementById('st-notscanned').textContent = notScannedUnresolved.toLocaleString('fr-FR');
     document.getElementById('sum-notscanned-count').textContent = notScannedUnresolved.toLocaleString('fr-FR');

@@ -207,11 +207,15 @@ est ouvert, pour ne pas payer le coût DOM à chaque scan — et paginé,
 qui tronquerait la liste : la catégorie « jamais scannés » peut compter
 plusieurs milliers d'entrées) : **codes-barres endommagés** (`scans`
 avec `barcodeAbime:true`, saisis à la main faute de pouvoir être scannés),
-**scannés non catalogués** (un scan sans correspondance dans `catalog` au
-moment du scan — repéré a posteriori par `!titre && !auteur && cote`,
-puisque seule la cote a pu être saisie via le champ « Renseigner » du
-feedback — à distinguer des exemplaires `manuel` d'`exemplarisation.html`,
-qui ont toujours un titre) et **jamais scannés** (différence entre les
+**scannés non catalogués** (un scan (`scans`, avec une cote saisie via le
+champ « Renseigner » du feedback faute de correspondance au moment du scan)
+dont le code-barre reste absent du `catalog` *actuel* — comparaison en
+direct à chaque rendu, pas figée sur les `titre`/`auteur` enregistrés au
+moment du scan : un exemplaire sort tout seul de cette liste dès qu'un
+nouvel export Syracuse le fait apparaître dans le catalogue — ex. correction
+d'une mauvaise localisation côté SIGB — sans avoir besoin de le rescanner ;
+à distinguer des exemplaires `manuel` d'`exemplarisation.html`, exclus via
+leur flag `manuel`) et **jamais scannés** (différence entre les
 codes-barres de `catalog` et ceux de `scans` — potentiellement perdus, ou
 récolement pas encore fait sur cet exemplaire). Chaque panneau a un bouton
 d'export (`.txt`, un code-barre par ligne, respectant la recherche et
