@@ -41,6 +41,9 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const current = await r2Get(KEY);
+      // Voir api/recolement.mjs : mise en cache CDN courte pour réduire le
+      // "Fast Origin Transfer" du polling répété côté client.
+      res.setHeader('Cache-Control', 'public, s-maxage=20, stale-while-revalidate=60');
       res.status(200).json(current ? JSON.parse(current.body) : emptyState());
       return;
     }

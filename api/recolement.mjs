@@ -181,6 +181,12 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const current = await r2Get(KEY);
+      // Mis en cache brièvement sur le CDN Vercel : plusieurs collègues qui
+      // pollent la même route en même temps (recolement.html, reserve.html,
+      // exemplarisation.html, toutes les 45s) partagent alors une seule
+      // réponse au lieu de retélécharger l'état complet à chaque fois — voir
+      // "Fast Origin Transfer" dans CLAUDE.md.
+      res.setHeader('Cache-Control', 'public, s-maxage=20, stale-while-revalidate=60');
       res.status(200).json(current ? JSON.parse(current.body) : emptyState());
       return;
     }
