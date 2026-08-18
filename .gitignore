@@ -4,3 +4,4 @@ node_modules/
 *.log
 .env
 data/xml/magasin/
+data/xml/all/
