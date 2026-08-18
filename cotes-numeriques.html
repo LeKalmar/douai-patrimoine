@@ -32,6 +32,8 @@
     .mg-count{font-size:.78rem;color:#888;white-space:nowrap}
     .mg-export-btn{font-family:inherit;font-size:.8rem;padding:.45rem .8rem;border:1px solid #12157A;border-radius:6px;background:#12157A;color:#fff;cursor:pointer;white-space:nowrap}
     .mg-export-btn:hover{background:#1a1fa0}
+    .mg-export-btn-secondary{background:#fff;color:#12157A}
+    .mg-export-btn-secondary:hover{background:#F5F5FF}
 
     .mg-table-wrap{border:1px solid #e8e8f0;border-radius:8px;overflow:hidden}
     table.mg-table{width:100%;border-collapse:collapse;font-size:.82rem}
@@ -96,7 +98,9 @@
       <option value="200">200 / page</option>
     </select>
     <span class="mg-count" id="mg-count"></span>
-    <button type="button" class="mg-export-btn" id="mg-export">⬇ Exporter les codes-barres (.txt)</button>
+    <button type="button" class="mg-export-btn" id="mg-export">⬇ Exporter (filtre actuel)</button>
+    <button type="button" class="mg-export-btn mg-export-btn-secondary" id="mg-export-2e">⬇ 2e étage</button>
+    <button type="button" class="mg-export-btn mg-export-btn-secondary" id="mg-export-5e">⬇ 5e étage</button>
   </div>
 
   <div class="mg-table-wrap">
@@ -295,13 +299,29 @@ function downloadTxt(text, filename) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 300);
 }
-document.getElementById('mg-export').addEventListener('click', () => {
-  applySearch();
-  const barcodes = FILTERED.map(r => r.barcode).filter(Boolean);
+function exportBarcodes(rows, prefix) {
+  const barcodes = rows.map(r => r.barcode).filter(Boolean);
   if (!barcodes.length) { alert('Aucun code-barre à exporter pour ce filtre.'); return; }
   const d = new Date(), pad = n => String(n).padStart(2, '0');
-  downloadTxt(barcodes.join('\n'),
-    `codes-barres-cotes-numeriques-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.txt`);
+  downloadTxt(barcodes.join('\n'), `${prefix}-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.txt`);
+}
+document.getElementById('mg-export').addEventListener('click', () => {
+  applySearch(); // respecte la recherche texte ET le filtre d'étage en cours
+  exportBarcodes(FILTERED, 'codes-barres-cotes-numeriques');
+});
+// Exports dédiés par étage : ignorent le menu déroulant d'étage (pas besoin
+// de le changer d'abord), mais respectent quand même la recherche texte en
+// cours, pour rester cohérents avec un usage "je cherche puis j'exporte".
+function rowsForEtage(etage) {
+  const q = (document.getElementById('mg-search-input').value || '').trim().toLowerCase();
+  return ROWS.filter(r => r.etage === etage &&
+    (!q || r.cote.toLowerCase().includes(q) || r.barcode.toLowerCase().includes(q)));
+}
+document.getElementById('mg-export-2e').addEventListener('click', () => {
+  exportBarcodes(rowsForEtage('2e'), 'codes-barres-2e-etage');
+});
+document.getElementById('mg-export-5e').addEventListener('click', () => {
+  exportBarcodes(rowsForEtage('5e'), 'codes-barres-5e-etage');
 });
 
 // Les deux fetch ci-dessous sont indépendants (données vs rapport de

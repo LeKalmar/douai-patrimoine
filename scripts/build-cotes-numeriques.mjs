@@ -61,6 +61,11 @@ const CONFIG = {
 // Retourne le numéro détecté (string) ou null.
 function numericLocDigitRun(coteG) {
   if (!coteG) return null;
+  // Cotes de la Réserve Douaisienne : préfixe "D" (± espace) juste avant le
+  // numéro ("D138678", "D 138678", "d100784"...). Ce ne sont pas des cotes
+  // 2e/5e étage malgré leur numéro à 5/6 chiffres commençant par "1" —
+  // exclues avant toute autre analyse.
+  if (/^d\s?\d/i.test(coteG)) return null;
   // Fusionne "1-2 chiffres.3 chiffres" (séparateur de milliers) en un seul
   // nombre — n'affecte pas un préfixe Dewey à 3 chiffres ("168.66",
   // "325.5" restent en morceaux de 3/2 ou 3/1 chiffres, jamais fusionnés).
@@ -80,8 +85,10 @@ function buildItems(xml) {
     totalItems: 0,
     kept: 0,
     excluded: 0,
+    douaisienneExcluded: 0, // sous-ensemble de excluded : préfixe "D" (Réserve Douaisienne)
     excludedSample: [],   // cotes sans aucun run 5/6 chiffres exploitable
     nearMissSample: [],   // cotes avec un run 5/6 chiffres mais qui ne commence pas par "1"
+    douaisienneSample: [], // échantillon des cotes "D..." écartées
     keptEdgeSample: [],   // cotes gardées avec tiret/point/zéro de tête, à relire
   };
 
@@ -100,9 +107,14 @@ function buildItems(xml) {
     if (!digitRun) {
       stats.excluded++;
       if (stats.excludedSample.length < 30) stats.excludedSample.push(coteDisplay);
-      const nearMissRuns = (coteG || '').match(/\d{5,6}/g) || [];
-      if (nearMissRuns.some(r => r[0] !== '1') && stats.nearMissSample.length < 30) {
-        stats.nearMissSample.push(coteDisplay);
+      if (/^d\s?\d/i.test(coteG || '')) {
+        stats.douaisienneExcluded++;
+        if (stats.douaisienneSample.length < 30) stats.douaisienneSample.push(coteDisplay);
+      } else {
+        const nearMissRuns = (coteG || '').match(/\d{5,6}/g) || [];
+        if (nearMissRuns.some(r => r[0] !== '1') && stats.nearMissSample.length < 30) {
+          stats.nearMissSample.push(coteDisplay);
+        }
       }
       continue;
     }
@@ -161,7 +173,8 @@ async function main() {
   console.log('  · construction et filtrage (cotes numériques 5/6 chiffres, premier chiffre "1")');
   const { items, stats } = buildItems(xml);
   console.log(
-    `     ${stats.totalItems} exemplaires ・ ${stats.kept} gardés, ${stats.excluded} exclus`
+    `     ${stats.totalItems} exemplaires ・ ${stats.kept} gardés, ${stats.excluded} exclus ` +
+    `(dont ${stats.douaisienneExcluded} Réserve Douaisienne)`
   );
 
   mkdirSync(dirname(resolve(CONFIG.output.data)), { recursive: true });
@@ -183,9 +196,11 @@ async function main() {
       totalItems: stats.totalItems,
       kept: stats.kept,
       excluded: stats.excluded,
+      douaisienneExcluded: stats.douaisienneExcluded,
     },
     excludedSample: stats.excludedSample,
     nearMissSample: stats.nearMissSample,
+    douaisienneSample: stats.douaisienneSample,
     keptEdgeSample: stats.keptEdgeSample,
   };
   writeFileSync(CONFIG.output.report, JSON.stringify(report, null, 2), 'utf-8');

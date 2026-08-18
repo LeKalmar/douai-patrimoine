@@ -427,14 +427,25 @@ restriction supplémentaire (absente de la règle magasins) est une demande
 explicite, pas déduite de la forme de l'export — à ne pas assouplir sans
 revalider avec un nouvel export.
 
+Avant cette règle numérique, un test écarte les cotes de la **Réserve
+Douaisienne** : préfixe « D » (± un espace, casse indifférente — « D138678 »,
+« D 138678 », « d100784 ») juste devant le numéro. Sans ce test, ces cotes
+seraient gardées à tort : leur numéro (après le « D ») a la même forme 5/6
+chiffres commençant par « 1 » que les vraies cotes 2e/5e étage — vérifié à
+l'introduction de la règle (2026-08-18) sur l'export réel : 6 050 des 43 787
+exemplaires initialement gardés portaient ce préfixe. Compteur et échantillon
+dans le rapport de build (`stats.douaisienneExcluded`, `douaisienneSample`).
+
 `cotes-numeriques.html` reprend le patron de `magasins.html` (recherche,
 tri par colonne, pagination) mais sans les colonnes titre/auteur/éditeur
 (pas de notice dans cet export) : cote, étage, indice Dewey (`930$i`), type
-(`920$t`), section (`921$b`), date d'entrée (`920$d`), code-barre. Un
-bouton « Exporter les codes-barres (.txt) » télécharge un code-barre par
-ligne en respectant la recherche **et** le filtre d'étage en cours (pas
-seulement la page affichée), même convention que les exports des
-« Statistiques avancées » de `recolement.html`. Cet outil est un pur
+(`920$t`), section (`921$b`), date d'entrée (`920$d`), code-barre. Trois
+boutons d'export en .txt (un code-barre par ligne, même convention que les
+exports des « Statistiques avancées » de `recolement.html`) : « Exporter
+(filtre actuel) » respecte la recherche texte et le menu déroulant d'étage ;
+« 2e étage » / « 5e étage » exportent directement l'étage correspondant
+(en respectant la recherche texte, mais **sans** dépendre du menu déroulant
+— pas besoin de le changer avant de cliquer). Cet outil est un pur
 repérage/tri, indépendant du récolement/de la réserve (pas d'écriture vers
 `/api/recolement`, pas de notion d'emplacement travée/colonne/étage) —
 volontairement laissé simple, sur demande explicite plutôt qu'une
