@@ -249,7 +249,7 @@
 
       <div class="stats-row">
         <div class="stat-card"><div class="stat-card-label">Scans enregistrés</div><div class="stat-card-val" id="st-total">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Notices cataloguées</div><div class="stat-card-val" id="st-catalog">—</div></div>
+        <div class="stat-card"><div class="stat-card-label" id="st-catalog-label">Notices cataloguées</div><div class="stat-card-val" id="st-catalog">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Progression</div><div class="stat-card-val" id="st-progress">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-notices-scanned" style="font-size:1.2rem">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
@@ -620,28 +620,35 @@ setInterval(flushPendingSync, 20000);
 setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
 
-/* ════════════ CATALOGUE (data/inventaire.json) ════════════
-   Fusionné avec les exemplaires créés via exemplarisation.html (état
-   partagé R2) : un code-barre créé là-bas, même sans emplacement renseigné,
-   doit être reconnu ici comme "connu du catalogue" dès le premier scan —
-   sinon handleScan() le traiterait comme inconnu et n'enregistrerait rien
-   (voir status 'unknown' plus bas). */
-Promise.all([
-  fetch('data/inventaire.json').then(r=>r.json()),
-  fetchExemplairesManuelsAsCatalogRows(),
-  fetchReliuresManuelles(),
-]).then(([data, manuels, reliuresManuelles])=>{
-  const items = data.concat(manuels);
-  catalog = {};
+/* ════════════ CATALOGUE(S) ════════════
+   Deux catalogues indépendants de reconnaissance de code-barre, un par
+   catalogGroup (voir js/reserve-shared.js) : 'reserve' pour la réserve
+   patrimoniale/Douaisienne/hors-réserve (data/inventaire.json, fusionné
+   avec les exemplaires créés via exemplarisation.html — un code-barre créé
+   là-bas, même sans emplacement renseigné, doit être reconnu ici comme
+   "connu du catalogue" dès le premier scan, sinon handleScan() le
+   traiterait comme inconnu et n'enregistrerait rien, voir status 'unknown'
+   plus bas), 'magasin' pour le(s) magasin(s) d'étage (data/magasins.json —
+   catalogue séparé du magasin 2e/5e étage, voir magasins.html ; partagé
+   entre le magasin 2e étage et un futur magasin 5e étage, ce catalogue
+   n'étant pas scindé par étage).
+   catalog/catalogNoticeCount restent les variables globales utilisées
+   partout ailleurs dans ce fichier (handleScan, cascade reliures,
+   updateStats, notScannedList, manualCoteList, updateAdvListsCount) : elles
+   ne pointent jamais directement vers un des deux catalogues construits
+   ci-dessous, seulement vers celui du groupe actif — voir
+   syncActiveCatalog(), appelée ici et à chaque changement de réserve. */
+function buildCatalogFromItems(items, fondsOverride){
+  const cat = {};
   const noticeIds = new Set();
   items.forEach(it=>{
     const bc = (it['915$b'] || it['995$f'] || '').trim();
     if(!bc) return;
     const cote = (it['930$g']||'').trim();
     const noticeId = it._noticeId || null;
-    catalog[bc] = {
+    cat[bc] = {
       cote, titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim(),
-      fonds:getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId,
+      fonds: fondsOverride || getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId,
       // Vient d'exemplarisation.html (pas une vraie notice Syracuse) — voir
       // js/exemplaires-manuels-shared.js. Propagé jusque dans le scan pour
       // que reserve.html puisse le colorer différemment (orange) d'un
@@ -650,21 +657,60 @@ Promise.all([
       // Reliures ($481/$482 → _relies, voir build-inventory.mjs) : autres
       // codes-barres physiquement dans le même volume que celui-ci. Utilisé
       // par handleScan() pour récoler tout le groupe d'un coup — voir
-      // applyReliureCascade().
+      // applyReliureCascade(). Absent du catalogue magasins (pas de
+      // reliures manuelles pour ce fonds).
       relies: Array.isArray(it._relies) ? it._relies : [],
     };
+    // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
+    // le compteur et la progression se basent sur des notices distinctes, pas
+    // sur des scans bruts, pour qu'un même exemplaire rescanné par erreur ou
+    // pour vérification ne compte jamais deux fois.
     if(noticeId) noticeIds.add(noticeId);
   });
-  applyManualReliureGroups(catalog, reliuresManuelles);
-  // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
-  // le compteur et la progression se basent sur des notices distinctes, pas
-  // sur des scans bruts, pour qu'un même exemplaire rescanné par erreur ou
-  // pour vérification ne compte jamais deux fois.
-  catalogNoticeCount = noticeIds.size;
-  document.getElementById('st-catalog').textContent = catalogNoticeCount.toLocaleString('fr-FR');
+  return { catalog: cat, noticeCount: noticeIds.size };
+}
+
+let catalogByGroup = { reserve:null, magasin:null };
+let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
+let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas encore chargé" (—) de "échec" (indisponible)
+const CATALOG_LABELS = { reserve:'Notices cataloguées', magasin:'Notices cataloguées (magasins)' };
+
+function syncActiveCatalog(){
+  const group = catalogGroupOfReserve(loc.reserve);
+  catalog = catalogByGroup[group];
+  catalogNoticeCount = catalogNoticeCountByGroup[group];
+  document.getElementById('st-catalog-label').textContent = CATALOG_LABELS[group] || CATALOG_LABELS.reserve;
+  document.getElementById('st-catalog').textContent = catalog
+    ? catalogNoticeCount.toLocaleString('fr-FR')
+    : (catalogFailedGroup[group] ? 'indisponible' : '—');
+}
+
+Promise.all([
+  fetch('data/inventaire.json').then(r=>r.json()),
+  fetchExemplairesManuelsAsCatalogRows(),
+  fetchReliuresManuelles(),
+]).then(([data, manuels, reliuresManuelles])=>{
+  const items = data.concat(manuels);
+  const built = buildCatalogFromItems(items);
+  applyManualReliureGroups(built.catalog, reliuresManuelles);
+  catalogByGroup.reserve = built.catalog;
+  catalogNoticeCountByGroup.reserve = built.noticeCount;
+  syncActiveCatalog();
   updateStats();
 }).catch(()=>{
-  document.getElementById('st-catalog').textContent = 'indisponible';
+  catalogFailedGroup.reserve = true;
+  syncActiveCatalog();
+});
+
+fetch('data/magasins.json').then(r=>r.json()).then(data=>{
+  const built = buildCatalogFromItems(data, 'Magasin 2e/5e étage');
+  catalogByGroup.magasin = built.catalog;
+  catalogNoticeCountByGroup.magasin = built.noticeCount;
+  syncActiveCatalog();
+  updateStats();
+}).catch(()=>{
+  catalogFailedGroup.magasin = true;
+  syncActiveCatalog();
 });
 
 /* ════════════ EMPLACEMENT ════════════
@@ -742,6 +788,7 @@ function applyReserveVisibility(){
 
 selReserve.addEventListener('change', ()=>{
   loc.reserve = selReserve.value;
+  syncActiveCatalog();
   applyReserveVisibility();
   if(loc.reserve==='horsreserve'){
     refreshLoc();
@@ -786,7 +833,7 @@ function displayTraveeId(t){
   if(t==='HORS-RESERVE') return 'Non rangé (hors réserve)';
   if(t==='ARMOIRE') return 'Armoire (bois)';
   if(t==='TIROIR') return 'Armoire à tiroirs';
-  return (t||'').replace(/^RD-/, '');
+  return (t||'').replace(/^RD-/, '').replace(/^M2-/, '').replace(/^M5-/, '');
 }
 
 function locLabel(t){

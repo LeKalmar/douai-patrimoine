@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Plan de la Réserve — Bibliothèques de Douai</title>
-  <meta name="description" content="Plan interactif de la réserve patrimoniale. Visualisation des travées, colonnes, armoires et de leur taux d'occupation d'après le récolement.">
+  <title>Plan des magasins — Bibliothèques de Douai</title>
+  <meta name="description" content="Plan interactif des espaces de stockage (réserve patrimoniale, Réserve Douaisienne, magasins d'étage). Visualisation des travées, colonnes, armoires et de leur taux d'occupation d'après le récolement.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
@@ -62,6 +62,9 @@
     .sr-item{padding:.45rem .9rem;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .1s}
     .sr-item:last-child{border-bottom:none}.sr-item:hover{background:#f5f5f5}
     .sr-item strong{color:#1a1a1a}.sr-item em{font-style:normal;color:#888;font-size:.72rem}
+    .room-group{margin-bottom:2.5rem}
+    .room-group-title{font-family:'DM Serif Display',serif;font-style:italic;font-size:1.6rem;font-weight:400;margin:0 0 1.1rem;color:#12157A;display:flex;align-items:center;gap:.75rem}
+    .room-group-title::after{content:'';flex:1;height:2px;background:linear-gradient(to right,#12157A,transparent)}
     .room-section{margin-bottom:2rem}
     .room-section-title{font-family:'DM Serif Display',serif;font-size:1.15rem;font-weight:400;margin:0 0 .75rem;color:#333;display:flex;align-items:center;gap:.6rem}
     .room-section-title::after{content:'';flex:1;height:1px;background:#e0e0e0}
@@ -124,9 +127,9 @@
 <section class="page-hero">
   <div class="container">
     <div>
-      <nav class="breadcrumb">Patrimoine · Réserve</nav>
-      <h1 class="page-title">Plan de la <em>Réserve</em></h1>
-      <p class="page-lead">Visualisation topographique des espaces de stockage d'après le récolement — travées, colonnes, armoires à tiroirs et armoires en bois.</p>
+      <nav class="breadcrumb">Patrimoine · Magasins</nav>
+      <h1 class="page-title">Plan des <em>Magasins</em></h1>
+      <p class="page-lead">Visualisation topographique des espaces de stockage d'après le récolement — réserve (travées, armoires à tiroirs, armoires en bois) et magasins d'étage.</p>
     </div>
     <div class="hero-actions">
       <a href="admin.html">← Espace professionnel</a>
@@ -180,31 +183,53 @@
 
       <div class="search-results" id="sres"></div>
 
-      <div class="room-section">
-        <h2 class="room-section-title">Réserve patrimoniale</h2>
-        <div class="room-plan">
-          <div class="room-inner" id="room-travees"></div>
+      <div class="room-group">
+        <h2 class="room-group-title">Réserve</h2>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Réserve patrimoniale</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees"></div>
+          </div>
+        </div>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Armoires (bois)</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-armoires"></div>
+          </div>
+        </div>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Armoires à tiroirs</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-tiroirs"></div>
+          </div>
+        </div>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Réserve Douaisienne</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-douaisienne"></div>
+          </div>
         </div>
       </div>
 
-      <div class="room-section">
-        <h2 class="room-section-title">Armoires (bois)</h2>
-        <div class="room-plan">
-          <div class="room-inner" id="room-armoires"></div>
+      <div class="room-group">
+        <h2 class="room-group-title">Magasin — 2e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-magasin2"></div>
+          </div>
         </div>
       </div>
 
-      <div class="room-section">
-        <h2 class="room-section-title">Armoires à tiroirs</h2>
-        <div class="room-plan">
-          <div class="room-inner" id="room-tiroirs"></div>
-        </div>
-      </div>
-
-      <div class="room-section">
-        <h2 class="room-section-title">Réserve Douaisienne</h2>
-        <div class="room-plan">
-          <div class="room-inner" id="room-travees-douaisienne"></div>
+      <div class="room-group">
+        <h2 class="room-group-title">Magasin — 5e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-magasin5"></div>
+          </div>
         </div>
       </div>
 
@@ -256,7 +281,7 @@ const TRAVEE_REF_MAXET=DEFAULT_MAX_ETAGE;
 function travTitle(tid){
   if(tid==='ARMOIRE') return 'Armoires (bois)';
   if(tid==='TIROIR') return 'Armoires à tiroirs';
-  return 'Travée '+tid.replace(/^RD-/,'');
+  return 'Travée '+tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'');
 }
 function etageWordFor(tid){
   if(tid==='ARMOIRE') return 'niveau';
@@ -541,7 +566,7 @@ function allEtagesOf(tid,col){
 }
 
 /* ════════════ CONSTRUCTION DU PLAN ════════════ */
-function buildPlan(){ buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs(); updateStats(); }
+function buildPlan(){ buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs(); buildMagasin2(); buildMagasin5(); updateStats(); }
 
 function buildTravees(){
   const room=document.getElementById('room-travees');
@@ -559,6 +584,22 @@ function buildTraveesDouaisienne(){
   const room=document.getElementById('room-travees-douaisienne');
   room.innerHTML='';
   TRAVEES_DOUAISIENNE.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
+function buildMagasin2(){
+  const room=document.getElementById('room-travees-magasin2');
+  room.innerHTML='';
+  TRAVEES_MAGASIN2.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
+function buildMagasin5(){
+  const room=document.getElementById('room-travees-magasin5');
+  room.innerHTML='';
+  TRAVEES_MAGASIN5.forEach(tDef=>{
     room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
   });
 }
@@ -624,7 +665,7 @@ function makeTraveeEl(tid,tDef,cols){
   });
   wrap.appendChild(box);
   const lbl=document.createElement('div');lbl.className='tv-label';
-  lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'');
+  lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'');
   wrap.appendChild(lbl);
   if(csvLoaded){
     const sub=document.createElement('div');sub.className='tv-sublabel';
@@ -673,8 +714,12 @@ function selectTravee(tid,tDef,cols){
   cols.forEach(col=>allEtagesOf(tid,col).forEach(e=>{total+=cnt(tid,col,e)+cntManuel(tid,col,e);}));
 
   const douaisienne=tid.startsWith('RD-');
+  const magasin2=tid.startsWith('M2-');
+  const magasin5=tid.startsWith('M5-');
   let html=`<div class="detail-panel-title">${travTitle(tid)}
     ${douaisienne?'<span class="detail-badge badge-amber">Réserve Douaisienne</span>':''}
+    ${magasin2?'<span class="detail-badge badge-amber">Magasin — 2e étage</span>':''}
+    ${magasin5?'<span class="detail-badge badge-amber">Magasin — 5e étage</span>':''}
     <span class="detail-badge badge-grey">${cols.length} col.</span>
     ${!known&&csvLoaded?'<span class="detail-badge badge-blue">non inventoriée</span>':''}
     ${total?`<span class="detail-badge badge-green">${total} notices</span>`:''}
@@ -855,7 +900,10 @@ document.getElementById('sq').addEventListener('input',function(){
   LOCATIONS_ALL.forEach(t=>{
     if(!t.id.toLowerCase().includes(q) && !(t.label||'').toLowerCase().includes(q)) return;
     const douaisienne=t.id.startsWith('RD-');
-    hits.push({type:'travee',label:travTitle(t.id),sub:(hasData(t.id)?'':'non inventorié')+(douaisienne?' — Réserve Douaisienne':''),tid:t.id});
+    const magasin2=t.id.startsWith('M2-');
+    const magasin5=t.id.startsWith('M5-');
+    const suffix=douaisienne?' — Réserve Douaisienne':(magasin2?' — Magasin 2e étage':(magasin5?' — Magasin 5e étage':''));
+    hits.push({type:'travee',label:travTitle(t.id),sub:(hasData(t.id)?'':'non inventorié')+suffix,tid:t.id});
   });
 
   let nc=0;

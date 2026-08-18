@@ -56,7 +56,78 @@ const TRAVEES_DOUAISIENNE = [
   {id:'RD-VI',  nbCols:4},
   {id:'RD-VII', nbCols:4},
 ];
-const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE];
+/* Magasin — 2e étage : local physique séparé de la réserve (autre étage du
+   bâtiment), catalogué à part dans data/magasins.json (voir magasins.html
+   et CLAUDE.md, section magasins) plutôt que dans data/inventaire.json.
+   Identifiants de travée préfixés "M2-" pour ne jamais entrer en collision
+   avec les travées I..XIX de la réserve patrimoniale ou RD-I..RD-VII de la
+   Réserve Douaisienne (même principe que le préfixe RD- ci-dessus).
+   Géométrie fournie par l'équipe (2026-08-18) : travées alpha/bêta/delta
+   puis travées numérotées I à XX, capacités variables par travée — pas de
+   règle générale, valeurs listées telles quelles. `maxEt:6` sur chaque
+   travée (au lieu du DEFAULT_MAX_ETAGE=8 de la réserve) : la quasi-totalité
+   des travées des magasins d'étage font 6 étagères — juste une référence
+   par défaut, pas un plafond dur (voir DEFAULT_MAX_ETAGE plus haut :
+   maxEtageOf() s'étend automatiquement au-delà dès que des données réelles
+   ou une "dernière étagère" marquée dépassent cette valeur, pour les
+   travées qui font exception). */
+const TRAVEES_MAGASIN2 = [
+  {id:'M2-ALPHA', nbCols:14, maxEt:6},
+  {id:'M2-BETA',  nbCols:6, maxEt:6},
+  {id:'M2-DELTA', nbCols:2, maxEt:6},
+  {id:'M2-I',     nbCols:5, maxEt:6},
+  {id:'M2-II',    nbCols:5, maxEt:6},
+  {id:'M2-III',   nbCols:5, maxEt:6},
+  {id:'M2-IV',    nbCols:12, maxEt:6},
+  {id:'M2-V',     nbCols:14, maxEt:6},
+  {id:'M2-VI',    nbCols:14, maxEt:6},
+  {id:'M2-VII',   nbCols:14, maxEt:6},
+  {id:'M2-VIII',  nbCols:14, maxEt:6},
+  {id:'M2-IX',    nbCols:14, maxEt:6},
+  {id:'M2-X',     nbCols:14, maxEt:6},
+  {id:'M2-XI',    nbCols:14, maxEt:6},
+  {id:'M2-XII',   nbCols:14, maxEt:6},
+  {id:'M2-XIII',  nbCols:14, maxEt:6},
+  {id:'M2-XIV',   nbCols:14, maxEt:6},
+  {id:'M2-XV',    nbCols:14, maxEt:6},
+  {id:'M2-XVI',   nbCols:14, maxEt:6},
+  {id:'M2-XVII',  nbCols:14, maxEt:6},
+  {id:'M2-XVIII', nbCols:14, maxEt:6},
+  {id:'M2-XIX',   nbCols:8, maxEt:6},
+  {id:'M2-XX',    nbCols:5, maxEt:6},
+];
+
+/* Magasin — 5e étage : même principe que le 2e étage ci-dessus (local
+   physique séparé, catalogue data/magasins.json), identifiants préfixés
+   "M5-". Géométrie fournie par l'équipe (2026-08-18) : travée I (6
+   colonnes), travées II à V (5 colonnes chacune), travées VI à XIX (14
+   colonnes chacune), et une travée alpha à 1 seule colonne — ordre et
+   valeurs listés tels quels, aucune règle générale sous-jacente. Même
+   `maxEt:6` par défaut que le 2e étage (voir commentaire ci-dessus). */
+const TRAVEES_MAGASIN5 = [
+  {id:'M5-I',     nbCols:6, maxEt:6},
+  {id:'M5-II',    nbCols:5, maxEt:6},
+  {id:'M5-III',   nbCols:5, maxEt:6},
+  {id:'M5-IV',    nbCols:5, maxEt:6},
+  {id:'M5-V',     nbCols:5, maxEt:6},
+  {id:'M5-VI',    nbCols:14, maxEt:6},
+  {id:'M5-VII',   nbCols:14, maxEt:6},
+  {id:'M5-VIII',  nbCols:14, maxEt:6},
+  {id:'M5-IX',    nbCols:14, maxEt:6},
+  {id:'M5-X',     nbCols:14, maxEt:6},
+  {id:'M5-XI',    nbCols:14, maxEt:6},
+  {id:'M5-XII',   nbCols:14, maxEt:6},
+  {id:'M5-XIII',  nbCols:14, maxEt:6},
+  {id:'M5-XIV',   nbCols:14, maxEt:6},
+  {id:'M5-XV',    nbCols:14, maxEt:6},
+  {id:'M5-XVI',   nbCols:14, maxEt:6},
+  {id:'M5-XVII',  nbCols:14, maxEt:6},
+  {id:'M5-XVIII', nbCols:14, maxEt:6},
+  {id:'M5-XIX',   nbCols:14, maxEt:6},
+  {id:'M5-ALPHA', nbCols:1, maxEt:6},
+];
+
+const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5];
 
 /* "horsreserve" est une pseudo-réserve sans travées : sert uniquement à
    recolement.html pour scanner des exemplaires retrouvés hors de la
@@ -66,14 +137,27 @@ const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE];
    locFieldsOf()), qui n'apparaît dans aucune LOCATIONS_ALL et n'est donc
    jamais représentée dans le plan de reserve.html : c'est volontaire, ces
    exemplaires ne sont par définition sur aucune étagère. */
+// catalogGroup distingue, pour recolement.html, quel catalogue de
+// reconnaissance de code-barre utiliser (voir syncActiveCatalog()) :
+// 'reserve' = data/inventaire.json (+ exemplaires manuels/reliures),
+// 'magasin' = data/magasins.json. Partagé par anticipation entre le
+// magasin 2e étage et un futur magasin 5e étage (même catalogue source,
+// non scindé par étage) — ajouter le 5e étage plus tard ne demandera
+// qu'une nouvelle entrée RESERVES avec ce même catalogGroup.
 const RESERVES = [
-  {id:'patrimoniale', label:'Réserve patrimoniale', travees:TRAVEES},
-  {id:'douaisienne',  label:'Réserve Douaisienne',  travees:TRAVEES_DOUAISIENNE},
-  {id:'horsreserve',  label:'Non rangé (hors réserve)', travees:[]},
+  {id:'patrimoniale', label:'Réserve patrimoniale', travees:TRAVEES, catalogGroup:'reserve'},
+  {id:'douaisienne',  label:'Réserve Douaisienne',  travees:TRAVEES_DOUAISIENNE, catalogGroup:'reserve'},
+  {id:'magasin2',     label:'Magasin — 2e étage',   travees:TRAVEES_MAGASIN2, catalogGroup:'magasin'},
+  {id:'magasin5',     label:'Magasin — 5e étage',   travees:TRAVEES_MAGASIN5, catalogGroup:'magasin'},
+  {id:'horsreserve',  label:'Non rangé (hors réserve)', travees:[], catalogGroup:'reserve'},
 ];
 function traveesOfReserve(reserveId){
   const r = RESERVES.find(r=>r.id===reserveId);
   return r ? r.travees : TRAVEES;
+}
+function catalogGroupOfReserve(reserveId){
+  const r = RESERVES.find(r=>r.id===reserveId);
+  return r ? r.catalogGroup : 'reserve';
 }
 
 /* Meubles hors travées (armoires en bois et armoires à tiroirs), physiquement

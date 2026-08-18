@@ -654,6 +654,108 @@ après un import de fichier de sauvegarde (`mergeIncomingData(data,
 partagé R2 et pas seulement le navigateur local qui a fait l'import — voir
 l'incident 2026-07-24 ci-dessous.
 
+## Récolement des magasins d'étage (2e et 5e étage, 2026-08-18)
+
+En plus de la réserve patrimoniale et de la Réserve Douaisienne (toutes
+deux au 1er étage), `recolement.html` couvre désormais le **Magasin — 2e
+étage** et le **Magasin — 5e étage** : deux locaux physiques
+supplémentaires, sélectionnables dans le même menu déroulant que les deux
+premiers (`RESERVES` dans `js/reserve-shared.js`), mais dont les
+documents sont catalogués à part dans `data/magasins.json` (voir
+« Magasins 2e/5e étage » plus haut) plutôt que dans `data/inventaire.json`.
+
+Même mécanisme que pour la Réserve Douaisienne : aucune nouvelle
+infrastructure de stockage. Les deux magasins partagent la même clé R2
+`recolement.json`, le même localStorage, la même API `/api/recolement`,
+le même bouton de sauvegarde — la séparation entre les locaux ne vient
+que du **préfixe des identifiants de travée** (`RD-` pour Douaisienne,
+`M2-`/`M5-` pour les magasins, aucun préfixe pour la réserve
+patrimoniale), qui garantit qu'un scan dans un local ne peut jamais
+entrer en collision avec un scan dans un autre. `TRAVEES_MAGASIN2`/
+`TRAVEES_MAGASIN5` (`js/reserve-shared.js`) portent la géométrie fournie
+par l'équipe : 2e étage — travées `ALPHA` (14 colonnes), `BETA` (6),
+`DELTA` (2), puis `I` à `XX` (5, 5, 5, 12, puis 14 pour `V` à `XVIII`, 8
+pour `XIX`, 5 pour `XX`) ; 5e étage — travée `I` (6 colonnes), `II` à `V`
+(5 chacune), `VI` à `XIX` (14 chacune), et une travée `ALPHA` à 1 seule
+colonne. Valeurs listées telles quelles, aucune règle générale
+sous-jacente. Chaque travée de ces deux magasins porte aussi `maxEt:6`
+(au lieu du `DEFAULT_MAX_ETAGE=8` de la réserve) : la quasi-totalité des
+travées des magasins d'étage font 6 étagères — une référence par défaut,
+pas un plafond dur (`maxEtageOf()` s'étend automatiquement au-delà dès
+que des données réelles ou une « dernière étagère » marquée dépassent
+cette valeur pour les travées qui font exception ; côté récolement, le
+stepper étage n'a de toute façon jamais de plafond pour une travée, voir
+plus loin). `displayTraveeId()` dans `recolement.html` (et `travTitle()`/
+le libellé de travée dans `reserve.html`) retirent ces préfixes `M2-`/
+`M5-` à l'affichage (même traitement que `RD-`), donc le stepper travée
+et le plan affichent « Alpha », « I », « XX »… sans le préfixe interne.
+
+Reconnaissance de code-barre par un second catalogue : `RESERVES` porte
+maintenant un champ `catalogGroup` (`'reserve'` pour
+patrimoniale/douaisienne/horsreserve, `'magasin'` pour les magasins 2e et
+5e étage — même catalogue partagé entre les deux, puisque
+`data/magasins.json` n'est pas scindé par étage) et `catalogGroupOfReserve()`
+le résout. Dans `recolement.html`, deux catalogues sont construits en
+parallèle au chargement (`buildCatalogFromItems()`, factorisé à partir de
+l'ancien code de chargement unique) : `catalogByGroup.reserve` (comme
+avant : `data/inventaire.json` + exemplaires manuels + reliures) et
+`catalogByGroup.magasin` (`data/magasins.json`, fonds forcé à « Magasin
+2e/5e étage » plutôt que déduit du préfixe de cote — les cotes numériques
+ne correspondent à aucun préfixe de `FONDS_PREFIXES`). Les variables
+globales `catalog`/`catalogNoticeCount`, utilisées partout ailleurs dans
+le fichier (scan, cascade reliures, statistiques, listes avancées) sans
+aucune modification de leur code, sont de simples pointeurs réassignés
+vers le bon groupe par `syncActiveCatalog()` — appelée une fois les deux
+catalogues chargés, puis à chaque changement de réserve dans le menu
+déroulant. Concrètement : scanner un code-barre du magasin pendant que
+« Magasin — 2e étage » est sélectionné affiche son titre/cote comme pour
+un exemplaire de réserve ; les compteurs « Notices cataloguées »/
+progression/« jamais scannés »/« scannés non catalogués » basculent avec
+le catalogue actif (libellé de la carte « Notices cataloguées » lui-même
+adapté via `st-catalog-label`) ; revenir sur la réserve patrimoniale
+restaure exactement l'état/le catalogue d'avant, rien n'est partagé entre
+les deux groupes. Seule la liste « codes-barres endommagés » reste
+volontairement globale (non scindée par groupe) : c'est une liste
+d'action à corriger, pas une comparaison catalogue.
+
+`reserve.html` (le plan visuel, renommé « Plan des Magasins » à cette
+occasion) a été étendu en parallèle pour visualiser ces deux nouveaux
+locaux — contrairement à ce qui avait été dit lors de l'introduction du
+magasin 2e étage (« reserve.html n'est pas modifié dans cette passe »),
+ce choix a été révisé sur demande explicite juste après. La page est
+réorganisée en groupes de sections (`.room-group`, titre `<h2>`, plus
+gros que les `.room-section-title` `<h3>` déjà existants) : **Réserve**
+regroupe les quatre sections déjà présentes (réserve patrimoniale,
+armoires, tiroirs, Réserve Douaisienne, inchangées) ; **Magasin — 2e
+étage** et **Magasin — 5e étage** sont deux nouveaux groupes, chacun avec
+sa propre section et son propre plan (`buildMagasin2()`/`buildMagasin5()`
+dans `reserve.html`, ajoutées à `buildPlan()` — même fonction
+`makeTraveeEl()` que pour la réserve, aucune duplication de logique de
+rendu). Le panneau de détail (`#detail`), les stats globales
+(`updateStats()`) et la recherche restent uniques et partagés entre tous
+les groupes (fonctionnent par identifiant de travée via `LOCATIONS_ALL`,
+indifférents à la section visuelle) — pas de scoping par groupe comme
+pour le catalogue de `recolement.html` : demande non faite, choix
+délibéré de rester simple. `selectTravee()` affiche un badge « Magasin —
+2e/5e étage » (même mécanique que le badge « Réserve Douaisienne »
+existant) et les résultats de recherche affichent un suffixe
+correspondant, pour lever l'ambiguïté entre une « Travée I » de la
+réserve patrimoniale, de la Réserve Douaisienne, du magasin 2e étage ou
+du magasin 5e étage (même chiffre romain réutilisé dans chaque local).
+
+`reserve.html` (le plan visuel) n'a **pas** été étendu au magasin 2e
+étage — il continue de dessiner uniquement `GROUPES` (travées I-XIX de la
+réserve patrimoniale, en dur) plus les sections Douaisienne/armoires/
+tiroirs codées séparément, indépendamment de `RESERVES`/`TRAVEES_ALL`.
+Étendre ces derniers ne casse rien côté `reserve.html` mais n'y ajoute
+pas non plus de visualisation du magasin — à faire séparément si demandé.
+
+Avant l'introduction du magasin 2e étage, un instantané de l'état R2
+`recolement.json` d'alors a été sauvegardé sous
+`recolement-backups/2026-08-18_14h50m10s.json` (12 948 scans à cette
+date) — même mécanisme que le bouton « Sauvegarder ce récolement »,
+déclenché ici depuis un script Node ponctuel plutôt que depuis l'UI.
+
 ## Sécurité — à savoir avant de toucher à l'espace pro
 
 L'« espace professionnel » n'a **toujours pas de vraie protection serveur
