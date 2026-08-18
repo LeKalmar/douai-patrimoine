@@ -68,6 +68,7 @@ bas, section « Stockage partagé »).
 | `reserve.html` | Plan interactif de la réserve (travées/colonnes/armoires) avec taux d'occupation calculé depuis `data/recolement.json` | **Protégé** |
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |
 | `magasins.html` | Catalogue des exemplaires du 2e/5e étage (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e étage » | **Protégé** |
+| `cotes-numeriques.html` | Repérage, dans un export complet et séparé de toute la bibliothèque, des exemplaires à cote numérique 5/6 chiffres (recherche, tri, export .txt des codes-barres pour ajout panier SIGB), à partir de `data/cotes-numeriques.json` — voir « Cotes numériques » | **Protégé** |
 | `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement, photo — tout en un seul formulaire) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
 | `reliures.html` | Création manuelle de groupes de documents reliés ensemble (équivalent $481/$482) et détection des groupes dont les emplacements récolés ne concordent pas — voir « Récolement en cascade des documents reliés » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
@@ -388,6 +389,70 @@ cote nouveau (nouveau préfixe lettré combiné à des chiffres, etc.), relire
 `data/xml/magasin/` (fichiers bruts, 125 Mo + 37 Mo) est gitignored — pas de
 repli local committé pour ce jeu de données, contrairement à
 `data/xml/notices.xml`/`exemplaires.xml` de la réserve.
+
+## Cotes numériques (repérage dans le catalogue complet)
+
+`cotes-numeriques.html` (2026-08-18) répond à un besoin de tri que le SIGB
+ne permet pas de faire assez finement : repérer, dans un export séparé de
+**toute** la bibliothèque, les exemplaires dont la cote est un numéro
+d'enregistrement séquentiel à 5 ou 6 chiffres, pour pouvoir exporter leurs
+codes-barres et les rajouter en panier dans le SIGB. Contrairement à
+`data/xml/notices.xml`/`exemplaires.xml` (réserve) et `xml/magasin/…`
+(magasins), cet export ne fournit **qu'un seul fichier** — `xml/all/catalogue.xml`
+sur R2, récupéré par `scripts/build-cotes-numeriques.mjs`
+(`npm run build:cotes-numeriques`) dans `data/xml/all/catalogue.xml` (pas de
+repli local committé, comme pour les magasins) — car l'export des notices
+plante tellement l'ensemble de la bibliothèque est volumineux. Ce fichier ne
+contient donc que des `<record>` d'exemplaires : pas de jointure
+notice/exemplaire ici, la cote (`930$g`/`930$h`) et le code-barre (`915$b`)
+sont lus directement sur chaque exemplaire, sans titre/auteur (absents de cet
+export). Sortie : `data/cotes-numeriques.json` + `data/cotes-numeriques-build-report.json`
+(même mécanique d'archivage `-previous.json` que les autres builds).
+
+Règle de détection (`numericLocDigitRun()` dans `build-cotes-numeriques.mjs`,
+volontairement **plus stricte** que `magasinDigitRun()` de
+`build-magasins.mjs` — choix explicite fait pour ce jeu de données, pas un
+oubli) : après avoir fusionné un éventuel point « 1-2 chiffres.3 chiffres »
+(séparateur de milliers, ex. « 11.268 » → « 11268 », « 138.678 » →
+« 138678 » — ne fusionne pas un préfixe Dewey à 3 chiffres comme
+« 168.66 »/« 325.5 », qui restent en morceaux de 3+2/3+1 chiffres), on
+cherche un groupe de chiffres consécutifs faisant EXACTEMENT 5 ou 6 chiffres
+**ET commençant par le chiffre « 1 »** (zéro de tête sur un groupe de 7
+retiré avant de mesurer, comme pour les magasins). Un groupe à 5 ou 6
+chiffres qui ne commence pas par « 1 » est délibérément écarté, même s'il
+pourrait s'agir d'un vrai numéro d'enregistrement — cf. `nearMissSample` du
+rapport de build pour les cotes concernées par ce cas, à relire si le
+périmètre semble trop restrictif après un premier export réel. Cette
+restriction supplémentaire (absente de la règle magasins) est une demande
+explicite, pas déduite de la forme de l'export — à ne pas assouplir sans
+revalider avec un nouvel export.
+
+`cotes-numeriques.html` reprend le patron de `magasins.html` (recherche,
+tri par colonne, pagination) mais sans les colonnes titre/auteur/éditeur
+(pas de notice dans cet export) : cote, étage, indice Dewey (`930$i`), type
+(`920$t`), section (`921$b`), date d'entrée (`920$d`), code-barre. Un
+bouton « Exporter les codes-barres (.txt) » télécharge un code-barre par
+ligne en respectant la recherche **et** le filtre d'étage en cours (pas
+seulement la page affichée), même convention que les exports des
+« Statistiques avancées » de `recolement.html`. Cet outil est un pur
+repérage/tri, indépendant du récolement/de la réserve (pas d'écriture vers
+`/api/recolement`, pas de notion d'emplacement travée/colonne/étage) —
+volontairement laissé simple, sur demande explicite plutôt qu'une
+intégration au plan de la réserve.
+
+Étage (2e/5e) : dérivé côté client uniquement (`etageOf()` dans
+`cotes-numeriques.html`, pas dans le script de build) à partir de
+`_coteDigitRun` déjà présent dans `data/cotes-numeriques.json`. Chacune des
+deux longueurs de cote (5 ou 6 chiffres) a sa **propre** séquence
+d'enregistrement et donc son propre seuil de bascule — comparer un numéro à
+5 chiffres et un numéro à 6 chiffres sur une même échelle n'aurait aucun
+sens (`ETAGE_THRESHOLDS = { 5: 13830, 6: 133530 }`) : cote ≤ seuil de sa
+longueur → 2e étage, au-delà → 5e étage, seuil inclus dans la borne basse.
+Ces deux seuils sont une donnée métier fournie par l'utilisateur, pas
+déduits de l'export — à revalider avec lui si un futur export venait à
+décaler ces plages. Le panneau de stats affiche le compte par étage
+(calculé sur `ROWS`, indépendamment du rapport de build) et un menu
+déroulant permet de filtrer le tableau (et donc l'export .txt) par étage.
 
 ## Exemplarisation rapide (catalogage minimal)
 
