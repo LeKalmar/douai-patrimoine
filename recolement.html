@@ -269,6 +269,10 @@
               <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
             </div>
             <div class="feedback" id="feedback"></div>
+            <div class="scan-row" id="nobarcode-row">
+              <input type="text" id="nobarcode-input" placeholder="Cote d'un livre sans code-barre" autocomplete="off">
+              <button type="button" class="tool-btn" id="nobarcode-save">Ajouter</button>
+            </div>
           </div>
           <div class="vide-row" id="vide-row">
             <button type="button" class="vide-btn" id="btn-vide">Emplacement vide</button>
@@ -407,6 +411,7 @@ const LS_VIDE   = 'rp_recolement_vide';
 const LS_NONRANGE = 'rp_recolement_nonrange';
 const LS_LASTSHELF = 'rp_recolement_lastshelf';
 const LS_RESOLVED = 'rp_recolement_resolved';
+const LS_NOBARCODE = 'rp_recolement_nobarcode';
 const LS_PENDING = 'rp_recolement_pending_sync';
 const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "temps réel" arrête de comptabiliser (voir updateTimeStats)
 
@@ -422,6 +427,7 @@ let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {trav
 let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let lastShelves = loadJSON(LS_LASTSHELF, {});  // "travee|colonne" -> {travee,colonne,etage,ts} (dernière étagère réelle de la colonne)
 let resolvedIssues = loadJSON(LS_RESOLVED, {}); // "categorie|barcode" -> {category,barcode,ts} — voir "LISTES AVANCÉES"
+let noBarcodeCotes = loadJSON(LS_NOBARCODE, {}); // cote normalisée -> {cote,travee,colonne,etage,ts} — voir "LIVRES SANS CODE-BARRE"
 let pendingSync = loadJSON(LS_PENDING, []);   // patches en attente d'envoi à /api/recolement
 
 function loadJSON(key, fallback){
@@ -436,7 +442,9 @@ function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShe
 function saveNonRangeShelves(){ localStorage.setItem(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
 function saveLastShelves(){ localStorage.setItem(LS_LASTSHELF, JSON.stringify(lastShelves)); }
 function saveResolvedIssues(){ localStorage.setItem(LS_RESOLVED, JSON.stringify(resolvedIssues)); }
+function saveNoBarcodeCotes(){ localStorage.setItem(LS_NOBARCODE, JSON.stringify(noBarcodeCotes)); }
 function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
+function normalizeCote(s){ return (s||'').trim().toUpperCase(); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ════════════ SYNCHRONISATION PARTAGÉE (R2 via /api/recolement) ════════════
@@ -593,6 +601,21 @@ let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
 let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas encore chargé" (—) de "échec" (indisponible)
 const CATALOG_LABELS = { reserve:'Notices cataloguées', magasin:'Notices cataloguées (magasins)' };
 
+// Index inverse cote -> code-barre, un par catalogGroup — sert à
+// handleNoBarcodeCote() (voir "LIVRES SANS CODE-BARRE" plus bas) pour
+// vérifier si une cote saisie à la main correspond à un exemplaire déjà
+// catalogué. Premier code-barre trouvé pour une cote donnée en cas de
+// doublon (rare, cotes normalement uniques par exemplaire).
+let catalogCoteIndexByGroup = { reserve:null, magasin:null };
+function buildCoteIndex(cat){
+  const idx = {};
+  Object.keys(cat).forEach(bc=>{
+    const c = normalizeCote(cat[bc].cote);
+    if(c && !idx[c]) idx[c] = bc;
+  });
+  return idx;
+}
+
 function syncActiveCatalog(){
   const group = catalogGroupOfReserve(loc.reserve);
   catalog = catalogByGroup[group];
@@ -613,6 +636,7 @@ Promise.all([
   applyManualReliureGroups(built.catalog, reliuresManuelles);
   catalogByGroup.reserve = built.catalog;
   catalogNoticeCountByGroup.reserve = built.noticeCount;
+  catalogCoteIndexByGroup.reserve = buildCoteIndex(built.catalog);
   syncActiveCatalog();
   updateStats();
 }).catch(()=>{
@@ -624,6 +648,7 @@ fetch('data/magasins.json').then(r=>r.json()).then(data=>{
   const built = buildCatalogFromItems(data, 'Magasin 2e/5e étage');
   catalogByGroup.magasin = built.catalog;
   catalogNoticeCountByGroup.magasin = built.noticeCount;
+  catalogCoteIndexByGroup.magasin = buildCoteIndex(built.catalog);
   syncActiveCatalog();
   updateStats();
 }).catch(()=>{
@@ -701,6 +726,26 @@ const ADV_CATS = {
       <td>${advActionCell('notscanned', r)}</td>
     </tr>`,
   },
+  nobarcode: {
+    title: 'Livres sans code-barre',
+    desc: 'Cotes saisies à la main pour des documents sans code-barre physique — récolés automatiquement si la cote est reconnue dans le catalogue actif, sinon juste listés ici pour savoir où en recoller un.',
+    placeholder: 'Filtrer (cote)…',
+    headers: ['Cote','Titre','Emplacement','En base ?'],
+    colspan: 4,
+    emptyMsg: 'Aucun livre sans code-barre pour l\'instant.',
+    filterFields: ['cote','titre'],
+    filePrefix: 'cotes-sans-code-barre',
+    exportField: 'cote',
+    needsCatalog: false,
+    resolvable: false,
+    listFn: noBarcodeList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||(r.foundInCatalog?'':'(absent du catalogue)')}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td>${r.foundInCatalog ? '<span style="color:#2e7d32">✓ trouvée — récolé</span>' : '<span style="color:#c62828">✗ absente</span>'}</td>
+    </tr>`,
+  },
 };
 document.getElementById('adv-groups').innerHTML = ADV_GROUPS.map(advGroupTemplate).join('');
 
@@ -772,6 +817,7 @@ function applyReserveVisibility(){
   document.getElementById('stp-etage-wrap').style.display = isHorsReserve ? 'none' : '';
   if(isHorsReserve) document.getElementById('stp-travee-wrap').style.display = 'none';
   document.getElementById('noncat-mode-zone').style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('nobarcode-row').style.display = isHorsReserve ? 'none' : '';
   document.querySelector('.expected-panel').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
   updateVideRowVisibility();
@@ -914,7 +960,7 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('input,select,button,a,label,.adv-details')) scanInput.focus();
 });
 
-function handleScan(barcode, damaged){
+function handleScan(barcode, damaged, opts){
   if(!barcode) return;
   const fields = locFieldsOf(loc);
   const cat = catalog ? catalog[barcode] : null;
@@ -931,6 +977,11 @@ function handleScan(barcode, damaged){
     kind: loc.locType,
     travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
     barcodeAbime: !!damaged,
+    // Vient de handleNoBarcodeCote() (cote saisie à la main, sans code-barre
+    // physique, mais reconnue dans le catalogue) — voir "LIVRES SANS
+    // CODE-BARRE" plus bas. Propagé sur le record pour que noBarcodeList()
+    // puisse retrouver ces scans-là sans structure de données séparée.
+    sansCodeBarre: !!(opts && opts.sansCodeBarre),
     ts: Date.now()
   };
 
@@ -1003,7 +1054,8 @@ function showFeedback(record, status, prev, reliureRecords){
   let html = `<div class="fb-top"><span class="fb-badge ${badgeCls}">${badgeTxt}</span>
     ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
     ${record.manuel ? `<span class="fb-badge" style="background:var(--plan-manuel);color:#fff" title="Créé via exemplarisation.html, pas encore une vraie notice Syracuse">⚡ Exemplarisé rapide</span>` : ''}
-    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}</div>`;
+    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}
+    ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Livres sans code-barre »">📎 Sans code-barre</span>` : ''}</div>`;
   html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
   if(status==='moved' && prev){
@@ -1033,6 +1085,56 @@ function showFeedback(record, status, prev, reliureRecords){
     });
   }
 }
+
+/* ════════════ LIVRES SANS CODE-BARRE ════════════
+   Pour les documents qui n'ont jamais eu de code-barre collé (courant dans
+   les magasins d'étage) : on saisit la cote plutôt que de scanner. Deux cas
+   (voir catalogCoteIndexByGroup ci-dessus) :
+   - la cote correspond à un exemplaire du catalogue actif → on le récole
+     normalement via handleScan() (même emplacement, même mécanique de
+     dup/déplacé, cascade reliures...), avec le flag sansCodeBarre:true sur
+     le record pour qu'il apparaisse *en plus* dans la liste d'export
+     "Livres sans code-barre" (voir noBarcodeList() et ADV_CATS.nobarcode).
+   - la cote ne correspond à rien de connu → pas de scan (rien à récoler,
+     on ne connaît même pas le titre), juste un enregistrement dans
+     noBarcodeCotes (clé = cote normalisée) pour la même liste d'export —
+     "et c'est tout", pas d'effet sur les statistiques de progression. */
+function handleNoBarcodeCote(coteRaw){
+  const cote = (coteRaw||'').trim();
+  if(!cote) return;
+  const group = catalogGroupOfReserve(loc.reserve);
+  const idx = catalogCoteIndexByGroup[group];
+  const foundBarcode = idx ? idx[normalizeCote(cote)] : null;
+
+  if(foundBarcode){
+    handleScan(foundBarcode, false, { sansCodeBarre:true });
+  } else {
+    const fields = locFieldsOf(loc);
+    const record = { cote, travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    noBarcodeCotes[normalizeCote(cote)] = record;
+    saveNoBarcodeCotes();
+    queuePatch({ type:'noBarcode', key:normalizeCote(cote), record });
+    showNoBarcodeFeedback(record);
+    beepError();
+    updateStats();
+  }
+  document.getElementById('nobarcode-input').value = '';
+  document.getElementById('nobarcode-input').focus();
+}
+function showNoBarcodeFeedback(record){
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback show warn';
+  fb.innerHTML = `<div class="fb-top"><span class="fb-badge warn">⚠ Cote absente du catalogue</span>
+    <span class="fb-cote">${esc(record.cote)}</span></div>
+    <div class="fb-titre">(non catalogué)</div>
+    <div class="fb-meta">Ajouté à la liste « Livres sans code-barre » — pas compté comme récolé.</div>`;
+}
+document.getElementById('nobarcode-save').addEventListener('click', ()=>{
+  handleNoBarcodeCote(document.getElementById('nobarcode-input').value);
+});
+document.getElementById('nobarcode-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); handleNoBarcodeCote(document.getElementById('nobarcode-input').value); }
+});
 
 /* ════════════ SCAN "NON RANGÉ" (exemplaire retrouvé hors réserve) ════════════
    Distinct du scan normal : pas d'emplacement (travée/colonne/étage), donc
@@ -1770,7 +1872,22 @@ function notScannedList(group){
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
 
+// Livres sans code-barre : union des scans enregistrés via handleNoBarcodeCote()
+// quand la cote a été reconnue (sansCodeBarre:true, comptent comme récolés)
+// et des cotes non reconnues (noBarcodeCotes, ne comptent pas comme récolées).
+// Liste "simple" (pas de suivi réglé/rouvert, voir ADV_CATS.nobarcode.resolvable).
+function noBarcodeList(group){
+  const foundRows = Object.values(scans)
+    .filter(r=>r.sansCodeBarre && traveeGroupOf(r.travee)===group)
+    .map(r=>({ cote:r.cote, titre:r.titre, travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:true }));
+  const notFoundRows = Object.values(noBarcodeCotes)
+    .filter(r=>traveeGroupOf(r.travee)===group)
+    .map(r=>({ cote:r.cote, titre:'', travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:false }));
+  return [...foundRows, ...notFoundRows].sort((a,b)=>b.ts-a.ts);
+}
+
 function advDetailsTemplate(id, spec){
+  const resolvable = spec.resolvable !== false;
   return `
     <details class="adv-details" id="adv-${id}">
       <summary>${esc(spec.title)} <span class="adv-count">(<span id="sum-${id}-count">0</span>)</span></summary>
@@ -1778,7 +1895,7 @@ function advDetailsTemplate(id, spec){
         <div class="log-header">
           <span class="log-title">${esc(spec.desc)}</span>
           <div class="log-header-actions">
-            <label class="log-toggle"><input type="checkbox" id="${id}-showresolved"> Afficher aussi les réglés</label>
+            ${resolvable ? `<label class="log-toggle"><input type="checkbox" id="${id}-showresolved"> Afficher aussi les réglés</label>` : ''}
             <input type="text" class="log-search" id="${id}-search" placeholder="${esc(spec.placeholder)}">
             <button type="button" class="export-btn" id="${id}-export">⬇ Exporter (.txt)</button>
           </div>
@@ -1818,6 +1935,7 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote-${gid}">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned-${gid}">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Livres sans code-barre</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start-${gid}" style="font-size:1rem">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last-${gid}" style="font-size:1rem">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Durée écoulée (calendaire)</div><div class="stat-card-val" id="st-span-${gid}" style="font-size:1.2rem">—</div></div>
@@ -1835,7 +1953,10 @@ function advGroupTemplate(g){
 // juste pas toutes rendues dans le DOM d'un coup.
 const ADV_PAGE_SIZE = 150;
 const advPage = {};
-ADV_GROUPS.forEach(g=>{ advPage[g.id] = { abime:1, manualcote:1, notscanned:1 }; });
+ADV_GROUPS.forEach(g=>{
+  advPage[g.id] = {};
+  Object.keys(ADV_CATS).forEach(catKey=>{ advPage[g.id][catKey] = 1; });
+});
 
 function renderAdvTable(tbodyId, pagerId, category, rows, filterFields, filter, showResolved, rowHtml, colspan, emptyMsg, page, onPageChange){
   const q = (filter||'').trim().toLowerCase();
@@ -1874,7 +1995,7 @@ function refreshAdvList(group, catKey){
     document.getElementById(id+'-pager').innerHTML = '';
     return;
   }
-  const showResolved = document.getElementById(id+'-showresolved').checked;
+  const showResolved = spec.resolvable !== false ? document.getElementById(id+'-showresolved').checked : true;
   renderAdvTable('log-'+id, id+'-pager', catKey, spec.listFn(group), spec.filterFields,
     document.getElementById(id+'-search').value, showResolved, spec.rowHtml, spec.colspan, spec.emptyMsg,
     advPage[group][catKey], p=>{ advPage[group][catKey]=p; refreshAdvList(group, catKey); });
@@ -1883,9 +2004,12 @@ function refreshAdvList(group, catKey){
 ADV_GROUPS.forEach(g=>{
   Object.keys(ADV_CATS).forEach(catKey=>{
     const id = `${catKey}-${g.id}`;
+    const spec = ADV_CATS[catKey];
     document.getElementById('adv-'+id).addEventListener('toggle', ()=>refreshAdvList(g.id, catKey));
     document.getElementById(id+'-search').addEventListener('input', function(){ advPage[g.id][catKey]=1; refreshAdvList(g.id, catKey); });
-    document.getElementById(id+'-showresolved').addEventListener('change', function(){ advPage[g.id][catKey]=1; refreshAdvList(g.id, catKey); });
+    if(spec.resolvable !== false){
+      document.getElementById(id+'-showresolved').addEventListener('change', function(){ advPage[g.id][catKey]=1; refreshAdvList(g.id, catKey); });
+    }
   });
 });
 
@@ -1905,6 +2029,10 @@ function updateAdvListsCount(){
       document.getElementById('sum-notscanned-'+g.id+'-count').textContent = notScannedUnresolved.toLocaleString('fr-FR');
     }
 
+    const nobarcodeCount = noBarcodeList(g.id).length;
+    document.getElementById('st-nobarcode-'+g.id).textContent = nobarcodeCount.toLocaleString('fr-FR');
+    document.getElementById('sum-nobarcode-'+g.id+'-count').textContent = nobarcodeCount.toLocaleString('fr-FR');
+
     Object.keys(ADV_CATS).forEach(catKey=>refreshAdvList(g.id, catKey));
   });
 }
@@ -1921,13 +2049,13 @@ function downloadTxt(text, filename){
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 300);
 }
-function exportAdvBarcodes(rows, filterFields, filter, showResolved, filenamePrefix){
+function exportAdvBarcodes(rows, filterFields, filter, showResolved, filenamePrefix, field){
   const q = (filter||'').trim().toLowerCase();
   let filtered = showResolved ? rows : rows.filter(r=>!r._resolved);
   if(q) filtered = filtered.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q)));
-  if(!filtered.length){ alert('Aucun code-barre à exporter pour ce filtre.'); return; }
+  if(!filtered.length){ alert('Aucun élément à exporter pour ce filtre.'); return; }
   const d = new Date(), pad = n => String(n).padStart(2,'0');
-  downloadTxt(filtered.map(r=>r.barcode).join('\n'),
+  downloadTxt(filtered.map(r=>r[field||'barcode']).join('\n'),
     `${filenamePrefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
 }
 ADV_GROUPS.forEach(g=>{
@@ -1935,19 +2063,21 @@ ADV_GROUPS.forEach(g=>{
     const id = `${catKey}-${g.id}`;
     const spec = ADV_CATS[catKey];
     document.getElementById(id+'-export').addEventListener('click', ()=>{
+      const showResolved = spec.resolvable !== false ? document.getElementById(id+'-showresolved').checked : true;
       exportAdvBarcodes(spec.listFn(g.id), spec.filterFields, document.getElementById(id+'-search').value,
-        document.getElementById(id+'-showresolved').checked, `${spec.filePrefix}-${g.id}`);
+        showResolved, `${spec.filePrefix}-${g.id}`, spec.exportField);
     });
   });
 });
 
 /* ════════════ EXPORT / IMPORT / RESET ════════════
    Un seul fichier JSON regroupe scans, non-catalogués, étagères vides,
-   emplacements non rangés et dernières étagères de colonne marquées :
+   emplacements non rangés, dernières étagères de colonne marquées et
+   cotes sans code-barre non reconnues :
    { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
-   lastShelves:[...] }.
-   Les anciens exports (simple tableau de scans, ou sans lastShelves) restent
-   importables. */
+   lastShelves:[...], noBarcodeCotes:[...] }.
+   Les anciens exports (simple tableau de scans, ou sans lastShelves/
+   noBarcodeCotes) restent importables. */
 function exportPayload(){
   return {
     scans: Object.values(scans),
@@ -1955,7 +2085,8 @@ function exportPayload(){
     videShelves: Object.values(videShelves),
     nonRangeShelves: Object.values(nonRangeShelves),
     lastShelves: Object.values(lastShelves),
-    resolvedIssues: Object.values(resolvedIssues)
+    resolvedIssues: Object.values(resolvedIssues),
+    noBarcodeCotes: Object.values(noBarcodeCotes)
   };
 }
 function downloadJSON(data, prefix){
@@ -2052,6 +2183,7 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
   const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
   const resolvedRows = Array.isArray(data) ? [] : (data.resolvedIssues||[]);
+  const noBarcodeRows = Array.isArray(data) ? [] : (data.noBarcodeCotes||[]);
 
   let added=0, updated=0;
   scanRows.forEach(r=>{
@@ -2081,14 +2213,21 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   });
   saveResolvedIssues();
 
+  noBarcodeRows.forEach(r=>{
+    if(!r.cote) return;
+    const key = normalizeCote(r.cote);
+    if(!noBarcodeCotes[key] || !noBarcodeCotes[key].ts || (r.ts||0) > noBarcodeCotes[key].ts) noBarcodeCotes[key] = r;
+  });
+  saveNoBarcodeCotes();
+
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
   updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 
-  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || resolvedRows.length)){
-    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, resolvedIssues:resolvedRows } });
+  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || resolvedRows.length || noBarcodeRows.length)){
+    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, resolvedIssues:resolvedRows, noBarcodeCotes:noBarcodeRows } });
   }
 
-  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length, resolved: resolvedRows.length };
+  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length, resolved: resolvedRows.length, noBarcode: noBarcodeRows.length };
 }
 
 document.getElementById('file-resume').addEventListener('change', function(e){
@@ -2098,7 +2237,7 @@ document.getElementById('file-resume').addEventListener('change', function(e){
     try{
       const data = JSON.parse(ev.target.result);
       const r = mergeIncomingData(data, { syncToServer:true });
-      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s), ${r.lastShelf} dernière(s) étagère(s) de colonne fusionnée(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
+      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s), ${r.lastShelf} dernière(s) étagère(s) de colonne fusionnée(s), ${r.noBarcode} cote(s) sans code-barre fusionnée(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
     }catch(err){ alert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
@@ -2124,13 +2263,14 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
 });
 
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués, tous les emplacements marqués vides ou non rangés et toutes les dernières étagères de colonne marquées sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
+  if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués, tous les emplacements marqués vides ou non rangés, toutes les dernières étagères de colonne marquées et toutes les cotes sans code-barre sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
   scans = {}; saveScans();
   nonCat = {}; saveNonCat();
   videShelves = {}; saveVideShelves();
   nonRangeShelves = {}; saveNonRangeShelves();
   lastShelves = {}; saveLastShelves();
   resolvedIssues = {}; saveResolvedIssues();
+  noBarcodeCotes = {}; saveNoBarcodeCotes();
   pendingSync = []; savePendingSync(); updateSyncIndicator();
   renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 });

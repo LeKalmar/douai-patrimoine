@@ -1,8 +1,8 @@
 /**
  * État partagé du récolement, stocké dans R2 sous la clé "recolement.json"
  * (même forme que l'export de recolement.html : {scans, nonCatalogues,
- * videShelves, nonRangeShelves, lastShelves, resolvedIssues}, chaque valeur
- * un tableau).
+ * videShelves, nonRangeShelves, lastShelves, resolvedIssues, noBarcodeCotes},
+ * chaque valeur un tableau).
  *
  * GET  → l'état courant (accessible sans authentification : mêmes données
  *        que celles déjà lisibles via data/recolement.json committé).
@@ -23,7 +23,7 @@ class BadRequest extends Error {
 }
 
 function emptyState() {
-  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], resolvedIssues: [] };
+  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], resolvedIssues: [], noBarcodeCotes: [] };
 }
 
 function locKey(row) {
@@ -46,6 +46,14 @@ function issueKey(row) {
   return `${row.category}|${row.barcode}`;
 }
 
+// noBarcodeCotes (livres sans code-barre, voir recolement.html) est keyé par
+// cote plutôt que par emplacement : plusieurs cotes distinctes peuvent
+// coexister sur le même emplacement, contrairement à nonCat/vide/nonrange
+// qui sont des propriétés d'un emplacement précis.
+function coteKey(row) {
+  return (row.cote || '').trim().toUpperCase();
+}
+
 function toMap(arr, keyFn) {
   const m = {};
   (arr || []).forEach(r => {
@@ -61,7 +69,7 @@ function fromMap(m) {
 // tirées de l'état courant) — factorisé pour être rejoué plusieurs fois de
 // suite par le cas 'batch' ci-dessous sans relire/réécrire R2 à chaque fois.
 function applyOne(maps, patch) {
-  const { scans, nonCat, vide, nonrange, lastShelf, resolved } = maps;
+  const { scans, nonCat, vide, nonrange, lastShelf, resolved, nobarcode } = maps;
   switch (patch.type) {
     case 'scan':
       if (!patch.record || !patch.record.barcode) throw new BadRequest('scan : record.barcode requis.');
@@ -100,6 +108,11 @@ function applyOne(maps, patch) {
       if (patch.record) resolved[patch.key] = patch.record;
       else delete resolved[patch.key];
       break;
+    case 'noBarcode':
+      if (!patch.key) throw new BadRequest('noBarcode : key requis.');
+      if (patch.record) nobarcode[patch.key] = patch.record;
+      else delete nobarcode[patch.key];
+      break;
     case 'bulkMerge': {
       // Fusionne un lot entier (import d'une sauvegarde JSON) dans l'état
       // partagé — jamais un écrasement : chaque entrée est ajoutée ou mise à
@@ -113,6 +126,7 @@ function applyOne(maps, patch) {
       const incomingNonRange = Array.isArray(patch.data.nonRangeShelves) ? patch.data.nonRangeShelves : [];
       const incomingLastShelves = Array.isArray(patch.data.lastShelves) ? patch.data.lastShelves : [];
       const incomingResolved = Array.isArray(patch.data.resolvedIssues) ? patch.data.resolvedIssues : [];
+      const incomingNoBarcode = Array.isArray(patch.data.noBarcodeCotes) ? patch.data.noBarcodeCotes : [];
 
       incomingScans.forEach(r => {
         if (!r.barcode) return;
@@ -134,6 +148,11 @@ function applyOne(maps, patch) {
         const existing = resolved[issueKey(r)];
         if (!existing || !existing.ts || (r.ts || 0) > existing.ts) resolved[issueKey(r)] = r;
       });
+      incomingNoBarcode.forEach(r => {
+        if (!r.cote) return;
+        const existing = nobarcode[coteKey(r)];
+        if (!existing || !existing.ts || (r.ts || 0) > existing.ts) nobarcode[coteKey(r)] = r;
+      });
       break;
     }
     // 'batch' n'est volontairement pas accepté ici : il n'est traité qu'au
@@ -151,6 +170,7 @@ function applyPatch(state, patch) {
     nonrange: toMap(state.nonRangeShelves, locKey),
     lastShelf: toMap(state.lastShelves, colKey),
     resolved: toMap(state.resolvedIssues, issueKey),
+    nobarcode: toMap(state.noBarcodeCotes, coteKey),
   };
 
   if (patch.type === 'batch') {
@@ -170,6 +190,7 @@ function applyPatch(state, patch) {
     nonRangeShelves: fromMap(maps.nonrange),
     lastShelves: fromMap(maps.lastShelf),
     resolvedIssues: fromMap(maps.resolved),
+    noBarcodeCotes: fromMap(maps.nobarcode),
   };
 }
 
