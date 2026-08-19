@@ -756,6 +756,34 @@ Avant l'introduction du magasin 2e étage, un instantané de l'état R2
 date) — même mécanisme que le bouton « Sauvegarder ce récolement »,
 déclenché ici depuis un script Node ponctuel plutôt que depuis l'UI.
 
+Les « Statistiques avancées du récolement » (bas de `recolement.html`,
+2026-08-19) sont dupliquées en deux groupes indépendants — **Réserve**
+(patrimoniale, Douaisienne, armoires, tiroirs, hors-réserve) et
+**Magasins (2e/5e étage)** — plutôt qu'un seul panneau global mélangeant
+les deux : occupation des emplacements, stats de temps et les 3 listes à
+problèmes (codes-barres endommagés, non catalogués à cote manuelle,
+jamais scannés) sont donc calculées et affichées séparément pour chaque
+groupe. Le groupe d'un scan est déterminé par `traveeGroupOf(travee)`
+(même principe que `catalogGroupOfReserve()` côté catalogue) : toute
+travée préfixée `M2-`/`M5-` est « magasin », tout le reste est
+« réserve ». Le HTML des deux groupes (barre d'occupation, stats-row de
+temps, 3 `<details>`) est généré une seule fois par
+`advGroupTemplate()`/`advDetailsTemplate()` à partir de `ADV_GROUPS` et
+`ADV_CATS` (deux tableaux/objets de configuration) plutôt qu'écrit deux
+fois à la main dans le HTML statique — tous les identifiants DOM sont
+suffixés `-reserve`/`-magasin` (ex. `adv-abime-reserve`,
+`log-notscanned-magasin`). `damagedList()`, `manualCoteList()` et
+`notScannedList()` prennent désormais un paramètre `group` ; les deux
+dernières comparent contre `catalogByGroup[group]` (voir plus haut)
+plutôt que contre la variable `catalog` active, donc les deux groupes
+restent visibles et à jour simultanément, indépendamment de la réserve
+actuellement sélectionnée dans le sélecteur d'emplacement (contrairement
+au catalogue de reconnaissance au scan, qui lui reste un simple pointeur
+basculé par `syncActiveCatalog()`). La clé de `resolvedIssues`
+(`categorie|barcode`) n'inclut volontairement pas le groupe : un
+code-barre donné n'appartient qu'à un seul groupe (via la travée de son
+scan), aucune ambiguïté possible entre les deux panneaux.
+
 ## Sécurité — à savoir avant de toucher à l'espace pro
 
 L'« espace professionnel » n'a **toujours pas de vraie protection serveur
