@@ -631,6 +631,79 @@ fetch('data/magasins.json').then(r=>r.json()).then(data=>{
   syncActiveCatalog();
 });
 
+/* ADV_GROUPS/ADV_CATS + génération du HTML de "Statistiques avancées"
+   (voir "LISTES AVANCÉES" plus bas pour le reste — issueKey, damagedList,
+   renderAdvTable, etc.) : déclarés ici, tôt dans le script, et pas plus bas
+   avec le reste de cette section, parce qu'updateStats() (qui lit
+   ADV_GROUPS) est déjà appelée pendant l'initialisation synchrone de la
+   page ci-dessous (setLocType(loc.locType) à la fin de la section
+   "EMPLACEMENT") — les déclarer plus bas provoquait un ReferenceError
+   (temporal dead zone) dès le chargement de la page, qui interrompait tout
+   le reste du script (scan, mini-plan, etc. jamais initialisés). */
+const ADV_GROUPS = [
+  { id:'reserve', label:'Réserve' },
+  { id:'magasin', label:'Magasins (2e/5e étage)' },
+];
+const ADV_CATS = {
+  abime: {
+    title: 'Codes-barres endommagés',
+    desc: 'Documents dont le code-barre a été saisi à la main (illisible au scanner)',
+    placeholder: 'Filtrer (cote, titre, code-barre)…',
+    headers: ['Cote','Titre','Emplacement','Code-barre',''],
+    colspan: 5,
+    emptyMsg: 'Aucun code-barre endommagé pour l\'instant.',
+    filterFields: ['cote','titre','barcode'],
+    filePrefix: 'codes-barres-endommages',
+    needsCatalog: false,
+    listFn: damagedList,
+    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${advActionCell('abime', r)}</td>
+    </tr>`,
+  },
+  manualcote: {
+    title: 'Scannés, non catalogués, cote saisie à la main',
+    desc: 'Code-barre absent du catalogue au moment du scan : seule la cote a été renseignée à la main, sans titre ni auteur',
+    placeholder: 'Filtrer (cote, code-barre)…',
+    headers: ['Cote','Emplacement','Code-barre',''],
+    colspan: 4,
+    emptyMsg: 'Aucun code-barre dans ce cas pour l\'instant.',
+    filterFields: ['cote','barcode'],
+    filePrefix: 'codes-barres-non-catalogues',
+    needsCatalog: true,
+    listFn: manualCoteList,
+    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${advActionCell('manualcote', r)}</td>
+    </tr>`,
+  },
+  notscanned: {
+    title: 'Jamais scannés — dans le catalogue mais pas encore récolés',
+    desc: 'Codes-barres du catalogue absents des scans : potentiellement perdus, ou récolement pas encore effectué',
+    placeholder: 'Filtrer (cote, titre, auteur, code-barre)…',
+    headers: ['Cote','Titre','Auteur','Code-barre',''],
+    colspan: 5,
+    emptyMsg: 'Tout le catalogue a été scanné au moins une fois.',
+    filterFields: ['cote','titre','auteur','barcode'],
+    filePrefix: 'codes-barres-jamais-scannes',
+    needsCatalog: true,
+    listFn: notScannedList,
+    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(titre inconnu)'}</td>
+      <td>${esc(r.auteur)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${advActionCell('notscanned', r)}</td>
+    </tr>`,
+  },
+};
+document.getElementById('adv-groups').innerHTML = ADV_GROUPS.map(advGroupTemplate).join('');
+
 /* ════════════ EMPLACEMENT ════════════
    Le scan code-barre et le comptage des non-catalogués sont deux outils
    affichés ensemble au même endroit (plus d'onglet à basculer entre les
@@ -1641,11 +1714,6 @@ function updateTimeStats(group){
    La clé `category|barcode` (sans groupe) suffit : un barcode donné
    n'appartient qu'à un seul groupe (via la travée de son scan), pas
    d'ambiguïté possible entre les deux panneaux. */
-const ADV_GROUPS = [
-  { id:'reserve', label:'Réserve' },
-  { id:'magasin', label:'Magasins (2e/5e étage)' },
-];
-
 function issueKey(category, barcode){ return category + '|' + barcode; }
 function isResolved(category, barcode){ return !!resolvedIssues[issueKey(category, barcode)]; }
 
@@ -1701,69 +1769,6 @@ function notScannedList(group){
     .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, _resolved: isResolved('notscanned', bc)}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
-
-/* Spécification de chaque catégorie de liste — factorisée pour générer à la
-   fois le template HTML (advDetailsTemplate) et le câblage JS (une seule
-   fois, en boucle sur ADV_GROUPS × ADV_CATS) plutôt que 6 fonctions quasi
-   identiques écrites à la main. */
-const ADV_CATS = {
-  abime: {
-    title: 'Codes-barres endommagés',
-    desc: 'Documents dont le code-barre a été saisi à la main (illisible au scanner)',
-    placeholder: 'Filtrer (cote, titre, code-barre)…',
-    headers: ['Cote','Titre','Emplacement','Code-barre',''],
-    colspan: 5,
-    emptyMsg: 'Aucun code-barre endommagé pour l\'instant.',
-    filterFields: ['cote','titre','barcode'],
-    filePrefix: 'codes-barres-endommages',
-    needsCatalog: false,
-    listFn: damagedList,
-    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
-      <td>${esc(r.titre)||'(non catalogué)'}</td>
-      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${advActionCell('abime', r)}</td>
-    </tr>`,
-  },
-  manualcote: {
-    title: 'Scannés, non catalogués, cote saisie à la main',
-    desc: 'Code-barre absent du catalogue au moment du scan : seule la cote a été renseignée à la main, sans titre ni auteur',
-    placeholder: 'Filtrer (cote, code-barre)…',
-    headers: ['Cote','Emplacement','Code-barre',''],
-    colspan: 4,
-    emptyMsg: 'Aucun code-barre dans ce cas pour l\'instant.',
-    filterFields: ['cote','barcode'],
-    filePrefix: 'codes-barres-non-catalogues',
-    needsCatalog: true,
-    listFn: manualCoteList,
-    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
-      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${advActionCell('manualcote', r)}</td>
-    </tr>`,
-  },
-  notscanned: {
-    title: 'Jamais scannés — dans le catalogue mais pas encore récolés',
-    desc: 'Codes-barres du catalogue absents des scans : potentiellement perdus, ou récolement pas encore effectué',
-    placeholder: 'Filtrer (cote, titre, auteur, code-barre)…',
-    headers: ['Cote','Titre','Auteur','Code-barre',''],
-    colspan: 5,
-    emptyMsg: 'Tout le catalogue a été scanné au moins une fois.',
-    filterFields: ['cote','titre','auteur','barcode'],
-    filePrefix: 'codes-barres-jamais-scannes',
-    needsCatalog: true,
-    listFn: notScannedList,
-    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
-      <td>${esc(r.titre)||'(titre inconnu)'}</td>
-      <td>${esc(r.auteur)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${advActionCell('notscanned', r)}</td>
-    </tr>`,
-  },
-};
 
 function advDetailsTemplate(id, spec){
   return `
@@ -1823,8 +1828,6 @@ function advGroupTemplate(g){
     ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey])).join('')}
   `;
 }
-
-document.getElementById('adv-groups').innerHTML = ADV_GROUPS.map(advGroupTemplate).join('');
 
 // Pagination plutôt qu'un plafond fixe (300) avec message "affinez la
 // recherche" : on veut pouvoir consulter l'intégralité d'une liste, y
