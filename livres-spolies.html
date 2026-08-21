@@ -95,7 +95,7 @@
     .ls-filter-info{font-size:.72rem;color:#666;font-style:italic;padding:.3rem .75rem;background:#fffde7;border-bottom:1px solid #fff9c4;display:none}
     .ls-filter-info.visible{display:block}
     .ls-table-scroll{overflow-x:auto}
-    .ls-table{width:100%;border-collapse:collapse;font-size:.78rem;min-width:1180px}
+    .ls-table{width:100%;border-collapse:collapse;font-size:.78rem;min-width:1600px}
     .ls-table th{position:sticky;top:0;background:#F5F5FF;padding:.45rem .65rem;text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.04em;color:#888;border-bottom:1px solid #e8e8f0;font-weight:600;white-space:nowrap}
     .ls-table td{padding:.4rem .65rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
     .ls-table tr:last-child td{border-bottom:none}
@@ -120,6 +120,8 @@
     .ls-input.possesseur{font-family:'DM Sans',sans-serif}
     .col-cote{min-width:110px}
     .col-possesseur{min-width:160px}
+    .col-origine{min-width:150px}
+    .col-date{min-width:120px}
     .ls-checkbox-cell{text-align:center}
     .ls-empty{padding:1.5rem;text-align:center;color:#bbb;font-size:.85rem;font-style:italic}
 
@@ -229,10 +231,13 @@
               <th data-sort="auteur">Auteur</th>
               <th data-sort="titre">Titre</th>
               <th data-sort="pub">Publication</th>
+              <th class="col-origine" data-sort="origine">Origine</th>
+              <th class="col-date" data-sort="dateEntree">Date d'entrée</th>
               <th class="col-cote" data-sort="coteBM">Cote BM</th>
               <th data-sort="trouve">Retrouvé</th>
               <th data-sort="exLibris">Ex-libris</th>
               <th class="col-possesseur" data-sort="possesseur">Ancien possesseur</th>
+              <th class="col-date" data-sort="dateSortie">Date de sortie</th>
             </tr>
           </thead>
           <tbody id="ls-tbody"></tbody>
@@ -430,7 +435,10 @@ function mergeRows(){
       exLibris: o.exLibris != null ? o.exLibris : r.exLibris,
       possesseur: o.possesseur != null ? o.possesseur : r.possesseur,
       coteBM: o.coteBM != null ? o.coteBM : r.coteBM,
-      _search: norm([r.auteur, r.titre, r.coteBM, r.type, r.lieu, r.editeur].join(' ')),
+      origine: o.origine != null ? o.origine : (r.origine || ''),
+      dateEntree: o.dateEntree != null ? o.dateEntree : (r.dateEntree || ''),
+      dateSortie: o.dateSortie != null ? o.dateSortie : (r.dateSortie || ''),
+      _search: norm([r.auteur, r.titre, r.coteBM, r.type, r.lieu, r.editeur, r.origine, r.dateEntree].join(' ')),
     };
   });
 }
@@ -571,7 +579,10 @@ const SORT_COLUMNS = {
   auteur:     { type: 'text',    get: r => r.auteur || '' },
   titre:      { type: 'text',    get: r => r.titre || '' },
   pub:        { type: 'text',    get: r => formatPub(r) },
+  origine:    { type: 'text',    get: r => r.origine || '' },
+  dateEntree: { type: 'text',    get: r => r.dateEntree || '' },
   coteBM:     { type: 'text',    get: r => r.coteBM || '' },
+  dateSortie: { type: 'text',    get: r => r.dateSortie || '' },
   // Ordre booléen : non (0) < rien (1) < oui (2)
   trouve:     { type: 'boolean', get: r => r.trouve === true ? 2 : (r.trouve === false ? 0 : 1) },
   exLibris:   { type: 'boolean', get: r => r.exLibris === true ? 2 : (r.exLibris === false ? 0 : 1) },
@@ -670,6 +681,16 @@ function possesseurCellHTML(r){
   return `<span class="ls-possesseur-hidden">—</span>`;
 }
 
+// La date de sortie (perdu/détruit) n'a de sens que si le livre est
+// explicitement marqué "non retrouvé" — masquée sinon, même logique que le
+// champ ancien possesseur vis-à-vis de l'ex-libris.
+function dateSortieCellHTML(r){
+  if(r.trouve === false){
+    return `<input type="text" class="ls-input" data-field="dateSortie" placeholder="ex. déclaré perdu en 2020" value="${esc(r.dateSortie)}">`;
+  }
+  return `<span class="ls-possesseur-hidden">—</span>`;
+}
+
 // Priorité d'affichage : non retrouvé (rouge) > retrouvé (vert) > cote BM
 // renseignée (jaune) > rien.
 function rowStateClass(r){
@@ -690,6 +711,11 @@ function refreshPossesseurCell(tr, row){
   if(td) td.innerHTML = possesseurCellHTML(row);
 }
 
+function refreshDateSortieCell(tr, row){
+  const td = tr.querySelector('.col-date-sortie');
+  if(td) td.innerHTML = dateSortieCellHTML(row);
+}
+
 function renderTablePage(){
   const total = FILTERED.length;
   const pages = Math.max(1, Math.ceil(total / STATE.perPage));
@@ -699,7 +725,7 @@ function renderTablePage(){
 
   const tbody = document.getElementById('ls-tbody');
   if(!slice.length){
-    tbody.innerHTML = `<tr><td colspan="9"><div class="ls-empty">Aucun résultat.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12"><div class="ls-empty">Aucun résultat.</div></td></tr>`;
   } else {
     tbody.innerHTML = slice.map(r => `
       <tr class="${rowStateClass(r)}" data-id="${r.id}">
@@ -708,10 +734,13 @@ function renderTablePage(){
         <td class="ls-auteur" title="${esc(r.auteur)}">${esc(r.auteur || '—')}</td>
         <td class="ls-titre">${esc(r.titre)}</td>
         <td class="ls-pub" title="${esc(formatPub(r))}">${esc(formatPub(r)) || '—'}${r.volumes ? ' · vol. ' + esc(r.volumes) : ''}</td>
+        <td class="col-origine"><input type="text" class="ls-input" data-field="origine" placeholder="ex. Don, saisie, réquisition…" value="${esc(r.origine)}"></td>
+        <td class="col-date"><input type="text" class="ls-input" data-field="dateEntree" placeholder="ex. 1946" value="${esc(r.dateEntree)}"></td>
         <td class="col-cote"><input type="text" class="ls-input" data-field="coteBM" placeholder="ex. D12345" value="${esc(r.coteBM)}"></td>
         <td class="ls-checkbox-cell">${tristateHTML('trouve', r.trouve, ['Non renseigné', 'Retrouvé', 'Non retrouvé'])}</td>
         <td class="ls-checkbox-cell">${tristateHTML('exLibris', r.exLibris, ['Non renseigné', 'Avec ex-libris', 'Sans ex-libris'])}</td>
         <td class="col-possesseur">${possesseurCellHTML(r)}</td>
+        <td class="col-date col-date-sortie">${dateSortieCellHTML(r)}</td>
       </tr>
     `).join('');
   }
@@ -766,7 +795,6 @@ window.gotoPage = function(page){
   const pages = Math.max(1, Math.ceil(FILTERED.length / STATE.perPage));
   STATE.page = Math.max(1, Math.min(page, pages));
   renderTablePage();
-  document.querySelector('.ls-table-scroll').scrollIntoView({ behavior:'smooth', block:'nearest' });
 };
 
 window.changePerPage = function(val){
@@ -804,6 +832,7 @@ document.getElementById('ls-tbody').addEventListener('click', function(e){
   const row = ROWS.find(r => r.id === id);
   updateRowStateClasses(tr, row);
   if(field === 'exLibris') refreshPossesseurCell(tr, row);
+  if(field === 'trouve') refreshDateSortieCell(tr, row);
 });
 
 /* ════ Export / réinitialisation ════ */

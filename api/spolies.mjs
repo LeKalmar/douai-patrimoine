@@ -1,7 +1,8 @@
 /**
  * Surcharges partagées de livres-spolies.html, stockées dans R2 sous la clé
  * "livres-spolies-overrides.json" (même forme que OVERRIDES côté client :
- * { [id]: { trouve, exLibris, possesseur, coteBM } }).
+ * { [id]: { trouve, exLibris, possesseur, coteBM, origine, dateEntree,
+ * dateSortie } }).
  *
  * GET  → l'état courant (lecture non authentifiée, même niveau d'exposition
  *        que le reste des données du projet).
@@ -12,7 +13,10 @@ import { r2Get, r2CasUpdate, r2Configured } from '../lib/r2.mjs';
 import { requireAuth } from '../lib/auth.mjs';
 
 const KEY = 'livres-spolies-overrides.json';
-const ALLOWED_FIELDS = new Set(['trouve', 'exLibris', 'possesseur', 'coteBM']);
+const ALLOWED_FIELDS = new Set([
+  'trouve', 'exLibris', 'possesseur', 'coteBM',
+  'origine', 'dateEntree', 'dateSortie',
+]);
 
 class BadRequest extends Error {
   constructor(message) {
