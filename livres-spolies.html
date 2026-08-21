@@ -47,6 +47,20 @@
     .cstat-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#12157A}
     .cstat-val.warn{color:#c9a227}
     .cstat-val.ok{color:#2e7d32}
+    .cstat-val.bad{color:#c62828}
+
+    /* Camembert de répartition */
+    .ls-piechart-wrap{display:flex;align-items:center;gap:1.75rem;flex-wrap:wrap;background:#fff;border:1px solid #e8e8f0;border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.75rem;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .ls-piechart{position:relative;width:150px;height:150px;border-radius:50%;flex-shrink:0;transition:background .2s}
+    .ls-piechart-hole{position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:0 0 0 1px #f0f0f0 inset}
+    .ls-piechart-hole .n{font-family:'DM Serif Display',serif;font-size:1.4rem;color:#12157A;line-height:1}
+    .ls-piechart-hole .l{font-size:.58rem;color:#999;text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+    .ls-piechart-legend{display:grid;gap:.45rem;flex:1;min-width:220px}
+    .ls-legend-item{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:#444}
+    .ls-legend-swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+    .ls-legend-label{flex:1}
+    .ls-legend-count{font-weight:600;color:#1a1a1a}
+    .ls-legend-pct{color:#999;font-size:.72rem;width:3.4em;text-align:right}
 
     /* Recherche catalogue */
     .catalog-search-wrap{background:#fff;border:1px solid #e8e8f0;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.75rem;box-shadow:0 1px 3px rgba(0,0,0,.04)}
@@ -170,6 +184,16 @@
     </p>
 
     <div class="ls-stats" id="ls-stats"></div>
+
+    <div class="ls-piechart-wrap">
+      <div class="ls-piechart" id="ls-piechart">
+        <div class="ls-piechart-hole">
+          <div class="n" id="ls-piechart-total">0</div>
+          <div class="l">livres</div>
+        </div>
+      </div>
+      <div class="ls-piechart-legend" id="ls-piechart-legend"></div>
+    </div>
 
     <div class="catalog-search-wrap">
       <div class="catalog-search-label">Rechercher dans le catalogue &amp; filtrer la liste</div>
@@ -425,15 +449,69 @@ function setOverride(id, field, value){
 function renderStats(){
   const total = ROWS.length;
   const trouve = ROWS.filter(r => r.trouve).length;
+  const nonTrouve = ROWS.filter(r => r.trouve === false).length;
+  const coteRenseignee = ROWS.filter(r => r.coteBM && r.coteBM.trim()).length;
   const exlibris = ROWS.filter(r => r.exLibris).length;
   const possesseurConnu = ROWS.filter(r => r.possesseur && r.possesseur.trim()).length;
   document.getElementById('ls-stats').innerHTML = `
     <div class="cstat"><div class="cstat-lbl">Ouvrages listés</div><div class="cstat-val">${total.toLocaleString('fr-FR')}</div></div>
     <div class="cstat"><div class="cstat-lbl">Retrouvés</div><div class="cstat-val ok">${trouve.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Non retrouvés</div><div class="cstat-val bad">${nonTrouve.toLocaleString('fr-FR')}</div></div>
     <div class="cstat"><div class="cstat-lbl">Restants</div><div class="cstat-val warn">${(total-trouve).toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Cote renseignée</div><div class="cstat-val warn">${coteRenseignee.toLocaleString('fr-FR')}</div></div>
     <div class="cstat"><div class="cstat-lbl">Avec ex-libris</div><div class="cstat-val">${exlibris.toLocaleString('fr-FR')}</div></div>
     <div class="cstat"><div class="cstat-lbl">Possesseur identifié</div><div class="cstat-val">${possesseurConnu.toLocaleString('fr-FR')}</div></div>
   `;
+  renderPieChart();
+}
+
+/* ════ Camembert de répartition ════
+   Catégories mutuellement exclusives (même ordre de priorité que
+   rowStateClass, avec les retrouvés subdivisés par ex-libris) pour que les
+   parts totalisent 100% : non retrouvé > retrouvé (± ex-libris) > cote
+   renseignée > non traité. */
+const PIE_CATEGORIES = [
+  { key: 'notfound', label: 'Non retrouvés',            color: '#c62828' },
+  { key: 'cote',      label: 'Cote renseignée',          color: '#c9a227' },
+  { key: 'found',     label: 'Retrouvés',                color: '#2e7d32' },
+  { key: 'foundEx',   label: 'Retrouvés avec ex-libris', color: '#12157A' },
+  { key: 'untreated', label: 'Non traités',              color: '#bbbbbb' },
+];
+
+function pieCategoryOf(r){
+  if(r.trouve === false) return 'notfound';
+  if(r.trouve === true) return r.exLibris === true ? 'foundEx' : 'found';
+  if(r.coteBM && r.coteBM.trim()) return 'cote';
+  return 'untreated';
+}
+
+function renderPieChart(){
+  const total = ROWS.length;
+  const counts = {};
+  PIE_CATEGORIES.forEach(c => counts[c.key] = 0);
+  ROWS.forEach(r => counts[pieCategoryOf(r)]++);
+
+  let acc = 0;
+  const stops = PIE_CATEGORIES.map(c => {
+    const pct = total ? (counts[c.key] / total) * 100 : 0;
+    const from = acc;
+    acc += pct;
+    return `${c.color} ${from}% ${acc}%`;
+  });
+  document.getElementById('ls-piechart').style.background =
+    total ? `conic-gradient(${stops.join(', ')})` : '#eee';
+  document.getElementById('ls-piechart-total').textContent = total.toLocaleString('fr-FR');
+
+  document.getElementById('ls-piechart-legend').innerHTML = PIE_CATEGORIES.map(c => {
+    const n = counts[c.key];
+    const pct = total ? (n / total * 100) : 0;
+    return `<div class="ls-legend-item">
+      <span class="ls-legend-swatch" style="background:${c.color}"></span>
+      <span class="ls-legend-label">${esc(c.label)}</span>
+      <span class="ls-legend-count">${n.toLocaleString('fr-FR')}</span>
+      <span class="ls-legend-pct">${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
 }
 
 /* ════ Recherche catalogue (data/inventaire.json + data/magasins.json) ════ */
