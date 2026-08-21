@@ -89,10 +89,10 @@
   .log-bc{font-family:monospace;color:#888}
   .arrow-sep{color:#bbb;margin:0 .2rem}
 
-  .detail-row td{background:#F5F5FF;padding:1rem 1.25rem}
-  .detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.6rem 1.2rem;margin-bottom:1rem}
-  .detail-grid .dl{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.15rem}
-  .detail-grid .dv{display:block;font-size:.85rem;color:#1a1a1a}
+  .ex-detail-row td{background:#F5F5FF;padding:1rem 1.25rem}
+  .ex-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.6rem 1.2rem;margin-bottom:1rem}
+  .ex-detail-grid .dl{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.15rem}
+  .ex-detail-grid .dv{display:block;font-size:.85rem;color:#1a1a1a}
   .ex-form{background:#fff;border:1px dashed #c9c9e8;border-radius:8px;padding:1rem}
   .ex-form h4{font-size:.85rem;color:#12157A;margin:0 0 .75rem;font-weight:700}
 
@@ -451,9 +451,9 @@ function locationLabel(l){
 
 function renderDetailRow(r){
   return `
-    <tr class="detail-row" id="detail-${esc(r.id)}">
+    <tr class="ex-detail-row" id="detail-${esc(r.id)}">
       <td colspan="6">
-        <div class="detail-grid">
+        <div class="ex-detail-grid">
           <div><span class="dl">Lieu d'édition (210$a)</span><span class="dv">${esc(r['210$a']) || '—'}</span></div>
           <div><span class="dl">Maison d'édition (210$c)</span><span class="dv">${esc(r['210$c']) || '—'}</span></div>
           <div><span class="dl">Importance matérielle (215$a)</span><span class="dv">${esc(r['215$a']) || '—'}</span></div>
