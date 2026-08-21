@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Transfert 2e étage → Réserve patrimoniale — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="js/reserve-shared.js"></script>
+<style>
+  :root{
+    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1150px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
+  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
+  .container{max-width:1150px;margin:0 auto;padding:0 1.5rem}
+
+  .section{padding:1.5rem 0 3rem}
+  .ex-note{font-size:.8rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
+  .ex-note strong{color:#665c00}
+
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem}
+  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+  .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#12157A}
+
+  .form-card{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
+  .form-card h2{font-family:'DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 1rem;color:#12157A}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.9rem;margin-bottom:.5rem}
+  .form-field{display:flex;flex-direction:column;gap:.3rem}
+  .form-field label{font-size:.72rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .form-field input{font-family:inherit;font-size:.95rem;padding:.55rem .7rem;border:1px solid #ccc;border-radius:8px;outline:none}
+  .form-field input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
+  .form-field.barcode input{font-family:monospace;font-size:1.05rem}
+  .form-warn{font-size:.78rem;color:#e65100;background:#fff8e1;border:1px solid #ffe0a3;border-radius:6px;padding:.5rem .7rem;margin-top:.3rem;display:none}
+  .form-warn.show{display:block}
+
+  .loc-fields{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin:.75rem 0}
+  .loc-toggle{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#333;margin:.9rem 0 0}
+  .loc-sel{font-family:inherit;font-size:.85rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
+  .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
+  .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
+  .stepper button:hover{background:#e0e0e0}
+  .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#12157A}
+  .loc-readout{font-size:.85rem;color:#12157A;font-weight:600;background:#F5F5FF;border:1px solid #ccc;border-radius:20px;padding:.45rem 1rem}
+
+  .form-submit{display:flex;align-items:center;gap:.75rem;margin-top:1rem}
+  .btn-primary{font-family:inherit;font-size:.9rem;padding:.65rem 1.4rem;border:1px solid #12157A;border-radius:8px;background:#12157A;color:#fff;cursor:pointer}
+  .btn-primary:hover{background:#1c1fa0}
+  .btn-mini{font-family:inherit;font-size:.75rem;padding:.35rem .8rem;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;color:#555}
+  .btn-mini:hover{background:#f5f5f5}
+
+  .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9}
+  .fb-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
+  .fb-badge{font-size:.68rem;padding:2px 9px;border-radius:20px;font-weight:600;background:#c8e6c9;color:#1b5e20}
+  .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
+
+  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.5rem}
+  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
+  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .log-table-wrap{overflow-x:auto}
+  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
+  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0;white-space:nowrap}
+  .log-table td{padding:.4rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .log-table tr:hover td{background:#fafafa}
+  .log-body{max-height:460px;overflow-y:auto}
+  .log-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:.85rem;padding:2px 6px}
+  .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
+  .log-cote{font-family:monospace;color:#12157A}
+  .log-bc{font-family:monospace;color:#888}
+  .arrow-sep{color:#bbb;margin:0 .2rem}
+
+  .detail-row td{background:#F5F5FF;padding:1rem 1.25rem}
+  .detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.6rem 1.2rem;margin-bottom:1rem}
+  .detail-grid .dl{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.15rem}
+  .detail-grid .dv{display:block;font-size:.85rem;color:#1a1a1a}
+  .ex-form{background:#fff;border:1px dashed #c9c9e8;border-radius:8px;padding:1rem}
+  .ex-form h4{font-size:.85rem;color:#12157A;margin:0 0 .75rem;font-weight:700}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+</style>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Magasins</nav>
+      <h1 class="page-title">Transfert <em>2e étage → Réserve</em></h1>
+      <p class="page-lead">Préparez la liste des livres à ramener du 2e étage depuis le registre papier (souvent la seule source pour ces documents non catalogués), puis exemplarisez-les rapidement — nouvelle cote, code-barre, emplacement — une fois retrouvés en réserve.</p>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <p class="ex-note">
+        <strong>Comment ça marche :</strong> recopiez d'abord les livres à transférer depuis le registre papier du 2e étage
+        (bouton « Ajouter à la liste »). Chaque champ est étiqueté avec son tag UNIMARC pour rester lisible en cohérence avec le
+        reste du catalogue. Une fois sur place et le livre retrouvé, cliquez sur « Exemplariser » dans la liste d'attente pour
+        lui attribuer une nouvelle cote, un nouveau code-barre et un emplacement dans la réserve patrimoniale — il apparaît
+        alors immédiatement dans <a href="index.html">le catalogue</a>, <a href="recolement.html">le récolement</a> et
+        <a href="reserve.html">le plan de la réserve</a>, exactement comme un exemplaire créé depuis
+        <a href="exemplarisation.html">l'exemplarisation rapide</a>.
+      </p>
+
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="form-card">
+        <h2>Ajouter un livre à transférer</h2>
+        <form id="add-form">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="f-titre">Titre (200$a)</label>
+              <input type="text" id="f-titre" autocomplete="off" autofocus required>
+            </div>
+            <div class="form-field">
+              <label for="f-auteur">Auteur (700$a)</label>
+              <input type="text" id="f-auteur" autocomplete="off">
+            </div>
+            <div class="form-field">
+              <label for="f-lieuEdition">Lieu d'édition (210$a)</label>
+              <input type="text" id="f-lieuEdition" autocomplete="off">
+            </div>
+            <div class="form-field">
+              <label for="f-maisonEdition">Maison d'édition (210$c)</label>
+              <input type="text" id="f-maisonEdition" autocomplete="off">
+            </div>
+            <div class="form-field">
+              <label for="f-annee">Année (210$d)</label>
+              <input type="text" id="f-annee" autocomplete="off" placeholder="ex. 1875 ou [18xx]">
+            </div>
+            <div class="form-field">
+              <label for="f-importanceMat">Importance matérielle (215$a)</label>
+              <input type="text" id="f-importanceMat" autocomplete="off" placeholder="ex. 234 p.">
+            </div>
+            <div class="form-field">
+              <label for="f-dimensions">Dimensions (215$d)</label>
+              <input type="text" id="f-dimensions" autocomplete="off" placeholder="ex. 22 cm">
+            </div>
+            <div class="form-field">
+              <label for="f-cotePapier">Cote relevée sur le registre (930$g)</label>
+              <input type="text" id="f-cotePapier" autocomplete="off">
+            </div>
+            <div class="form-field">
+              <label for="f-lieuOrigine">Lieu d'origine (915$a)</label>
+              <input type="text" id="f-lieuOrigine" autocomplete="off">
+            </div>
+            <div class="form-field">
+              <label for="f-dateEntree">Date d'entrée à la bibliothèque (920$d)</label>
+              <input type="text" id="f-dateEntree" autocomplete="off" placeholder="JJ/MM/AAAA">
+            </div>
+          </div>
+
+          <div class="form-submit">
+            <button type="submit" class="btn-primary">Ajouter à la liste de transfert</button>
+          </div>
+          <div class="feedback" id="feedback"></div>
+        </form>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title" id="pending-title">Livres en attente de transfert</span>
+        </div>
+        <div class="log-body log-table-wrap">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Cote (registre)</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Ajouté le</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="pending-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title" id="done-title">Historique des transferts</span>
+        </div>
+        <div class="log-body log-table-wrap">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Cote registre</th><th>Titre</th><th>Nouvelle cote</th><th>Nouveau code-barre</th><th>Emplacement</th><th>Transféré le</th>
+              </tr>
+            </thead>
+            <tbody id="done-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+document.getElementById('logout-btn').addEventListener('click', function() {
+  sessionStorage.removeItem('rp_admin_auth');
+  sessionStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ════════════════════════════════════════════════════════════
+   ÉTAT PARTAGÉ (R2 via /api/transferts) + codes-barres déjà connus
+   (Syracuse + exemplaires manuels), pour l'avertissement de doublon
+   au moment d'attribuer un nouveau code-barre.
+   ════════════════════════════════════════════════════════════ */
+const LS_KEY = 'rp_transferts_magasins';
+let TRANSFERTS = {};        // { [id]: record }
+let SYRACUSE_BARCODES = {}; // { [barcode]: {titre,cote} }
+let NONCAT = {};
+function nonCatKey(f){ return `${f.travee}|${f.colonne}|${f.etage}`; }
+function loadNonCatFromServer(){
+  return fetch('/api/recolement').then(r => r.ok ? r.json() : null).then(data => {
+    if(!data) return;
+    NONCAT = {};
+    (data.nonCatalogues || []).forEach(r => { if(r.travee && r.etage !== undefined) NONCAT[nonCatKey(r)] = r; });
+  }).catch(() => {});
+}
+
+function loadLocal(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(TRANSFERTS)); }
+
+/* ════ File d'attente de synchro (trois endpoints possibles) ════ */
+const LS_PENDING = 'rp_transferts_magasins_pending_sync';
+let pendingSync = (function(){ try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch(e){ return []; } })();
+function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
+
+function authHeaders(){
+  const token = sessionStorage.getItem('rp_admin_token');
+  const h = { 'Content-Type': 'application/json' };
+  if(token) h['Authorization'] = 'Basic ' + token;
+  return h;
+}
+
+let lastSyncError = null;
+function updateSyncIndicator(){
+  const el = document.getElementById('sync-status');
+  if(pendingSync.length){
+    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
+    el.classList.add('pending');
+  } else {
+    el.textContent = '✓ synchronisé';
+    el.classList.remove('pending');
+  }
+}
+
+function queuePatch(item){
+  pendingSync.push(item);
+  savePendingSync();
+  updateSyncIndicator();
+  flushPendingSync();
+}
+
+function endpointUrl(name){
+  if(name === 'recolement') return '/api/recolement';
+  if(name === 'transferts') return '/api/transferts';
+  return '/api/exemplaires-manuels';
+}
+
+let flushingSync = false;
+async function flushPendingSync(){
+  if(flushingSync) return;
+  flushingSync = true;
+  try{
+    while(pendingSync.length){
+      const item = pendingSync[0];
+      let res;
+      try{
+        res = await fetch(endpointUrl(item.endpoint), { method:'POST', headers: authHeaders(), body: JSON.stringify(item.patch) });
+      }catch(e){
+        lastSyncError = 'hors ligne ou serveur injoignable';
+        break;
+      }
+      if(res.status===401){
+        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
+        break;
+      }
+      if(res.status===503){
+        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
+        break;
+      }
+      if(!res.ok){
+        lastSyncError = `erreur serveur (${res.status})`;
+        break;
+      }
+      lastSyncError = null;
+      pendingSync.shift();
+      savePendingSync();
+    }
+  } finally {
+    flushingSync = false;
+    updateSyncIndicator();
+  }
+}
+
+function mergeIncoming(serverState){
+  const pendingIds = new Set(
+    pendingSync.filter(p => p.endpoint === 'transferts').map(p => p.patch.record ? p.patch.record.id : p.patch.id)
+  );
+  Object.keys(serverState || {}).forEach(id => {
+    if(!pendingIds.has(id)) TRANSFERTS[id] = serverState[id];
+  });
+  saveLocal();
+  renderAll();
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/transferts');
+    if(!res.ok) return;
+    mergeIncoming(await res.json());
+  }catch(e){ /* hors ligne : on reste sur le cache local */ }
+}
+
+window.addEventListener('online', flushPendingSync);
+setInterval(flushPendingSync, 20000);
+setInterval(()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } });
+
+/* ════════════════════════════════════════════════════════════
+   EMPLACEMENT (étape "Exemplariser") — même géométrie que
+   exemplarisation.html/recolement.html (js/reserve-shared.js), mais
+   réserve fixée à "patrimoniale" (pas de sélecteur) puisque c'est tout
+   le sens de cet outil. Un seul panneau "Exemplariser" ouvert à la fois
+   (openId), redessiné à chaque render : ces fonctions manipulent l'état
+   exLoc partagé plutôt que des variables par ligne.
+   ════════════════════════════════════════════════════════════ */
+let openId = null;
+let exLoc = null;
+function resetExLoc(){ exLoc = { locType:'etagere', travee:'I', colonne:1, etage:1 }; }
+
+function colLetter(n){ return String.fromCharCode(64 + n); }
+function locFieldsOf(l){
+  if(l.locType === 'armoire') return { travee:'ARMOIRE', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  if(l.locType === 'tiroir') return { travee:'TIROIR', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
+}
+function displayTraveeId(t){
+  if(t === 'ARMOIRE') return 'Armoire (bois)';
+  if(t === 'TIROIR') return 'Armoire à tiroirs';
+  return (t || '').replace(/^RD-/, '');
+}
+function exCurrentTraveeDef(){
+  const list = traveesOfReserve('patrimoniale');
+  return list.find(t => t.id === exLoc.travee) || list[0];
+}
+function exCurrentLocDef(){
+  if(exLoc.locType === 'armoire') return EMPLACEMENTS_ARMOIRE[0];
+  if(exLoc.locType === 'tiroir') return EMPLACEMENTS_TIROIR[0];
+  return exCurrentTraveeDef();
+}
+function exSetLocType(type){
+  exLoc.locType = type;
+  const wrap = document.getElementById('ex-stp-travee-wrap');
+  if(wrap) wrap.style.display = type === 'etagere' ? '' : 'none';
+  const def = exCurrentLocDef();
+  exLoc.colonne = Math.min(def.nbCols, Math.max(1, exLoc.colonne || 1));
+  exLoc.etage = type === 'etagere' ? Math.max(1, exLoc.etage || 1) : Math.min(def.maxEt, Math.max(1, exLoc.etage || 1));
+  exRefreshLoc();
+}
+function exRefreshLoc(){
+  const elColonne = document.getElementById('ex-val-colonne');
+  const elEtage = document.getElementById('ex-val-etage');
+  const elTravee = document.getElementById('ex-val-travee');
+  const elReadout = document.getElementById('ex-loc-readout');
+  if(!elColonne) return;
+  elColonne.textContent = colLetter(exLoc.colonne);
+  elEtage.textContent = exLoc.etage;
+  if(exLoc.locType === 'etagere') elTravee.textContent = displayTraveeId(exLoc.travee);
+  let readout;
+  if(exLoc.locType === 'armoire') readout = `Armoire (bois) · Meuble ${colLetter(exLoc.colonne)} · Niveau ${exLoc.etage}`;
+  else if(exLoc.locType === 'tiroir') readout = `Armoire à tiroirs · Meuble ${colLetter(exLoc.colonne)} · Tiroir ${exLoc.etage}`;
+  else readout = `Travée ${displayTraveeId(exLoc.travee)} · Col. ${colLetter(exLoc.colonne)} · Étage ${exLoc.etage}`;
+  elReadout.textContent = readout;
+}
+function syncExPanelUI(){
+  if(!openId) return;
+  const sel = document.getElementById('ex-loctype');
+  if(!sel) return;
+  sel.value = exLoc.locType;
+  document.getElementById('ex-stp-travee-wrap').style.display = exLoc.locType === 'etagere' ? '' : 'none';
+  exRefreshLoc();
+}
+
+/* ════════════════════════════════════════════════════════════
+   RENDU
+   ════════════════════════════════════════════════════════════ */
+function renderStats(){
+  const rows = Object.values(TRANSFERTS);
+  const pending = rows.filter(r => r.status === 'pending').length;
+  const done = rows.filter(r => r.status === 'done').length;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">En attente de transfert</div><div class="stat-card-val">${pending.toLocaleString('fr-FR')}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Déjà transférés</div><div class="stat-card-val">${done.toLocaleString('fr-FR')}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Total dans la liste</div><div class="stat-card-val">${rows.length.toLocaleString('fr-FR')}</div></div>
+  `;
+}
+
+function locationLabel(l){
+  if(!l) return '<em style="color:#bbb">—</em>';
+  if(l.locType === 'armoire') return `Armoire · ${esc(l.colonne)} · niv. ${esc(l.etage)}`;
+  if(l.locType === 'tiroir') return `Tiroir · ${esc(l.colonne)} · tir. ${esc(l.etage)}`;
+  return `${esc(displayTraveeId(l.travee))} · ${esc(l.colonne)} · ét. ${esc(l.etage)}`;
+}
+
+function renderDetailRow(r){
+  return `
+    <tr class="detail-row" id="detail-${esc(r.id)}">
+      <td colspan="6">
+        <div class="detail-grid">
+          <div><span class="dl">Lieu d'édition (210$a)</span><span class="dv">${esc(r['210$a']) || '—'}</span></div>
+          <div><span class="dl">Maison d'édition (210$c)</span><span class="dv">${esc(r['210$c']) || '—'}</span></div>
+          <div><span class="dl">Importance matérielle (215$a)</span><span class="dv">${esc(r['215$a']) || '—'}</span></div>
+          <div><span class="dl">Dimensions (215$d)</span><span class="dv">${esc(r['215$d']) || '—'}</span></div>
+          <div><span class="dl">Lieu d'origine (915$a)</span><span class="dv">${esc(r['915$a']) || '—'}</span></div>
+          <div><span class="dl">Date d'entrée (920$d)</span><span class="dv">${esc(r['920$d']) || '—'}</span></div>
+        </div>
+        <form class="ex-form" id="ex-form" data-id="${esc(r.id)}">
+          <h4>Exemplariser — attribuer une nouvelle cote, un code-barre et un emplacement</h4>
+          <div class="form-grid">
+            <div class="form-field barcode">
+              <label for="ex-barcode">Nouveau code-barre</label>
+              <input type="text" id="ex-barcode" autocomplete="off" autofocus required>
+            </div>
+            <div class="form-field">
+              <label for="ex-cote">Nouvelle cote</label>
+              <input type="text" id="ex-cote" autocomplete="off" placeholder="ex. D104214" required>
+            </div>
+          </div>
+          <div class="form-warn" id="ex-dup-warn"></div>
+
+          <div class="loc-toggle">
+            <label><input type="checkbox" id="ex-loc-enabled" checked> J'indique l'emplacement maintenant</label>
+          </div>
+          <div id="ex-loc-block">
+            <div class="loc-fields">
+              <select class="loc-sel" id="ex-loctype">
+                <option value="etagere">Étagère</option>
+                <option value="armoire">Armoire</option>
+                <option value="tiroir">Tiroir</option>
+              </select>
+              <div class="stepper" id="ex-stp-travee-wrap">
+                <button type="button" data-step="travee" data-dir="-1">−</button>
+                <span id="ex-val-travee">I</span>
+                <button type="button" data-step="travee" data-dir="1">+</button>
+              </div>
+              <div class="stepper" id="ex-stp-colonne-wrap">
+                <button type="button" data-step="colonne" data-dir="-1">−</button>
+                <span id="ex-val-colonne">1</span>
+                <button type="button" data-step="colonne" data-dir="1">+</button>
+              </div>
+              <div class="stepper" id="ex-stp-etage-wrap">
+                <button type="button" data-step="etage" data-dir="-1">−</button>
+                <span id="ex-val-etage">1</span>
+                <button type="button" data-step="etage" data-dir="1">+</button>
+              </div>
+              <span class="loc-readout" id="ex-loc-readout">—</span>
+            </div>
+          </div>
+
+          <div class="form-submit">
+            <button type="submit" class="btn-primary">Valider le transfert</button>
+            <button type="button" class="btn-mini" id="ex-cancel">Annuler</button>
+          </div>
+        </form>
+      </td>
+    </tr>
+  `;
+}
+
+function renderPending(){
+  const rows = Object.values(TRANSFERTS).filter(r => r.status === 'pending').sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  document.getElementById('pending-title').textContent = `Livres en attente de transfert (${rows.length})`;
+  const tbody = document.getElementById('pending-tbody');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="6"><div class="log-empty">Aucun livre en attente pour le moment.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="log-cote">${esc(r['930$g']) || '—'}</td>
+      <td>${esc(r['200$a']) || '<em style="color:#bbb">Sans titre</em>'}</td>
+      <td>${esc(r['700$a']) || '—'}</td>
+      <td>${esc(r['210$d']) || '—'}</td>
+      <td>${r.ts ? new Date(r.ts).toLocaleString('fr-FR') : '—'}</td>
+      <td>
+        <button type="button" class="btn-mini ex-toggle" data-id="${esc(r.id)}">${openId === r.id ? 'Fermer' : 'Exemplariser'}</button>
+        <button type="button" class="log-del ex-remove" data-id="${esc(r.id)}" title="Retirer de la liste">✕</button>
+      </td>
+    </tr>
+    ${openId === r.id ? renderDetailRow(r) : ''}
+  `).join('');
+  syncExPanelUI();
+}
+
+function renderDone(){
+  const rows = Object.values(TRANSFERTS).filter(r => r.status === 'done').sort((a, b) => (b.doneTs || 0) - (a.doneTs || 0));
+  document.getElementById('done-title').textContent = `Historique des transferts (${rows.length})`;
+  const tbody = document.getElementById('done-tbody');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="6"><div class="log-empty">Aucun transfert effectué pour le moment.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="log-cote">${esc(r['930$g']) || '—'}</td>
+      <td>${esc(r['200$a']) || '<em style="color:#bbb">Sans titre</em>'}</td>
+      <td class="log-cote">${esc(r.newCote) || '—'}</td>
+      <td class="log-bc">${esc(r.newBarcode) || '—'}</td>
+      <td>${locationLabel(r.location)}</td>
+      <td>${r.doneTs ? new Date(r.doneTs).toLocaleString('fr-FR') : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderAll(){ renderStats(); renderPending(); renderDone(); }
+
+/* ════════════════════════════════════════════════════════════
+   AJOUT D'UN LIVRE À TRANSFÉRER (formulaire, saisie manuelle)
+   ════════════════════════════════════════════════════════════ */
+const ADD_FIELD_IDS = ['f-titre','f-auteur','f-lieuEdition','f-maisonEdition','f-annee','f-importanceMat','f-dimensions','f-cotePapier','f-lieuOrigine','f-dateEntree'];
+
+document.getElementById('add-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const titre = document.getElementById('f-titre').value.trim();
+  if(!titre) return;
+
+  const record = {
+    id: crypto.randomUUID(),
+    '200$a': titre,
+    '700$a': document.getElementById('f-auteur').value.trim(),
+    '210$a': document.getElementById('f-lieuEdition').value.trim(),
+    '210$c': document.getElementById('f-maisonEdition').value.trim(),
+    '210$d': document.getElementById('f-annee').value.trim(),
+    '215$a': document.getElementById('f-importanceMat').value.trim(),
+    '215$d': document.getElementById('f-dimensions').value.trim(),
+    '930$g': document.getElementById('f-cotePapier').value.trim(),
+    '915$a': document.getElementById('f-lieuOrigine').value.trim(),
+    '920$d': document.getElementById('f-dateEntree').value.trim(),
+    status: 'pending',
+    ts: Date.now(),
+  };
+
+  TRANSFERTS[record.id] = record;
+  saveLocal();
+  renderAll();
+  queuePatch({ endpoint: 'transferts', patch: { type: 'upsert', record } });
+
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback show ok';
+  fb.innerHTML = `<div class="fb-top"><span class="fb-badge">✓ Ajouté à la liste de transfert</span></div><div class="fb-titre">${esc(titre)}</div>`;
+
+  ADD_FIELD_IDS.forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('f-titre').focus();
+});
+
+/* ════════════════════════════════════════════════════════════
+   LISTE D'ATTENTE : retirer / exemplariser (délégation d'événements,
+   le contenu est redessiné à chaque changement d'état)
+   ════════════════════════════════════════════════════════════ */
+const pendingTbody = document.getElementById('pending-tbody');
+
+pendingTbody.addEventListener('click', function(e){
+  const stepBtn = e.target.closest('[data-step]');
+  if(stepBtn){
+    const field = stepBtn.dataset.step, dir = parseInt(stepBtn.dataset.dir, 10);
+    if(field === 'travee'){
+      const list = traveesOfReserve('patrimoniale');
+      const idx = Math.min(list.length - 1, Math.max(0, list.findIndex(t => t.id === exLoc.travee) + dir));
+      exLoc.travee = list[idx].id; exLoc.colonne = 1; exLoc.etage = 1;
+    } else if(field === 'colonne'){
+      const max = exCurrentLocDef().nbCols;
+      exLoc.colonne = Math.min(max, Math.max(1, exLoc.colonne + dir));
+    } else if(field === 'etage'){
+      const max = exLoc.locType === 'etagere' ? Infinity : exCurrentLocDef().maxEt;
+      exLoc.etage = Math.min(max, Math.max(1, exLoc.etage + dir));
+    }
+    exRefreshLoc();
+    return;
+  }
+
+  const toggleBtn = e.target.closest('.ex-toggle');
+  if(toggleBtn){
+    const id = toggleBtn.dataset.id;
+    openId = (openId === id) ? null : id;
+    if(openId) resetExLoc();
+    renderPending();
+    return;
+  }
+
+  const cancelBtn = e.target.closest('#ex-cancel');
+  if(cancelBtn){
+    openId = null;
+    renderPending();
+    return;
+  }
+
+  const removeBtn = e.target.closest('.ex-remove');
+  if(removeBtn){
+    const id = removeBtn.dataset.id;
+    const rec = TRANSFERTS[id];
+    if(!confirm(`Retirer « ${rec ? (rec['200$a'] || id) : id} » de la liste de transfert ?`)) return;
+    delete TRANSFERTS[id];
+    if(openId === id) openId = null;
+    saveLocal();
+    renderAll();
+    queuePatch({ endpoint: 'transferts', patch: { type: 'delete', id } });
+  }
+});
+
+pendingTbody.addEventListener('change', function(e){
+  if(e.target.id === 'ex-loctype'){ exSetLocType(e.target.value); }
+  if(e.target.id === 'ex-loc-enabled'){
+    document.getElementById('ex-loc-block').style.display = e.target.checked ? '' : 'none';
+  }
+});
+
+pendingTbody.addEventListener('input', function(e){
+  if(e.target.id !== 'ex-barcode') return;
+  const bc = e.target.value.trim();
+  const dupWarn = document.getElementById('ex-dup-warn');
+  const syr = bc ? SYRACUSE_BARCODES[bc] : null;
+  if(syr){
+    dupWarn.textContent = `⚠ Ce code-barre existe déjà : « ${syr.titre || '(sans titre)'} » (cote ${syr.cote || '—'}). Vérifiez qu'il ne s'agit pas d'une erreur avant de continuer.`;
+    dupWarn.classList.add('show');
+  } else {
+    dupWarn.classList.remove('show');
+  }
+});
+
+pendingTbody.addEventListener('submit', function(e){
+  const form = e.target.closest('#ex-form');
+  if(!form) return;
+  e.preventDefault();
+
+  const id = form.dataset.id;
+  const rec = TRANSFERTS[id];
+  if(!rec) return;
+
+  const newBarcode = document.getElementById('ex-barcode').value.trim();
+  const newCote = document.getElementById('ex-cote').value.trim();
+  if(!newBarcode || !newCote) return;
+
+  const locEnabled = document.getElementById('ex-loc-enabled').checked;
+  const location = locEnabled ? { ...locFieldsOf(exLoc), locType: exLoc.locType } : null;
+  const now = Date.now();
+
+  const manuelRecord = {
+    barcode: newBarcode,
+    titre: rec['200$a'] || '',
+    auteur: rec['700$a'] || '',
+    date: rec['210$d'] || '',
+    cote: newCote,
+    '210$a': rec['210$a'] || '',
+    '210$c': rec['210$c'] || '',
+    '215$a': rec['215$a'] || '',
+    '215$d': rec['215$d'] || '',
+    '915$a': rec['915$a'] || '',
+    '920$d': rec['920$d'] || '',
+    coteOrigine: rec['930$g'] || '',
+    location,
+    ts: now,
+  };
+  queuePatch({ endpoint: 'exemplaires-manuels', patch: { type: 'upsert', record: manuelRecord } });
+
+  if(locEnabled){
+    const fields = locFieldsOf(exLoc);
+    queuePatch({
+      endpoint: 'recolement',
+      patch: {
+        type: 'scan',
+        record: {
+          barcode: newBarcode,
+          cote: newCote,
+          titre: manuelRecord.titre,
+          auteur: manuelRecord.auteur,
+          fonds: getFondsFromCote(newCote),
+          etat: '',
+          manuel: true,
+          kind: exLoc.locType,
+          travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+          barcodeAbime: false,
+          ts: now,
+        },
+      },
+    });
+
+    const ncKey = nonCatKey(fields);
+    const curNc = NONCAT[ncKey];
+    const curCount = curNc ? curNc.count : 0;
+    if(curCount > 0){
+      const newCount = curCount - 1;
+      const newRecord = newCount > 0 ? { travee: fields.travee, colonne: fields.colonne, etage: fields.etage, count: newCount, ts: Date.now() } : null;
+      if(newRecord) NONCAT[ncKey] = newRecord; else delete NONCAT[ncKey];
+      queuePatch({ endpoint: 'recolement', patch: { type: 'nonCat', key: ncKey, record: newRecord } });
+    }
+  }
+
+  const doneRecord = { ...rec, status: 'done', newCote, newBarcode, location, doneTs: now };
+  TRANSFERTS[id] = doneRecord;
+  saveLocal();
+  openId = null;
+  renderAll();
+  queuePatch({ endpoint: 'transferts', patch: { type: 'upsert', record: doneRecord } });
+});
+
+/* ════════════════════════════════════════════════════════════
+   DÉMARRAGE
+   ════════════════════════════════════════════════════════════ */
+TRANSFERTS = loadLocal();
+renderAll();
+updateSyncIndicator();
+
+fetch('data/inventaire.json').then(r => r.ok ? r.json() : []).then(items => {
+  (items || []).forEach(it => {
+    const bc = (it['915$b'] || it['995$f'] || '').trim();
+    if(!bc) return;
+    SYRACUSE_BARCODES[bc] = { titre: (it['200$a'] || '').trim(), cote: (it['930$g'] || '').trim() };
+  });
+}).catch(() => {});
+
+fetch('/api/exemplaires-manuels').then(r => r.ok ? r.json() : {}).then(data => {
+  Object.values(data || {}).forEach(rec => {
+    if(!rec.barcode) return;
+    SYRACUSE_BARCODES[rec.barcode] = { titre: rec.titre || '', cote: rec.cote || '' };
+  });
+}).catch(() => {});
+
+syncFromServer();
+loadNonCatFromServer();
+flushPendingSync();
+</script>
+</body>
+</html>

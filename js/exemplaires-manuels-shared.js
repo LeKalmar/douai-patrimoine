@@ -12,6 +12,11 @@
  *   200$a → titre, 700$a → auteur, 210$d → date, 930$g → cote,
  *   995$f → code-barre (même champ que celui lu par recolement.html pour
  *   construire son "catalog", voir la ligne `it['915$b'] || it['995$f']`).
+ *   Champs optionnels supplémentaires (posés par transfert-magasins.html
+ *   sur les exemplaires issus du transfert 2e étage → réserve patrimoniale,
+ *   absents des exemplaires créés directement par exemplarisation.html) :
+ *   210$a → lieu d'édition, 210$c → maison d'édition, 215$a → importance
+ *   matérielle, 215$d → dimensions.
  */
 const EXEMPLAIRES_MANUELS_SOUS_FONDS = '⚡ Exemplarisation rapide (à cataloguer)';
 
@@ -19,7 +24,11 @@ function exemplaireManuelToCatalogRecord(rec) {
   return {
     '200$a': rec.titre || '',
     '700$a': rec.auteur || '',
+    '210$a': rec['210$a'] || '',
+    '210$c': rec['210$c'] || '',
     '210$d': rec.date || '',
+    '215$a': rec['215$a'] || '',
+    '215$d': rec['215$d'] || '',
     '930$g': rec.cote || '',
     '995$f': rec.barcode || '',
     'Sous-fonds': EXEMPLAIRES_MANUELS_SOUS_FONDS,

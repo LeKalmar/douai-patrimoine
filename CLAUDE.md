@@ -575,6 +575,66 @@ demandé (ex. dans le tableau des exemplaires créés, ou dans le catalogue),
 il faudra soit un endpoint `GET` signé supplémentaire (le bucket n'est pas
 public), soit activer un accès public R2 sur ce préfixe précis.
 
+## Transfert 2e étage → réserve patrimoniale
+
+`transfert-magasins.html` (2026-08-21) répond à un besoin distinct de
+`magasins.html`/`exemplarisation.html` : beaucoup de documents du 2e étage
+ne sont **pas catalogués du tout** dans Syracuse (absents de
+`data/magasins.json`) — le seul support pour les repérer est un **registre
+papier**. L'outil est en deux temps :
+
+1. **Ajouter à la liste de transfert** (depuis le bureau, en lisant le
+   registre papier) : un formulaire de saisie manuelle dont chaque champ
+   est étiqueté avec son tag UNIMARC (titre `200$a`, auteur `700$a`, lieu
+   d'édition `210$a`, maison d'édition `210$c`, année `210$d`, importance
+   matérielle `215$a`, dimensions `215$d`, cote relevée sur le registre
+   `930$g`, lieu d'origine `915$a` — code d'acquisition du type `EA2018`/
+   `DON2019` dans les exports Syracuse existants, ici saisi à la main —,
+   date d'entrée à la bibliothèque `920$d`). Seul le titre est requis. Ces
+   champs sont volontairement gardés tels quels, tagués UNIMARC, dans le
+   stockage partagé plutôt que traduits vers des clés génériques : pour ces
+   documents non catalogués, ce formulaire est parfois la seule donnée
+   numérique qui existera avant un vrai catalogage Syracuse.
+2. **Exemplariser** (sur place, une fois le livre retrouvé) : dans la liste
+   d'attente, un panneau dépliable par ligne (un seul ouvert à la fois,
+   variable `openId`) reprend la mécanique d'emplacement de
+   `exemplarisation.html` (`js/reserve-shared.js` : steppers travée/
+   colonne/étage, sélecteur étagère/armoire/tiroir) mais avec la réserve
+   **fixée** à `patrimoniale` (pas de sélecteur de réserve — c'est tout le
+   sens de l'outil), plus deux champs « Nouvelle cote » et « Nouveau
+   code-barre ».
+
+Stockage partagé (nouveau, même patron que `api/exemplaires-manuels.mjs` :
+GET public, POST authentifié, fusion `r2CasUpdate`) : clé R2
+`transferts-magasins.json`, forme `{ [id]: record }` avec `id` généré côté
+client (`crypto.randomUUID()` — pas de code-barre disponible à la création,
+contrairement à `exemplaires-manuels.json` qui est keyé par code-barre).
+`record.status` vaut `'pending'` (en attente, champs UNIMARC ci-dessus
+seulement) puis `'done'` une fois exemplarisé (mêmes champs + `newCote`,
+`newBarcode`, `doneTs`) — passage à `'done'` via le même patch `upsert`
+que la création, sans type de patch dédié. `api/transferts.mjs` gère aussi
+`{type:'delete', id}` pour retirer un livre de la liste.
+
+À l'exemplarisation, **aucun changement de schéma** côté
+`api/exemplaires-manuels.mjs` : le nouvel exemplaire envoyé en `upsert`
+porte directement les tags UNIMARC recopiés depuis le registre papier
+(`210$a`/`210$c`/`215$a`/`215$d` en plus des champs habituels
+`barcode`/`titre`/`auteur`/`date`/`cote`/`location`), plus `coteOrigine`
+(la cote du registre papier, distincte de la nouvelle `cote` attribuée) et
+`915$a`/`920$d` conservés tels quels pour traçabilité — le patch `upsert`
+de `api/exemplaires-manuels.mjs` est agnostique du contenu du record, seul
+`record.barcode` est requis. Comme pour un exemplaire créé directement par
+`exemplarisation.html`, un patch `scan` est aussi envoyé vers
+`/api/recolement` si l'emplacement est renseigné (case cochée par défaut),
+avec le même décrément de l'estimation `nonCat` de l'emplacement.
+`js/exemplaires-manuels-shared.js` (`exemplaireManuelToCatalogRecord()`)
+fait passer `210$a`/`210$c`/`215$a`/`215$d` vers la ligne affichée dans le
+catalogue — additif, sans effet sur les exemplaires créés par
+`exemplarisation.html` qui n'ont pas ces clés. `js/inventaire.js` affichait
+déjà `215$a`/`215$d` dans le détail d'une fiche (`DETAIL_FIELDS`), donc
+importance matérielle et dimensions apparaissent sans changement côté
+`js/inventaire.js`.
+
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
 Bucket R2 `douai-patrimoine` (compte Cloudflare de l'utilisateur), utilisé
@@ -588,14 +648,16 @@ pour trois choses indépendantes :
   (dev local sans `.env`), comportement d'origine inchangé — lecture des
   fichiers locaux, échec strict s'ils manquent.
 - **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`,
-  `reliures-manuelles.json`** : état partagé canonique de `recolement.html` /
-  `livres-spolies.html` / `exemplarisation.html` (voir « Exemplarisation
-  rapide » plus haut) / `reliures.html` (voir « Récolement en cascade des
-  documents reliés » plus haut), pour que plusieurs collègues avancent en
-  même temps sans export/import JSON manuel. Chaque page garde le
-  `localStorage` comme source de vérité locale (fonctionne hors ligne, file
-  d'attente `rp_*_pending_sync` rejouée à la reconnexion) et envoie en plus
-  chaque changement en arrière-plan.
+  `reliures-manuelles.json`, `transferts-magasins.json`** : état partagé
+  canonique de `recolement.html` / `livres-spolies.html` /
+  `exemplarisation.html` (voir « Exemplarisation rapide » plus haut) /
+  `reliures.html` (voir « Récolement en cascade des documents reliés » plus
+  haut) / `transfert-magasins.html` (voir « Transfert 2e étage → réserve
+  patrimoniale » plus haut), pour que plusieurs collègues avancent en même
+  temps sans export/import JSON manuel. Chaque page garde le `localStorage`
+  comme source de vérité locale (fonctionne hors ligne, file d'attente
+  `rp_*_pending_sync` rejouée à la reconnexion) et envoie en plus chaque
+  changement en arrière-plan.
 - **`recolement-backups/<horodatage>.json`** : instantanés datés et
   immuables (un objet par sauvegarde, jamais réécrit), distincts de l'état
   partagé courant ci-dessus. Créés par le bouton « Sauvegarder ce
@@ -611,9 +673,9 @@ pour trois choses indépendantes :
   catégories ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
   dans le site ne relit ces images pour l'instant.
 
-Cinq fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
+Six fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
 `api/exemplaires-manuels.mjs`, `api/reliures-manuelles.mjs`,
-`api/vignette.mjs`) servent de proxy vers R2 :
+`api/vignette.mjs`, `api/transferts.mjs`) servent de proxy vers R2 :
 `GET` (sauf `api/vignette.mjs`, POST uniquement) renvoie l'état courant
 (public, même niveau
 d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit un
@@ -783,6 +845,62 @@ basculé par `syncActiveCatalog()`). La clé de `resolvedIssues`
 (`categorie|barcode`) n'inclut volontairement pas le groupe : un
 code-barre donné n'appartient qu'à un seul groupe (via la travée de son
 scan), aucune ambiguïté possible entre les deux panneaux.
+
+Piège rencontré en construisant cette section (2026-08-19) : `ADV_GROUPS`/
+`ADV_CATS` (et la ligne qui injecte le HTML dans `#adv-groups`) doivent être
+déclarés **tôt** dans le script, juste après les blocs `Promise.all`/`fetch`
+de chargement du catalogue — PAS avec le reste de la section "LISTES
+AVANCÉES" plus bas (où logiquement ils semblent appartenir). Raison :
+`updateStats()` (qui lit `ADV_GROUPS`) est déjà appelée pendant
+l'initialisation synchrone de la page, dans `setLocType(loc.locType)` en fin
+de section "EMPLACEMENT" — les déclarer plus bas provoque un
+`ReferenceError` (temporal dead zone) dès le chargement, qui interrompt tout
+le reste du script (plus aucun scan, mini-plan jamais construit). Les
+fonctions (`damagedList`, `advDetailsTemplate`, etc.) n'ont pas ce problème
+— elles sont hissées (hoisting des déclarations `function`) — seules les
+`const` du haut de la section doivent rester tôt dans le fichier.
+
+### Livres sans code-barre
+
+`recolement.html` (2026-08-19) permet aussi de saisir la **cote** d'un
+document qui n'a jamais eu de code-barre collé (fréquent dans les magasins
+d'étage) — barre `#nobarcode-input` juste sous le scan de code-barre,
+disponible pour tous les groupes (réserve et magasins). `handleNoBarcodeCote()`
+vérifie la cote (normalisée par `normalizeCote()`, trim + majuscules) contre
+`catalogCoteIndexByGroup[group]`, un index inverse cote→code-barre construit
+une fois par catalogue (`buildCoteIndex()`, appelé juste après le chargement
+de chaque `catalogByGroup`) :
+
+- **Cote trouvée** : le document est récolé comme un scan normal — on
+  appelle directement `handleScan(codeBarreTrouvé, false, {sansCodeBarre:true})`,
+  qui pose `record.sansCodeBarre = true` (toute la mécanique dup/déplacé/
+  cascade reliures s'applique normalement).
+- **Cote absente** : pas de scan possible (aucun code-barre à associer),
+  juste un enregistrement dans `noBarcodeCotes` (nouvelle catégorie du
+  bundle `recolement.json`, clé = cote normalisée — pas un emplacement,
+  contrairement à `nonCat`/`videShelves`/`nonRangeShelves`, puisque
+  plusieurs cotes distinctes peuvent coexister sur le même emplacement) —
+  aucun effet sur la progression/l'occupation, uniquement une entrée dans la
+  liste d'export.
+
+`noBarcodeList(group)` (utilisée par `ADV_CATS.nobarcode`, un 4e panneau
+ajouté automatiquement aux deux groupes de "Statistiques avancées" via la
+même génération de template que les 3 autres) réunit les deux sources :
+`scans` filtrés par `sansCodeBarre` (cotes trouvées, comptées comme
+récolées) et `noBarcodeCotes` (cotes absentes). Contrairement aux 3 autres
+listes, **pas de suivi réglé/rouvert** (`ADV_CATS.nobarcode.resolvable:
+false` — demande explicite, liste volontairement simple) : `advDetailsTemplate()`
+et `refreshAdvList()` sautent la case "Afficher aussi les réglés" et la
+colonne d'action quand `resolvable===false`. L'export (`exportField:'cote'`)
+télécharge des **cotes**, pas des codes-barres — contrairement aux 3 autres
+catégories — puisque le but est justement de savoir sur quels documents
+recoller un code-barre.
+
+`noBarcodeCotes` suit le même patron que les autres catégories du bundle
+`recolement.json` : synchronisé vers R2 via un nouveau patch `noBarcode`
+(`api/recolement.mjs`, clé = cote normalisée via `coteKey()`), inclus dans
+`emptyState()`, `bulkMerge` et `exportPayload()`/`mergeIncomingData()` côté
+client — un ancien export sans ce champ reste importable (`|| []`).
 
 ## Sécurité — à savoir avant de toucher à l'espace pro
 
