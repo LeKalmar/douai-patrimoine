@@ -80,6 +80,7 @@ bas, section « Stockage partagé »).
 | `reliures.html` | Création manuelle de groupes de documents reliés ensemble (équivalent $481/$482) et détection des groupes dont les emplacements récolés ne concordent pas — voir « Récolement en cascade des documents reliés » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `rotobib.html` | Désherbage assisté par les statistiques de prêt : scan d'un code-barre, fiche + histogramme de prêts sur 4 ans, décision (conserver/pilon/braderie/relocalisation), export .txt par traitement — voir « Rotobib » | **Protégé** |
+| `desherbage-stats.html` | Vue d'ensemble purement statistique (lecture seule) de l'export de désherbage : prêts totaux par année, répartition par prêts cumulés, liste triable des exemplaires — voir « Rotobib » | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
 `_archive/` contient des pages retirées du site actif (voir
@@ -747,6 +748,36 @@ bouton « annuler » par ligne) donnent une vue d'ensemble de l'avancement
 de la campagne. Quatre boutons d'export `.txt` (un code-barre par ligne,
 même convention que les autres exports du projet) — un par traitement, y
 compris « Conserver » — pour ajout panier dans le SIGB.
+
+`desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
+volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni
+stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
+`data/desherbage.json` pour une vue d'ensemble de la campagne. Trois blocs :
+
+- Un bandeau de chiffres clés (exemplaires de l'export, part jamais
+  empruntée, total de prêts sur les 4 dernières années avec la moyenne par
+  exemplaire, total cumulé depuis l'acquisition, exemplaire le plus
+  emprunté). Sur l'export du 2026-08-26 : 71,6% des 6140 exemplaires n'ont
+  **jamais** été empruntés (`prets.cumules === 0`), et les 4 dernières
+  années cumulées (98 prêts) pèsent très peu face au total historique
+  (3982) — cohérent avec le principe même de l'outil : cette sélection
+  porte sur des documents à circulation faible ou nulle.
+- Deux histogrammes en barres (barres simples, une seule teinte, comme
+  `rotobib.html` — magnitude d'une seule série, pas besoin de palette
+  catégorielle) : les **prêts totaux par année** (somme sur tous les
+  exemplaires, mêmes 4 années réelles que l'histogramme par livre de
+  Rotobib, déduites de `referenceYear` dans le rapport de build) et la
+  **répartition des exemplaires par prêts cumulés** (paliers 0, 1, 2, 3, 4,
+  5–9, 10+ — choisis d'après la distribution réelle : la traîne au-delà de
+  9 ne représente qu'une quarantaine d'exemplaires, un seul palier « 10+ »
+  suffit à la représenter sans la diluer en paliers vides). Survol/focus
+  clavier sur chaque barre affiche une infobulle (`#chart-tooltip`, un seul
+  élément repositionné en JS) avec le détail et la part en %.
+- Une liste triable/filtrable de tous les exemplaires (titre, auteur, cote,
+  prêts AN-3/AN-2/AN-1/AN, cumulés, réservations cumulées, code-barre) —
+  même patron recherche + tri par colonne + pagination que `magasins.html`,
+  triée par défaut sur les prêts cumulés décroissants : le livre le plus
+  emprunté de l'export apparaît donc en première ligne sans manipulation.
 
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
