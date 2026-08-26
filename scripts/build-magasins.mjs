@@ -42,7 +42,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { loadDotEnv } from './lib/dotenv.mjs';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
-import { iterateRecords, parseRecord, getSubfield, flatten } from './lib/marc-xml.mjs';
+import { iterateRecords, parseRecord, getSubfield, flatten, indexNotices } from './lib/marc-xml.mjs';
 
 loadDotEnv();
 
@@ -90,28 +90,10 @@ function magasinDigitRun(coteG) {
 }
 
 // ── Étape 1 : indexer les notices ──────────────────────────────────────────
-function indexNotices(xml) {
-  const notices = new Map();
-  const primaryItemToNotice = new Map();
-
-  let count = 0;
-  for (const recXml of iterateRecords(xml)) {
-    const rec = parseRecord(recXml);
-    const noticeId = rec.controlfields['001'];
-    if (!noticeId) continue;
-
-    const flat = flatten(rec, CONFIG.noticeFieldsWhitelist, CONFIG.multiSep);
-    flat._noticeId = noticeId;
-    if (rec.leader) flat._leader = rec.leader;
-    notices.set(noticeId, flat);
-
-    const f995 = getSubfield(rec, '995', 'f');
-    if (f995) primaryItemToNotice.set(f995.trim(), noticeId);
-
-    count++;
-  }
-
-  return { notices, primaryItemToNotice, count };
+// indexNotices() vit dans lib/marc-xml.mjs (partagée avec build-desherbage.mjs,
+// qui joint son propre export sur ce même fichier xml/magasin/notices.xml.xml).
+function indexNoticesForMagasins(xml) {
+  return indexNotices(xml, { whitelist: CONFIG.noticeFieldsWhitelist, multiSep: CONFIG.multiSep });
 }
 
 // ── Étape 2 : itérer les exemplaires, joindre, filtrer par étage ───────────
@@ -223,7 +205,7 @@ async function main() {
   const exemplairesXml = readFileSync(CONFIG.input.exemplaires, 'utf-8');
 
   console.log('  · indexation des notices');
-  const index = indexNotices(noticesXml);
+  const index = indexNoticesForMagasins(noticesXml);
   console.log(`     ${index.count} notices, ${index.primaryItemToNotice.size} liens $995$f`);
 
   console.log('  · construction et filtrage (2e/5e étage uniquement)');

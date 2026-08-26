@@ -5,3 +5,4 @@ node_modules/
 .env
 data/xml/magasin/
 data/xml/all/
+data/xml/desherbage/desherbage.xml
