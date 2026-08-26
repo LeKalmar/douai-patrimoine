@@ -576,7 +576,17 @@ function buildCatalogFromItems(items, fondsOverride){
     // build-magasins.mjs) — sans quoi "livres sans code-barre" ne verrait
     // qu'un fragment de cote (ex. juste "R") pour ces exemplaires.
     const cote = [it['930$g'], it['930$h'], it['930$i']].filter(Boolean).join(' ').trim();
-    const noticeId = it._noticeId || null;
+    // it._noticeId (posé par build-inventory.mjs à partir du 001 MARC) n'existe
+    // que pour les vraies notices Syracuse de la réserve — les exemplaires de
+    // magasins (data/magasins.json, export GESMARC "à plat", vérifié
+    // 2026-08-26 : "Identifiant" y est en bijection avec le code-barre, aucune
+    // notice ne regroupe plusieurs exemplaires) et les exemplaires manuels
+    // (exemplarisation.html) n'en ont jamais. Repli sur le code-barre lui-même
+    // dans ce cas : chacun compte alors comme sa propre "notice" plutôt que
+    // d'être silencieusement exclu du compteur — sans ce repli,
+    // catalogNoticeCount valait 0 pour tout le catalogue magasins (bug
+    // "Notices récolées" bloqué à 0 malgré des scans réels, 2026-08-26).
+    const noticeId = it._noticeId || bc;
     cat[bc] = {
       cote, titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim(),
       // _fondsLabel (posé par build-magasins.mjs, par exemplaire : étage +
@@ -594,12 +604,17 @@ function buildCatalogFromItems(items, fondsOverride){
       // applyReliureCascade(). Absent du catalogue magasins (pas de
       // reliures manuelles pour ce fonds).
       relies: Array.isArray(it._relies) ? it._relies : [],
+      // Répercuté depuis data/magasins.json (voir build-magasins.mjs) —
+      // utilisé uniquement par magasinEtageStats() ci-dessous pour classer un
+      // exemplaire 2e/5e étage (présent) vs 6e étage (absent). undefined pour
+      // la réserve, sans effet là où ce champ n'est pas lu.
+      coteDigitRun: it._coteDigitRun || null,
     };
     // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
     // le compteur et la progression se basent sur des notices distinctes, pas
     // sur des scans bruts, pour qu'un même exemplaire rescanné par erreur ou
     // pour vérification ne compte jamais deux fois.
-    if(noticeId) noticeIds.add(noticeId);
+    noticeIds.add(noticeId);
   });
   return { catalog: cat, noticeCount: noticeIds.size };
 }
@@ -699,6 +714,64 @@ const ADV_GROUPS = [
   { id:'reserve', label:'Réserve' },
   { id:'magasin', label:'Magasins (2e/5e/6e étage)' },
 ];
+
+/* Répartition "notices récolées" par magasin physique distinct (2e/5e/6e
+   étage), en plus du total groupé ci-dessus — catalogByGroup.magasin reste
+   un catalogue UNIQUE, non scindé par étage (voir CLAUDE.md), donc on
+   reclasse chaque exemplaire a posteriori, sur deux axes différents :
+   - récolé (numérateur) : d'après la travée réelle du scan (préfixe
+     M2-/M5-/M6-, terrain — exactement ce que le récolement vérifie).
+   - total (dénominateur) : d'après la cote (coteDigitRun, propagé depuis
+     _coteDigitRun de data/magasins.json dans buildCatalogFromItems — mêmes
+     seuils que magasins.html/ETAGE_THRESHOLDS), seule information
+     disponible côté catalogue, qui lui n'a pas de notion d'emplacement
+     physique tant qu'un exemplaire n'a pas été scanné.
+   Déclaré ici, tôt comme ADV_GROUPS/ADV_CATS ci-dessous, pour la même
+   raison (temporal dead zone, voir commentaire plus bas). */
+const MAGASIN_ETAGE_THRESHOLDS = { 5: 13830, 6: 133530 };
+function magasinEtageOfDigitRun(digitRun){
+  if(!digitRun) return '6e';
+  const threshold = MAGASIN_ETAGE_THRESHOLDS[digitRun.length];
+  if(!threshold) return '6e';
+  const num = parseInt(digitRun, 10) || 0;
+  return num <= threshold ? '2e' : '5e';
+}
+function magasinEtageOfTravee(travee){
+  if(!travee) return null;
+  if(travee.startsWith('M2-')) return '2e';
+  if(travee.startsWith('M5-')) return '5e';
+  if(travee.startsWith('M6-')) return '6e';
+  return null;
+}
+const MAGASIN_ETAGES = [
+  { id:'2e', label:'2e étage' },
+  { id:'5e', label:'5e étage' },
+  { id:'6e', label:'6e étage' },
+];
+function magasinEtageStats(){
+  const cat = catalogByGroup.magasin;
+  const totals = { '2e':0, '5e':0, '6e':0 };
+  if(cat){
+    Object.values(cat).forEach(entry=>{ totals[magasinEtageOfDigitRun(entry.coteDigitRun)]++; });
+  }
+  const scannedNotices = { '2e':new Set(), '5e':new Set(), '6e':new Set() };
+  Object.values(scans).forEach(r=>{
+    const et = magasinEtageOfTravee(r.travee);
+    if(!et || !cat) return;
+    const entry = cat[r.barcode];
+    if(entry) scannedNotices[et].add(entry.noticeId);
+  });
+  return MAGASIN_ETAGES.map(e=>({ id:e.id, label:e.label, scanned:scannedNotices[e.id].size, total:totals[e.id] }));
+}
+function updateMagasinEtageStats(){
+  if(!document.getElementById('st-etage-2e')) return; // groupe 'reserve' : bloc non rendu, voir advGroupTemplate()
+  magasinEtageStats().forEach(r=>{
+    document.getElementById('st-etage-'+r.id).textContent = r.total
+      ? `${r.scanned.toLocaleString('fr-FR')} / ${r.total.toLocaleString('fr-FR')}`
+      : r.scanned.toLocaleString('fr-FR');
+  });
+}
+
 const ADV_CATS = {
   abime: {
     title: 'Codes-barres endommagés',
@@ -1755,6 +1828,7 @@ function updateStats(){
   const nonCatTotal = Object.values(nonCat).reduce((s,r)=>s+r.count, 0);
   document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
   ADV_GROUPS.forEach(g=>{ updateShelfBar(g.id); updateTimeStats(g.id); });
+  updateMagasinEtageStats();
   updateAdvListsCount();
 }
 
@@ -2029,6 +2103,12 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Temps de travail réel (estimé)</div><div class="stat-card-val" id="st-realtime-${gid}" style="font-size:1.2rem">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Sessions de travail détectées</div><div class="stat-card-val" id="st-sessions-${gid}">—</div></div>
     </div>
+
+    ${gid==='magasin' ? `
+    <div class="stats-row" style="margin-bottom:0">
+      ${MAGASIN_ETAGES.map(e=>`<div class="stat-card"><div class="stat-card-label">Notices récolées — ${esc(e.label)}</div><div class="stat-card-val" id="st-etage-${e.id}" style="font-size:1.2rem">—</div></div>`).join('')}
+    </div>
+    ` : ''}
 
     ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey])).join('')}
   `;

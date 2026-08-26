@@ -1129,6 +1129,61 @@ fonctions (`damagedList`, `advDetailsTemplate`, etc.) n'ont pas ce problème
 — elles sont hissées (hoisting des déclarations `function`) — seules les
 `const` du haut de la section doivent rester tôt dans le fichier.
 
+Bug corrigé (2026-08-26) : le compteur « Notices récolées » (haut de page)
+restait bloqué à 0 pour le groupe magasin quel que soit le nombre de scans
+réels. Cause : `buildCatalogFromItems()` posait `noticeId = it._noticeId ||
+null`, or `data/magasins.json` (export GESMARC à plat) ne porte jamais
+`_noticeId` (propriété posée uniquement par `build-inventory.mjs` à partir
+du `001` MARC pour la réserve) — un exemplaire GESMARC a un champ
+`Identifiant` mais vérifié (2026-08-26, échantillon complet) en bijection
+stricte avec le code-barre, jamais partagé entre plusieurs exemplaires,
+donc sans valeur ajoutée par rapport au code-barre lui-même. `noticeId`
+valait donc toujours `null` pour tout le catalogue magasins, et la ligne
+`if(noticeId) noticeIds.add(noticeId);` n'ajoutait jamais rien au
+compteur — `catalogNoticeCount` restait à 0, ce qui faisait afficher
+« — »/0 partout où ce compteur est lu (`st-catalog`, `st-progress`,
+`st-notices-scanned`). Corrigé en remplaçant le repli par le code-barre
+lui-même (`noticeId = it._noticeId || bc`) : chaque exemplaire compte
+alors comme sa propre notice quand aucune vraie notice Syracuse n'existe —
+comportement correct aussi bien pour les magasins que pour les exemplaires
+créés via `exemplarisation.html` (également sans `_noticeId`), qui étaient
+donc, eux aussi, silencieusement exclus de ce compteur côté réserve avant
+ce correctif.
+
+Répartition par magasin distinct (`recolement.html`, 2026-08-26) : en plus
+du total groupé « Notices récolées » du bloc Magasins ci-dessus,
+trois cartes supplémentaires (« Notices récolées — 2e étage »/« — 5e
+étage »/« — 6e étage », `updateMagasinEtageStats()`) détaillent la
+progression par magasin physique distinct, seulement dans le groupe
+`magasin` de `advGroupTemplate()` (`gid==='magasin'`, absent du groupe
+Réserve). Nécessaire car `catalogByGroup.magasin` reste un catalogue
+**unique**, non scindé par étage (voir « Reconnaissance de code-barre par
+un second catalogue » plus haut) — chaque exemplaire y est donc reclassé
+a posteriori sur deux axes différents selon qu'on compte le numérateur ou
+le dénominateur :
+
+- **Récolé** (numérateur) : d'après la travée réelle du scan
+  (`magasinEtageOfTravee()`, préfixe `M2-`/`M5-`/`M6-` du `record.travee`)
+  — le terrain, exactement ce que le récolement vérifie physiquement.
+- **Total** (dénominateur) : d'après la cote (`magasinEtageOfDigitRun()`,
+  appliqué à `coteDigitRun` — propagé dans `buildCatalogFromItems()` depuis
+  `_coteDigitRun` de `data/magasins.json`, mêmes seuils
+  `MAGASIN_ETAGE_THRESHOLDS` que `ETAGE_THRESHOLDS` dans `magasins.html`) —
+  seule information disponible côté catalogue, qui lui n'a pas de notion
+  d'emplacement physique tant qu'un exemplaire n'a pas été scanné au moins
+  une fois.
+
+Ces deux axes ne sont volontairement pas garantis cohérents entre eux : un
+exemplaire dont la cote indique "2e étage" mais scanné sous une travée
+`M5-` compte comme récolé au 5e étage (axe travée) mais comme faisant
+partie du total attendu du 2e étage (axe cote) — un léger écart de ce type
+peut donc apparaître sans qu'il s'agisse d'une anomalie de classement au
+sens de `ADV_CATS.horssection` (qui, elle, porte sur la section Syracuse,
+pas sur l'étage). `MAGASIN_ETAGE_THRESHOLDS`/`MAGASIN_ETAGES`/les fonctions
+`magasinEtageOfDigitRun()`/`magasinEtageOfTravee()`/`magasinEtageStats()`
+sont déclarées tôt dans le script, au même endroit et pour la même raison
+que `ADV_GROUPS`/`ADV_CATS` ci-dessus (temporal dead zone).
+
 ### Livres sans code-barre
 
 `recolement.html` (2026-08-19) permet aussi de saisir la **cote** d'un
