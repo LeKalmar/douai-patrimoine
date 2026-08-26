@@ -127,7 +127,16 @@ const TRAVEES_MAGASIN5 = [
   {id:'M5-ALPHA', nbCols:1, maxEt:6},
 ];
 
-const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5];
+/* Magasin — 6e étage : même principe que les 2e/5e étage ci-dessus, mais
+   sans géométrie propre fournie par l'équipe — le 6e étage partage le même
+   bâtiment/plan que le 5e (confirmé 2026-08-26), on réutilise donc telle
+   quelle la géométrie de TRAVEES_MAGASIN5, préfixe "M6-" pour ne pas entrer
+   en collision avec M2-/M5-/RD-/la réserve patrimoniale. Contrairement aux
+   2e/5e étage (uniquement cotes numériques), le 6e étage couvre aussi les
+   cotes littérales/Dewey — voir CLAUDE.md, section magasins. */
+const TRAVEES_MAGASIN6 = TRAVEES_MAGASIN5.map(t => ({ ...t, id: t.id.replace(/^M5-/, 'M6-') }));
+
+const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5, ...TRAVEES_MAGASIN6];
 
 /* "horsreserve" est une pseudo-réserve sans travées : sert uniquement à
    recolement.html pour scanner des exemplaires retrouvés hors de la
@@ -149,6 +158,7 @@ const RESERVES = [
   {id:'douaisienne',  label:'Réserve Douaisienne',  travees:TRAVEES_DOUAISIENNE, catalogGroup:'reserve'},
   {id:'magasin2',     label:'Magasin — 2e étage',   travees:TRAVEES_MAGASIN2, catalogGroup:'magasin'},
   {id:'magasin5',     label:'Magasin — 5e étage',   travees:TRAVEES_MAGASIN5, catalogGroup:'magasin'},
+  {id:'magasin6',     label:'Magasin — 6e étage',   travees:TRAVEES_MAGASIN6, catalogGroup:'magasin'},
   {id:'horsreserve',  label:'Non rangé (hors réserve)', travees:[], catalogGroup:'reserve'},
 ];
 function traveesOfReserve(reserveId){

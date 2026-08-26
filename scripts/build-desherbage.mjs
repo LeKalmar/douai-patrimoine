@@ -51,7 +51,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { loadDotEnv } from './lib/dotenv.mjs';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
-import { decodeXml, indexNotices } from './lib/marc-xml.mjs';
+import { indexNotices } from './lib/marc-xml.mjs';
+import { iterateGesmarcItems, parseGesmarcItem } from './lib/gesmarc.mjs';
 
 loadDotEnv();
 
@@ -84,23 +85,6 @@ const CONFIG = {
     ? parseInt(process.env.DESHERBAGE_REFERENCE_YEAR, 10)
     : new Date().getFullYear(),
 };
-
-// ── Parseur GESMARC (property name/value à plat, pas du MARC-XML) ──────────
-function* iterateGesmarcItems(xml) {
-  const re = /<item\s+type="GESMARC">([\s\S]*?)<\/item>/g;
-  let m;
-  while ((m = re.exec(xml))) yield m[1];
-}
-
-function parseGesmarcItem(itemXml) {
-  const props = {};
-  const re = /<property\s+name="([^"]*)"[^>]*\svalue="([^"]*)"/g;
-  let m;
-  while ((m = re.exec(itemXml))) {
-    props[decodeXml(m[1])] = decodeXml(m[2]);
-  }
-  return props;
-}
 
 // Champ de comptage annuel : vide = 0 prêt/réservation cette année-là (voir
 // en-tête du fichier), pas une donnée manquante.

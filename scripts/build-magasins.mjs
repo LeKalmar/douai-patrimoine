@@ -3,35 +3,40 @@
  * build-magasins.mjs
  * ────────────────────────────────────────────────────────────────────────────
  * Construit `data/magasins.json` (et `data/magasins-build-report.json`) à
- * partir de l'export Syracuse des magasins du 2e et 5e étage :
+ * partir de l'export complet de la bibliothèque :
  *
- *   - xml/magasin/notices.xml.xml      (R2) → data/xml/magasin/notices.xml
- *   - xml/magasin/exemplaires.xml.xml  (R2) → data/xml/magasin/exemplaires.xml
+ *   xml/bib.xml (R2) → data/xml/bib.xml
  *
- * Contrairement à l'inventaire principal (data/xml/notices.xml), cet export
- * n'a pas pu être filtré en amont pour exclure les ouvrages du 6e étage —
- * les deux fonds sont mélangés dans le même XML. On les sépare ici par la
- * cote de l'exemplaire ($930$g, éventuellement suivie de $930$h) :
+ * `bib.xml` est un export "GESMARC" à plat (voir scripts/lib/gesmarc.mjs),
+ * pas du MARC-XML — un `<item>` par exemplaire, avec ses propres propriétés
+ * (`Titre`, `Auteur`, `Editeur`, `Code-barres (valeur)`, `Cote n° 1/2/3`,
+ * `Bibliothèque (Libellé)`, `Section (Libellé)`…). Il couvre tout le réseau
+ * (plusieurs bibliothèques, toutes les sections) : ce script isole les
+ * exemplaires des magasins d'étage de la bibliothèque de Douai —
+ * `Bibliothèque (Libellé)` commençant par "Douai" et `Section (Libellé)`
+ * valant exactement "Magasin" (adulte) ou "Magasin Jeunesse".
  *
- *   - Les cotes du 2e/5e étage sont des numéros d'enregistrement séquentiels
- *     de 5 ou 6 chiffres (ex : "100350", "156235"), parfois avec un zéro de
- *     tête ("0100011"), parfois suivis d'un tiret et d'un complément
- *     ("104391-182 JOR" — le numéro reste "104391"), parfois écrits avec un
- *     point comme séparateur de milliers pour les nombres à 5 chiffres
- *     ("12.352" = 12352).
- *   - Les cotes du 6e étage sont soit purement littérales ("R FON", "BD
- *     TSI"), soit des indices Dewey classiques à 3 chiffres avant le point
- *     ("940.21 BER", "330.122 KER" — le préfixe à 3 chiffres est le signal
- *     qui les distingue du séparateur de milliers ci-dessus).
+ * Contrairement à l'ancien export dédié (xml/magasin/notices.xml.xml +
+ * exemplaires.xml.xml), `bib.xml` ne nécessite aucune jointure notice/
+ * exemplaire séparée : titre/auteur/éditeur sont déjà portés par chaque
+ * exemplaire.
  *
- * Règle retenue (voir CLAUDE.md, section magasins) : on extrait tous les
- * groupes de chiffres consécutifs de la cote (après avoir fusionné un
- * éventuel point "1-2 chiffres.3 chiffres" en un seul nombre) ; si un de ces
- * groupes fait 5 ou 6 chiffres (un zéro de tête sur un groupe de 7 étant
- * retiré avant de mesurer), l'exemplaire est gardé comme 2e/5e étage. Sinon
- * il est exclu (6e étage). Validé sur les 38 236 exemplaires réels : ~12 600
- * gardés, ~25 600 exclus, cf. data/magasins-build-report.json pour le détail
- * et des échantillons à relire.
+ * Étage (2e/5e vs 6e) : au sein de la section "Magasin", les deux fonds
+ * cohabitent dans le même export, distingués par la forme de la cote — la
+ * cote complète est reconstruite en joignant "Cote n° 1", "Cote n° 2" et
+ * "Cote n° 3" (chacune peut porter un fragment du numéro ou de la lettre,
+ * cf. rapport de build) avant d'y chercher un numéro d'enregistrement :
+ *
+ *   - 2e/5e étage : numéro séquentiel de 5 ou 6 chiffres (ex : "166010"),
+ *     parfois avec un zéro de tête, parfois un point séparateur de milliers
+ *     pour un nombre à 5 chiffres ("12.352" = 12352).
+ *   - 6e étage : cotes littérales ("R GRI", "BD TSI") ou indices Dewey
+ *     classiques à 3 chiffres avant le point ("940.21", "330.122").
+ *
+ * Contrairement à l'ancien script, le 6e étage n'est plus exclu : toute la
+ * section "Magasin"/"Magasin Jeunesse" est gardée, avec juste un marquage
+ * (`_coteDigitRun` présent ou non) qui permet à magasins.html/récolement de
+ * distinguer 2e/5e (numérique) du 6e (le reste) — voir CLAUDE.md.
  *
  * Aucune dépendance npm. Node ≥ 18. Nécessite R2 configuré (.env local ou
  * variables Vercel) — ce jeu de données n'a pas de repli local committé.
@@ -42,45 +47,32 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { loadDotEnv } from './lib/dotenv.mjs';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
-import { iterateRecords, parseRecord, getSubfield, flatten, indexNotices } from './lib/marc-xml.mjs';
+import { iterateGesmarcItemsFromFile, parseGesmarcItem } from './lib/gesmarc.mjs';
 
 loadDotEnv();
 
 const CONFIG = {
-  r2Keys: {
-    notices:     'xml/magasin/notices.xml.xml',
-    exemplaires: 'xml/magasin/exemplaires.xml.xml',
-  },
-  input: {
-    notices:     'data/xml/magasin/notices.xml',
-    exemplaires: 'data/xml/magasin/exemplaires.xml',
-  },
+  r2Key: 'xml/bib.xml',
+  input: 'data/xml/bib.xml',
   output: {
     magasins: 'data/magasins.json',
     report:   'data/magasins-build-report.json',
   },
   vignetteBaseUrl: 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/vignette/',
-  multiSep: '§',
-  itemFieldsWhitelist: ['915', '920', '921', '930'],
-  noticeFieldsWhitelist: [
-    '100', '101', '102', '105', '106', '140', '200', '210', '214', '215',
-    '300', '303', '307', '316', '517', '610', '686', '700', '701', '702',
-    '801', '902',
-  ],
+  // Sections de bib.xml qui correspondent aux magasins d'étage (2e/5e/6e).
+  magasinSections: ['Magasin', 'Magasin Jeunesse'],
   force: process.env.SYRACUSE_FORCE === '1',
 };
 
-// ── Filtre étage : la cote désigne-t-elle un ouvrage du 2e/5e étage ? ──────
-// Voir l'en-tête du fichier pour la règle. Retourne le groupe de chiffres
-// identifié (utile pour le tri) ou null si la cote est du 6e étage / hors
-// périmètre.
-function magasinDigitRun(coteG) {
-  if (!coteG) return null;
+// ── Filtre étage : la cote (jointe) désigne-t-elle un ouvrage 2e/5e étage ? ─
+// Voir l'en-tête du fichier. Retourne le groupe de chiffres identifié (2e/5e
+// étage) ou null (6e étage — désormais gardé, pas exclu).
+function magasinDigitRun(cote) {
+  if (!cote) return null;
   // Fusionne "1-2 chiffres.3 chiffres" (séparateur de milliers) en un seul
   // nombre. N'affecte pas un préfixe Dewey à 3 chiffres ("940.21" reste
-  // "940" + "." + "21", aucun des deux morceaux ne fait 1-2 chiffres suivis
-  // de exactement 3 chiffres après le point).
-  const merged = coteG.replace(/(?<!\d)(\d{1,2})\.(\d{3})(?!\d)/g, '$1$2');
+  // "940" + "." + "21").
+  const merged = cote.replace(/(?<!\d)(\d{1,2})\.(\d{3})(?!\d)/g, '$1$2');
   const runs = merged.match(/\d+/g) || [];
   for (let run of runs) {
     if (run.length === 7 && run[0] === '0') run = run.slice(1);
@@ -89,102 +81,94 @@ function magasinDigitRun(coteG) {
   return null;
 }
 
-// ── Étape 1 : indexer les notices ──────────────────────────────────────────
-// indexNotices() vit dans lib/marc-xml.mjs (partagée avec build-desherbage.mjs,
-// qui joint son propre export sur ce même fichier xml/magasin/notices.xml.xml).
-function indexNoticesForMagasins(xml) {
-  return indexNotices(xml, { whitelist: CONFIG.noticeFieldsWhitelist, multiSep: CONFIG.multiSep });
+function secteurLabel(section) {
+  return section === 'Magasin Jeunesse' ? 'Jeunesse' : 'Adulte';
 }
 
-// ── Étape 2 : itérer les exemplaires, joindre, filtrer par étage ───────────
-function buildItems(xml, index) {
+function fondsLabel(digitRun, section) {
+  const etage = digitRun ? '2e/5e étage' : '6e étage';
+  return `Magasin — ${etage} (${secteurLabel(section)})`;
+}
+
+// ── Itère les exemplaires de bib.xml, filtre bibliothèque + section ────────
+// bib.xml (700+ Mo) est lu en flux (iterateGesmarcItemsFromFile) plutôt que
+// chargé entièrement en mémoire — voir scripts/lib/gesmarc.mjs.
+async function buildItems(path) {
   const items = [];
   const stats = {
     totalItems: 0,
-    joinedByPrimary: 0,
-    orphans: 0,
-    orphansSample: [],
     kept: 0,
-    excluded: 0,
-    excludedSample: [],
+    bySection: {},   // 'Magasin' / 'Magasin Jeunesse' → compte
+    byEtage: { '2e/5e': 0, '6e': 0 },
     keptEdgeSample: [], // cotes gardées avec tiret/point/zéro de tête, à relire
   };
 
-  for (const recXml of iterateRecords(xml)) {
-    const rec = parseRecord(recXml);
+  for await (const itemXml of iterateGesmarcItemsFromFile(path)) {
     stats.totalItems++;
+    const props = parseGesmarcItem(itemXml);
 
-    const itemFlat = flatten(rec, CONFIG.itemFieldsWhitelist, CONFIG.multiSep);
-    const itemId = rec.controlfields['001'] ?? null;
+    const bibliotheque = props['Bibliothèque (Libellé)'] || '';
+    const section = props['Section (Libellé)'] || '';
+    if (!bibliotheque.startsWith('Douai')) continue;
+    if (!CONFIG.magasinSections.includes(section)) continue;
 
-    const b915 = getSubfield(rec, '915', 'b');
-    const noticeId = b915 ? index.primaryItemToNotice.get(b915.trim()) : null;
-    if (noticeId) {
-      stats.joinedByPrimary++;
-    } else {
-      stats.orphans++;
-      if (stats.orphansSample.length < 10) stats.orphansSample.push({ itemId, b915 });
-    }
+    const barcode = (props['Code-barres (valeur)'] || '').trim();
+    if (!barcode) continue;
 
-    const coteG = getSubfield(rec, '930', 'g');
-    const coteH = getSubfield(rec, '930', 'h');
-    const coteDisplay = [coteG, coteH].filter(Boolean).join(' ');
-    const digitRun = magasinDigitRun(coteG);
+    const cote1 = props['Cote n° 1'] || '';
+    const cote2 = props['Cote n° 2'] || '';
+    const cote3 = props['Cote n° 3'] || '';
+    const coteJointe = [cote1, cote2, cote3].filter(Boolean).join(' ');
+    const digitRun = magasinDigitRun(coteJointe);
 
-    if (!digitRun) {
-      stats.excluded++;
-      if (stats.excludedSample.length < 30) stats.excludedSample.push(coteDisplay);
-      continue;
-    }
     stats.kept++;
-    if (/[-.]/.test(coteG || '') || /^0/.test(coteG || '')) {
-      if (stats.keptEdgeSample.length < 30) stats.keptEdgeSample.push(coteDisplay);
+    stats.bySection[section] = (stats.bySection[section] || 0) + 1;
+    stats.byEtage[digitRun ? '2e/5e' : '6e']++;
+    if (/[-.]/.test(coteJointe) || /^0/.test(cote1)) {
+      if (stats.keptEdgeSample.length < 30) stats.keptEdgeSample.push(coteJointe);
     }
 
-    const noticeData = noticeId ? index.notices.get(noticeId) : {};
-    const merged = { ...noticeData, ...itemFlat };
-    merged._itemId = itemId;
-    merged._noticeId = noticeId ?? null;
-    merged._joinType = noticeId ? 'primary' : null;
-    merged._coteDigitRun = digitRun;
-
-    const barcode = b915 ? b915.trim() : null;
-    if (barcode) {
-      merged.lien_num = `${CONFIG.vignetteBaseUrl}${barcode}.jpg`;
-      merged['995$f'] = barcode;
-    }
-
-    items.push(merged);
+    items.push({
+      '930$g': cote1 || null,
+      '930$h': cote2 || null,
+      '930$i': cote3 || null,
+      '915$b': barcode,
+      '200$a': props['Titre'] || null,
+      '700$a': props['Auteur'] || null,
+      '210$c': props['Editeur'] || null,
+      '210$d': props['Publié le'] || null,
+      lien_num: `${CONFIG.vignetteBaseUrl}${barcode}.jpg`,
+      _coteDigitRun: digitRun,
+      _secteur: section,
+      _bibliotheque: bibliotheque,
+      _fondsLabel: fondsLabel(digitRun, section),
+    });
   }
 
   return { items, stats };
 }
 
-// ── Récupération des XML depuis R2 ──────────────────────────────────────────
+// ── Récupération du XML depuis R2 ──────────────────────────────────────────
 async function syncXmlFromR2() {
   if (!r2Configured()) {
     console.error(
-      '✖ R2 non configuré : ce jeu de données (xml/magasin/…) n\'a pas de repli ' +
+      '✖ R2 non configuré : ce jeu de données (xml/bib.xml) n\'a pas de repli ' +
       'local committé. Renseignez R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, ' +
       'R2_SECRET_ACCESS_KEY dans .env.'
     );
     process.exit(1);
   }
-  console.log('  · récupération de xml/magasin/notices.xml.xml et exemplaires.xml.xml…');
-  const targets = [
-    { key: CONFIG.r2Keys.notices, local: CONFIG.input.notices },
-    { key: CONFIG.r2Keys.exemplaires, local: CONFIG.input.exemplaires },
-  ];
-  for (const t of targets) {
-    const obj = await r2Get(t.key);
-    if (!obj) {
-      console.error(`✖ ${t.key} absent de R2.`);
-      process.exit(1);
-    }
-    mkdirSync(dirname(resolve(t.local)), { recursive: true });
-    writeFileSync(t.local, obj.body, 'utf-8');
-    console.log(`    → ${t.local} mis à jour depuis R2 (${(obj.body.length / 1e6).toFixed(1)} Mo)`);
+  console.log(`  · récupération de ${CONFIG.r2Key}… (fichier volumineux, patientez)`);
+  // raw:true — bib.xml dépasse la limite de longueur d'une string V8, on
+  // garde le corps en Buffer (voir r2Get() dans lib/r2.mjs).
+  const obj = await r2Get(CONFIG.r2Key, { raw: true });
+  if (!obj) {
+    console.error(`✖ ${CONFIG.r2Key} absent de R2.`);
+    process.exit(1);
   }
+  mkdirSync(dirname(resolve(CONFIG.input)), { recursive: true });
+  writeFileSync(CONFIG.input, obj.body);
+  console.log(`    → ${CONFIG.input} mis à jour depuis R2 (${(obj.body.length / 1e6).toFixed(1)} Mo)`);
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
@@ -192,37 +176,32 @@ async function main() {
   const startedAt = Date.now();
   console.log('▶ build-magasins: démarrage');
 
-  const filesExist = existsSync(CONFIG.input.notices) && existsSync(CONFIG.input.exemplaires);
-  if (!filesExist || CONFIG.force) {
+  if (!existsSync(CONFIG.input) || CONFIG.force) {
     await syncXmlFromR2();
   } else {
-    console.log('  · fichiers locaux déjà présents (SYRACUSE_FORCE=1 pour forcer le re-téléchargement)');
+    console.log('  · fichier local déjà présent (SYRACUSE_FORCE=1 pour forcer le re-téléchargement)');
   }
 
-  console.log(`  · lecture ${CONFIG.input.notices}`);
-  const noticesXml = readFileSync(CONFIG.input.notices, 'utf-8');
-  console.log(`  · lecture ${CONFIG.input.exemplaires}`);
-  const exemplairesXml = readFileSync(CONFIG.input.exemplaires, 'utf-8');
-
-  console.log('  · indexation des notices');
-  const index = indexNoticesForMagasins(noticesXml);
-  console.log(`     ${index.count} notices, ${index.primaryItemToNotice.size} liens $995$f`);
-
-  console.log('  · construction et filtrage (2e/5e étage uniquement)');
-  const buildResult = buildItems(exemplairesXml, index);
-  const s = buildResult.stats;
+  console.log(`  · lecture (en flux) ${CONFIG.input}`);
+  console.log('  · construction et filtrage (magasins d\'étage, bibliothèque Douai)');
+  const { items, stats } = await buildItems(CONFIG.input);
   console.log(
-    `     ${s.totalItems} exemplaires ・ ${s.joinedByPrimary} joints, ${s.orphans} orphelins ・ ` +
-    `${s.kept} gardés (2e/5e étage), ${s.excluded} exclus (6e étage)`
+    `     ${stats.totalItems} exemplaires scannés ・ ${stats.kept} gardés ` +
+    `(${stats.byEtage['2e/5e']} 2e/5e étage, ${stats.byEtage['6e']} 6e étage) ・ ` +
+    `sections : ${JSON.stringify(stats.bySection)}`
   );
 
+  if (stats.kept === 0 && !CONFIG.force) {
+    console.error('✖ Aucun exemplaire retenu — export bib.xml inattendu. SYRACUSE_FORCE=1 pour forcer quand même.');
+    process.exit(1);
+  }
+
   mkdirSync(dirname(resolve(CONFIG.output.magasins)), { recursive: true });
-  writeFileSync(CONFIG.output.magasins, JSON.stringify(buildResult.items), 'utf-8');
-  console.log(`  · écrit ${CONFIG.output.magasins} (${buildResult.items.length} entrées)`);
+  writeFileSync(CONFIG.output.magasins, JSON.stringify(items), 'utf-8');
+  console.log(`  · écrit ${CONFIG.output.magasins} (${items.length} entrées)`);
 
   // Archive le rapport précédent avant de l'écraser (même mécanique que
-  // build-inventory.mjs) — permet à l'espace pro de comparer export actuel
-  // et export précédent (date + delta de documents).
+  // build-inventory.mjs).
   if (existsSync(CONFIG.output.report)) {
     const previousPath = CONFIG.output.report.replace(/\.json$/, '-previous.json');
     writeFileSync(previousPath, readFileSync(CONFIG.output.report, 'utf-8'), 'utf-8');
@@ -233,16 +212,12 @@ async function main() {
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
     stats: {
-      notices: index.count,
-      items: s.totalItems,
-      joinedByPrimary: s.joinedByPrimary,
-      orphans: s.orphans,
-      kept: s.kept,
-      excluded: s.excluded,
+      totalItems: stats.totalItems,
+      kept: stats.kept,
+      bySection: stats.bySection,
+      byEtage: stats.byEtage,
     },
-    orphansSample: s.orphansSample,
-    excludedSample: s.excludedSample,
-    keptEdgeSample: s.keptEdgeSample,
+    keptEdgeSample: stats.keptEdgeSample,
   };
   writeFileSync(CONFIG.output.report, JSON.stringify(report, null, 2), 'utf-8');
   console.log(`  · écrit ${CONFIG.output.report}`);

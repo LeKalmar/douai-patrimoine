@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Magasins 2e/5e étage — Réserve patrimoniale</title>
+  <title>Magasins 2e/5e/6e étage — Réserve patrimoniale</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <style>
     :root { --warm: #c9a96e; --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
@@ -66,8 +66,8 @@
   <div class="container">
     <div>
       <div class="breadcrumb"><a href="admin.html">Espace professionnel</a> / Magasins</div>
-      <h1 class="page-title">Magasins — 2e &amp; 5e étage</h1>
-      <p class="page-lead">Catalogue des exemplaires du 2e et 5e étage, extrait de l'export Syracuse des magasins. Les ouvrages du 6e étage (cotes littérales type « R FON » ou Dewey type « 934.5 LUI ») sont automatiquement écartés — cf. <a href="data/magasins-build-report.json" download style="color:inherit">rapport de build</a>.</p>
+      <h1 class="page-title">Magasins — 2e, 5e &amp; 6e étage</h1>
+      <p class="page-lead">Catalogue des exemplaires des magasins d'étage (adulte et jeunesse), extrait de l'export complet de la bibliothèque (bib.xml). Le 2e et le 5e étage ont des cotes numériques (numéro d'enregistrement), le 6e étage des cotes littérales ou Dewey (type « R FON », « 934.5 LUI ») — cf. <a href="data/magasins-build-report.json" download style="color:inherit">rapport de build</a>.</p>
     </div>
     <div class="hero-actions">
       <a href="admin.html">← Espace professionnel</a>
@@ -85,6 +85,17 @@
       <span>🔎</span>
       <input type="text" id="mg-search-input" placeholder="Rechercher un titre, un auteur, une cote, un code-barre…">
     </div>
+    <select class="mg-select" id="mg-etage-select">
+      <option value="">Tous les étages</option>
+      <option value="2e">2e étage</option>
+      <option value="5e">5e étage</option>
+      <option value="6e">6e étage</option>
+    </select>
+    <select class="mg-select" id="mg-secteur-select">
+      <option value="">Adulte + Jeunesse</option>
+      <option value="Adulte">Adulte</option>
+      <option value="Jeunesse">Jeunesse</option>
+    </select>
     <select class="mg-select" id="mg-perpage">
       <option value="25">25 / page</option>
       <option value="50" selected>50 / page</option>
@@ -99,15 +110,16 @@
       <thead>
         <tr>
           <th data-sort="cote">Cote<span class="arrow" data-arrow="cote"></span></th>
+          <th data-sort="etage">Étage<span class="arrow" data-arrow="etage"></span></th>
+          <th data-sort="secteur">Secteur<span class="arrow" data-arrow="secteur"></span></th>
           <th data-sort="titre">Titre<span class="arrow" data-arrow="titre"></span></th>
           <th data-sort="auteur">Auteur<span class="arrow" data-arrow="auteur"></span></th>
-          <th data-sort="editeur">Éditeur / Année<span class="arrow" data-arrow="editeur"></span></th>
-          <th data-sort="date">Entrée<span class="arrow" data-arrow="date"></span></th>
+          <th data-sort="editeur">Éditeur / Publié le<span class="arrow" data-arrow="editeur"></span></th>
           <th data-sort="barcode">Code-barre<span class="arrow" data-arrow="barcode"></span></th>
         </tr>
       </thead>
       <tbody id="mg-tbody">
-        <tr><td colspan="6" class="mg-empty">Chargement du catalogue…</td></tr>
+        <tr><td colspan="7" class="mg-empty">Chargement du catalogue…</td></tr>
       </tbody>
     </table>
   </div>
@@ -140,47 +152,60 @@ let sortDir = 1;       // 1 asc, -1 desc
 let page = 1;
 let perPage = 50;
 
+// Mêmes seuils que cotes-numeriques.html : chaque longueur de cote (5 ou 6
+// chiffres) a sa propre séquence d'enregistrement, donc son propre seuil de
+// bascule 2e/5e étage — réutilisés ici tels quels (même numérotation
+// Syracuse). Un exemplaire sans run numérique (_coteDigitRun absent) est du
+// 6e étage (cote littérale/Dewey — plus exclu depuis le passage à bib.xml,
+// voir build-magasins.mjs).
+const ETAGE_THRESHOLDS = { 5: 13830, 6: 133530 };
+function etageOf(coteNum, digitRunLength) {
+  if (!coteNum || !digitRunLength) return '6e';
+  const threshold = ETAGE_THRESHOLDS[digitRunLength];
+  if (!threshold) return '6e';
+  return coteNum <= threshold ? '2e' : '5e';
+}
+
 function normalize(rec) {
   const g = rec['930$g'] || '';
   const h = rec['930$h'] || '';
-  const cote = [g, h].filter(Boolean).join(' ');
-  const coteNum = parseInt(rec._coteDigitRun || '', 10) || 0;
+  const i = rec['930$i'] || '';
+  const cote = [g, h, i].filter(Boolean).join(' ');
+  const digitRun = rec._coteDigitRun || '';
+  const coteNum = parseInt(digitRun, 10) || 0;
+  const etage = etageOf(coteNum, digitRun.length);
+  const secteur = rec._secteur === 'Magasin Jeunesse' ? 'Jeunesse' : 'Adulte';
   const multi = s => (s || '').split('§').join(' / ');
   const titre = multi(rec['200$a']) || '(Sans titre)';
-  const sousTitre = multi(rec['200$e']);
-  const auteur = rec['700$a']
-    ? [multi(rec['700$a']), multi(rec['700$b'])].filter(Boolean).join(' ')
-    : multi(rec['200$f']);
+  const auteur = multi(rec['700$a']);
   const editeur = rec['210$c'] || '';
   const annee = rec['210$d'] || '';
-  const dateEntree = rec['920$d'] || '';
   const barcode = rec['915$b'] || '';
-  return { rec, cote, coteNum, titre, sousTitre, auteur, editeur, annee, dateEntree, barcode };
-}
-
-function dateEntreeSortKey(s) {
-  // format attendu JJ/MM/AAAA -> AAAAMMJJ pour un tri chronologique simple
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || '');
-  return m ? m[3] + m[2] + m[1] : '';
+  return { rec, cote, coteNum, etage, secteur, titre, auteur, editeur, annee, barcode };
 }
 
 const SORTERS = {
   cote:    (a, b) => (a.coteNum - b.coteNum) || a.cote.localeCompare(b.cote),
+  etage:   (a, b) => a.etage.localeCompare(b.etage) || (a.coteNum - b.coteNum),
+  secteur: (a, b) => a.secteur.localeCompare(b.secteur),
   titre:   (a, b) => a.titre.localeCompare(b.titre),
   auteur:  (a, b) => a.auteur.localeCompare(b.auteur),
   editeur: (a, b) => (a.editeur + a.annee).localeCompare(b.editeur + b.annee),
-  date:    (a, b) => dateEntreeSortKey(a.dateEntree).localeCompare(dateEntreeSortKey(b.dateEntree)),
   barcode: (a, b) => a.barcode.localeCompare(b.barcode),
 };
 
 function applySearch() {
   const q = (document.getElementById('mg-search-input').value || '').trim().toLowerCase();
-  if (!q) { FILTERED = ROWS; return; }
+  const etageFilter = document.getElementById('mg-etage-select').value;
+  const secteurFilter = document.getElementById('mg-secteur-select').value;
   FILTERED = ROWS.filter(r =>
-    r.titre.toLowerCase().includes(q) ||
-    r.auteur.toLowerCase().includes(q) ||
-    r.cote.toLowerCase().includes(q) ||
-    r.barcode.toLowerCase().includes(q)
+    (!etageFilter || r.etage === etageFilter) &&
+    (!secteurFilter || r.secteur === secteurFilter) &&
+    (!q ||
+      r.titre.toLowerCase().includes(q) ||
+      r.auteur.toLowerCase().includes(q) ||
+      r.cote.toLowerCase().includes(q) ||
+      r.barcode.toLowerCase().includes(q))
   );
 }
 
@@ -205,18 +230,18 @@ function render() {
 
   const tbody = document.getElementById('mg-tbody');
   if (!pageRows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="mg-empty">Aucun résultat.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="mg-empty">Aucun résultat.</td></tr>';
   } else {
     tbody.innerHTML = pageRows.map(r => `
       <tr>
         <td class="mg-cote">${esc(r.cote)}</td>
+        <td class="mg-meta">${esc(r.etage)} étage</td>
+        <td class="mg-meta">${esc(r.secteur)}</td>
         <td class="mg-titre">
           ${r.rec.lien_num ? `<a href="${esc(r.rec.lien_num)}" target="_blank" rel="noopener">${esc(r.titre)}</a>` : esc(r.titre)}
-          ${r.sousTitre ? `<div class="mg-meta">${esc(r.sousTitre)}</div>` : ''}
         </td>
         <td class="mg-auteur">${esc(r.auteur) || '—'}</td>
         <td class="mg-meta">${esc([r.editeur, r.annee].filter(Boolean).join(', ')) || '—'}</td>
-        <td class="mg-meta">${esc(r.dateEntree) || '—'}</td>
         <td class="mg-meta">${esc(r.barcode) || '—'}</td>
       </tr>
     `).join('');
@@ -258,6 +283,8 @@ function renderPagination(total, totalPages) {
 }
 
 document.getElementById('mg-search-input').addEventListener('input', () => { page = 1; render(); });
+document.getElementById('mg-etage-select').addEventListener('change', () => { page = 1; render(); });
+document.getElementById('mg-secteur-select').addEventListener('change', () => { page = 1; render(); });
 document.getElementById('mg-perpage').addEventListener('change', (e) => {
   perPage = parseInt(e.target.value, 10);
   page = 1;
@@ -271,34 +298,45 @@ document.querySelectorAll('.mg-table th[data-sort]').forEach(th => {
   });
 });
 
+let latestReport = null;
+let rowsLoaded = false;
+
+function renderStats() {
+  if (!rowsLoaded || !latestReport) return;
+  const s = latestReport.stats || {};
+  const date = latestReport.generatedAt ? new Date(latestReport.generatedAt).toLocaleString('fr-FR') : '—';
+  const etage2 = ROWS.filter(r => r.etage === '2e').length;
+  const etage5 = ROWS.filter(r => r.etage === '5e').length;
+  const etage6 = ROWS.filter(r => r.etage === '6e').length;
+  document.getElementById('mg-stats').innerHTML = `
+    <div class="mstat"><div class="mstat-lbl">Total magasins</div><div class="mstat-val">${(s.kept ?? '—').toLocaleString?.('fr-FR') ?? s.kept}</div></div>
+    <div class="mstat"><div class="mstat-lbl">2e étage</div><div class="mstat-val">${etage2.toLocaleString('fr-FR')}</div></div>
+    <div class="mstat"><div class="mstat-lbl">5e étage</div><div class="mstat-val">${etage5.toLocaleString('fr-FR')}</div></div>
+    <div class="mstat"><div class="mstat-lbl">6e étage</div><div class="mstat-val">${etage6.toLocaleString('fr-FR')}</div></div>
+    <div class="mstat"><div class="mstat-lbl">Dernier build</div><div class="mstat-val" style="font-size:.95rem">${date}</div></div>
+  `;
+}
+
 fetch('data/magasins.json')
   .then(res => res.json())
   .then(data => {
     ROWS = data.map(normalize);
     FILTERED = ROWS;
+    rowsLoaded = true;
     render();
+    renderStats();
   })
   .catch(err => {
     document.getElementById('mg-tbody').innerHTML =
-      '<tr><td colspan="6" class="mg-empty">Impossible de charger data/magasins.json — lancez `npm run build:magasins`.</td></tr>';
+      '<tr><td colspan="7" class="mg-empty">Impossible de charger data/magasins.json — lancez `npm run build:magasins`.</td></tr>';
     console.error(err);
   });
 
 fetch('data/magasins-build-report.json')
   .then(res => res.json())
-  .then(report => {
-    const s = report.stats || {};
-    const date = report.generatedAt ? new Date(report.generatedAt).toLocaleString('fr-FR') : '—';
-    document.getElementById('mg-stats').innerHTML = `
-      <div class="mstat"><div class="mstat-lbl">Gardés (2e/5e)</div><div class="mstat-val">${(s.kept ?? '—').toLocaleString?.('fr-FR') ?? s.kept}</div></div>
-      <div class="mstat"><div class="mstat-lbl">Exclus (6e étage)</div><div class="mstat-val">${(s.excluded ?? '—').toLocaleString?.('fr-FR') ?? s.excluded}</div></div>
-      <div class="mstat"><div class="mstat-lbl">Total exemplaires</div><div class="mstat-val">${(s.items ?? '—').toLocaleString?.('fr-FR') ?? s.items}</div></div>
-      <div class="mstat"><div class="mstat-lbl">Dernier build</div><div class="mstat-val" style="font-size:.95rem">${date}</div></div>
-    `;
-  })
-  .catch(() => {
-    document.getElementById('mg-stats').innerHTML = '<div class="mstat"><div class="mstat-lbl">Rapport indisponible</div></div>';
-  });
+  .then(report => { latestReport = report; })
+  .catch(() => { latestReport = { stats: {} }; })
+  .then(renderStats);
 </script>
 
 </body>

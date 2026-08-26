@@ -233,6 +233,15 @@
         </div>
       </div>
 
+      <div class="room-group">
+        <h2 class="room-group-title">Magasin — 6e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-magasin6"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="detail-panel" id="detail">
         <p class="placeholder-msg">Sélectionnez une travée, une armoire ou un tiroir pour afficher son contenu.</p>
       </div>
@@ -281,7 +290,7 @@ const TRAVEE_REF_MAXET=DEFAULT_MAX_ETAGE;
 function travTitle(tid){
   if(tid==='ARMOIRE') return 'Armoires (bois)';
   if(tid==='TIROIR') return 'Armoires à tiroirs';
-  return 'Travée '+tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'');
+  return 'Travée '+tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'').replace(/^M6-/,'');
 }
 function etageWordFor(tid){
   if(tid==='ARMOIRE') return 'niveau';
@@ -566,7 +575,7 @@ function allEtagesOf(tid,col){
 }
 
 /* ════════════ CONSTRUCTION DU PLAN ════════════ */
-function buildPlan(){ buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs(); buildMagasin2(); buildMagasin5(); updateStats(); }
+function buildPlan(){ buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs(); buildMagasin2(); buildMagasin5(); buildMagasin6(); updateStats(); }
 
 function buildTravees(){
   const room=document.getElementById('room-travees');
@@ -600,6 +609,14 @@ function buildMagasin5(){
   const room=document.getElementById('room-travees-magasin5');
   room.innerHTML='';
   TRAVEES_MAGASIN5.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
+function buildMagasin6(){
+  const room=document.getElementById('room-travees-magasin6');
+  room.innerHTML='';
+  TRAVEES_MAGASIN6.forEach(tDef=>{
     room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
   });
 }
@@ -665,7 +682,7 @@ function makeTraveeEl(tid,tDef,cols){
   });
   wrap.appendChild(box);
   const lbl=document.createElement('div');lbl.className='tv-label';
-  lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'');
+  lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'').replace(/^M6-/,'');
   wrap.appendChild(lbl);
   if(csvLoaded){
     const sub=document.createElement('div');sub.className='tv-sublabel';
@@ -716,10 +733,12 @@ function selectTravee(tid,tDef,cols){
   const douaisienne=tid.startsWith('RD-');
   const magasin2=tid.startsWith('M2-');
   const magasin5=tid.startsWith('M5-');
+  const magasin6=tid.startsWith('M6-');
   let html=`<div class="detail-panel-title">${travTitle(tid)}
     ${douaisienne?'<span class="detail-badge badge-amber">Réserve Douaisienne</span>':''}
     ${magasin2?'<span class="detail-badge badge-amber">Magasin — 2e étage</span>':''}
     ${magasin5?'<span class="detail-badge badge-amber">Magasin — 5e étage</span>':''}
+    ${magasin6?'<span class="detail-badge badge-amber">Magasin — 6e étage</span>':''}
     <span class="detail-badge badge-grey">${cols.length} col.</span>
     ${!known&&csvLoaded?'<span class="detail-badge badge-blue">non inventoriée</span>':''}
     ${total?`<span class="detail-badge badge-green">${total} notices</span>`:''}
@@ -902,7 +921,8 @@ document.getElementById('sq').addEventListener('input',function(){
     const douaisienne=t.id.startsWith('RD-');
     const magasin2=t.id.startsWith('M2-');
     const magasin5=t.id.startsWith('M5-');
-    const suffix=douaisienne?' — Réserve Douaisienne':(magasin2?' — Magasin 2e étage':(magasin5?' — Magasin 5e étage':''));
+    const magasin6=t.id.startsWith('M6-');
+    const suffix=douaisienne?' — Réserve Douaisienne':(magasin2?' — Magasin 2e étage':(magasin5?' — Magasin 5e étage':(magasin6?' — Magasin 6e étage':'')));
     hits.push({type:'travee',label:travTitle(t.id),sub:(hasData(t.id)?'':'non inventorié')+suffix,tid:t.id});
   });
 

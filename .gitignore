@@ -3,6 +3,4 @@ node_modules/
 .DS_Store
 *.log
 .env
-data/xml/magasin/
-data/xml/all/
-data/xml/desherbage/desherbage.xml
+data/xml/

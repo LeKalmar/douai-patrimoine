@@ -68,7 +68,7 @@
     <div>
       <div class="breadcrumb"><a href="admin.html">Espace professionnel</a> / Cotes numériques</div>
       <h1 class="page-title">Cotes numériques</h1>
-      <p class="page-lead">Exemplaires de l'export complet de la bibliothèque dont la cote est un numéro d'enregistrement à 5 ou 6 chiffres commençant par « 1 » (ex. « 11268 », « 138678 », parfois écrites avec un point séparateur de milliers). Les cotes Dewey classiques ne sont pas retenues — cf. <a href="data/cotes-numeriques-build-report.json" download style="color:inherit">rapport de build</a>.</p>
+      <p class="page-lead">Exemplaires de l'export complet de la bibliothèque (bib.xml, toutes bibliothèques et sections de Douai confondues) dont la cote est un numéro d'enregistrement à 5 ou 6 chiffres commençant par « 1 » (ex. « 11268 », « 138678 », parfois écrites avec un point séparateur de milliers). Les cotes Dewey classiques ne sont pas retenues. La colonne Bibliothèque/Section sert à repérer une cote numérique qui traînerait hors d'un magasin — cf. <a href="data/cotes-numeriques-build-report.json" download style="color:inherit">rapport de build</a>.</p>
     </div>
     <div class="hero-actions">
       <a href="admin.html">← Espace professionnel</a>
@@ -109,10 +109,10 @@
         <tr>
           <th data-sort="cote">Cote<span class="arrow" data-arrow="cote"></span></th>
           <th data-sort="etage">Étage<span class="arrow" data-arrow="etage"></span></th>
-          <th data-sort="dewey">Indice Dewey<span class="arrow" data-arrow="dewey"></span></th>
-          <th data-sort="type">Type<span class="arrow" data-arrow="type"></span></th>
-          <th data-sort="section">Section<span class="arrow" data-arrow="section"></span></th>
-          <th data-sort="date">Entrée<span class="arrow" data-arrow="date"></span></th>
+          <th data-sort="titre">Titre<span class="arrow" data-arrow="titre"></span></th>
+          <th data-sort="auteur">Auteur<span class="arrow" data-arrow="auteur"></span></th>
+          <th data-sort="bibsection">Bibliothèque · Section<span class="arrow" data-arrow="bibsection"></span></th>
+          <th data-sort="publie">Publié le<span class="arrow" data-arrow="publie"></span></th>
           <th data-sort="barcode">Code-barre<span class="arrow" data-arrow="barcode"></span></th>
         </tr>
       </thead>
@@ -165,32 +165,29 @@ function etageOf(coteNum, digitRunLength) {
 function normalize(rec) {
   const g = rec['930$g'] || '';
   const h = rec['930$h'] || '';
-  const cote = [g, h].filter(Boolean).join(' ');
+  const i = rec['930$i'] || '';
+  const cote = [g, h, i].filter(Boolean).join(' ');
   const digitRun = rec._coteDigitRun || '';
   const coteNum = parseInt(digitRun, 10) || 0;
   const etage = etageOf(coteNum, digitRun.length);
-  const dewey = rec['930$i'] || '';
-  const type = rec['920$t'] || '';
-  const section = rec['921$b'] || rec['920$r'] || '';
-  const dateEntree = rec['920$d'] || '';
+  const titre = rec['200$a'] || '';
+  const auteur = rec['700$a'] || '';
+  const bibliotheque = (rec._bibliotheque || '').replace(/^Douai\s*/, '');
+  const section = rec._section || '';
+  const bibsection = [bibliotheque, section].filter(Boolean).join(' · ');
+  const publie = rec['210$d'] || '';
   const barcode = rec['915$b'] || '';
-  return { rec, cote, coteNum, etage, dewey, type, section, dateEntree, barcode };
-}
-
-function dateEntreeSortKey(s) {
-  // format attendu JJ/MM/AAAA -> AAAAMMJJ pour un tri chronologique simple
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || '');
-  return m ? m[3] + m[2] + m[1] : '';
+  return { rec, cote, coteNum, etage, titre, auteur, bibliotheque, section, bibsection, publie, barcode };
 }
 
 const SORTERS = {
-  cote:    (a, b) => (a.coteNum - b.coteNum) || a.cote.localeCompare(b.cote),
-  etage:   (a, b) => a.etage.localeCompare(b.etage) || (a.coteNum - b.coteNum),
-  dewey:   (a, b) => a.dewey.localeCompare(b.dewey),
-  type:    (a, b) => a.type.localeCompare(b.type),
-  section: (a, b) => a.section.localeCompare(b.section),
-  date:    (a, b) => dateEntreeSortKey(a.dateEntree).localeCompare(dateEntreeSortKey(b.dateEntree)),
-  barcode: (a, b) => a.barcode.localeCompare(b.barcode),
+  cote:      (a, b) => (a.coteNum - b.coteNum) || a.cote.localeCompare(b.cote),
+  etage:     (a, b) => a.etage.localeCompare(b.etage) || (a.coteNum - b.coteNum),
+  titre:     (a, b) => a.titre.localeCompare(b.titre),
+  auteur:    (a, b) => a.auteur.localeCompare(b.auteur),
+  bibsection:(a, b) => a.bibsection.localeCompare(b.bibsection),
+  publie:    (a, b) => a.publie.localeCompare(b.publie),
+  barcode:   (a, b) => a.barcode.localeCompare(b.barcode),
 };
 
 function applySearch() {
@@ -198,7 +195,11 @@ function applySearch() {
   const etageFilter = document.getElementById('mg-etage-select').value;
   FILTERED = ROWS.filter(r =>
     (!etageFilter || r.etage === etageFilter) &&
-    (!q || r.cote.toLowerCase().includes(q) || r.barcode.toLowerCase().includes(q))
+    (!q ||
+      r.cote.toLowerCase().includes(q) ||
+      r.barcode.toLowerCase().includes(q) ||
+      r.titre.toLowerCase().includes(q) ||
+      r.auteur.toLowerCase().includes(q))
   );
 }
 
@@ -229,10 +230,10 @@ function render() {
       <tr>
         <td class="mg-cote">${esc(r.cote)}</td>
         <td class="mg-meta">${r.etage ? r.etage + ' étage' : '—'}</td>
-        <td class="mg-meta">${esc(r.dewey) || '—'}</td>
-        <td class="mg-meta">${esc(r.type) || '—'}</td>
-        <td class="mg-meta">${esc(r.section) || '—'}</td>
-        <td class="mg-meta">${esc(r.dateEntree) || '—'}</td>
+        <td>${esc(r.titre) || '—'}</td>
+        <td class="mg-meta">${esc(r.auteur) || '—'}</td>
+        <td class="mg-meta">${esc(r.bibsection) || '—'}</td>
+        <td class="mg-meta">${esc(r.publie) || '—'}</td>
         <td class="mg-barcode">${esc(r.barcode) || '—'}</td>
       </tr>
     `).join('');

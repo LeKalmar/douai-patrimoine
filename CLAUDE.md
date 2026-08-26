@@ -41,19 +41,30 @@ bas, section « Stockage partagé »).
   de Mo). `npm run test:r2` vérifie qu'un token R2 fonctionne (PUT/GET/DELETE
   sur une clé de test), sans toucher aux données réelles.
 - `npm run build:magasins` — régénère `data/magasins.json` et
-  `data/magasins-build-report.json` à partir d'un export Syracuse séparé
-  (magasins du 2e/5e étage), toujours récupéré depuis R2 (pas de repli
-  local committé, contrairement à `npm run build`). Voir « Magasins 2e/5e
-  étage » plus bas. Le parseur MARC-XML est partagé entre les deux scripts
-  de build via `scripts/lib/marc-xml.mjs`.
+  `data/magasins-build-report.json` à partir de l'export complet de la
+  bibliothèque `xml/bib.xml` (R2, pas de repli local committé), filtré aux
+  magasins d'étage (2e/5e/6e, adulte et jeunesse). Voir « Magasins 2e/5e/6e
+  étage » plus bas.
+- `npm run build:cotes-numeriques` — régénère `data/cotes-numeriques.json` et
+  son rapport, également depuis `xml/bib.xml` (toute la bibliothèque, pas
+  seulement les magasins). Voir « Cotes numériques » plus bas.
+- `npm run upload:bib` — pousse `data/xml/bib.xml` (export complet de la
+  bibliothèque, format GESMARC, plusieurs centaines de Mo) vers R2
+  (`xml/bib.xml`). À relancer après chaque nouvel export ; les deux scripts
+  ci-dessus le rapatrient alors automatiquement. Le parseur GESMARC est
+  partagé entre `build-magasins.mjs`, `build-cotes-numeriques.mjs` et
+  `build-desherbage.mjs` via `scripts/lib/gesmarc.mjs` (le parseur MARC-XML,
+  pour `data/xml/notices.xml`/`exemplaires.xml`, reste dans
+  `scripts/lib/marc-xml.mjs`) — `bib.xml` étant trop volumineux pour tenir
+  dans une seule string JS, ces deux scripts le lisent en flux
+  (`iterateGesmarcItemsFromFile()`) plutôt qu'avec un `readFileSync()`
+  classique.
 - `npm run build:desherbage` — régénère `data/desherbage.json` et
   `data/desherbage-build-report.json` à partir de l'export Syracuse
-  « statistiques de prêt » utilisé par Rotobib (`rotobib.html`), toujours
-  récupéré depuis R2 (comme les magasins). `npm run upload:desherbage` pousse
-  `data/xml/desherbage/desherbage.xml` vers R2 après chaque nouvelle
-  extraction. Voir « Rotobib » plus bas.
-- Avant d'écraser `data/build-report.json`, `data/magasins-build-report.json`
-  ou `data/desherbage-build-report.json`,
+  « statistiques de prêt » utilisé par Rotobib (`rotobib.html`), indépendant
+  de `bib.xml` (voir « Rotobib » plus bas).
+- Avant d'écraser `data/build-report.json`, `data/magasins-build-report.json`,
+  `data/cotes-numeriques-build-report.json` ou `data/desherbage-build-report.json`,
   chaque script archive la version précédente dans un fichier `-previous.json`
   du même nom (un seul niveau d'historique, écrasé au build suivant). Sert à
   afficher dans `admin.html` un delta de documents (« +N depuis l'export
@@ -74,8 +85,8 @@ bas, section « Stockage partagé »).
 | `recolement.html` | Outil de scan de codes-barres pour localiser les documents (travée/colonne/étage) dans la réserve. Partage `js/reserve-shared.js` avec `reserve.html` | **Protégé** |
 | `reserve.html` | Plan interactif de la réserve (travées/colonnes/armoires) avec taux d'occupation calculé depuis `data/recolement.json` | **Protégé** |
 | `analyse-cotes.html` | Détection des trous, doublons et disponibilités dans les cotes, à partir de `data/inventaire.json` | **Protégé** |
-| `magasins.html` | Catalogue des exemplaires du 2e/5e étage (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e étage » | **Protégé** |
-| `cotes-numeriques.html` | Repérage, dans un export complet et séparé de toute la bibliothèque, des exemplaires à cote numérique 5/6 chiffres (recherche, tri, export .txt des codes-barres pour ajout panier SIGB), à partir de `data/cotes-numeriques.json` — voir « Cotes numériques » | **Protégé** |
+| `magasins.html` | Catalogue des exemplaires des magasins 2e/5e/6e étage, adulte et jeunesse (recherche, tri, pagination), à partir de `data/magasins.json` — voir « Magasins 2e/5e/6e étage » | **Protégé** |
+| `cotes-numeriques.html` | Repérage, dans l'export complet de la bibliothèque, des exemplaires à cote numérique 5/6 chiffres (recherche, tri, export .txt des codes-barres pour ajout panier SIGB), à partir de `data/cotes-numeriques.json` — voir « Cotes numériques » | **Protégé** |
 | `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement, photo — tout en un seul formulaire) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
 | `reliures.html` | Création manuelle de groupes de documents reliés ensemble (équivalent $481/$482) et détection des groupes dont les emplacements récolés ne concordent pas — voir « Récolement en cascade des documents reliés » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
@@ -354,72 +365,110 @@ propres CSV (`csv/Professionnels.csv`, `Individus.csv`, `Documents.csv`,
 `Lieux.csv`, `Imprimeries.csv`, `periodiques.csv`, `auteurs.csv`) via
 `js/main.js` pour peupler la carte MapLibre.
 
-## Magasins 2e/5e étage (catalogue filtré)
+## Magasins 2e/5e/6e étage (catalogue filtré)
 
-`magasins.html` (2026-07-24) donne un catalogue navigable (recherche, tri,
-pagination) des collections des magasins du 2e et 5e étage, à partir d'un
-export Syracuse séparé de celui de la réserve (`xml/magasin/notices.xml.xml`
-et `xml/magasin/exemplaires.xml.xml` sur R2, récupérés par
+`magasins.html` donne un catalogue navigable (recherche, tri, pagination,
+filtres étage et secteur) des collections des magasins d'étage (2e, 5e et
+6e, adulte et jeunesse). Depuis 2026-08-26, la source est `xml/bib.xml` —
+l'export complet de la bibliothèque (R2, pas de repli local committé,
+fichier de plusieurs centaines de Mo), récupéré par
 `scripts/build-magasins.mjs` → `data/magasins.json` +
-`data/magasins-build-report.json`). Ce flux est indépendant de
+`data/magasins-build-report.json`. Ce flux est indépendant de
 `npm run build` / `data/inventaire.json` : lancez `npm run build:magasins`
-séparément après un nouvel export.
+séparément après un nouvel export + `npm run upload:bib`.
 
-Problème d'origine : cet export mélange dans les mêmes fichiers XML les
-ouvrages du 2e/5e étage **et** ceux du 6e étage — impossible à distinguer à
-l'export. `build-magasins.mjs` les sépare a posteriori à partir de la cote
-de l'exemplaire (`930$g`, éventuellement suivi de `930$h`) :
+Avant 2026-08-26, ce catalogue venait d'un export Syracuse dédié
+(`xml/magasin/notices.xml.xml` + `exemplaires.xml.xml`, MARC-XML classique)
+qui ne couvrait que le 2e/5e étage et excluait volontairement le 6e (motif
+historique : ces deux fichiers restent dans R2 et sont toujours utilisés
+par `build-desherbage.mjs`/Rotobib — voir plus bas — mais `build-magasins.mjs`
+ne les lit plus). `bib.xml` est un export "GESMARC" à plat (voir
+`scripts/lib/gesmarc.mjs`), pas du MARC-XML : chaque exemplaire porte
+directement `Titre`/`Auteur`/`Editeur`/`Publié le` (pas de jointure
+notice/exemplaire nécessaire), une `Bibliothèque (Libellé)` (le réseau
+Douai-Cuincy expose plusieurs bibliothèques dans le même export — on ne
+garde que celles dont le libellé commence par "Douai", ce qui exclut
+notamment "Médiathèque départementale") et une `Section (Libellé)`.
 
-- **2e/5e étage** (à garder) : cotes à numérotation séquentielle de 5 ou 6
+Filtre magasins (`build-magasins.mjs`) : `Section (Libellé)` vaut
+exactement `"Magasin"` (adulte, ~40 000 exemplaires sur l'export du
+2026-08-26) ou `"Magasin Jeunesse"` (~23 000) — les deux sont gardés et
+distingués via le champ `_secteur` (affiché "Adulte"/"Jeunesse" dans
+`magasins.html`). Contrairement à l'ancien export, **le 6e étage n'est
+plus exclu** : au sein de chacune de ces deux sections, 2e/5e étage (cotes
+numériques) et 6e étage (cotes littérales/Dewey) cohabitent toujours dans
+le même export, distingués a posteriori par la forme de la cote — seule la
+sémantique change (un marquage `_coteDigitRun` présent/absent plutôt qu'un
+filtre d'exclusion) :
+
+- **2e/5e étage** : cotes à numérotation séquentielle de 5 ou 6
   chiffres — `100350`, `156235` — parfois avec un zéro de tête
   (`0100011` → `100011`), parfois suivies d'un tiret et d'un complément de
   volume/tome (`104391-182 JOR` → le numéro reste `104391`), parfois
   écrites avec un point comme séparateur de milliers pour un nombre à 5
   chiffres (`12.352` = 12352).
-- **6e étage** (à exclure) : cotes purement littérales (`R FON`, `BD TSI`)
-  ou indices Dewey classiques à 3 chiffres avant le point (`940.21 BER`,
-  `330.122 KER` — le préfixe à 3 chiffres est justement ce qui les
-  distingue du séparateur de milliers ci-dessus : un vrai numéro
-  d'enregistrement à 5 chiffres n'a jamais 3 chiffres avant le point).
+- **6e étage** : cotes purement littérales (`R GRI`, `BD TSI`) ou indices
+  Dewey classiques à 3 chiffres avant le point (`940.21`, `330.122` — le
+  préfixe à 3 chiffres est justement ce qui les distingue du séparateur de
+  milliers ci-dessus : un vrai numéro d'enregistrement à 5 chiffres n'a
+  jamais 3 chiffres avant le point).
 
-Algorithme retenu (`magasinDigitRun()` dans `scripts/build-magasins.mjs`) :
-fusionner un éventuel point « 1-2 chiffres.3 chiffres » en un seul nombre,
-puis chercher un groupe de chiffres consécutifs de longueur 5 ou 6 (zéro de
-tête sur un groupe de 7 retiré avant de mesurer) n'importe où dans la cote.
-Un groupe trouvé → gardé (2e/5e étage) ; sinon → exclu (6e étage). Validé
-à la main sur les 38 236 exemplaires réels de l'export (2026-07-24) : 12 609
-gardés, 25 627 exclus — voir `data/magasins-build-report.json` pour les
-compteurs et des échantillons (`excludedSample`, `keptEdgeSample`) à relire
-en cas de doute après un nouvel export. Cette règle repose sur la forme
-observée de cet export précis ; si un futur export introduit un format de
-cote nouveau (nouveau préfixe lettré combiné à des chiffres, etc.), relire
-`keptEdgeSample`/`excludedSample` avant de faire confiance au tri.
+Particularité de `bib.xml` : la cote n'est pas portée par un seul champ
+(`930$g` en MARC-XML) mais éclatée sur 3 propriétés indépendantes — `"Cote
+n° 1"`, `"Cote n° 2"`, `"Cote n° 3"` (ex. `"166010"`/`""`/`""`, ou
+`"R"`/`"GRI"`/`""`, parfois même une classification Dewey secondaire dans
+le 3e champ à titre d'information, ex. `"166010"`/`"JAF"`/`"320.966"`).
+`build-magasins.mjs` les rejoint (espace comme séparateur) **avant**
+d'appliquer `magasinDigitRun()` (même algorithme qu'auparavant : fusionner
+un éventuel point « 1-2 chiffres.3 chiffres » en un seul nombre, puis
+chercher un groupe de chiffres consécutifs de longueur 5 ou 6 n'importe où
+dans la cote jointe) — vérifier les 3 champs plutôt qu'un seul est
+nécessaire pour ce nouvel export (demande explicite, 2026-08-26). Les
+champs de sortie `930$g`/`930$h`/`930$i` de `data/magasins.json`
+correspondent directement à `Cote n° 1/2/3`.
 
-`data/xml/magasin/` (fichiers bruts, 125 Mo + 37 Mo) est gitignored — pas de
-repli local committé pour ce jeu de données, contrairement à
-`data/xml/notices.xml`/`exemplaires.xml` de la réserve.
+`210$d` (année/date affichée dans la colonne "Éditeur / Publié le" de
+`magasins.html`) vient de la propriété `Publié le` de `bib.xml` — absente
+de l'export du 2026-08-26 (un nouvel export l'ajoutant était en cours au
+moment de cette migration), donc vide tant qu'un export la contenant n'a
+pas été rechargé via `npm run upload:bib` + `npm run build:magasins`. La
+colonne "Entrée" (date d'entrée) de l'ancien `magasins.html` a été retirée :
+`bib.xml` ne porte pas d'équivalent au `920$d` de l'ancien export MARC-XML.
+
+`data/xml/magasin/` et `data/xml/all/` (anciens exports, gitignorés comme
+tout `data/xml/`) ne sont plus lus par `build-magasins.mjs`/
+`build-cotes-numeriques.mjs` — `xml/magasin/notices.xml.xml` reste
+cependant utilisé par `build-desherbage.mjs` (Rotobib, voir plus bas), donc
+pas retiré de R2.
 
 ## Cotes numériques (repérage dans le catalogue complet)
 
 `cotes-numeriques.html` (2026-08-18) répond à un besoin de tri que le SIGB
-ne permet pas de faire assez finement : repérer, dans un export séparé de
-**toute** la bibliothèque, les exemplaires dont la cote est un numéro
-d'enregistrement séquentiel à 5 ou 6 chiffres, pour pouvoir exporter leurs
-codes-barres et les rajouter en panier dans le SIGB. Contrairement à
-`data/xml/notices.xml`/`exemplaires.xml` (réserve) et `xml/magasin/…`
-(magasins), cet export ne fournit **qu'un seul fichier** — `xml/all/catalogue.xml`
-sur R2, récupéré par `scripts/build-cotes-numeriques.mjs`
-(`npm run build:cotes-numeriques`) dans `data/xml/all/catalogue.xml` (pas de
-repli local committé, comme pour les magasins) — car l'export des notices
-plante tellement l'ensemble de la bibliothèque est volumineux. Ce fichier ne
-contient donc que des `<record>` d'exemplaires : pas de jointure
-notice/exemplaire ici, la cote (`930$g`/`930$h`) et le code-barre (`915$b`)
-sont lus directement sur chaque exemplaire, sans titre/auteur (absents de cet
-export). Sortie : `data/cotes-numeriques.json` + `data/cotes-numeriques-build-report.json`
+ne permet pas de faire assez finement : repérer, dans **toute** la
+bibliothèque, les exemplaires dont la cote est un numéro d'enregistrement
+séquentiel à 5 ou 6 chiffres, pour pouvoir exporter leurs codes-barres et
+les rajouter en panier dans le SIGB.
+
+Depuis 2026-08-26, la source est `xml/bib.xml` (export complet de la
+bibliothèque, format GESMARC — voir « Magasins 2e/5e/6e étage » ci-dessus
+pour le détail du format et `scripts/lib/gesmarc.mjs`), récupéré par
+`scripts/build-cotes-numeriques.mjs` (`npm run build:cotes-numeriques`)
+dans `data/xml/bib.xml` (pas de repli local committé). Seul le filtre
+`Bibliothèque (Libellé)` commençant par
+"Douai" est appliqué — **aucun filtre de section** : contrairement à
+`build-magasins.mjs`, ce script scanne bien toute la bibliothèque (pas
+seulement les magasins), pour repérer une éventuelle anomalie de classement
+(une cote numérique qui traînerait hors d'un magasin). Avant 2026-08-26, la
+source était `xml/all/catalogue.xml` (MARC-XML, exemplaires seuls, sans
+titre/auteur) — ce fichier reste dans R2 mais n'est plus lu par ce script.
+Sortie : `data/cotes-numeriques.json` + `data/cotes-numeriques-build-report.json`
 (même mécanique d'archivage `-previous.json` que les autres builds).
 
-Règle de détection (`numericLocDigitRun()` dans `build-cotes-numeriques.mjs`,
-volontairement **plus stricte** que `magasinDigitRun()` de
+Comme pour les magasins, la cote de `bib.xml` est éclatée sur 3 propriétés
+(`Cote n° 1/2/3`, → `930$g`/`930$h`/`930$i` dans la sortie) qui sont
+jointes (espace) avant toute analyse. Règle de détection
+(`numericLocDigitRun()` dans `build-cotes-numeriques.mjs`, appliquée à cette
+cote jointe, volontairement **plus stricte** que `magasinDigitRun()` de
 `build-magasins.mjs` — choix explicite fait pour ce jeu de données, pas un
 oubli) : après avoir fusionné un éventuel point « 1-2 chiffres.3 chiffres »
 (séparateur de milliers, ex. « 11.268 » → « 11268 », « 138.678 » →
@@ -430,35 +479,43 @@ cherche un groupe de chiffres consécutifs faisant EXACTEMENT 5 ou 6 chiffres
 retiré avant de mesurer, comme pour les magasins). Un groupe à 5 ou 6
 chiffres qui ne commence pas par « 1 » est délibérément écarté, même s'il
 pourrait s'agir d'un vrai numéro d'enregistrement — cf. `nearMissSample` du
-rapport de build pour les cotes concernées par ce cas, à relire si le
-périmètre semble trop restrictif après un premier export réel. Cette
-restriction supplémentaire (absente de la règle magasins) est une demande
-explicite, pas déduite de la forme de l'export — à ne pas assouplir sans
-revalider avec un nouvel export.
+rapport de build pour les cotes concernées par ce cas. Cette restriction
+supplémentaire (absente de la règle magasins) est une demande explicite,
+pas déduite de la forme de l'export — à ne pas assouplir sans revalider.
 
 Avant cette règle numérique, un test écarte les cotes de la **Réserve
 Douaisienne** : préfixe « D » (± un espace, casse indifférente — « D138678 »,
-« D 138678 », « d100784 ») juste devant le numéro. Sans ce test, ces cotes
-seraient gardées à tort : leur numéro (après le « D ») a la même forme 5/6
-chiffres commençant par « 1 » que les vraies cotes 2e/5e étage — vérifié à
-l'introduction de la règle (2026-08-18) sur l'export réel : 6 050 des 43 787
-exemplaires initialement gardés portaient ce préfixe. Compteur et échantillon
-dans le rapport de build (`stats.douaisienneExcluded`, `douaisienneSample`).
+« D 138678 », « d100784 ») juste devant le numéro (testé sur la cote jointe).
+Sans ce test, ces cotes seraient gardées à tort : leur numéro (après le
+« D ») a la même forme 5/6 chiffres commençant par « 1 » que les vraies
+cotes 2e/5e étage. Compteur et échantillon dans le rapport de build
+(`stats.douaisienneExcluded`, `douaisienneSample`).
 
 `cotes-numeriques.html` reprend le patron de `magasins.html` (recherche,
-tri par colonne, pagination) mais sans les colonnes titre/auteur/éditeur
-(pas de notice dans cet export) : cote, étage, indice Dewey (`930$i`), type
-(`920$t`), section (`921$b`), date d'entrée (`920$d`), code-barre. Trois
-boutons d'export en .txt (un code-barre par ligne, même convention que les
-exports des « Statistiques avancées » de `recolement.html`) : « Exporter
-(filtre actuel) » respecte la recherche texte et le menu déroulant d'étage ;
-« 2e étage » / « 5e étage » exportent directement l'étage correspondant
-(en respectant la recherche texte, mais **sans** dépendre du menu déroulant
-— pas besoin de le changer avant de cliquer). Cet outil est un pur
-repérage/tri, indépendant du récolement/de la réserve (pas d'écriture vers
-`/api/recolement`, pas de notion d'emplacement travée/colonne/étage) —
-volontairement laissé simple, sur demande explicite plutôt qu'une
-intégration au plan de la réserve.
+tri par colonne, pagination) : cote, étage, titre, auteur, « Bibliothèque ·
+Section » (les valeurs brutes `_bibliotheque`/`_section` de `bib.xml`,
+concaténées — sert justement à repérer une cote numérique détectée hors
+d'un magasin, ex. en section « Adulte » ou « Réserve » plutôt que
+« Magasin »), publié le (`Publié le` de `bib.xml`, vide tant qu'un export
+le portant n'a pas été chargé), code-barre. Contrairement à l'ancien export
+MARC-XML (exemplaires seuls, sans titre/auteur), `bib.xml` porte titre et
+auteur par exemplaire — plus besoin de s'en passer. Les colonnes indice
+Dewey/type/date d'entrée de l'ancienne version ont été retirées : `bib.xml`
+ne porte pas d'équivalent à `930$i`/`920$t`/`920$d` de l'ancien export.
+Trois boutons d'export en .txt (un code-barre par ligne, même convention
+que les exports des « Statistiques avancées » de `recolement.html`) :
+« Exporter (filtre actuel) » respecte la recherche texte et le menu
+déroulant d'étage ; « 2e étage » / « 5e étage » exportent directement
+l'étage correspondant (en respectant la recherche texte, mais **sans**
+dépendre du menu déroulant — pas besoin de le changer avant de cliquer).
+Cet outil est un pur repérage/tri, indépendant du récolement/de la réserve
+(pas d'écriture vers `/api/recolement`, pas de notion d'emplacement
+travée/colonne/étage) — volontairement laissé simple, sur demande explicite
+plutôt qu'une intégration au plan de la réserve. Contrairement à
+`magasins.html`, il n'y a pas de menu « 6e étage » ici : ce script ne garde
+que les cotes numériques 5/6 chiffres commençant par « 1 » (voir règle de
+détection ci-dessus), donc jamais de cote littérale/Dewey (6e étage) dans
+`data/cotes-numeriques.json`.
 
 Étage (2e/5e) : dérivé côté client uniquement (`etageOf()` dans
 `cotes-numeriques.html`, pas dans le script de build) à partir de
@@ -669,22 +726,23 @@ build:desherbage`) :
   prêt/réservation par année (`Nombre de prêts AN` = année en cours,
   `AN-1`, `AN-2`, `AN-3`) plus un total `Nombre de prêts cumulés` depuis
   l'acquisition. Aucune info notice (titre/auteur/date de parution) dans ce
-  fichier — uniquement l'exemplaire. Parsé par un petit parseur dédié
-  (`iterateGesmarcItems`/`parseGesmarcItem` dans build-desherbage.mjs,
-  regex sur `<property name="…" value="…">`), pas par `scripts/lib/marc-xml.mjs`
-  (réservé au vrai MARC-XML).
+  fichier — uniquement l'exemplaire. Parsé par le parseur GESMARC partagé
+  (`iterateGesmarcItems`/`parseGesmarcItem` dans `scripts/lib/gesmarc.mjs` —
+  aussi utilisé par `build-magasins.mjs`/`build-cotes-numeriques.mjs` pour
+  `bib.xml`, voir « Magasins 2e/5e/6e étage » ; regex sur `<property
+  name="…" value="…">`), pas par `scripts/lib/marc-xml.mjs` (réservé au vrai
+  MARC-XML).
 - Jointure : vérifié sur l'export du 2026-08-26 (6140 exemplaires) que
   100% des codes-barres de cet export se retrouvent dans
-  `xml/magasin/notices.xml.xml` (le même export notices que
-  `build-magasins.mjs`, voir « Magasins 2e/5e étage ») — le désherbage
-  porte sur des collections des magasins d'étage. `indexNotices()` (dans
-  `scripts/lib/marc-xml.mjs`, factorisée hors de `build-magasins.mjs` pour
-  que l'import de cette seule fonction ne déclenche pas tout le
-  `build-magasins.mjs`, qui exécute son `main()` au chargement du module)
-  sert à la fois à `build-magasins.mjs` et `build-desherbage.mjs`, chacun
-  avec sa propre whitelist de champs notice. Pas besoin de retélécharger
-  `xml/magasin/exemplaires.xml.xml` : les champs exemplaire utiles (cote,
-  section, état, statistiques) sont déjà dans `desherbage.xml` lui-même.
+  `xml/magasin/notices.xml.xml` — le désherbage porte sur des collections
+  des magasins d'étage. Ce fichier reste téléchargé spécifiquement par
+  `build-desherbage.mjs` pour cette jointure (via `indexNotices()` de
+  `scripts/lib/marc-xml.mjs`) même si `build-magasins.mjs` ne l'utilise
+  plus depuis son passage à `bib.xml` (2026-08-26, voir plus haut) — les
+  deux scripts sont désormais indépendants l'un de l'autre pour cette
+  entrée. Pas besoin de retélécharger `xml/magasin/exemplaires.xml.xml` :
+  les champs exemplaire utiles (cote, section, état, statistiques) sont
+  déjà dans `desherbage.xml` lui-même.
 - Champs de prêt/réservation vides dans l'export : Syracuse omet la valeur
   plutôt que d'écrire "0" pour les 4 compteurs annuels — vérifié que la
   somme des 4 années (vide = 0) ne dépasse jamais `Nombre de prêts
@@ -782,7 +840,7 @@ stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
 Bucket R2 `douai-patrimoine` (compte Cloudflare de l'utilisateur), utilisé
-pour trois choses indépendantes :
+pour plusieurs choses indépendantes :
 
 - **`xml/notices.xml`, `xml/exemplaires.xml`** : copie des exports Syracuse
   bruts, poussée par `npm run upload:xml` après chaque nouvel export. But :
@@ -791,6 +849,18 @@ pour trois choses indépendantes :
   `data/xml/` avant de builder si les variables R2 sont présentes ; sinon
   (dev local sans `.env`), comportement d'origine inchangé — lecture des
   fichiers locaux, échec strict s'ils manquent.
+- **`xml/bib.xml`** : export complet de la bibliothèque (format GESMARC,
+  plusieurs centaines de Mo), poussé par `npm run upload:bib`. Source de
+  `build-magasins.mjs` et `build-cotes-numeriques.mjs` (voir « Magasins
+  2e/5e/6e étage » et « Cotes numériques » plus haut) — trop volumineux
+  pour tenir dans une seule string JS (`r2Get(key, {raw:true})` renvoie un
+  Buffer plutôt qu'une string décodée, écrit tel quel sur disque ; les deux
+  scripts le relisent ensuite en flux via `iterateGesmarcItemsFromFile()`
+  dans `scripts/lib/gesmarc.mjs`). `xml/magasin/exemplaires.xml.xml` et
+  `xml/all/catalogue.xml` (anciennes sources de ces deux scripts avant
+  2026-08-26) restent dans R2 mais ne sont plus lus par aucun script —
+  `xml/magasin/notices.xml.xml` reste en revanche utilisé par
+  `build-desherbage.mjs` (Rotobib).
 - **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`,
   `reliures-manuelles.json`, `transferts-magasins.json`, `desherbage-traitements.json`** :
   état partagé canonique de `recolement.html` / `livres-spolies.html` /
@@ -837,7 +907,12 @@ Le client R2/S3 (`lib/r2.mjs`) signe les requêtes en SigV4 à la main avec
 cohérent avec le "zéro dépendance npm" du reste du projet (`r2Get`/`r2Put`/
 `r2Delete`/`r2CasUpdate`, plus `r2List` pour `ListObjectsV2` — seule requête
 signée du projet à porter une query string canonique SigV4 ; réponse XML
-S3 parsée à la main par regex, volontairement minimal). Variables
+S3 parsée à la main par regex, volontairement minimal). `r2Get(key,
+{raw:true})` renvoie le corps en `Buffer` plutôt qu'en string décodée
+UTF-8 — nécessaire pour `xml/bib.xml` (voir ci-dessus), dont la taille
+dépasse la limite de longueur d'une string V8 (~512 Mo) : un
+`.toString('utf8')` sur un buffer de cette taille lèverait
+`ERR_STRING_TOO_LONG`. Variables
 d'environnement requises (Vercel + `.env` local, jamais commitées,
 `.env` est dans `.gitignore`) : `R2_ACCOUNT_ID`, `R2_BUCKET`,
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, plus `ADMIN_USER`/`ADMIN_PASS`
@@ -861,22 +936,23 @@ après un import de fichier de sauvegarde (`mergeIncomingData(data,
 partagé R2 et pas seulement le navigateur local qui a fait l'import — voir
 l'incident 2026-07-24 ci-dessous.
 
-## Récolement des magasins d'étage (2e et 5e étage, 2026-08-18)
+## Récolement des magasins d'étage (2e/5e étage, 2026-08-18 ; 6e étage, 2026-08-26)
 
 En plus de la réserve patrimoniale et de la Réserve Douaisienne (toutes
 deux au 1er étage), `recolement.html` couvre désormais le **Magasin — 2e
-étage** et le **Magasin — 5e étage** : deux locaux physiques
-supplémentaires, sélectionnables dans le même menu déroulant que les deux
-premiers (`RESERVES` dans `js/reserve-shared.js`), mais dont les
-documents sont catalogués à part dans `data/magasins.json` (voir
-« Magasins 2e/5e étage » plus haut) plutôt que dans `data/inventaire.json`.
+étage**, le **Magasin — 5e étage** et le **Magasin — 6e étage** : trois
+locaux physiques supplémentaires, sélectionnables dans le même menu
+déroulant que les deux premiers (`RESERVES` dans `js/reserve-shared.js`),
+mais dont les documents sont catalogués à part dans `data/magasins.json`
+(voir « Magasins 2e/5e/6e étage » plus haut) plutôt que dans
+`data/inventaire.json`.
 
 Même mécanisme que pour la Réserve Douaisienne : aucune nouvelle
-infrastructure de stockage. Les deux magasins partagent la même clé R2
+infrastructure de stockage. Les trois magasins partagent la même clé R2
 `recolement.json`, le même localStorage, la même API `/api/recolement`,
 le même bouton de sauvegarde — la séparation entre les locaux ne vient
 que du **préfixe des identifiants de travée** (`RD-` pour Douaisienne,
-`M2-`/`M5-` pour les magasins, aucun préfixe pour la réserve
+`M2-`/`M5-`/`M6-` pour les magasins, aucun préfixe pour la réserve
 patrimoniale), qui garantit qu'un scan dans un local ne peut jamais
 entrer en collision avec un scan dans un autre. `TRAVEES_MAGASIN2`/
 `TRAVEES_MAGASIN5` (`js/reserve-shared.js`) portent la géométrie fournie
@@ -885,30 +961,41 @@ par l'équipe : 2e étage — travées `ALPHA` (14 colonnes), `BETA` (6),
 pour `XIX`, 5 pour `XX`) ; 5e étage — travée `I` (6 colonnes), `II` à `V`
 (5 chacune), `VI` à `XIX` (14 chacune), et une travée `ALPHA` à 1 seule
 colonne. Valeurs listées telles quelles, aucune règle générale
-sous-jacente. Chaque travée de ces deux magasins porte aussi `maxEt:6`
-(au lieu du `DEFAULT_MAX_ETAGE=8` de la réserve) : la quasi-totalité des
-travées des magasins d'étage font 6 étagères — une référence par défaut,
-pas un plafond dur (`maxEtageOf()` s'étend automatiquement au-delà dès
-que des données réelles ou une « dernière étagère » marquée dépassent
-cette valeur pour les travées qui font exception ; côté récolement, le
-stepper étage n'a de toute façon jamais de plafond pour une travée, voir
-plus loin). `displayTraveeId()` dans `recolement.html` (et `travTitle()`/
-le libellé de travée dans `reserve.html`) retirent ces préfixes `M2-`/
-`M5-` à l'affichage (même traitement que `RD-`), donc le stepper travée
-et le plan affichent « Alpha », « I », « XX »… sans le préfixe interne.
+sous-jacente. `TRAVEES_MAGASIN6` (2026-08-26) ne reprend **aucune**
+géométrie propre : le 6e étage partage le même plan que le 5e (confirmé
+par l'équipe), donc `TRAVEES_MAGASIN6 = TRAVEES_MAGASIN5.map(...)` avec le
+préfixe `M5-` remplacé par `M6-`, calculé une seule fois dans
+`js/reserve-shared.js` plutôt que redupliqué à la main. Chaque travée de
+ces trois magasins porte aussi `maxEt:6` (au lieu du `DEFAULT_MAX_ETAGE=8`
+de la réserve) : la quasi-totalité des travées des magasins d'étage font 6
+étagères — une référence par défaut, pas un plafond dur (`maxEtageOf()`
+s'étend automatiquement au-delà dès que des données réelles ou une
+« dernière étagère » marquée dépassent cette valeur pour les travées qui
+font exception ; côté récolement, le stepper étage n'a de toute façon
+jamais de plafond pour une travée, voir plus loin). `displayTraveeId()`
+dans `recolement.html` (et `travTitle()`/le libellé de travée dans
+`reserve.html`) retirent ces préfixes `M2-`/`M5-`/`M6-` à l'affichage
+(même traitement que `RD-`), donc le stepper travée et le plan affichent
+« Alpha », « I », « XX »… sans le préfixe interne.
 
 Reconnaissance de code-barre par un second catalogue : `RESERVES` porte
 maintenant un champ `catalogGroup` (`'reserve'` pour
-patrimoniale/douaisienne/horsreserve, `'magasin'` pour les magasins 2e et
-5e étage — même catalogue partagé entre les deux, puisque
+patrimoniale/douaisienne/horsreserve, `'magasin'` pour les magasins 2e,
+5e et 6e étage — même catalogue partagé entre les trois, puisque
 `data/magasins.json` n'est pas scindé par étage) et `catalogGroupOfReserve()`
 le résout. Dans `recolement.html`, deux catalogues sont construits en
 parallèle au chargement (`buildCatalogFromItems()`, factorisé à partir de
 l'ancien code de chargement unique) : `catalogByGroup.reserve` (comme
 avant : `data/inventaire.json` + exemplaires manuels + reliures) et
-`catalogByGroup.magasin` (`data/magasins.json`, fonds forcé à « Magasin
-2e/5e étage » plutôt que déduit du préfixe de cote — les cotes numériques
-ne correspondent à aucun préfixe de `FONDS_PREFIXES`). Les variables
+`catalogByGroup.magasin` (`data/magasins.json`). Depuis le passage à
+`bib.xml` (2026-08-26), le fonds affiché par exemplaire n'est plus un
+`fondsOverride` unique passé par `recolement.html` mais le champ
+`_fondsLabel` posé directement par `build-magasins.mjs` (ex. « Magasin —
+2e/5e étage (Adulte) », « Magasin — 6e étage (Jeunesse) ») —
+`buildCatalogFromItems()` le préfère (`it._fondsLabel || fondsOverride ||
+getFondsFromCote(cote)`), ce qui permet à un même catalogue partagé de
+distinguer étage et secteur exemplaire par exemplaire, sans avoir besoin
+de scinder `catalogByGroup.magasin` par étage. Les variables
 globales `catalog`/`catalogNoticeCount`, utilisées partout ailleurs dans
 le fichier (scan, cascade reliures, statistiques, listes avancées) sans
 aucune modification de leur code, sont de simples pointeurs réassignés
@@ -925,37 +1012,27 @@ les deux groupes. Seule la liste « codes-barres endommagés » reste
 volontairement globale (non scindée par groupe) : c'est une liste
 d'action à corriger, pas une comparaison catalogue.
 
-`reserve.html` (le plan visuel, renommé « Plan des Magasins » à cette
-occasion) a été étendu en parallèle pour visualiser ces deux nouveaux
-locaux — contrairement à ce qui avait été dit lors de l'introduction du
-magasin 2e étage (« reserve.html n'est pas modifié dans cette passe »),
-ce choix a été révisé sur demande explicite juste après. La page est
-réorganisée en groupes de sections (`.room-group`, titre `<h2>`, plus
-gros que les `.room-section-title` `<h3>` déjà existants) : **Réserve**
-regroupe les quatre sections déjà présentes (réserve patrimoniale,
-armoires, tiroirs, Réserve Douaisienne, inchangées) ; **Magasin — 2e
-étage** et **Magasin — 5e étage** sont deux nouveaux groupes, chacun avec
-sa propre section et son propre plan (`buildMagasin2()`/`buildMagasin5()`
-dans `reserve.html`, ajoutées à `buildPlan()` — même fonction
-`makeTraveeEl()` que pour la réserve, aucune duplication de logique de
-rendu). Le panneau de détail (`#detail`), les stats globales
-(`updateStats()`) et la recherche restent uniques et partagés entre tous
-les groupes (fonctionnent par identifiant de travée via `LOCATIONS_ALL`,
-indifférents à la section visuelle) — pas de scoping par groupe comme
-pour le catalogue de `recolement.html` : demande non faite, choix
-délibéré de rester simple. `selectTravee()` affiche un badge « Magasin —
-2e/5e étage » (même mécanique que le badge « Réserve Douaisienne »
-existant) et les résultats de recherche affichent un suffixe
-correspondant, pour lever l'ambiguïté entre une « Travée I » de la
-réserve patrimoniale, de la Réserve Douaisienne, du magasin 2e étage ou
-du magasin 5e étage (même chiffre romain réutilisé dans chaque local).
-
-`reserve.html` (le plan visuel) n'a **pas** été étendu au magasin 2e
-étage — il continue de dessiner uniquement `GROUPES` (travées I-XIX de la
-réserve patrimoniale, en dur) plus les sections Douaisienne/armoires/
-tiroirs codées séparément, indépendamment de `RESERVES`/`TRAVEES_ALL`.
-Étendre ces derniers ne casse rien côté `reserve.html` mais n'y ajoute
-pas non plus de visualisation du magasin — à faire séparément si demandé.
+`reserve.html` (le plan visuel, renommé « Plan des Magasins » à
+l'introduction des magasins 2e/5e étage) visualise ces locaux. La page est
+organisée en groupes de sections (`.room-group`, titre `<h2>`, plus gros
+que les `.room-section-title` `<h3>`) : **Réserve** regroupe les quatre
+sections déjà présentes (réserve patrimoniale, armoires, tiroirs, Réserve
+Douaisienne, inchangées) ; **Magasin — 2e étage**, **Magasin — 5e étage**
+et **Magasin — 6e étage** (ce dernier ajouté 2026-08-26) sont trois autres
+groupes, chacun avec sa propre section et son propre plan
+(`buildMagasin2()`/`buildMagasin5()`/`buildMagasin6()` dans `reserve.html`,
+ajoutées à `buildPlan()` — même fonction `makeTraveeEl()` que pour la
+réserve, aucune duplication de logique de rendu). Le panneau de détail
+(`#detail`), les stats globales (`updateStats()`) et la recherche restent
+uniques et partagés entre tous les groupes (fonctionnent par identifiant de
+travée via `LOCATIONS_ALL`, indifférents à la section visuelle) — pas de
+scoping par groupe comme pour le catalogue de `recolement.html` : demande
+non faite, choix délibéré de rester simple. `selectTravee()` affiche un
+badge « Magasin — 2e/5e/6e étage » selon le préfixe (même mécanique que le
+badge « Réserve Douaisienne » existant) et les résultats de recherche
+affichent un suffixe correspondant, pour lever l'ambiguïté entre une
+« Travée I » de la réserve patrimoniale, de la Réserve Douaisienne, ou de
+l'un des trois magasins (même chiffre romain réutilisé dans chaque local).
 
 Avant l'introduction du magasin 2e étage, un instantané de l'état R2
 `recolement.json` d'alors a été sauvegardé sous
@@ -966,13 +1043,13 @@ déclenché ici depuis un script Node ponctuel plutôt que depuis l'UI.
 Les « Statistiques avancées du récolement » (bas de `recolement.html`,
 2026-08-19) sont dupliquées en deux groupes indépendants — **Réserve**
 (patrimoniale, Douaisienne, armoires, tiroirs, hors-réserve) et
-**Magasins (2e/5e étage)** — plutôt qu'un seul panneau global mélangeant
+**Magasins (2e/5e/6e étage)** — plutôt qu'un seul panneau global mélangeant
 les deux : occupation des emplacements, stats de temps et les 3 listes à
 problèmes (codes-barres endommagés, non catalogués à cote manuelle,
 jamais scannés) sont donc calculées et affichées séparément pour chaque
 groupe. Le groupe d'un scan est déterminé par `traveeGroupOf(travee)`
 (même principe que `catalogGroupOfReserve()` côté catalogue) : toute
-travée préfixée `M2-`/`M5-` est « magasin », tout le reste est
+travée préfixée `M2-`/`M5-`/`M6-` est « magasin », tout le reste est
 « réserve ». Le HTML des deux groupes (barre d'occupation, stats-row de
 temps, 3 `<details>`) est généré une seule fois par
 `advGroupTemplate()`/`advDetailsTemplate()` à partir de `ADV_GROUPS` et

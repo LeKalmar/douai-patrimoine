@@ -554,10 +554,11 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFro
    là-bas, même sans emplacement renseigné, doit être reconnu ici comme
    "connu du catalogue" dès le premier scan, sinon handleScan() le
    traiterait comme inconnu et n'enregistrerait rien, voir status 'unknown'
-   plus bas), 'magasin' pour le(s) magasin(s) d'étage (data/magasins.json —
-   catalogue séparé du magasin 2e/5e étage, voir magasins.html ; partagé
-   entre le magasin 2e étage et un futur magasin 5e étage, ce catalogue
-   n'étant pas scindé par étage).
+   plus bas), 'magasin' pour les magasins d'étage (data/magasins.json,
+   construit depuis bib.xml — voir magasins.html et CLAUDE.md ; partagé
+   entre les magasins 2e/5e/6e étage, ce catalogue n'étant pas scindé par
+   étage — chaque exemplaire porte son propre `_fondsLabel` pour distinguer
+   étage/secteur à l'affichage).
    catalog/catalogNoticeCount restent les variables globales utilisées
    partout ailleurs dans ce fichier (handleScan, cascade reliures,
    updateStats, notScannedList, manualCoteList, updateAdvListsCount) : elles
@@ -570,11 +571,18 @@ function buildCatalogFromItems(items, fondsOverride){
   items.forEach(it=>{
     const bc = (it['915$b'] || it['995$f'] || '').trim();
     if(!bc) return;
-    const cote = (it['930$g']||'').trim();
+    // Jointe 930$g/h/i plutôt que $g seul : nécessaire pour les magasins
+    // (data/magasins.json, cote éclatée sur 3 propriétés bib.xml, voir
+    // build-magasins.mjs) — sans quoi "livres sans code-barre" ne verrait
+    // qu'un fragment de cote (ex. juste "R") pour ces exemplaires.
+    const cote = [it['930$g'], it['930$h'], it['930$i']].filter(Boolean).join(' ').trim();
     const noticeId = it._noticeId || null;
     cat[bc] = {
       cote, titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim(),
-      fonds: fondsOverride || getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId,
+      // _fondsLabel (posé par build-magasins.mjs, par exemplaire : étage +
+      // secteur adulte/jeunesse) prime sur un fondsOverride global — sinon
+      // repli sur getFondsFromCote() (réserve patrimoniale/Douaisienne).
+      fonds: it._fondsLabel || fondsOverride || getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId,
       // Vient d'exemplarisation.html (pas une vraie notice Syracuse) — voir
       // js/exemplaires-manuels-shared.js. Propagé jusque dans le scan pour
       // que reserve.html puisse le colorer différemment (orange) d'un
@@ -645,7 +653,9 @@ Promise.all([
 });
 
 fetch('data/magasins.json').then(r=>r.json()).then(data=>{
-  const built = buildCatalogFromItems(data, 'Magasin 2e/5e étage');
+  // Pas de fondsOverride : chaque exemplaire porte déjà son propre
+  // _fondsLabel (étage + secteur), posé par build-magasins.mjs.
+  const built = buildCatalogFromItems(data);
   catalogByGroup.magasin = built.catalog;
   catalogNoticeCountByGroup.magasin = built.noticeCount;
   catalogCoteIndexByGroup.magasin = buildCoteIndex(built.catalog);
@@ -667,7 +677,7 @@ fetch('data/magasins.json').then(r=>r.json()).then(data=>{
    le reste du script (scan, mini-plan, etc. jamais initialisés). */
 const ADV_GROUPS = [
   { id:'reserve', label:'Réserve' },
-  { id:'magasin', label:'Magasins (2e/5e étage)' },
+  { id:'magasin', label:'Magasins (2e/5e/6e étage)' },
 ];
 const ADV_CATS = {
   abime: {
@@ -870,7 +880,7 @@ function displayTraveeId(t){
   if(t==='HORS-RESERVE') return 'Non rangé (hors réserve)';
   if(t==='ARMOIRE') return 'Armoire (bois)';
   if(t==='TIROIR') return 'Armoire à tiroirs';
-  return (t||'').replace(/^RD-/, '').replace(/^M2-/, '').replace(/^M5-/, '');
+  return (t||'').replace(/^RD-/, '').replace(/^M2-/, '').replace(/^M5-/, '').replace(/^M6-/, '');
 }
 
 function locLabel(t){
@@ -1695,12 +1705,13 @@ function updateStats(){
 // — même dans le cas marginal où un emplacement a été scanné puis marqué
 // vide après coup (les scans n'y sont jamais effacés automatiquement).
 // Groupe d'un emplacement/scan à partir de sa travée : 'magasin' pour les
-// travées préfixées M2-/M5- (magasins 2e/5e étage), 'reserve' pour tout le
-// reste (patrimoniale, Douaisienne RD-, armoires, tiroirs, hors-réserve) —
-// voir catalogGroupOfReserve() dans js/reserve-shared.js pour l'équivalent
-// côté catalogue. Sert à scinder "Statistiques avancées" par groupe.
+// travées préfixées M2-/M5-/M6- (magasins 2e/5e/6e étage), 'reserve' pour
+// tout le reste (patrimoniale, Douaisienne RD-, armoires, tiroirs,
+// hors-réserve) — voir catalogGroupOfReserve() dans js/reserve-shared.js
+// pour l'équivalent côté catalogue. Sert à scinder "Statistiques avancées"
+// par groupe.
 function traveeGroupOf(travee){
-  return (travee && (travee.startsWith('M2-') || travee.startsWith('M5-'))) ? 'magasin' : 'reserve';
+  return (travee && (travee.startsWith('M2-') || travee.startsWith('M5-') || travee.startsWith('M6-'))) ? 'magasin' : 'reserve';
 }
 
 function computeShelfBreakdown(group){

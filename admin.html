@@ -122,7 +122,7 @@
     </div>
   </div>
 
-  <p class="admin-intro">Bienvenue ! Retrouvez ici les outils utilisés par l'équipe pour la réserve patrimoniale et les magasins 2e/5e étage.</p>
+  <p class="admin-intro">Bienvenue ! Retrouvez ici les outils utilisés par l'équipe pour la réserve patrimoniale et les magasins 2e/5e/6e étage.</p>
 
   <section class="admin-section">
     <div class="admin-section-head">
@@ -203,15 +203,15 @@
 
   <section class="admin-section">
     <div class="admin-section-head">
-      <h2>Magasins 2e/5e étage</h2>
-      <p>Le catalogue, séparé de la réserve patrimoniale, des collections conservées aux 2e et 5e étages.</p>
+      <h2>Magasins 2e/5e/6e étage</h2>
+      <p>Le catalogue, séparé de la réserve patrimoniale, des collections conservées aux 2e, 5e et 6e étages (adulte et jeunesse), extrait de l'export complet de la bibliothèque.</p>
     </div>
     <div class="admin-tools-grid">
       <a href="magasins.html" class="admin-tool-card">
         <span class="admin-tool-icon">📚</span>
         <span>
           <h3>Catalogue des magasins</h3>
-          <p>Recherchez, triez et parcourez les exemplaires du 2e et 5e étage (les cotes du 6e étage sont automatiquement écartées).</p>
+          <p>Recherchez, triez et parcourez les exemplaires des magasins 2e, 5e et 6e étage (adulte et jeunesse).</p>
         </span>
       </a>
       <a href="transfert-magasins.html" class="admin-tool-card">
@@ -329,19 +329,19 @@
     html += '<div class="admin-stats-grid">';
     html += branchCard('Réserve patrimoniale', patrimoniale, patrimonialePrev);
     html += branchCard('Réserve Douaisienne', douaisienne, douaisiennePrev);
-    html += branchCard('Magasins 2e/5e étage', magasins, magasinsPrev);
+    html += branchCard('Magasins 2e/5e/6e étage', magasins, magasinsPrev);
     html += '</div>';
 
     html += '<div class="admin-export-dates">';
     html += exportCard('Réserve (patrimoniale + Douaisienne)', current, previous);
-    html += exportCard('Magasins 2e/5e étage', magCurrent, magPrevious);
+    html += exportCard('Magasins 2e/5e/6e étage', magCurrent, magPrevious);
     html += '</div>';
 
-    if (s.joinRate != null || ms.excluded != null) {
+    if (s.joinRate != null || (ms.byEtage && ms.byEtage['6e'] != null)) {
       html += '<p class="admin-tech-note">Détails techniques : ' +
         (s.joinRate != null ? 'taux de jointure réserve ' + s.joinRate + '% (' + (s.orphans || 0) + ' orphelins)' : '') +
-        (s.joinRate != null && ms.excluded != null ? ' — ' : '') +
-        (ms.excluded != null ? ms.excluded + ' exemplaires du 6e étage écartés des magasins' : '') +
+        (s.joinRate != null && ms.byEtage ? ' — ' : '') +
+        (ms.byEtage ? 'magasins : ' + (ms.byEtage['2e/5e'] || 0) + ' au 2e/5e étage, ' + (ms.byEtage['6e'] || 0) + ' au 6e étage' : '') +
         '.</p>';
     }
 
