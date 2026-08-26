@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Statistiques de prêt — Désherbage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  :root{ --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .breadcrumb a{color:rgba(255,255,255,0.7);text-decoration:none}
+  .breadcrumb a:hover{color:#fff}
+  .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
+  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
+  .section{padding:1.5rem 0 3rem}
+
+  .ex-note{font-size:.8rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
+  .ex-note strong{color:#665c00}
+
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem}
+  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+  .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#12157A}
+  .stat-card-sub{font-size:.72rem;color:#999;margin-top:.2rem}
+
+  .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.25rem;margin-bottom:1.75rem}
+  .chart-card{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem}
+  .chart-card h2{font-family:'DM Serif Display',serif;font-weight:400;font-size:1.05rem;margin:0 0 .2rem;color:#12157A}
+  .chart-card .chart-note{font-size:.76rem;color:#999;margin:0 0 1.1rem}
+
+  .bar-chart{display:flex;align-items:flex-end;gap:.4rem;height:170px;padding:0 .25rem;position:relative}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:default}
+  .bar-val{font-size:.78rem;font-weight:600;color:#12157A;margin-bottom:.3rem;font-variant-numeric:tabular-nums}
+  .bar{width:24px;max-width:24px;background:#12157A;border-radius:4px 4px 0 0;min-height:2px;transition:height .2s,background .15s}
+  .bar-col:hover .bar,.bar-col:focus-visible .bar{background:#1c1fa0}
+  .bar-col:focus-visible{outline:2px solid #12157A;outline-offset:3px;border-radius:4px}
+  .bar-label{font-size:.72rem;color:#888;margin-top:.5rem;text-align:center;line-height:1.3}
+
+  .chart-tooltip{position:fixed;pointer-events:none;background:#1a1a2e;color:#fff;font-size:.75rem;padding:.4rem .6rem;border-radius:6px;z-index:1000;display:none;box-shadow:0 4px 16px rgba(0,0,0,.25);white-space:nowrap}
+  .chart-tooltip .tt-val{font-weight:700}
+
+  .st-toolbar{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;padding:.85rem 1rem;background:#fafafa;border:1px solid #e8e8f0;border-radius:8px}
+  .st-search{display:flex;align-items:center;gap:.4rem;background:#fff;border:1px solid #ddd;border-radius:6px;padding:.4rem .7rem;flex:1;min-width:220px}
+  .st-search input{border:none;outline:none;font-size:.85rem;background:transparent;width:100%;font-family:inherit;color:#333}
+  .st-select{font-family:inherit;font-size:.8rem;border:1px solid #ddd;border-radius:6px;padding:.4rem .6rem;background:#fff;color:#555;cursor:pointer}
+  .st-count{font-size:.78rem;color:#888;white-space:nowrap}
+
+  .st-table-wrap{border:1px solid #e8e8f0;border-radius:8px;overflow:hidden;overflow-x:auto}
+  table.st-table{width:100%;border-collapse:collapse;font-size:.82rem}
+  .st-table th{position:sticky;top:0;background:#F5F5FF;padding:.5rem .7rem;text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#888;border-bottom:1px solid #e8e8f0;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+  .st-table th:hover{color:#12157A}
+  .st-table th.num{text-align:right}
+  .st-table th .arrow{font-size:.65rem;margin-left:.2rem;color:#c9a96e}
+  .st-table td{padding:.45rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:top;font-variant-numeric:tabular-nums}
+  .st-table td.num{text-align:right}
+  .st-table tr:last-child td{border-bottom:none}
+  .st-table tr:hover td{background:#fafafa}
+  .st-cote{font-family:monospace;font-weight:600;color:#12157A;white-space:nowrap}
+  .st-titre{max-width:320px}
+  .st-meta{color:#999;font-size:.76rem;white-space:nowrap}
+  .st-empty{padding:2rem;text-align:center;color:#bbb;font-size:.85rem;font-style:italic}
+  .st-cumul-hi{font-weight:700;color:#12157A}
+
+  .st-pagination{display:flex;align-items:center;justify-content:space-between;padding:.55rem .75rem;border-top:1px solid #e8e8f0;background:#fafafa;flex-wrap:wrap;gap:.5rem}
+  .pag-info{font-size:.72rem;color:#888}
+  .pag-controls{display:flex;align-items:center;gap:.25rem}
+  .pag-btn{font-family:inherit;font-size:.72rem;padding:.2rem .55rem;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;color:#555;transition:all .12s;min-width:28px;text-align:center;line-height:1.4}
+  .pag-btn:hover:not(:disabled){background:#e8e8f0;border-color:#aaa}
+  .pag-btn:disabled{opacity:.35;cursor:default}
+  .pag-btn.active{background:#12157A;color:#fff;border-color:#12157A;font-weight:600}
+  .pag-ellipsis{font-size:.72rem;color:#bbb;padding:0 .15rem}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+</style>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb"><a href="admin.html">Espace professionnel</a> · Magasins 2e/5e étage</nav>
+      <h1 class="page-title">Statistiques de prêt</h1>
+      <p class="page-lead">Vue d'ensemble, purement statistique, de l'export de désherbage : volumes de prêts par année, répartition des exemplaires selon leur usage, et liste triable pour repérer par exemple le livre le plus emprunté de la sélection.</p>
+    </div>
+    <div class="hero-actions">
+      <a href="rotobib.html">♻️ Rotobib</a>
+      <a href="admin.html">← Espace professionnel</a>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <p class="ex-note">
+        <strong>À propos :</strong> ces chiffres portent sur l'export de désherbage
+        (<code>data/desherbage.json</code>, voir <a href="rotobib.html">Rotobib</a>) — les mêmes exemplaires des
+        magasins 2e/5e étage, avec leurs statistiques de prêt par année. Purement consultatif : aucune donnée n'est
+        modifiée ici, pour choisir un traitement (conserver/pilon/braderie/relocalisation) direction Rotobib.
+      </p>
+
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="stat-card-label">Chargement…</div></div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <h2>Prêts totaux par année</h2>
+          <p class="chart-note">Somme des prêts de tous les exemplaires de l'export, sur chacune des 4 dernières années.</p>
+          <div class="bar-chart" id="bar-years"></div>
+        </div>
+        <div class="chart-card">
+          <h2>Répartition par prêts cumulés</h2>
+          <p class="chart-note">Nombre d'exemplaires selon leur total de prêts depuis l'acquisition (toutes années confondues).</p>
+          <div class="bar-chart" id="bar-buckets"></div>
+        </div>
+      </div>
+
+      <div class="st-toolbar">
+        <div class="st-search">
+          <span>🔎</span>
+          <input type="text" id="st-search-input" placeholder="Rechercher un titre, un auteur, une cote, un code-barre…">
+        </div>
+        <select class="st-select" id="st-perpage">
+          <option value="25">25 / page</option>
+          <option value="50" selected>50 / page</option>
+          <option value="100">100 / page</option>
+          <option value="200">200 / page</option>
+        </select>
+        <span class="st-count" id="st-count"></span>
+      </div>
+
+      <div class="st-table-wrap">
+        <table class="st-table">
+          <thead>
+            <tr>
+              <th data-sort="titre">Titre<span class="arrow" data-arrow="titre"></span></th>
+              <th data-sort="auteur">Auteur<span class="arrow" data-arrow="auteur"></span></th>
+              <th data-sort="cote">Cote<span class="arrow" data-arrow="cote"></span></th>
+              <th class="num" data-sort="an3">AN-3<span class="arrow" data-arrow="an3"></span></th>
+              <th class="num" data-sort="an2">AN-2<span class="arrow" data-arrow="an2"></span></th>
+              <th class="num" data-sort="an1">AN-1<span class="arrow" data-arrow="an1"></span></th>
+              <th class="num" data-sort="an">AN<span class="arrow" data-arrow="an"></span></th>
+              <th class="num" data-sort="cumules">Cumulés<span class="arrow" data-arrow="cumules"></span></th>
+              <th class="num" data-sort="resaCumulees">Résa. cumul.<span class="arrow" data-arrow="resaCumulees"></span></th>
+              <th data-sort="barcode">Code-barre<span class="arrow" data-arrow="barcode"></span></th>
+            </tr>
+          </thead>
+          <tbody id="st-tbody">
+            <tr><td colspan="10" class="st-empty">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="st-pagination">
+        <span class="pag-info" id="pag-info"></span>
+        <div class="pag-controls" id="pag-controls"></div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div class="chart-tooltip" id="chart-tooltip"></div>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmt(n){ return (n||0).toLocaleString('fr-FR'); }
+
+/* ════════════════════════════════════════════════════════════
+   TOOLTIP (survol + focus clavier des barres)
+   ════════════════════════════════════════════════════════════ */
+const tooltip = document.getElementById('chart-tooltip');
+function showTooltip(el, html){
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  const r = el.getBoundingClientRect();
+  tooltip.style.left = Math.round(r.left + r.width/2 - tooltip.offsetWidth/2) + 'px';
+  tooltip.style.top = Math.round(r.top - tooltip.offsetHeight - 8) + 'px';
+}
+function hideTooltip(){ tooltip.style.display = 'none'; }
+
+function renderBarChart(containerId, items){
+  // items: [{label, value, tooltip}]
+  const max = Math.max(1, ...items.map(i => i.value));
+  const el = document.getElementById(containerId);
+  el.innerHTML = items.map((it, i) => `
+    <div class="bar-col" tabindex="0" data-i="${i}">
+      <div class="bar-val">${fmt(it.value)}</div>
+      <div class="bar" style="height:${Math.max(2, (it.value/max)*100)}%"></div>
+      <div class="bar-label">${esc(it.label)}</div>
+    </div>
+  `).join('');
+  el.querySelectorAll('.bar-col').forEach(col => {
+    const it = items[+col.dataset.i];
+    const show = () => showTooltip(col, it.tooltip);
+    col.addEventListener('mouseenter', show);
+    col.addEventListener('focus', show);
+    col.addEventListener('mouseleave', hideTooltip);
+    col.addEventListener('blur', hideTooltip);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   CHARGEMENT + AGRÉGATS
+   ════════════════════════════════════════════════════════════ */
+let ROWS = [];
+let FILTERED = [];
+let sortKey = 'cumules';
+let sortDir = -1; // le plus emprunté en premier par défaut
+let page = 1;
+let perPage = 50;
+
+function normalize(rec){
+  const noms = (rec['700$a']||'').split('§').map(s=>s.trim()).filter(Boolean);
+  const prenoms = (rec['700$b']||'').split('§').map(s=>s.trim());
+  const auteur = noms.length
+    ? noms.map((n,i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ')
+    : (rec.auteurDesherbage || '');
+  const titre = rec['200$a'] || rec.titreDesherbage || '(titre inconnu)';
+  const p = rec.prets || { an3:0, an2:0, an1:0, an:0, cumules:0 };
+  const r = rec.reservations || {};
+  return {
+    rec, titre, auteur,
+    cote: rec.coteAffichee || '',
+    barcode: rec._barcode || '',
+    an3: p.an3||0, an2: p.an2||0, an1: p.an1||0, an: p.an||0, cumules: p.cumules||0,
+    resaCumulees: r.cumulees||0,
+  };
+}
+
+const SORTERS = {
+  titre:   (a,b) => a.titre.localeCompare(b.titre),
+  auteur:  (a,b) => a.auteur.localeCompare(b.auteur),
+  cote:    (a,b) => a.cote.localeCompare(b.cote),
+  an3:     (a,b) => a.an3 - b.an3,
+  an2:     (a,b) => a.an2 - b.an2,
+  an1:     (a,b) => a.an1 - b.an1,
+  an:      (a,b) => a.an - b.an,
+  cumules: (a,b) => a.cumules - b.cumules,
+  resaCumulees: (a,b) => a.resaCumulees - b.resaCumulees,
+  barcode: (a,b) => a.barcode.localeCompare(b.barcode),
+};
+
+function applySearch(){
+  const q = (document.getElementById('st-search-input').value || '').trim().toLowerCase();
+  if(!q){ FILTERED = ROWS; return; }
+  FILTERED = ROWS.filter(r =>
+    r.titre.toLowerCase().includes(q) ||
+    r.auteur.toLowerCase().includes(q) ||
+    r.cote.toLowerCase().includes(q) ||
+    r.barcode.toLowerCase().includes(q)
+  );
+}
+function applySort(){
+  const fn = SORTERS[sortKey] || SORTERS.cumules;
+  FILTERED = FILTERED.slice().sort((a,b) => sortDir * fn(a,b));
+}
+
+function render(){
+  applySearch();
+  applySort();
+
+  const total = FILTERED.length;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  if(page > totalPages) page = totalPages;
+  const start = (page-1) * perPage;
+  const pageRows = FILTERED.slice(start, start + perPage);
+
+  document.getElementById('st-count').textContent =
+    fmt(total) + ' exemplaire' + (total>1?'s':'') +
+    (total !== ROWS.length ? ' (sur ' + fmt(ROWS.length) + ')' : '');
+
+  const tbody = document.getElementById('st-tbody');
+  if(!pageRows.length){
+    tbody.innerHTML = '<tr><td colspan="10" class="st-empty">Aucun résultat.</td></tr>';
+  } else {
+    tbody.innerHTML = pageRows.map(r => `
+      <tr>
+        <td class="st-titre">${esc(r.titre)}</td>
+        <td>${esc(r.auteur) || '—'}</td>
+        <td class="st-cote">${esc(r.cote) || '—'}</td>
+        <td class="num st-meta">${fmt(r.an3)}</td>
+        <td class="num st-meta">${fmt(r.an2)}</td>
+        <td class="num st-meta">${fmt(r.an1)}</td>
+        <td class="num st-meta">${fmt(r.an)}</td>
+        <td class="num st-cumul-hi">${fmt(r.cumules)}</td>
+        <td class="num st-meta">${fmt(r.resaCumulees)}</td>
+        <td class="st-meta">${esc(r.barcode) || '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  renderPagination(total, totalPages);
+  document.querySelectorAll('.st-table th .arrow').forEach(elm => {
+    const key = elm.dataset.arrow;
+    elm.textContent = key === sortKey ? (sortDir === 1 ? '▲' : '▼') : '';
+  });
+}
+
+function renderPagination(total, totalPages){
+  document.getElementById('pag-info').textContent = total ? `Page ${page} / ${totalPages}` : '';
+  const controls = document.getElementById('pag-controls');
+  const btn = (label, target, disabled, active) =>
+    `<button class="pag-btn${active?' active':''}" data-page="${target}" ${disabled?'disabled':''}>${label}</button>`;
+  let html = btn('«', 1, page===1, false) + btn('‹', page-1, page===1, false);
+  const windowSize = 2;
+  for(let p=1; p<=totalPages; p++){
+    if(p===1 || p===totalPages || Math.abs(p-page)<=windowSize) html += btn(String(p), p, false, p===page);
+    else if(Math.abs(p-page)===windowSize+1) html += '<span class="pag-ellipsis">…</span>';
+  }
+  html += btn('›', page+1, page===totalPages, false) + btn('»', totalPages, page===totalPages, false);
+  controls.innerHTML = html;
+  controls.querySelectorAll('.pag-btn').forEach(b => {
+    b.addEventListener('click', () => { page = parseInt(b.dataset.page,10); render(); });
+  });
+}
+
+document.getElementById('st-search-input').addEventListener('input', () => { page=1; render(); });
+document.getElementById('st-perpage').addEventListener('change', e => { perPage = parseInt(e.target.value,10); page=1; render(); });
+document.querySelectorAll('.st-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if(sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = -1; }
+    render();
+  });
+});
+
+function buildCharts(rows, referenceYear){
+  const years = [referenceYear-3, referenceYear-2, referenceYear-1, referenceYear];
+  const keys = ['an3','an2','an1','an'];
+  const totalPerYear = keys.map(k => rows.reduce((s,r) => s + r[k], 0));
+  const grandTotal = totalPerYear.reduce((a,b)=>a+b, 0) || 1;
+  renderBarChart('bar-years', years.map((y,i) => ({
+    label: String(y),
+    value: totalPerYear[i],
+    tooltip: `<span class="tt-val">${fmt(totalPerYear[i])}</span> prêt${totalPerYear[i]>1?'s':''} en ${y} (${Math.round(100*totalPerYear[i]/grandTotal)}% des 4 années)`,
+  })));
+
+  const buckets = [
+    { label:'0', test: v => v===0 },
+    { label:'1', test: v => v===1 },
+    { label:'2', test: v => v===2 },
+    { label:'3', test: v => v===3 },
+    { label:'4', test: v => v===4 },
+    { label:'5–9', test: v => v>=5 && v<=9 },
+    { label:'10+', test: v => v>=10 },
+  ];
+  const bucketCounts = buckets.map(b => rows.filter(r => b.test(r.cumules)).length);
+  renderBarChart('bar-buckets', buckets.map((b,i) => ({
+    label: b.label,
+    value: bucketCounts[i],
+    tooltip: `<span class="tt-val">${fmt(bucketCounts[i])}</span> exemplaire${bucketCounts[i]>1?'s':''} à ${b.label} prêt${b.label!=='0'?'s':''} cumulé${b.label!=='0'?'s':''} (${Math.round(100*bucketCounts[i]/rows.length)}%)`,
+  })));
+}
+
+function buildStats(rows){
+  const totalRecent = rows.reduce((s,r) => s + r.an3+r.an2+r.an1+r.an, 0);
+  const totalCumules = rows.reduce((s,r) => s + r.cumules, 0);
+  const jamaisEmprunte = rows.filter(r => r.cumules === 0).length;
+  const top = rows.reduce((best,r) => (!best || r.cumules > best.cumules) ? r : best, null);
+  const moyenne = rows.length ? (totalRecent / rows.length) : 0;
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">Exemplaires (export)</div><div class="stat-card-val">${fmt(rows.length)}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Jamais emprunté</div><div class="stat-card-val">${fmt(jamaisEmprunte)}</div><div class="stat-card-sub">${rows.length ? Math.round(100*jamaisEmprunte/rows.length) : 0}% de l'export</div></div>
+    <div class="stat-card"><div class="stat-card-label">Prêts (4 dernières années)</div><div class="stat-card-val">${fmt(totalRecent)}</div><div class="stat-card-sub">moyenne ${moyenne.toFixed(2)} / exemplaire</div></div>
+    <div class="stat-card"><div class="stat-card-label">Prêts cumulés (total)</div><div class="stat-card-val">${fmt(totalCumules)}</div><div class="stat-card-sub">depuis l'acquisition</div></div>
+    <div class="stat-card"><div class="stat-card-label">Le plus emprunté</div><div class="stat-card-val">${top ? fmt(top.cumules) : '—'}</div><div class="stat-card-sub">${top ? esc(top.titre) : ''}</div></div>
+  `;
+}
+
+Promise.all([
+  fetch('data/desherbage.json').then(r => r.ok ? r.json() : []),
+  fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : {}),
+]).then(([data, report]) => {
+  ROWS = data.map(normalize);
+  FILTERED = ROWS;
+  const referenceYear = (report && report.stats && report.stats.referenceYear) || new Date().getFullYear();
+  buildStats(ROWS);
+  buildCharts(ROWS, referenceYear);
+  render();
+}).catch(err => {
+  document.getElementById('st-tbody').innerHTML =
+    '<tr><td colspan="10" class="st-empty">Impossible de charger data/desherbage.json — lancez `npm run build:desherbage`.</td></tr>';
+  document.getElementById('stats-row').innerHTML = '<div class="stat-card"><div class="stat-card-label">Données indisponibles</div></div>';
+  console.error(err);
+});
+</script>
+</body>
+</html>
