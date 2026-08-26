@@ -961,11 +961,11 @@ par l'équipe : 2e étage — travées `ALPHA` (14 colonnes), `BETA` (6),
 pour `XIX`, 5 pour `XX`) ; 5e étage — travée `I` (6 colonnes), `II` à `V`
 (5 chacune), `VI` à `XIX` (14 chacune), et une travée `ALPHA` à 1 seule
 colonne. Valeurs listées telles quelles, aucune règle générale
-sous-jacente. `TRAVEES_MAGASIN6` (2026-08-26) ne reprend **aucune**
-géométrie propre : le 6e étage partage le même plan que le 5e (confirmé
-par l'équipe), donc `TRAVEES_MAGASIN6 = TRAVEES_MAGASIN5.map(...)` avec le
-préfixe `M5-` remplacé par `M6-`, calculé une seule fois dans
-`js/reserve-shared.js` plutôt que redupliqué à la main. Chaque travée de
+sous-jacente. `TRAVEES_MAGASIN6` a d'abord réutilisé (2026-08-26) la
+géométrie de `TRAVEES_MAGASIN5` en supposant que le 6e étage partageait le
+même plan que le 5e ; corrigé le même jour avec la géométrie propre fournie
+par l'équipe — travée `I` (5 colonnes), travées `II` à `XV` (11 colonnes
+chacune). Chaque travée de
 ces trois magasins porte aussi `maxEt:6` (au lieu du `DEFAULT_MAX_ETAGE=8`
 de la réserve) : la quasi-totalité des travées des magasins d'étage font 6
 étagères — une référence par défaut, pas un plafond dur (`maxEtageOf()`

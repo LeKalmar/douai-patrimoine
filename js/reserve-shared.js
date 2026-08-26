@@ -127,14 +127,32 @@ const TRAVEES_MAGASIN5 = [
   {id:'M5-ALPHA', nbCols:1, maxEt:6},
 ];
 
-/* Magasin — 6e étage : même principe que les 2e/5e étage ci-dessus, mais
-   sans géométrie propre fournie par l'équipe — le 6e étage partage le même
-   bâtiment/plan que le 5e (confirmé 2026-08-26), on réutilise donc telle
-   quelle la géométrie de TRAVEES_MAGASIN5, préfixe "M6-" pour ne pas entrer
-   en collision avec M2-/M5-/RD-/la réserve patrimoniale. Contrairement aux
-   2e/5e étage (uniquement cotes numériques), le 6e étage couvre aussi les
-   cotes littérales/Dewey — voir CLAUDE.md, section magasins. */
-const TRAVEES_MAGASIN6 = TRAVEES_MAGASIN5.map(t => ({ ...t, id: t.id.replace(/^M5-/, 'M6-') }));
+/* Magasin — 6e étage : même principe que les 2e/5e étage ci-dessus,
+   préfixe "M6-" pour ne pas entrer en collision avec M2-/M5-/RD-/la réserve
+   patrimoniale. Géométrie propre fournie par l'équipe (2026-08-26,
+   remplace l'hypothèse initiale de partage du plan du 5e étage) : travée I
+   (5 colonnes), travées II à XV (11 colonnes chacune) — valeurs listées
+   telles quelles, aucune règle générale sous-jacente. Même `maxEt:6` par
+   défaut que les 2e/5e étage. Contrairement aux 2e/5e étage (uniquement
+   cotes numériques), le 6e étage couvre aussi les cotes littérales/Dewey —
+   voir CLAUDE.md, section magasins. */
+const TRAVEES_MAGASIN6 = [
+  {id:'M6-I',     nbCols:5, maxEt:6},
+  {id:'M6-II',    nbCols:11, maxEt:6},
+  {id:'M6-III',   nbCols:11, maxEt:6},
+  {id:'M6-IV',    nbCols:11, maxEt:6},
+  {id:'M6-V',     nbCols:11, maxEt:6},
+  {id:'M6-VI',    nbCols:11, maxEt:6},
+  {id:'M6-VII',   nbCols:11, maxEt:6},
+  {id:'M6-VIII',  nbCols:11, maxEt:6},
+  {id:'M6-IX',    nbCols:11, maxEt:6},
+  {id:'M6-X',     nbCols:11, maxEt:6},
+  {id:'M6-XI',    nbCols:11, maxEt:6},
+  {id:'M6-XII',   nbCols:11, maxEt:6},
+  {id:'M6-XIII',  nbCols:11, maxEt:6},
+  {id:'M6-XIV',   nbCols:11, maxEt:6},
+  {id:'M6-XV',    nbCols:11, maxEt:6},
+];
 
 const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5, ...TRAVEES_MAGASIN6];
 
