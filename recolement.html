@@ -609,6 +609,19 @@ let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
 let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas encore chargé" (—) de "échec" (indisponible)
 const CATALOG_LABELS = { reserve:'Notices cataloguées', magasin:'Notices cataloguées (magasins)' };
 
+// Catalogue de reconnaissance "large", distinct de catalogByGroup.magasin :
+// depuis 2026-08-26, data/magasins.json couvre toute la bibliothèque de
+// Douai, pas seulement les magasins (voir build-magasins.mjs) — mais
+// catalogByGroup.magasin reste filtré aux seuls exemplaires _isMagasin pour
+// que les statistiques de progression des magasins (notices cataloguées,
+// "jamais scannés"…) restent basées sur le même périmètre qu'avant, sans
+// être noyées par le reste de la bibliothèque. magasinWideCatalog, lui,
+// contient TOUS les exemplaires — utilisé uniquement par handleScan() en
+// repli quand un code-barre scanné dans un magasin est absent de
+// catalogByGroup.magasin, pour détecter une anomalie de classement (voir
+// CLAUDE.md, section "Récolement des magasins d'étage").
+let magasinWideCatalog = null;
+
 // Index inverse cote -> code-barre, un par catalogGroup — sert à
 // handleNoBarcodeCote() (voir "LIVRES SANS CODE-BARRE" plus bas) pour
 // vérifier si une cote saisie à la main correspond à un exemplaire déjà
@@ -653,12 +666,19 @@ Promise.all([
 });
 
 fetch('data/magasins.json').then(r=>r.json()).then(data=>{
-  // Pas de fondsOverride : chaque exemplaire porte déjà son propre
-  // _fondsLabel (étage + secteur), posé par build-magasins.mjs.
-  const built = buildCatalogFromItems(data);
+  // Filtré aux seuls exemplaires _isMagasin : périmètre inchangé pour les
+  // statistiques de progression (notices cataloguées, "jamais scannés"…),
+  // voir magasinWideCatalog ci-dessus pour le reste de la bibliothèque.
+  // `!== false` plutôt que truthy strict : un ancien data/magasins.json
+  // généré avant l'ajout de ce flag n'a pas du tout de champ _isMagasin,
+  // mais ne contenait déjà que des magasins (voir magasins.html, même
+  // traitement). Pas de fondsOverride : chaque exemplaire porte déjà son
+  // propre _fondsLabel (étage + secteur), posé par build-magasins.mjs.
+  const built = buildCatalogFromItems(data.filter(it=>it._isMagasin !== false));
   catalogByGroup.magasin = built.catalog;
   catalogNoticeCountByGroup.magasin = built.noticeCount;
   catalogCoteIndexByGroup.magasin = buildCoteIndex(built.catalog);
+  magasinWideCatalog = buildCatalogFromItems(data).catalog;
   syncActiveCatalog();
   updateStats();
 }).catch(()=>{
@@ -754,6 +774,26 @@ const ADV_CATS = {
       <td>${esc(r.titre)||(r.foundInCatalog?'':'(absent du catalogue)')}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td>${r.foundInCatalog ? '<span style="color:#2e7d32">✓ trouvée — récolé</span>' : '<span style="color:#c62828">✗ absente</span>'}</td>
+    </tr>`,
+  },
+  horssection: {
+    title: 'Anomalies de classement (hors magasin selon Syracuse)',
+    desc: 'Code-barre scanné dans un magasin mais catalogué dans Syracuse sous une autre section que Magasin/Magasin Jeunesse (colonne "Section réelle") — à vérifier : mauvais classement côté catalogue, ou document à ranger ailleurs.',
+    placeholder: 'Filtrer (cote, titre, section, code-barre)…',
+    headers: ['Cote','Titre','Section réelle','Emplacement','Code-barre',''],
+    colspan: 6,
+    emptyMsg: 'Aucune anomalie de classement détectée pour l\'instant.',
+    filterFields: ['cote','titre','sectionReelle','barcode'],
+    filePrefix: 'anomalies-classement-magasin',
+    needsCatalog: false,
+    listFn: horsSectionList,
+    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(titre inconnu)'}</td>
+      <td>${esc(r.sectionReelle)||'—'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${advActionCell('horssection', r)}</td>
     </tr>`,
   },
 };
@@ -973,7 +1013,21 @@ document.addEventListener('click', e=>{
 function handleScan(barcode, damaged, opts){
   if(!barcode) return;
   const fields = locFieldsOf(loc);
-  const cat = catalog ? catalog[barcode] : null;
+  const group = catalogGroupOfReserve(loc.reserve);
+  let cat = catalog ? catalog[barcode] : null;
+  // Anomalie de classement : ce code-barre n'est pas un exemplaire connu du
+  // magasin (catalogByGroup.magasin, filtré _isMagasin), mais on scanne bien
+  // dans un magasin — on regarde s'il existe ailleurs dans toute la
+  // bibliothèque (magasinWideCatalog, voir plus haut) avant de le déclarer
+  // "inconnu". S'il y est, c'est un document catalogué sous une autre
+  // section Syracuse que Magasin/Magasin Jeunesse alors qu'il est
+  // physiquement ici (ou l'inverse) — à faire remonter, pas une vraie
+  // absence du catalogue.
+  let horsSection = false;
+  if(!cat && group==='magasin' && magasinWideCatalog && magasinWideCatalog[barcode]){
+    cat = magasinWideCatalog[barcode];
+    horsSection = true;
+  }
   const prev = scans[barcode];
 
   const record = {
@@ -992,6 +1046,13 @@ function handleScan(barcode, damaged, opts){
     // CODE-BARRE" plus bas. Propagé sur le record pour que noBarcodeList()
     // puisse retrouver ces scans-là sans structure de données séparée.
     sansCodeBarre: !!(opts && opts.sansCodeBarre),
+    // Section Syracuse réelle (record.fonds ci-dessus) différente de
+    // Magasin/Magasin Jeunesse alors que ce scan a eu lieu dans un magasin —
+    // voir ADV_CATS.horssection plus bas. Ne s'efface pas tout seul si le
+    // même code-barre est rescanné plus tard sans le retrouver dans
+    // magasinWideCatalog (ex. catalogue pas encore rechargé) : on conserve
+    // le dernier statut connu.
+    horsSection: horsSection || (prev ? !!prev.horsSection : false),
     ts: Date.now()
   };
 
@@ -1065,7 +1126,8 @@ function showFeedback(record, status, prev, reliureRecords){
     ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
     ${record.manuel ? `<span class="fb-badge" style="background:var(--plan-manuel);color:#fff" title="Créé via exemplarisation.html, pas encore une vraie notice Syracuse">⚡ Exemplarisé rapide</span>` : ''}
     ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}
-    ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Livres sans code-barre »">📎 Sans code-barre</span>` : ''}</div>`;
+    ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Livres sans code-barre »">📎 Sans code-barre</span>` : ''}
+    ${record.horsSection ? `<span class="fb-badge" style="background:#c62828;color:#fff" title="Catalogué sous une autre section que Magasin/Magasin Jeunesse — à vérifier dans Syracuse">⚠ Anomalie de classement</span>` : ''}</div>`;
   html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
   if(status==='moved' && prev){
@@ -1883,6 +1945,19 @@ function notScannedList(group){
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
 
+// Anomalies de classement : scans dont handleScan() a posé horsSection:true
+// (voir plus haut) — le code-barre existe dans magasinWideCatalog mais pas
+// dans catalogByGroup.magasin, donc catalogué sous une autre section que
+// Magasin/Magasin Jeunesse alors qu'il est physiquement dans un magasin.
+// record.fonds porte déjà le libellé de cette section réelle (_fondsLabel
+// posé par build-magasins.mjs pour les exemplaires hors magasin — voir
+// CLAUDE.md), pas besoin d'une structure de données séparée.
+function horsSectionList(group){
+  return Object.values(scans).filter(r=>r.horsSection && traveeGroupOf(r.travee)===group)
+    .map(r=>Object.assign({}, r, { sectionReelle:r.fonds, _resolved: isResolved('horssection', r.barcode) }))
+    .sort((a,b)=>b.ts-a.ts);
+}
+
 // Livres sans code-barre : union des scans enregistrés via handleNoBarcodeCote()
 // quand la cote a été reconnue (sansCodeBarre:true, comptent comme récolés)
 // et des cotes non reconnues (noBarcodeCotes, ne comptent pas comme récolées).
@@ -1947,6 +2022,7 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote-${gid}">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned-${gid}">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Livres sans code-barre</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
+      <div class="stat-card"><div class="stat-card-label">Anomalies de classement</div><div class="stat-card-val" id="st-horssection-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start-${gid}" style="font-size:1rem">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last-${gid}" style="font-size:1rem">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Durée écoulée (calendaire)</div><div class="stat-card-val" id="st-span-${gid}" style="font-size:1.2rem">—</div></div>
@@ -2043,6 +2119,10 @@ function updateAdvListsCount(){
     const nobarcodeCount = noBarcodeList(g.id).length;
     document.getElementById('st-nobarcode-'+g.id).textContent = nobarcodeCount.toLocaleString('fr-FR');
     document.getElementById('sum-nobarcode-'+g.id+'-count').textContent = nobarcodeCount.toLocaleString('fr-FR');
+
+    const horsSectionUnresolved = horsSectionList(g.id).filter(r=>!r._resolved).length;
+    document.getElementById('st-horssection-'+g.id).textContent = horsSectionUnresolved.toLocaleString('fr-FR');
+    document.getElementById('sum-horssection-'+g.id+'-count').textContent = horsSectionUnresolved.toLocaleString('fr-FR');
 
     Object.keys(ADV_CATS).forEach(catKey=>refreshAdvList(g.id, catKey));
   });

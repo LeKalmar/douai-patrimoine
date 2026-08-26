@@ -401,6 +401,28 @@ le même export, distingués a posteriori par la forme de la cote — seule la
 sémantique change (un marquage `_coteDigitRun` présent/absent plutôt qu'un
 filtre d'exclusion) :
 
+**Ce filtre de section n'est plus appliqué au niveau du build depuis
+2026-08-26** (demande explicite) : `data/magasins.json` garde en réalité
+TOUS les exemplaires de la bibliothèque de Douai, avec un flag `_isMagasin`
+qui distingue ceux dont `Section (Libellé)` vaut Magasin/Magasin Jeunesse
+du reste. `magasins.html` filtre lui-même sur `_isMagasin` côté client à la
+réception du fetch, donc son comportement affiché ne change pas ; le flag
+`_secteur` reste la section brute (pas forcément Adulte/Jeunesse pour un
+exemplaire hors magasin). Raison de ce changement : `recolement.html`
+(section « Récolement des magasins d'étage » plus bas) construit désormais
+DEUX catalogues de reconnaissance à partir de ce même fichier — un filtré
+`_isMagasin` (pour les statistiques de progression, périmètre inchangé) et
+un complet `magasinWideCatalog` (repli uniquement, pour reconnaître un
+code-barre scanné dans un magasin même s'il est catalogué sous une autre
+section, et signaler l'anomalie plutôt que d'afficher « inconnu du
+catalogue »). Un exemplaire hors magasin porte un `_fondsLabel` = sa
+section Syracuse réelle (`"Adulte"`, `"Réserve"`…) plutôt qu'un libellé de
+magasin, pour que cette anomalie soit lisible dès l'affichage du fonds au
+scan. Le rapport de build distingue les deux volumes : `stats.kept` reste
+le compte "magasins" uniquement (ce qu'affichent `magasins.html`/
+`admin.html`), `stats.keptTotalDouai` est le nouveau total toute
+bibliothèque confondue.
+
 - **2e/5e étage** : cotes à numérotation séquentielle de 5 ou 6
   chiffres — `100350`, `156235` — parfois avec un zéro de tête
   (`0100011` → `100011`), parfois suivies d'un tiret et d'un complément de
@@ -1011,6 +1033,31 @@ restaure exactement l'état/le catalogue d'avant, rien n'est partagé entre
 les deux groupes. Seule la liste « codes-barres endommagés » reste
 volontairement globale (non scindée par groupe) : c'est une liste
 d'action à corriger, pas une comparaison catalogue.
+
+Détection des anomalies de classement (2026-08-26) : `catalogByGroup.magasin`
+n'est construit qu'à partir des exemplaires `_isMagasin` de
+`data/magasins.json` (voir « Magasins 2e/5e/6e étage » — le fichier couvre
+en réalité toute la bibliothèque de Douai), pour que les statistiques de
+progression des magasins gardent le même périmètre qu'avant. Un second
+catalogue, `magasinWideCatalog`, est construit en parallèle à partir de
+la totalité de `data/magasins.json` (sans filtre) et sert uniquement de
+repli dans `handleScan()` : si un code-barre scanné pendant que
+`catalogGroupOfReserve(loc.reserve)==='magasin'` est absent de
+`catalogByGroup.magasin` mais présent dans `magasinWideCatalog`, il est
+quand même reconnu (titre/cote/fonds affichés, scan enregistré normalement)
+au lieu d'être traité comme « inconnu du catalogue » — le `fonds` affiché
+est alors la vraie section Syracuse de ce document (ex. « Adulte »), posée
+par `_fondsLabel` (voir plus haut) au lieu d'un libellé de magasin. Le
+`record` de ce scan porte en plus `horsSection:true`, affiché comme badge
+rouge « ⚠ Anomalie de classement » dans le panneau de feedback du scan, et
+alimente une 4e liste des « Statistiques avancées (Magasins) » —
+`ADV_CATS.horssection` (`horsSectionList()`), avec le même suivi
+réglé/rouvert et le même export `.txt` que les 3 catégories existantes —
+pour repérer les documents à reclasser ou à corriger dans Syracuse. Cette
+liste reste vide côté groupe « Réserve » (un scan de la réserve
+patrimoniale/Douaisienne n'a aucun moyen de poser `horsSection`), affichée
+par la même génération générique de template que le reste sans code
+spécifique par groupe.
 
 `reserve.html` (le plan visuel, renommé « Plan des Magasins » à
 l'introduction des magasins 2e/5e étage) visualise ces locaux. La page est

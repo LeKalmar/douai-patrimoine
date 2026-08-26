@@ -320,7 +320,14 @@ function renderStats() {
 fetch('data/magasins.json')
   .then(res => res.json())
   .then(data => {
-    ROWS = data.map(normalize);
+    // Depuis 2026-08-26, data/magasins.json couvre toute la bibliothèque de
+    // Douai (voir build-magasins.mjs) pour permettre à recolement.html de
+    // reconnaître n'importe quel code-barre et détecter les anomalies de
+    // classement — cette page-ci reste un catalogue des seuls magasins,
+    // d'où ce filtre côté client. `!== false` (plutôt que truthy strict) :
+    // un ancien data/magasins.json généré avant l'ajout de ce flag n'a pas
+    // du tout de champ _isMagasin, mais ne contenait déjà que des magasins.
+    ROWS = data.filter(rec => rec._isMagasin !== false).map(normalize);
     FILTERED = ROWS;
     rowsLoaded = true;
     render();

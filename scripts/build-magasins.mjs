@@ -11,10 +11,21 @@
  * pas du MARC-XML — un `<item>` par exemplaire, avec ses propres propriétés
  * (`Titre`, `Auteur`, `Editeur`, `Code-barres (valeur)`, `Cote n° 1/2/3`,
  * `Bibliothèque (Libellé)`, `Section (Libellé)`…). Il couvre tout le réseau
- * (plusieurs bibliothèques, toutes les sections) : ce script isole les
- * exemplaires des magasins d'étage de la bibliothèque de Douai —
- * `Bibliothèque (Libellé)` commençant par "Douai" et `Section (Libellé)`
- * valant exactement "Magasin" (adulte) ou "Magasin Jeunesse".
+ * (plusieurs bibliothèques, toutes les sections).
+ *
+ * Depuis 2026-08-26, `data/magasins.json` garde TOUS les exemplaires de la
+ * bibliothèque de Douai (`Bibliothèque (Libellé)` commençant par "Douai"),
+ * pas seulement ceux de `Section (Libellé)` = "Magasin"/"Magasin Jeunesse" —
+ * chaque exemplaire porte un flag `_isMagasin` qui distingue les deux.
+ * Raison (demande explicite) : `recolement.html` (voir CLAUDE.md, section
+ * "Récolement des magasins d'étage") a besoin de reconnaître N'IMPORTE QUEL
+ * code-barre de toute la bibliothèque quand on scanne dans un magasin — pas
+ * seulement ceux déjà classés "Magasin" côté Syracuse — afin de détecter les
+ * anomalies de classement (un document physiquement dans un magasin mais
+ * catalogué sous une autre section, ou l'inverse). `magasins.html`, lui,
+ * continue de n'afficher que les exemplaires `_isMagasin` (filtre appliqué
+ * côté client désormais, pas au build) : son rôle de catalogue des magasins
+ * proprement dit ne change pas.
  *
  * Contrairement à l'ancien export dédié (xml/magasin/notices.xml.xml +
  * exemplaires.xml.xml), `bib.xml` ne nécessite aucune jointure notice/
@@ -90,17 +101,21 @@ function fondsLabel(digitRun, section) {
   return `Magasin — ${etage} (${secteurLabel(section)})`;
 }
 
-// ── Itère les exemplaires de bib.xml, filtre bibliothèque + section ────────
+// ── Itère les exemplaires de bib.xml, filtre bibliothèque seulement ────────
 // bib.xml (700+ Mo) est lu en flux (iterateGesmarcItemsFromFile) plutôt que
-// chargé entièrement en mémoire — voir scripts/lib/gesmarc.mjs.
+// chargé entièrement en mémoire — voir scripts/lib/gesmarc.mjs. Aucun filtre
+// de section : voir l'en-tête du fichier (_isMagasin distingue a posteriori
+// les exemplaires réellement en magasin des autres, gardés pour permettre à
+// recolement.html de détecter les anomalies de classement).
 async function buildItems(path) {
   const items = [];
   const stats = {
     totalItems: 0,
     kept: 0,
-    bySection: {},   // 'Magasin' / 'Magasin Jeunesse' → compte
-    byEtage: { '2e/5e': 0, '6e': 0 },
-    keptEdgeSample: [], // cotes gardées avec tiret/point/zéro de tête, à relire
+    keptMagasin: 0,
+    bySection: {},   // toutes les sections rencontrées (bibliothèque Douai) → compte
+    byEtage: { '2e/5e': 0, '6e': 0 }, // uniquement au sein des exemplaires _isMagasin
+    keptEdgeSample: [], // cotes _isMagasin gardées avec tiret/point/zéro de tête, à relire
   };
 
   for await (const itemXml of iterateGesmarcItemsFromFile(path)) {
@@ -110,10 +125,11 @@ async function buildItems(path) {
     const bibliotheque = props['Bibliothèque (Libellé)'] || '';
     const section = props['Section (Libellé)'] || '';
     if (!bibliotheque.startsWith('Douai')) continue;
-    if (!CONFIG.magasinSections.includes(section)) continue;
 
     const barcode = (props['Code-barres (valeur)'] || '').trim();
     if (!barcode) continue;
+
+    const isMagasin = CONFIG.magasinSections.includes(section);
 
     const cote1 = props['Cote n° 1'] || '';
     const cote2 = props['Cote n° 2'] || '';
@@ -123,9 +139,12 @@ async function buildItems(path) {
 
     stats.kept++;
     stats.bySection[section] = (stats.bySection[section] || 0) + 1;
-    stats.byEtage[digitRun ? '2e/5e' : '6e']++;
-    if (/[-.]/.test(coteJointe) || /^0/.test(cote1)) {
-      if (stats.keptEdgeSample.length < 30) stats.keptEdgeSample.push(coteJointe);
+    if (isMagasin) {
+      stats.keptMagasin++;
+      stats.byEtage[digitRun ? '2e/5e' : '6e']++;
+      if (/[-.]/.test(coteJointe) || /^0/.test(cote1)) {
+        if (stats.keptEdgeSample.length < 30) stats.keptEdgeSample.push(coteJointe);
+      }
     }
 
     items.push({
@@ -139,9 +158,14 @@ async function buildItems(path) {
       '210$d': props['Publié le'] || null,
       lien_num: `${CONFIG.vignetteBaseUrl}${barcode}.jpg`,
       _coteDigitRun: digitRun,
+      _isMagasin: isMagasin,
       _secteur: section,
       _bibliotheque: bibliotheque,
-      _fondsLabel: fondsLabel(digitRun, section),
+      // Pour un exemplaire hors magasin, le "fonds" affiché est sa vraie
+      // section Syracuse (ex. "Adulte", "Réserve"…) plutôt qu'un libellé de
+      // magasin — c'est justement ce qui rend une anomalie de classement
+      // visible au scan dans recolement.html (voir CLAUDE.md).
+      _fondsLabel: isMagasin ? fondsLabel(digitRun, section) : (section || 'Section inconnue'),
     });
   }
 
@@ -183,16 +207,16 @@ async function main() {
   }
 
   console.log(`  · lecture (en flux) ${CONFIG.input}`);
-  console.log('  · construction et filtrage (magasins d\'étage, bibliothèque Douai)');
+  console.log('  · construction (bibliothèque Douai, toutes sections — voir en-tête du fichier)');
   const { items, stats } = await buildItems(CONFIG.input);
   console.log(
-    `     ${stats.totalItems} exemplaires scannés ・ ${stats.kept} gardés ` +
-    `(${stats.byEtage['2e/5e']} 2e/5e étage, ${stats.byEtage['6e']} 6e étage) ・ ` +
-    `sections : ${JSON.stringify(stats.bySection)}`
+    `     ${stats.totalItems} exemplaires scannés ・ ${stats.kept} gardés (bibliothèque Douai) ・ ` +
+    `dont ${stats.keptMagasin} en magasin (${stats.byEtage['2e/5e']} 2e/5e étage, ${stats.byEtage['6e']} 6e étage) ・ ` +
+    `${Object.keys(stats.bySection).length} sections distinctes rencontrées`
   );
 
-  if (stats.kept === 0 && !CONFIG.force) {
-    console.error('✖ Aucun exemplaire retenu — export bib.xml inattendu. SYRACUSE_FORCE=1 pour forcer quand même.');
+  if (stats.keptMagasin === 0 && !CONFIG.force) {
+    console.error('✖ Aucun exemplaire de magasin retenu — export bib.xml inattendu. SYRACUSE_FORCE=1 pour forcer quand même.');
     process.exit(1);
   }
 
@@ -213,7 +237,13 @@ async function main() {
     durationMs: Date.now() - startedAt,
     stats: {
       totalItems: stats.totalItems,
-      kept: stats.kept,
+      // `kept` reste le compte "magasins" (ce que admin.html affiche comme
+      // "Magasins 2e/5e/6e étage") — `keptTotalDouai` est le nouveau total
+      // toute bibliothèque Douai confondue, désormais gardé dans
+      // data/magasins.json pour la reconnaissance élargie de recolement.html
+      // (voir en-tête du fichier), mais qui ne doit pas fausser ce compte.
+      kept: stats.keptMagasin,
+      keptTotalDouai: stats.kept,
       bySection: stats.bySection,
       byEtage: stats.byEtage,
     },
