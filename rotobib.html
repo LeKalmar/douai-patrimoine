@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Rotobib — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  :root{
+    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
+  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
+  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+
+  .section{padding:1.5rem 0 3rem}
+  .ex-note{font-size:.8rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
+  .ex-note strong{color:#665c00}
+
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:1.5rem}
+  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+  .stat-card-val{font-family:'DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#12157A}
+  .stat-card.st-conserver .stat-card-val{color:var(--ok)}
+  .stat-card.st-pilon .stat-card-val{color:var(--danger)}
+  .stat-card.st-braderie .stat-card-val{color:var(--warn)}
+  .stat-card.st-relocalisation .stat-card-val{color:#12157A}
+
+  .form-card{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
+  .form-card h2{font-family:'DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 1rem;color:#12157A}
+  .roto-scan-row{display:flex;gap:.75rem;align-items:center}
+  #roto-scan-input{flex:1;min-width:220px;font-size:1.2rem;font-family:'DM Mono',monospace,inherit;padding:.75rem 1rem;border:1px solid #ccc;border-radius:8px;outline:none}
+  #roto-scan-input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
+
+  .roto-notfound{background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:1rem;color:#665c00;display:none;margin-bottom:1.5rem}
+  .roto-notfound.show{display:block}
+
+  .roto-detail{display:none;background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem}
+  .roto-detail.show{display:block}
+  .roto-head{display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:.5rem}
+  .roto-cover{width:88px;height:118px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f2f2f5;flex-shrink:0}
+  .roto-headcol{flex:1;min-width:240px}
+  .roto-titre{font-family:'DM Serif Display',serif;font-size:1.35rem;color:#12157A;margin:0 0 .25rem;line-height:1.25}
+  .roto-soustitre{font-size:.85rem;color:#777;margin:0 0 .5rem;font-style:italic}
+  .roto-auteur{font-size:.95rem;color:#333;margin:0 0 .5rem}
+  .roto-meta{font-size:.78rem;color:#888;line-height:1.8}
+  .roto-meta b{color:#555;font-weight:600}
+  .roto-badge{display:inline-block;font-size:.68rem;padding:2px 9px;border-radius:20px;margin-right:.35rem;font-weight:600}
+  .roto-badge-cote{background:#F5F5FF;color:#12157A;font-family:monospace}
+  .roto-badge-excl{background:#ffebee;color:#c62828;border:1px solid #ffcdd2}
+  .roto-badge-statut{color:#fff}
+  .roto-badge-statut.conserver{background:var(--ok)}
+  .roto-badge-statut.pilon{background:var(--danger)}
+  .roto-badge-statut.braderie{background:var(--warn)}
+  .roto-badge-statut.relocalisation{background:#12157A}
+
+  .roto-date-box{background:#12157A;color:#fff;border-radius:10px;padding:.85rem 1.25rem;display:inline-block;margin:1rem 0 .25rem}
+  .roto-date-label{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;opacity:.75}
+  .roto-date-val{font-family:'DM Serif Display',serif;font-size:1.9rem;line-height:1.15}
+
+  .roto-hist-wrap{margin-top:1.25rem;padding-top:1rem;border-top:1px dashed #e0e0e0}
+  .roto-hist-title{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.6rem}
+  .roto-hist{display:flex;align-items:flex-end;gap:1rem;height:120px;padding:0 .25rem}
+  .roto-hist-col{flex:1;max-width:90px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .roto-hist-val{font-size:.8rem;font-weight:600;color:#12157A;margin-bottom:.25rem}
+  .roto-hist-bar{width:100%;max-width:46px;background:#c9cdf0;border-radius:4px 4px 0 0;min-height:3px;transition:height .2s}
+  .roto-hist-bar.nonzero{background:#12157A}
+  .roto-hist-label{font-size:.7rem;color:#888;margin-top:.4rem}
+  .roto-cumul{font-size:.8rem;color:#666;margin-top:.6rem}
+
+  .roto-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.25rem;padding-top:1.1rem;border-top:1px dashed #e0e0e0}
+  .roto-btn{font-family:inherit;font-size:.88rem;padding:.7rem 1rem;border-radius:8px;cursor:pointer;border:1px solid #ccc;background:#fff;color:#333;transition:all .15s;flex:1;min-width:135px;text-align:center}
+  .roto-btn:hover{background:#f5f5f5}
+  .roto-btn.active{color:#fff;border-color:transparent}
+  .roto-btn[data-statut="conserver"].active{background:var(--ok)}
+  .roto-btn[data-statut="pilon"].active{background:var(--danger)}
+  .roto-btn[data-statut="braderie"].active{background:var(--warn)}
+  .roto-btn[data-statut="relocalisation"].active{background:#12157A}
+  .roto-undo-row{margin-top:.6rem}
+  .roto-undo{font-size:.78rem;color:#888;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0}
+
+  .roto-flash{display:none;margin-bottom:1.5rem;border-radius:var(--radius-md);padding:.9rem 1rem;background:#e8f5e9;border:1px solid #c8e6c9;color:#1b5e20;font-size:.88rem}
+  .roto-flash.show{display:block}
+
+  .export-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.5rem}
+  .export-btn{font-family:inherit;font-size:.78rem;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;color:#555;transition:all .15s}
+  .export-btn:hover{background:#f5f5f5;border-color:#999}
+
+  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.5rem}
+  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
+  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:180px}
+  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
+  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0;white-space:nowrap}
+  .log-table td{padding:.4rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .log-table tr:hover td{background:#fafafa}
+  .log-body{max-height:360px;overflow-y:auto}
+  .log-del{background:none;border:none;color:#12157A;cursor:pointer;font-size:.78rem;padding:2px 6px;text-decoration:underline}
+  .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
+  .log-bc{font-family:monospace;color:#888}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+</style>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Magasins 2e/5e étage</nav>
+      <h1 class="page-title">Rotobib</h1>
+      <p class="page-lead">Scannez un code-barre pour voir sa fiche et ses statistiques de prêt, puis décidez : conserver, pilon, braderie ou relocalisation.</p>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <p class="ex-note">
+        <strong>Comment ça marche :</strong> cet outil porte sur un export ponctuel de statistiques de prêt
+        (<code>xml/desherbage/desherbage.xml</code>), distinct du catalogue des magasins — mêmes exemplaires, profil
+        d'export différent pour obtenir les prêts par année. Scannez un code-barre : sa fiche (titre, auteur, cote,
+        date de parution) et son historique de prêts sur les 4 dernières années s'affichent. Choisissez ensuite un
+        traitement — les décisions sont partagées entre collègues (comme le récolement) et s'exportent en .txt pour
+        ajout panier dans le SIGB.
+      </p>
+
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="form-card">
+        <h2>Scanner un exemplaire</h2>
+        <div class="roto-scan-row">
+          <input type="text" id="roto-scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
+        </div>
+      </div>
+
+      <div class="roto-flash" id="roto-flash"></div>
+      <div class="roto-notfound" id="roto-notfound"></div>
+
+      <div class="roto-detail" id="roto-detail">
+        <div class="roto-head">
+          <img class="roto-cover" id="roto-cover" style="display:none">
+          <div class="roto-headcol">
+            <p class="roto-titre" id="roto-titre"></p>
+            <p class="roto-soustitre" id="roto-soustitre" style="display:none"></p>
+            <p class="roto-auteur" id="roto-auteur"></p>
+            <div id="roto-badges"></div>
+            <p class="roto-meta" id="roto-meta"></p>
+          </div>
+        </div>
+
+        <div class="roto-date-box">
+          <div class="roto-date-label">Date de parution</div>
+          <div class="roto-date-val" id="roto-date"></div>
+        </div>
+
+        <div class="roto-hist-wrap">
+          <div class="roto-hist-title">Prêts par année</div>
+          <div class="roto-hist" id="roto-hist"></div>
+          <p class="roto-cumul" id="roto-cumul"></p>
+        </div>
+
+        <div class="roto-actions">
+          <button type="button" class="roto-btn" data-statut="conserver">✓ Conserver</button>
+          <button type="button" class="roto-btn" data-statut="pilon">🗑️ Pilon</button>
+          <button type="button" class="roto-btn" data-statut="braderie">🏷️ Braderie</button>
+          <button type="button" class="roto-btn" data-statut="relocalisation">📦 Relocalisation</button>
+        </div>
+        <div class="roto-undo-row" id="roto-undo-row" style="display:none">
+          <button type="button" class="roto-undo" id="roto-undo">↺ Annuler le traitement</button>
+        </div>
+      </div>
+
+      <div class="export-row">
+        <button type="button" class="export-btn" data-export="conserver">Exporter Conserver (.txt)</button>
+        <button type="button" class="export-btn" data-export="pilon">Exporter Pilon (.txt)</button>
+        <button type="button" class="export-btn" data-export="braderie">Exporter Braderie (.txt)</button>
+        <button type="button" class="export-btn" data-export="relocalisation">Exporter Relocalisation (.txt)</button>
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">Traitements récents</span>
+          <input type="text" class="log-search" id="log-search" placeholder="Filtrer (titre, code-barre)…">
+        </div>
+        <div class="log-body">
+          <table class="log-table">
+            <thead>
+              <tr><th>Code-barre</th><th>Titre</th><th>Traitement</th><th>Le</th><th></th></tr>
+            </thead>
+            <tbody id="log-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+document.getElementById('logout-btn').addEventListener('click', function() {
+  sessionStorage.removeItem('rp_admin_auth');
+  sessionStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const STATUTS = ['conserver','pilon','braderie','relocalisation'];
+const STATUT_LABEL = { conserver:'Conserver', pilon:'Pilon', braderie:'Braderie', relocalisation:'Relocalisation' };
+
+/* ════════════════════════════════════════════════════════════
+   DONNÉES DÉSHERBAGE (data/desherbage.json + rapport de build)
+   ════════════════════════════════════════════════════════════ */
+let DESHERB = [];
+let BY_BC = new Map();
+let REFERENCE_YEAR = new Date().getFullYear();
+let currentRecord = null;
+
+Promise.all([
+  fetch('data/desherbage.json').then(r => r.ok ? r.json() : []),
+  fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : {}),
+]).then(([data, report]) => {
+  DESHERB = data;
+  BY_BC = new Map(data.map(r => [r._barcode, r]));
+  if (report && report.stats && report.stats.referenceYear) REFERENCE_YEAR = report.stats.referenceYear;
+  updateStats();
+  renderLog();
+}).catch(() => {});
+
+/* ════════════════════════════════════════════════════════════
+   ÉTAT PARTAGÉ (R2 via /api/desherbage)
+   ════════════════════════════════════════════════════════════ */
+const LS_KEY = 'rp_desherbage_traitements';
+let TRAITEMENTS = {}; // { [barcode]: {barcode,statut,ts} }
+function loadLocal(){ try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { return {}; } }
+function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(TRAITEMENTS)); }
+TRAITEMENTS = loadLocal();
+
+const LS_PENDING = 'rp_desherbage_pending_sync';
+let pendingSync = (function(){ try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch(e){ return []; } })();
+function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
+
+function authHeaders(){
+  const token = sessionStorage.getItem('rp_admin_token');
+  const h = { 'Content-Type': 'application/json' };
+  if(token) h['Authorization'] = 'Basic ' + token;
+  return h;
+}
+
+let lastSyncError = null;
+function updateSyncIndicator(){
+  const el = document.getElementById('sync-status');
+  if(pendingSync.length){
+    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
+    el.classList.add('pending');
+  } else {
+    el.textContent = '✓ synchronisé';
+    el.classList.remove('pending');
+  }
+}
+
+function queuePatch(patch){
+  pendingSync.push(patch);
+  savePendingSync();
+  updateSyncIndicator();
+  flushPendingSync();
+}
+
+let flushingSync = false;
+async function flushPendingSync(){
+  if(flushingSync) return;
+  flushingSync = true;
+  try{
+    while(pendingSync.length){
+      const patch = pendingSync[0];
+      let res;
+      try{
+        res = await fetch('/api/desherbage', { method:'POST', headers: authHeaders(), body: JSON.stringify(patch) });
+      }catch(e){
+        lastSyncError = 'hors ligne ou serveur injoignable';
+        break;
+      }
+      if(res.status===401){
+        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
+        break;
+      }
+      if(res.status===503){
+        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
+        break;
+      }
+      if(!res.ok){
+        lastSyncError = `erreur serveur (${res.status})`;
+        break;
+      }
+      lastSyncError = null;
+      pendingSync.shift();
+      savePendingSync();
+    }
+  } finally {
+    flushingSync = false;
+    updateSyncIndicator();
+  }
+}
+
+function mergeIncoming(serverState){
+  const pendingBarcodes = new Set(pendingSync.map(p => p.record ? p.record.barcode : p.barcode));
+  Object.keys(serverState || {}).forEach(bc => {
+    if(!pendingBarcodes.has(bc)) TRAITEMENTS[bc] = serverState[bc];
+  });
+  saveLocal();
+  updateStats();
+  renderLog();
+  if(currentRecord) highlightButtons();
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/desherbage');
+    if(!res.ok) return;
+    mergeIncoming(await res.json());
+  }catch(e){ /* hors ligne : on reste sur le cache local */ }
+}
+
+window.addEventListener('online', flushPendingSync);
+setInterval(flushPendingSync, 20000);
+setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
+
+/* ════════════════════════════════════════════════════════════
+   STATISTIQUES
+   ════════════════════════════════════════════════════════════ */
+function updateStats(){
+  const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
+  let treated = 0;
+  DESHERB.forEach(r => {
+    const t = TRAITEMENTS[r._barcode];
+    if(t && counts[t.statut] !== undefined){ counts[t.statut]++; treated++; }
+  });
+  const nonTraites = DESHERB.length - treated;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">Total export</div><div class="stat-card-val">${DESHERB.length}</div></div>
+    <div class="stat-card st-conserver"><div class="stat-card-label">Conservés</div><div class="stat-card-val">${counts.conserver}</div></div>
+    <div class="stat-card st-pilon"><div class="stat-card-label">Pilon</div><div class="stat-card-val">${counts.pilon}</div></div>
+    <div class="stat-card st-braderie"><div class="stat-card-label">Braderie</div><div class="stat-card-val">${counts.braderie}</div></div>
+    <div class="stat-card st-relocalisation"><div class="stat-card-label">Relocalisation</div><div class="stat-card-val">${counts.relocalisation}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Non traités</div><div class="stat-card-val">${nonTraites}</div></div>
+  `;
+}
+
+/* ════════════════════════════════════════════════════════════
+   SCAN + AFFICHAGE DE LA FICHE
+   ════════════════════════════════════════════════════════════ */
+const scanInput = document.getElementById('roto-scan-input');
+
+function titreComplet(rec){
+  const base = rec['200$a'] || rec.titreDesherbage || '(titre inconnu)';
+  return base;
+}
+function sousTitre(rec){
+  if(rec['200$i']) return `${rec['200$h'] ? rec['200$h'] + '. ' : ''}${rec['200$i']}`;
+  if(rec.titrePartie) return rec.titrePartie;
+  return null;
+}
+function auteurComplet(rec){
+  const noms = (rec['700$a']||'').split('§').map(s=>s.trim()).filter(Boolean);
+  const prenoms = (rec['700$b']||'').split('§').map(s=>s.trim());
+  if(noms.length){
+    return noms.map((n,i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ');
+  }
+  return rec.auteurDesherbage || null;
+}
+
+function handleScanLookup(raw){
+  const bc = String(raw||'').trim();
+  if(!bc) return;
+  const rec = BY_BC.get(bc);
+  document.getElementById('roto-flash').classList.remove('show');
+  if(!rec){
+    currentRecord = null;
+    document.getElementById('roto-detail').classList.remove('show');
+    const nf = document.getElementById('roto-notfound');
+    nf.innerHTML = `Code-barre <strong>${esc(bc)}</strong> introuvable dans l'export de désherbage en cours (${DESHERB.length} exemplaires). Ce n'est peut-être pas un livre concerné par cette campagne.`;
+    nf.classList.add('show');
+    scanInput.value = '';
+    scanInput.focus();
+    return;
+  }
+  document.getElementById('roto-notfound').classList.remove('show');
+  showDetail(rec);
+  scanInput.value = '';
+  scanInput.focus();
+}
+
+scanInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); handleScanLookup(scanInput.value); }
+});
+document.addEventListener('click', e => {
+  if(!e.target.closest('input,select,button,a,.log-body')) scanInput.focus();
+});
+
+function showDetail(rec){
+  currentRecord = rec;
+
+  const cover = document.getElementById('roto-cover');
+  if(rec.imagette){ cover.src = rec.imagette; cover.style.display = ''; cover.onerror = () => { cover.style.display = 'none'; }; }
+  else cover.style.display = 'none';
+
+  document.getElementById('roto-titre').textContent = titreComplet(rec);
+  const st = sousTitre(rec);
+  const stEl = document.getElementById('roto-soustitre');
+  if(st){ stEl.textContent = st; stEl.style.display = ''; } else stEl.style.display = 'none';
+
+  const auteur = auteurComplet(rec);
+  document.getElementById('roto-auteur').textContent = auteur || '';
+
+  const badges = [];
+  if(rec.coteAffichee) badges.push(`<span class="roto-badge roto-badge-cote">${esc(rec.coteAffichee)}</span>`);
+  if(rec.exclusionPret) badges.push(`<span class="roto-badge roto-badge-excl">${esc(rec.exclusionPret)}</span>`);
+  const traitement = TRAITEMENTS[rec._barcode];
+  if(traitement) badges.push(`<span class="roto-badge roto-badge-statut ${traitement.statut}">${STATUT_LABEL[traitement.statut]}</span>`);
+  document.getElementById('roto-badges').innerHTML = badges.join(' ');
+
+  const metaParts = [];
+  const editeur = rec['210$c'] || rec.editeurDesherbage;
+  const lieu = rec['210$a'];
+  if(editeur || lieu) metaParts.push(`<b>Éditeur</b> ${esc([lieu, editeur].filter(Boolean).join(', '))}`);
+  if(rec['215$a']) metaParts.push(`<b>Description</b> ${esc(rec['215$a'])}${rec['215$d'] ? ' ; ' + esc(rec['215$d']) : ''}`);
+  if(rec['686$a']) metaParts.push(`<b>Dewey</b> ${esc(rec['686$a'])}`);
+  if(rec.bibliotheque) metaParts.push(`<b>Bibliothèque</b> ${esc(rec.bibliotheque)}`);
+  if(rec.section) metaParts.push(`<b>Section</b> ${esc(rec.section)}`);
+  if(rec.etat) metaParts.push(`<b>État</b> ${esc(rec.etat)}`);
+  if(rec.isbn) metaParts.push(`<b>ISBN</b> ${esc(rec.isbn)}`);
+  if(rec.issn) metaParts.push(`<b>ISSN</b> ${esc(rec.issn)}`);
+  metaParts.push(`<b>Code-barre</b> ${esc(rec._barcode)}`);
+  document.getElementById('roto-meta').innerHTML = metaParts.join(' &nbsp;·&nbsp; ');
+
+  document.getElementById('roto-date').textContent = rec['210$d'] || '—';
+
+  const p = rec.prets || { an3:0, an2:0, an1:0, an:0, cumules:0 };
+  const years = [REFERENCE_YEAR-3, REFERENCE_YEAR-2, REFERENCE_YEAR-1, REFERENCE_YEAR];
+  const values = [p.an3, p.an2, p.an1, p.an];
+  const max = Math.max(1, ...values);
+  document.getElementById('roto-hist').innerHTML = values.map((v,i) => `
+    <div class="roto-hist-col">
+      <div class="roto-hist-val">${v}</div>
+      <div class="roto-hist-bar ${v>0?'nonzero':''}" style="height:${Math.max(3, (v/max)*100)}%"></div>
+      <div class="roto-hist-label">${years[i]}</div>
+    </div>
+  `).join('');
+  const r = rec.reservations || {};
+  const resaTotal = (r.an||0)+(r.an1||0)+(r.an2||0)+(r.an3||0);
+  document.getElementById('roto-cumul').textContent =
+    `${p.cumules} prêt${p.cumules>1?'s':''} au total depuis l'acquisition` +
+    (resaTotal ? ` · ${resaTotal} réservation${resaTotal>1?'s':''} sur les 4 dernières années` : '');
+
+  highlightButtons();
+  document.getElementById('roto-detail').classList.add('show');
+}
+
+function highlightButtons(){
+  if(!currentRecord) return;
+  const t = TRAITEMENTS[currentRecord._barcode];
+  document.querySelectorAll('.roto-btn').forEach(b => {
+    b.classList.toggle('active', !!t && b.dataset.statut === t.statut);
+  });
+  document.getElementById('roto-undo-row').style.display = t ? '' : 'none';
+}
+
+/* ════════════════════════════════════════════════════════════
+   TRAITEMENT (conserver / pilon / braderie / relocalisation)
+   ════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.roto-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if(!currentRecord) return;
+    const statut = btn.dataset.statut;
+    const bc = currentRecord._barcode;
+    const record = { barcode: bc, statut, ts: new Date().toISOString() };
+    TRAITEMENTS[bc] = record;
+    saveLocal();
+    queuePatch({ type:'set', record });
+    updateStats();
+    highlightButtons();
+    renderLog();
+    flashTreated(currentRecord, statut);
+  });
+});
+
+document.getElementById('roto-undo').addEventListener('click', () => {
+  if(!currentRecord) return;
+  const bc = currentRecord._barcode;
+  delete TRAITEMENTS[bc];
+  saveLocal();
+  queuePatch({ type:'clear', barcode: bc });
+  updateStats();
+  highlightButtons();
+  renderLog();
+});
+
+function flashTreated(rec, statut){
+  const fl = document.getElementById('roto-flash');
+  fl.textContent = `✓ « ${titreComplet(rec)} » marqué « ${STATUT_LABEL[statut]} ». Prêt pour le prochain scan.`;
+  fl.classList.add('show');
+  currentRecord = null;
+  document.getElementById('roto-detail').classList.remove('show');
+  scanInput.value = '';
+  scanInput.focus();
+}
+
+/* ════════════════════════════════════════════════════════════
+   JOURNAL DES TRAITEMENTS RÉCENTS
+   ════════════════════════════════════════════════════════════ */
+function renderLog(){
+  const q = (document.getElementById('log-search').value || '').toLowerCase();
+  const rows = Object.values(TRAITEMENTS)
+    .map(t => ({ t, rec: BY_BC.get(t.barcode) }))
+    .filter(({t, rec}) => {
+      if(!q) return true;
+      const titre = rec ? titreComplet(rec).toLowerCase() : '';
+      return t.barcode.toLowerCase().includes(q) || titre.includes(q);
+    })
+    .sort((a,b) => (b.t.ts||'').localeCompare(a.t.ts||''))
+    .slice(0, 200);
+
+  const tbody = document.getElementById('log-tbody');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="5" class="log-empty">Aucun traitement enregistré.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(({t, rec}) => `
+    <tr>
+      <td class="log-bc">${esc(t.barcode)}</td>
+      <td>${rec ? esc(titreComplet(rec)) : '—'}</td>
+      <td><span class="roto-badge roto-badge-statut ${t.statut}">${STATUT_LABEL[t.statut]}</span></td>
+      <td>${t.ts ? esc(new Date(t.ts).toLocaleString('fr-FR')) : ''}</td>
+      <td><button type="button" class="log-del" data-undo="${esc(t.barcode)}">annuler</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-undo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const bc = btn.dataset.undo;
+      delete TRAITEMENTS[bc];
+      saveLocal();
+      queuePatch({ type:'clear', barcode: bc });
+      updateStats();
+      if(currentRecord && currentRecord._barcode === bc) highlightButtons();
+      renderLog();
+    });
+  });
+}
+document.getElementById('log-search').addEventListener('input', renderLog);
+
+/* ════════════════════════════════════════════════════════════
+   EXPORT .TXT PAR TYPE DE TRAITEMENT
+   ════════════════════════════════════════════════════════════ */
+function downloadTxt(text, filename){
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 300);
+}
+document.querySelectorAll('[data-export]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const statut = btn.dataset.export;
+    const barcodes = Object.values(TRAITEMENTS).filter(t => t.statut === statut).map(t => t.barcode);
+    if(!barcodes.length){ alert(`Aucun exemplaire marqué « ${STATUT_LABEL[statut]} » pour l'instant.`); return; }
+    const d = new Date(), pad = n => String(n).padStart(2,'0');
+    downloadTxt(barcodes.join('\n') + '\n', `rotobib-${statut}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════ */
+updateSyncIndicator();
+syncFromServer();
+renderLog();
+scanInput.focus();
+</script>
+</body>
+</html>

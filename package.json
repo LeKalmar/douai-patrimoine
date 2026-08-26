@@ -12,7 +12,9 @@
     "build:force": "SYRACUSE_FORCE=1 node scripts/build-inventory.mjs",
     "build:magasins": "node scripts/build-magasins.mjs",
     "build:cotes-numeriques": "node scripts/build-cotes-numeriques.mjs",
+    "build:desherbage": "node scripts/build-desherbage.mjs",
     "upload:xml": "node scripts/upload-xml-to-r2.mjs",
+    "upload:desherbage": "node scripts/upload-desherbage-to-r2.mjs",
     "test:r2": "node scripts/test-r2.mjs",
     "backfill:reliure": "node scripts/backfill-reliure.mjs"
   }

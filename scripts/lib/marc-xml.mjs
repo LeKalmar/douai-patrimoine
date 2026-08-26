@@ -95,3 +95,34 @@ export function flatten(record, whitelist = null, multiSep = '§') {
   }
   return out;
 }
+
+// Indexe un fichier de notices MARC-XML par $995$f (code-barre de
+// l'exemplaire primaire porté sur la notice) → notice aplatie (flatten()).
+// Partagé par build-magasins.mjs et build-desherbage.mjs (les deux joignent
+// sur le même export xml/magasin/notices.xml.xml) : vit ici plutôt que dans
+// l'un des deux scripts pour qu'importer cette fonction ne déclenche pas le
+// `await main()` de l'autre script (effet de bord d'un import direct
+// module-à-module).
+export function indexNotices(xml, { whitelist = null, multiSep = '§' } = {}) {
+  const notices = new Map();
+  const primaryItemToNotice = new Map();
+
+  let count = 0;
+  for (const recXml of iterateRecords(xml)) {
+    const rec = parseRecord(recXml);
+    const noticeId = rec.controlfields['001'];
+    if (!noticeId) continue;
+
+    const flat = flatten(rec, whitelist, multiSep);
+    flat._noticeId = noticeId;
+    if (rec.leader) flat._leader = rec.leader;
+    notices.set(noticeId, flat);
+
+    const f995 = getSubfield(rec, '995', 'f');
+    if (f995) primaryItemToNotice.set(f995.trim(), noticeId);
+
+    count++;
+  }
+
+  return { notices, primaryItemToNotice, count };
+}
