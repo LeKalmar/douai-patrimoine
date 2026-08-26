@@ -46,7 +46,14 @@ bas, section « Stockage partagé »).
   local committé, contrairement à `npm run build`). Voir « Magasins 2e/5e
   étage » plus bas. Le parseur MARC-XML est partagé entre les deux scripts
   de build via `scripts/lib/marc-xml.mjs`.
-- Avant d'écraser `data/build-report.json` ou `data/magasins-build-report.json`,
+- `npm run build:desherbage` — régénère `data/desherbage.json` et
+  `data/desherbage-build-report.json` à partir de l'export Syracuse
+  « statistiques de prêt » utilisé par Rotobib (`rotobib.html`), toujours
+  récupéré depuis R2 (comme les magasins). `npm run upload:desherbage` pousse
+  `data/xml/desherbage/desherbage.xml` vers R2 après chaque nouvelle
+  extraction. Voir « Rotobib » plus bas.
+- Avant d'écraser `data/build-report.json`, `data/magasins-build-report.json`
+  ou `data/desherbage-build-report.json`,
   chaque script archive la version précédente dans un fichier `-previous.json`
   du même nom (un seul niveau d'historique, écrasé au build suivant). Sert à
   afficher dans `admin.html` un delta de documents (« +N depuis l'export
@@ -72,6 +79,7 @@ bas, section « Stockage partagé »).
 | `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement, photo — tout en un seul formulaire) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
 | `reliures.html` | Création manuelle de groupes de documents reliés ensemble (équivalent $481/$482) et détection des groupes dont les emplacements récolés ne concordent pas — voir « Récolement en cascade des documents reliés » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
+| `rotobib.html` | Désherbage assisté par les statistiques de prêt : scan d'un code-barre, fiche + histogramme de prêts sur 4 ans, décision (conserver/pilon/braderie/relocalisation), export .txt par traitement — voir « Rotobib » | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
 `_archive/` contient des pages retirées du site actif (voir
@@ -635,6 +643,111 @@ déjà `215$a`/`215$d` dans le détail d'une fiche (`DETAIL_FIELDS`), donc
 importance matérielle et dimensions apparaissent sans changement côté
 `js/inventaire.js`.
 
+## Rotobib (désherbage assisté par les statistiques de prêt)
+
+`rotobib.html` (2026-08-26) aide à décider, exemplaire par exemplaire, s'il
+faut le conserver, le mettre au pilon, le mettre en braderie ou le
+relocaliser — en s'appuyant sur ses statistiques de prêt plutôt que sur une
+inspection à l'œil. Porte sur un export Syracuse **ponctuel et distinct** de
+`data/magasins.json` : mêmes exemplaires (des magasins 2e/5e étage), mais
+avec un profil d'export différent donnant accès aux statistiques de prêt/
+réservation par année — informations absentes de l'export magasins habituel.
+**Cet export ne doit jamais être fusionné dans `data/magasins.json` comme
+s'il s'agissait de nouveaux exemplaires** : c'est la même collection, vue
+sous un autre angle, en parallèle, uniquement pour les besoins du
+désherbage.
+
+Pipeline de build (`scripts/build-desherbage.mjs`, `npm run
+build:desherbage`) :
+
+- Entrée : `xml/desherbage/desherbage.xml` (R2, poussé par `npm run
+  upload:desherbage` — pas de repli local committé, comme les magasins/cotes
+  numériques). Format **GESMARC**, pas du MARC-XML comme le reste du
+  projet : `<items><item type="GESMARC"><property name="…" value="…"
+  /></item></items>`, un `<item>` par exemplaire, avec les statistiques de
+  prêt/réservation par année (`Nombre de prêts AN` = année en cours,
+  `AN-1`, `AN-2`, `AN-3`) plus un total `Nombre de prêts cumulés` depuis
+  l'acquisition. Aucune info notice (titre/auteur/date de parution) dans ce
+  fichier — uniquement l'exemplaire. Parsé par un petit parseur dédié
+  (`iterateGesmarcItems`/`parseGesmarcItem` dans build-desherbage.mjs,
+  regex sur `<property name="…" value="…">`), pas par `scripts/lib/marc-xml.mjs`
+  (réservé au vrai MARC-XML).
+- Jointure : vérifié sur l'export du 2026-08-26 (6140 exemplaires) que
+  100% des codes-barres de cet export se retrouvent dans
+  `xml/magasin/notices.xml.xml` (le même export notices que
+  `build-magasins.mjs`, voir « Magasins 2e/5e étage ») — le désherbage
+  porte sur des collections des magasins d'étage. `indexNotices()` (dans
+  `scripts/lib/marc-xml.mjs`, factorisée hors de `build-magasins.mjs` pour
+  que l'import de cette seule fonction ne déclenche pas tout le
+  `build-magasins.mjs`, qui exécute son `main()` au chargement du module)
+  sert à la fois à `build-magasins.mjs` et `build-desherbage.mjs`, chacun
+  avec sa propre whitelist de champs notice. Pas besoin de retélécharger
+  `xml/magasin/exemplaires.xml.xml` : les champs exemplaire utiles (cote,
+  section, état, statistiques) sont déjà dans `desherbage.xml` lui-même.
+- Champs de prêt/réservation vides dans l'export : Syracuse omet la valeur
+  plutôt que d'écrire "0" pour les 4 compteurs annuels — vérifié que la
+  somme des 4 années (vide = 0) ne dépasse jamais `Nombre de prêts
+  cumulés` (toujours écrit explicitement, y compris "0"), et que
+  `cumulés` peut être strictement supérieur à cette somme quand
+  l'exemplaire a des prêts plus anciens que les 4 dernières années. Une
+  case vide sur les 4 compteurs annuels signifie donc bien "0 prêt cette
+  année-là" (`parseCount()`), pas une donnée manquante — sur l'export de
+  référence, seuls 70 des 6140 exemplaires ont au moins une valeur non
+  vide sur ces 4 champs, ce qui est cohérent avec le principe même de
+  l'outil : ce sont majoritairement des livres peu ou pas empruntés
+  récemment.
+- Année de référence de "AN" : absente de l'export (pas de date
+  d'extraction fournie par Syracuse dans ce format). Prise par défaut comme
+  l'année en cours au moment du `npm run build:desherbage`
+  (`new Date().getFullYear()`), réglable via la variable d'environnement
+  `DESHERBAGE_REFERENCE_YEAR` si le build est lancé longtemps après
+  l'export réel. Stockée dans `data/desherbage-build-report.json`
+  (`stats.referenceYear`), lue par `rotobib.html` pour étiqueter les
+  barres de l'histogramme avec de vraies années plutôt que "AN"/"AN-1"/etc.
+- Sortie : `data/desherbage.json` (un enregistrement par exemplaire,
+  champs notice dénormalisés `200$a`/`210$d`/`700$a`/… comme
+  `data/magasins.json`, plus `prets`/`reservations` — objets `{an, an1,
+  an2, an3, cumules}` — et les champs propres à l'export désherbage :
+  `coteAffichee`, `bibliotheque`, `section`, `etat`, `exclusionPret`,
+  `imagette`…) + `data/desherbage-build-report.json` (même mécanique
+  d'archivage `-previous.json` que les autres builds).
+
+Côté `rotobib.html` : un champ de scan (comme `recolement.html` — une
+scannette USB suffit, pas de lecture caméra) affiche, dès qu'un code-barre
+de l'export est reconnu, la fiche de l'exemplaire (titre, auteur, éditeur,
+cote, description) et met en avant deux informations utiles à la décision :
+la **date de parution** (`210$d`, dans un encadré, affichée telle quelle —
+volontairement non re-parsée en année numérique pour ne pas perdre une
+mention imprécise du type "18e siècle" ou "s.d.") et un **histogramme des
+prêts sur les 4 dernières années** (`prets.an3`→`prets.an`, étiquetées avec
+les vraies années déduites de `referenceYear`), avec le total cumulé
+affiché à part en dessous (pas comme une 5e barre : il peut inclure des
+prêts antérieurs aux 4 années représentées, donc pas comparable terme à
+terme). Quatre boutons **Conserver / Pilon / Braderie / Relocalisation**
+enregistrent la décision ; « Relocalisation » reste une simple étiquette de
+traitement (pas de saisie d'emplacement dans cet outil — si un jour
+nécessaire, voir le sélecteur travée/colonne/étage de
+`exemplarisation.html`/`transfert-magasins.html` comme modèle). Après un
+choix, le panneau se referme et le champ de scan reprend le focus, prêt
+pour l'exemplaire suivant — même logique d'enchaînement que le scan de
+`recolement.html`.
+
+Décisions stockées dans R2 sous la clé `desherbage-traitements.json`
+(`api/desherbage.mjs`, forme `{ [barcode]: {barcode, statut, ts} }`, même
+patron GET public / POST authentifié / compare-and-swap que
+`api/exemplaires-manuels.mjs` — patch `{type:'set', record}` pour
+choisir/changer un traitement, `{type:'clear', barcode}` pour l'annuler),
+partagées entre collègues comme le reste de l'outillage (plusieurs postes
+peuvent désherber en parallèle). `rotobib.html` reprend le patron habituel
+de synchronisation (localStorage `rp_desherbage_traitements` comme source
+de vérité locale, file d'attente `rp_desherbage_pending_sync` rejouée à la
+reconnexion). Un bandeau de statistiques (total de l'export, compte par
+traitement, non traités) et un journal des traitements récents (recherche,
+bouton « annuler » par ligne) donnent une vue d'ensemble de l'avancement
+de la campagne. Quatre boutons d'export `.txt` (un code-barre par ligne,
+même convention que les autres exports du projet) — un par traitement, y
+compris « Conserver » — pour ajout panier dans le SIGB.
+
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
 Bucket R2 `douai-patrimoine` (compte Cloudflare de l'utilisateur), utilisé
@@ -648,12 +761,13 @@ pour trois choses indépendantes :
   (dev local sans `.env`), comportement d'origine inchangé — lecture des
   fichiers locaux, échec strict s'ils manquent.
 - **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`,
-  `reliures-manuelles.json`, `transferts-magasins.json`** : état partagé
-  canonique de `recolement.html` / `livres-spolies.html` /
+  `reliures-manuelles.json`, `transferts-magasins.json`, `desherbage-traitements.json`** :
+  état partagé canonique de `recolement.html` / `livres-spolies.html` /
   `exemplarisation.html` (voir « Exemplarisation rapide » plus haut) /
   `reliures.html` (voir « Récolement en cascade des documents reliés » plus
   haut) / `transfert-magasins.html` (voir « Transfert 2e étage → réserve
-  patrimoniale » plus haut), pour que plusieurs collègues avancent en même
+  patrimoniale » plus haut) / `rotobib.html` (voir « Rotobib » plus haut),
+  pour que plusieurs collègues avancent en même
   temps sans export/import JSON manuel. Chaque page garde le `localStorage`
   comme source de vérité locale (fonctionne hors ligne, file d'attente
   `rp_*_pending_sync` rejouée à la reconnexion) et envoie en plus chaque
@@ -673,9 +787,9 @@ pour trois choses indépendantes :
   catégories ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
   dans le site ne relit ces images pour l'instant.
 
-Six fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
+Sept fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
 `api/exemplaires-manuels.mjs`, `api/reliures-manuelles.mjs`,
-`api/vignette.mjs`, `api/transferts.mjs`) servent de proxy vers R2 :
+`api/vignette.mjs`, `api/transferts.mjs`, `api/desherbage.mjs`) servent de proxy vers R2 :
 `GET` (sauf `api/vignette.mjs`, POST uniquement) renvoie l'état courant
 (public, même niveau
 d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit un
