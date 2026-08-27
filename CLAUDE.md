@@ -1355,3 +1355,20 @@ est sécurisé au-delà de ce qui est décrit ici.
   des données réelles. À cette occasion, ajout de la catégorie
   `lastShelves` (voir plus haut) pour le cas inverse : marquer qu'une
   colonne s'arrête réellement avant le `maxEt` par défaut de sa travée.
+- Corrigé (2026-08-27) : le compteur « catalogué » d'un emplacement de
+  magasin (`reserve.html`, et le mini-plan de `recolement.html`) pouvait
+  être très sous-évalué par rapport au nombre réel de scans reconnus — ex.
+  34 exemplaires scannés sur une étagère du 6e étage affichés comme
+  seulement 2 « catalogué(s) ». Cause : `parseRecolement()`/
+  `buildLocalSlotState()` dédoublonnaient le compteur par **cote** (pour
+  qu'un même exemplaire rescanné ne gonfle jamais le compteur), une
+  hypothèse valide en réserve et au 2e/5e étage (cote = numéro séquentiel
+  unique par exemplaire) mais fausse au 6e étage, où la cote est littéraire
+  (ex. « R BEN ») et désigne une **catégorie de rayon**, pas un livre : des
+  dizaines de titres différents y partagent légitimement la même cote — le
+  dédoublonnage les écrasait donc en une seule entrée comptée. Corrigé en
+  réservant ce dédoublonnage par cote à la réserve
+  (`isMagasinTravee()` dans `reserve.html`, `traveeGroupOf(tid)!=='reserve'`
+  dans `recolement.html`) : pour un magasin, chaque code-barre compte
+  individuellement (déjà garanti unique par l'état R2, keyé par
+  code-barre), sans déduplication supplémentaire.

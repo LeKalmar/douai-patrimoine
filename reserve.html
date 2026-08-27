@@ -132,6 +132,7 @@
       <p class="page-lead">Visualisation topographique des espaces de stockage d'après le récolement — réserve (travées, armoires à tiroirs, armoires en bois) et magasins d'étage.</p>
     </div>
     <div class="hero-actions">
+      <a href="recolement.html">📷 Récolement</a>
       <a href="admin.html">← Espace professionnel</a>
       <button type="button" id="logout-btn">Se déconnecter</button>
     </div>
@@ -385,6 +386,12 @@ function parseLastShelf(rows){
   });
 }
 
+// Travées de magasin d'étage (préfixe M2-/M5-/M6-) — voir isMagasinTravee()
+// juste en dessous pour pourquoi leur dédoublonnage diffère de la réserve.
+function isMagasinTravee(t){
+  return t.startsWith('M2-') || t.startsWith('M5-') || t.startsWith('M6-');
+}
+
 function parseRecolement(rows){
   CNT={}; CNT_MANUEL={}; DET={};
   rows.forEach(row=>{
@@ -403,8 +410,20 @@ function parseRecolement(rows){
     const key = `${t}|${col}|${etage}`;
     if (!DET[key]) DET[key] = [];
 
-    // Ne compter et n'ajouter que si la cote est nouvelle pour ce slot
-    const coteDejaVue = cote && DET[key].some(x => x.c === cote);
+    // Dédoublonnage par cote réservé à la réserve (patrimoniale/Douaisienne/
+    // armoires/tiroirs) : là, une cote identifie une notice unique, donc
+    // deux exemplaires qui la partagent sont deux copies de LA MÊME notice,
+    // à ne compter qu'une fois. Dans les magasins d'étage en revanche, la
+    // cote du 6e étage est littéraire (ex. "R BEN" = Roman, auteur en
+    // "BEN…") : c'est une catégorie de rayon, pas un identifiant de livre —
+    // des dizaines de titres différents y partagent légitimement la même
+    // cote. Y dédoublonner par cote sous-comptait donc gravement le nombre
+    // de livres réellement récolés (ex. 32 romans "R BEN" comptés comme 1
+    // seul). Le code-barre, lui, est toujours unique par exemplaire (chaque
+    // entrée de `rows` vient d'un état déjà keyé par code-barre côté
+    // serveur) : pour un magasin, chaque scan compte donc individuellement,
+    // sans déduplication supplémentaire.
+    const coteDejaVue = !isMagasinTravee(t) && cote && DET[key].some(x => x.c === cote);
     if (!coteDejaVue) {
       if (manuel) CNT_MANUEL[key] = (CNT_MANUEL[key] || 0) + 1;
       else CNT[key] = (CNT[key] || 0) + 1;
