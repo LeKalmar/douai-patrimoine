@@ -1543,22 +1543,30 @@ function travMiniTitle(tid){
 
 // Reconstruit, pour la seule travée tid, les mêmes maps que CNT/NONCAT/VIDE/
 // NONRANGE dans reserve.html — dédoublonnage par cote identique à
-// parseRecolement() là-bas, pour qu'un même exemplaire rescanné plusieurs
-// fois ne gonfle jamais le compteur "catalogué" de la case.
+// parseRecolement() là-bas (voir isMagasinTravee() côté reserve.html pour
+// le détail) : réservé à la réserve, où une cote identifie une notice
+// unique (deux exemplaires la partageant sont deux copies de la même
+// notice, à ne compter qu'une fois) ; sauté pour les magasins d'étage, où
+// la cote du 6e étage est littéraire (ex. "R BEN") et partagée par des
+// dizaines de livres différents — y dédoublonner par cote sous-compterait
+// gravement le nombre réel de livres récolés.
 function buildLocalSlotState(tid){
   // cnt = exemplaires réellement catalogués (Syracuse), manuel = exemplaires
   // créés via exemplarisation.html (voir catalog[bc].manuel plus haut) —
   // deux compteurs distincts pour que le mini-plan les colore différemment
   // (bleu vs orange), même logique que parseRecolement() dans reserve.html.
+  const isMagasin = traveeGroupOf(tid) !== 'reserve';
   const cnt={}, manuel={}, seenCotes={};
   Object.values(scans).forEach(r=>{
     if(r.kind==='horsreserve' || r.travee!==tid) return;
     const key=`${r.travee}|${r.colonne}|${r.etage}`;
-    if(!seenCotes[key]) seenCotes[key]=new Set();
-    const cote=(r.cote||'').trim();
-    if(cote){
-      if(seenCotes[key].has(cote)) return;
-      seenCotes[key].add(cote);
+    if(!isMagasin){
+      if(!seenCotes[key]) seenCotes[key]=new Set();
+      const cote=(r.cote||'').trim();
+      if(cote){
+        if(seenCotes[key].has(cote)) return;
+        seenCotes[key].add(cote);
+      }
     }
     if(r.manuel) manuel[key]=(manuel[key]||0)+1;
     else cnt[key]=(cnt[key]||0)+1;
