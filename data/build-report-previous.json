@@ -1,17 +1,19 @@
 {
-  "generatedAt": "2026-07-25T17:38:26.946Z",
-  "durationMs": 3078,
+  "generatedAt": "2026-08-14T13:52:05.726Z",
+  "durationMs": 3764,
   "status": "ok",
   "warnings": [],
   "stats": {
-    "notices": 15268,
-    "items": 15268,
-    "joinedByPrimary": 15268,
+    "notices": 15518,
+    "items": 15518,
+    "joinedByPrimary": 15518,
     "joinedByCote": 0,
     "orphans": 0,
     "joinRate": 100,
-    "reserveDouaisienne": 6452,
-    "reservePatrimoniale": 8816
+    "reserveDouaisienne": 6614,
+    "reservePatrimoniale": 8904,
+    "reliureGroups": 178,
+    "reliureItems": 703
   },
   "orphansSample": []
 }

@@ -161,6 +161,13 @@ async function buildItems(path) {
       _isMagasin: isMagasin,
       _secteur: section,
       _bibliotheque: bibliotheque,
+      // Champ Syracuse "Piège" (MARC 921$a/$b, ex. "Pilon", "Braderie", "En
+      // magasin", "Exclu DEFINITIVEMENT du prêt Consultation sur place") —
+      // déjà résolu en libellé lisible côté GESMARC (pas besoin de mapper de
+      // codes ici, contrairement à build-inventory.mjs qui repart du
+      // MARC-XML brut). Repris tel quel par recolement.html pour signaler un
+      // exemplaire à traiter (pilon/braderie…) dans les tableaux d'anomalies.
+      _piege: (props['Pièges'] || '').trim() || null,
       // Pour un exemplaire hors magasin, le "fonds" affiché est sa vraie
       // section Syracuse (ex. "Adulte", "Réserve"…) plutôt qu'un libellé de
       // magasin — c'est justement ce qui rend une anomalie de classement

@@ -79,6 +79,54 @@ const CONFIG = {
   force: process.env.SYRACUSE_FORCE === '1',
 };
 
+// ── Piège (MARC 921$a/$b) ────────────────────────────────────────────────
+// Champ Syracuse indiquant un statut particulier de l'exemplaire (pilon,
+// braderie, consultation sur place, perdu…). Contrairement à bib.xml (export
+// GESMARC, voir build-magasins.mjs) qui porte directement un libellé lisible
+// ("Pièges"), le MARC-XML utilisé ici ne porte que les codes bruts ($a =
+// nature de l'exclusion, $b = motif détaillé) — on les résout à la main avec
+// cette table, construite par relevé exhaustif des couples (Code)/(Libellé)
+// de bib.xml (les deux exports partagent la même table de codes Syracuse).
+// Un code absent de la table est affiché tel quel plutôt que masqué.
+const PIEGE_A_LABELS = {
+  1: 'Exclu du prêt temporairement',
+  2: 'Exclu DEFINITIVEMENT du prêt',
+  4: 'Non réservable',
+};
+const PIEGE_B_LABELS = {
+  2: 'en réserve',
+  3: 'perdu',
+  4: 'pilon',
+  7: 'Equipement',
+  8: 'Réserve Patrimoniale',
+  9: 'Voir banque de prêt',
+  10: 'Réserve Saint Exupery',
+  BRAD: 'Braderie',
+  CSP: 'Consultation sur place',
+  EXC: 'Exclu de la recherche portail',
+  MAG: 'En magasin',
+  PAD: 'Prêt à Domicile',
+  PER: 'Perdu',
+  PIL: 'Pilon',
+  QUAR: 'Quarantaine',
+  RAP: '3 rappels envoyés',
+  REP: 'En réparation',
+  TRA: 'En traitement',
+};
+// Reproduit le format du champ "Pièges" déjà concaténé côté GESMARC (voir
+// build-magasins.mjs), pour que recolement.html affiche la même chose quel
+// que soit la source (réserve ou magasins).
+function piegeLabelOf(merged) {
+  const a = (merged['921$a'] || '').trim();
+  const b = (merged['921$b'] || '').trim();
+  const c = (merged['921$c'] || '').trim();
+  const parts = [];
+  if (a) parts.push(PIEGE_A_LABELS[a] || a);
+  if (b) parts.push(PIEGE_B_LABELS[b] || b);
+  if (c) parts.push(c);
+  return parts.length ? parts.join(' ') : null;
+}
+
 // ── Reliures ($481 « aussi relié dans ce volume » / $482 « relié à la suite
 // de ») ──────────────────────────────────────────────────────────────────
 // Ces deux champs référencent (sous-champ $3) une AUTRE notice du même
@@ -256,6 +304,7 @@ function buildItems(xml, index) {
     merged._itemId = itemId;
     merged._noticeId = noticeId ?? null;
     merged._joinType = joinType;
+    merged._piege = piegeLabelOf(merged);
 
     // Vignette : reconstruite à partir du code-barres de l'exemplaire, plus
     // besoin d'une colonne CSV dédiée — l'URL S3/R2 est fixe, seul le nom du

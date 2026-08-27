@@ -163,7 +163,7 @@ menu déroulant se désactive automatiquement sur « Réserve Douaisienne »).
 données produites par `recolement.html` (un seul bouton « Exporter le
 récolement », un seul export/import à gérer) :
 `{ scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
-lastShelves:[...], resolvedIssues:[...] }`.
+lastShelves:[...], noBarcodeCotes:[...] }`.
 `videShelves` sert à marquer explicitement qu'une étagère est vide (aucun
 livre, catalogué ou non) — utile car le nombre d'étagères réelles par
 colonne varie (jusqu'à `maxEt` défini par travée dans
@@ -331,34 +331,53 @@ sur ce flag. Un exemplaire créé avec emplacement directement depuis
 envoie à `/api/recolement`, sans attendre un premier rescan physique.
 
 Les « Statistiques avancées du récolement » (bas de `recolement.html`)
-listent trois catégories de problèmes, chacune dans un `<details>` repliable
-(rendu paresseux — le tableau détaillé n'est reconstruit que si le panneau
-est ouvert, pour ne pas payer le coût DOM à chaque scan — et paginé,
-`ADV_PAGE_SIZE` lignes par page avec Précédent/Suivant, plutôt qu'un plafond
-qui tronquerait la liste : la catégorie « jamais scannés » peut compter
-plusieurs milliers d'entrées) : **codes-barres endommagés** (`scans`
-avec `barcodeAbime:true`, saisis à la main faute de pouvoir être scannés),
-**scannés non catalogués** (un scan (`scans`, avec une cote saisie via le
-champ « Renseigner » du feedback faute de correspondance au moment du scan)
-dont le code-barre reste absent du `catalog` *actuel* — comparaison en
-direct à chaque rendu, pas figée sur les `titre`/`auteur` enregistrés au
-moment du scan : un exemplaire sort tout seul de cette liste dès qu'un
-nouvel export Syracuse le fait apparaître dans le catalogue — ex. correction
-d'une mauvaise localisation côté SIGB — sans avoir besoin de le rescanner ;
-à distinguer des exemplaires `manuel` d'`exemplarisation.html`, exclus via
-leur flag `manuel`) et **jamais scannés** (différence entre les
+listent plusieurs catégories de problèmes, chacune dans un `<details>`
+repliable (rendu paresseux — le tableau détaillé n'est reconstruit que si
+le panneau est ouvert, pour ne pas payer le coût DOM à chaque scan — et
+paginé, `ADV_PAGE_SIZE` lignes par page avec Précédent/Suivant, plutôt
+qu'un plafond qui tronquerait la liste : la catégorie « jamais scannés »
+peut compter plusieurs milliers d'entrées) : **codes-barres endommagés**
+(`scans` avec `barcodeAbime:true`, saisis à la main faute de pouvoir être
+scannés), **scannés non catalogués** (un scan (`scans`, avec une cote
+saisie via le champ « Renseigner » du feedback faute de correspondance au
+moment du scan) dont le code-barre reste absent du `catalog` *actuel* —
+comparaison en direct à chaque rendu, pas figée sur les `titre`/`auteur`
+enregistrés au moment du scan : un exemplaire sort tout seul de cette liste
+dès qu'un nouvel export Syracuse le fait apparaître dans le catalogue — ex.
+correction d'une mauvaise localisation côté SIGB — sans avoir besoin de le
+rescanner ; à distinguer des exemplaires `manuel` d'`exemplarisation.html`,
+exclus via leur flag `manuel`) et **jamais scannés** (différence entre les
 codes-barres de `catalog` et ceux de `scans` — potentiellement perdus, ou
-récolement pas encore fait sur cet exemplaire). Chaque panneau a un bouton
-d'export (`.txt`, un code-barre par ligne, respectant la recherche et
-la case « Afficher aussi les réglés » en cours) et, par ligne, un bouton
-✓ Réglé/↺ Rouvrir qui bascule un flag dans `resolvedIssues` (clé composite
-`categorie|barcode` — un même code-barre peut apparaître réglé dans une
-catégorie et pas dans une autre) sans toucher aux données sous-jacentes : ça
-ne fait que retirer l'entrée des compteurs et de la liste par défaut, le
-vrai traitement (rescanner, cataloguer…) reste à faire séparément. Ce flag
-est synchronisé vers R2 comme le reste (patch `resolveIssue` dans
-`api/recolement.mjs`), pour qu'un problème réglé par un·e collègue
-disparaisse aussi chez les autres.
+récolement pas encore fait sur cet exemplaire). Ces tableaux (ainsi que
+« anomalies de classement », voir plus bas — mais pas « scannés non
+catalogués », pour qui le code-barre est justement absent du catalogue au
+moment du scan) affichent aussi, quand elle est connue, une colonne
+**Piège** (2026-08-27) — le champ Syracuse indiquant un statut particulier
+de l'exemplaire (« Pilon », « Braderie », « En magasin », « Exclu
+DEFINITIVEMENT du prêt Consultation sur place »…, MARC 921$a/$b/$c),
+propagé jusque dans `catalog[bc].piege` puis `record.piege` (comme
+`etat`/`fonds`), pour repérer un exemplaire à traiter sans avoir à rouvrir
+Syracuse pour chaque code-barre suspect. Deux sources selon le fonds,
+posées par les scripts de build (jamais recalculé côté client) : côté
+magasins, `build-magasins.mjs` reprend tel quel le champ déjà résolu par
+l'export GESMARC de `bib.xml` (`props['Pièges']`, ex. "Exclu
+DEFINITIVEMENT du prêt Consultation sur place") ; côté réserve,
+`data/xml/exemplaires.xml` (MARC-XML) ne porte que les codes bruts
+(921$a = nature de l'exclusion, 921$b = motif, 921$c = note libre), donc
+`build-inventory.mjs` les résout à la main via `PIEGE_A_LABELS`/
+`PIEGE_B_LABELS` (table relevée exhaustivement depuis les couples
+(Code)/(Libellé) de `bib.xml` — les deux exports partagent la même table de
+codes Syracuse) et les concatène dans le même format que le champ
+« Pièges » de GESMARC, pour un rendu identique côté `recolement.html` quel
+que soit le fonds d'origine. Chaque panneau a un bouton d'export (`.txt`,
+un code-barre par ligne, respectant la recherche en cours). Il n'y a
+volontairement plus de mécanisme « ✓ Réglé/↺ Rouvrir » (retiré le
+2026-08-27, jugé inutile à l'usage) : ces
+tableaux reflètent toujours l'état brut des données, sans notion de
+problème « traité » distincte du scan/catalogage réel. Depuis la même date,
+les magasins ne forment plus un seul groupe combiné mais trois groupes
+indépendants (2e/5e/6e étage), voir plus bas « Récolement des magasins
+d'étage » pour le détail.
 
 `histoire-du-livre.html` est indépendante de ce flux : elle charge ses
 propres CSV (`csv/Professionnels.csv`, `Individus.csv`, `Documents.csv`,
@@ -946,10 +965,9 @@ partagée est inactive. `npm run test:r2` permet de vérifier un token sans
 toucher aux données réelles.
 
 En plus des patchs unitaires (`scan`, `deleteScan`, `nonCat`, `vide`,
-`nonrange`, `lastShelf`, `resolveIssue` — ce dernier pour les « Statistiques
-avancées », voir plus haut), `api/recolement.mjs` accepte un patch
+`nonrange`, `lastShelf`, `noBarcode`), `api/recolement.mjs` accepte un patch
 `bulkMerge` (`{type:'bulkMerge', data:{scans, nonCatalogues, videShelves,
-nonRangeShelves, lastShelves, resolvedIssues}}`) qui fusionne un lot entier
+nonRangeShelves, lastShelves, noBarcodeCotes}}`) qui fusionne un lot entier
 avec la même sémantique que les patchs unitaires (jamais de suppression, un
 scan plus récent — `ts` — l'emporte sur un plus ancien). C'est ce patch
 qu'envoie `recolement.html`
@@ -1050,14 +1068,13 @@ est alors la vraie section Syracuse de ce document (ex. « Adulte »), posée
 par `_fondsLabel` (voir plus haut) au lieu d'un libellé de magasin. Le
 `record` de ce scan porte en plus `horsSection:true`, affiché comme badge
 rouge « ⚠ Anomalie de classement » dans le panneau de feedback du scan, et
-alimente une 4e liste des « Statistiques avancées (Magasins) » —
-`ADV_CATS.horssection` (`horsSectionList()`), avec le même suivi
-réglé/rouvert et le même export `.txt` que les 3 catégories existantes —
-pour repérer les documents à reclasser ou à corriger dans Syracuse. Cette
-liste reste vide côté groupe « Réserve » (un scan de la réserve
-patrimoniale/Douaisienne n'a aucun moyen de poser `horsSection`), affichée
-par la même génération générique de template que le reste sans code
-spécifique par groupe.
+alimente une liste supplémentaire des « Statistiques avancées » —
+`ADV_CATS.horssection` (`horsSectionList()`), avec le même export `.txt`
+que les autres catégories — pour repérer les documents à reclasser ou à
+corriger dans Syracuse. Cette liste reste vide côté groupe « Réserve » (un
+scan de la réserve patrimoniale/Douaisienne n'a aucun moyen de poser
+`horsSection`), affichée par la même génération générique de template que
+le reste sans code spécifique par groupe.
 
 `reserve.html` (le plan visuel, renommé « Plan des Magasins » à
 l'introduction des magasins 2e/5e étage) visualise ces locaux. La page est
@@ -1088,32 +1105,53 @@ date) — même mécanisme que le bouton « Sauvegarder ce récolement »,
 déclenché ici depuis un script Node ponctuel plutôt que depuis l'UI.
 
 Les « Statistiques avancées du récolement » (bas de `recolement.html`,
-2026-08-19) sont dupliquées en deux groupes indépendants — **Réserve**
-(patrimoniale, Douaisienne, armoires, tiroirs, hors-réserve) et
-**Magasins (2e/5e/6e étage)** — plutôt qu'un seul panneau global mélangeant
-les deux : occupation des emplacements, stats de temps et les 3 listes à
-problèmes (codes-barres endommagés, non catalogués à cote manuelle,
-jamais scannés) sont donc calculées et affichées séparément pour chaque
-groupe. Le groupe d'un scan est déterminé par `traveeGroupOf(travee)`
-(même principe que `catalogGroupOfReserve()` côté catalogue) : toute
-travée préfixée `M2-`/`M5-`/`M6-` est « magasin », tout le reste est
-« réserve ». Le HTML des deux groupes (barre d'occupation, stats-row de
-temps, 3 `<details>`) est généré une seule fois par
-`advGroupTemplate()`/`advDetailsTemplate()` à partir de `ADV_GROUPS` et
-`ADV_CATS` (deux tableaux/objets de configuration) plutôt qu'écrit deux
-fois à la main dans le HTML statique — tous les identifiants DOM sont
-suffixés `-reserve`/`-magasin` (ex. `adv-abime-reserve`,
-`log-notscanned-magasin`). `damagedList()`, `manualCoteList()` et
-`notScannedList()` prennent désormais un paramètre `group` ; les deux
-dernières comparent contre `catalogByGroup[group]` (voir plus haut)
-plutôt que contre la variable `catalog` active, donc les deux groupes
-restent visibles et à jour simultanément, indépendamment de la réserve
-actuellement sélectionnée dans le sélecteur d'emplacement (contrairement
-au catalogue de reconnaissance au scan, qui lui reste un simple pointeur
-basculé par `syncActiveCatalog()`). La clé de `resolvedIssues`
-(`categorie|barcode`) n'inclut volontairement pas le groupe : un
-code-barre donné n'appartient qu'à un seul groupe (via la travée de son
-scan), aucune ambiguïté possible entre les deux panneaux.
+2026-08-19 ; scindées par étage de magasin le 2026-08-27, voir plus bas)
+sont dupliquées en plusieurs groupes indépendants — `ADV_GROUPS` :
+**Réserve** (patrimoniale, Douaisienne, armoires, tiroirs, hors-réserve) et
+un groupe par magasin d'étage, **Magasin — 2e étage**, **Magasin — 5e
+étage**, **Magasin — 6e étage** — plutôt qu'un seul panneau global
+mélangeant tout : occupation des emplacements, stats de temps et les
+listes à problèmes (codes-barres endommagés, non catalogués à cote
+manuelle, jamais scannés, livres sans code-barre, anomalies de classement)
+sont donc calculées et affichées séparément pour chaque groupe. Le groupe
+d'un scan est déterminé par `traveeGroupOf(travee)` : toute travée
+préfixée `M2-`/`M5-`/`M6-` devient respectivement `'magasin-2e'`/
+`'magasin-5e'`/`'magasin-6e'`, tout le reste est `'reserve'` — à ne pas
+confondre avec `catalogGroupOfReserve()` côté catalogue (js/reserve-shared.js),
+resté binaire `reserve`/`magasin` puisque `catalogByGroup.magasin` n'est
+toujours pas scindé par étage (voir plus haut) ; `catalogGroupOf(advGroupId)`
+dans `recolement.html` fait la traduction id-de-groupe-stats →
+id-de-catalogue partout où un groupe de statistiques avancées a besoin du
+catalogue (`manualCoteList()`, `notScannedList()`, `refreshAdvList()`,
+`updateAdvListsCount()`). `notScannedList()` filtre en plus, pour un groupe
+magasin, chaque entrée du catalogue par son étage déduit de la cote
+(`magasinEtageGroupOfDigitRun(coteDigitRun)`, mêmes seuils que
+`MAGASIN_ETAGE_THRESHOLDS`/`magasins.html`) — seule information disponible
+côté catalogue tant qu'un exemplaire n'a pas été scanné (même logique
+dénominateur que `magasinFloorStats()`, ci-dessous). Le HTML de chaque
+groupe (barre d'occupation, stats-row de temps, `<details>` par catégorie)
+est généré une seule fois par `advGroupTemplate()`/`advDetailsTemplate()` à
+partir de `ADV_GROUPS` et `ADV_CATS` (deux tableaux/objets de
+configuration) plutôt qu'écrit à la main pour chacun — tous les
+identifiants DOM sont suffixés par l'id du groupe (ex.
+`adv-abime-magasin-2e`, `log-notscanned-magasin-6e`). Chaque catégorie a un
+bouton d'export `.txt` par groupe ; les 3 groupes magasin ont en plus un
+second bouton « ⬇ Exporter tous les magasins », qui réunit les 3 étages
+(`MAGASIN_ADV_GROUPS.flatMap(...)`) sans tenir compte de la recherche en
+cours de ce groupe précis — pour exporter en un clic les codes-barres
+problématiques de toute la zone magasins sans devoir répéter l'export 3
+fois. Il n'y a plus de suivi « réglé/rouvert » par ligne (retiré le
+2026-08-27, jugé inutile à l'usage) — ces tableaux reflètent toujours
+l'état brut, sans notion de problème « traité » séparée du vrai
+scan/catalogage.
+
+« Notices récolées » par magasin physique (`magasinFloorStats()`, un
+stat-card dans chacun des 3 groupes magasin, id `st-etage-<gid>`) reprend
+le même calcul dual-axe qu'avant la scission par groupe (numérateur =
+notices distinctes scannées sous une travée de cet étage ; dénominateur =
+exemplaires du catalogue classés à cet étage par leur cote) — seulement
+recadré pour peupler un stat-card par groupe plutôt que 3 cartes dans un
+seul panneau combiné.
 
 Piège rencontré en construisant cette section (2026-08-19) : `ADV_GROUPS`/
 `ADV_CATS` (et la ligne qui injecte le HTML dans `#adv-groups`) doivent être
@@ -1150,28 +1188,32 @@ créés via `exemplarisation.html` (également sans `_noticeId`), qui étaient
 donc, eux aussi, silencieusement exclus de ce compteur côté réserve avant
 ce correctif.
 
-Répartition par magasin distinct (`recolement.html`, 2026-08-26) : en plus
-du total groupé « Notices récolées » du bloc Magasins ci-dessus,
-trois cartes supplémentaires (« Notices récolées — 2e étage »/« — 5e
-étage »/« — 6e étage », `updateMagasinEtageStats()`) détaillent la
-progression par magasin physique distinct, seulement dans le groupe
-`magasin` de `advGroupTemplate()` (`gid==='magasin'`, absent du groupe
-Réserve). Nécessaire car `catalogByGroup.magasin` reste un catalogue
-**unique**, non scindé par étage (voir « Reconnaissance de code-barre par
-un second catalogue » plus haut) — chaque exemplaire y est donc reclassé
-a posteriori sur deux axes différents selon qu'on compte le numérateur ou
-le dénominateur :
+Répartition par magasin distinct (`recolement.html`, 2026-08-26 ; recadrée
+en un stat-card par groupe le 2026-08-27 lors de la scission des
+« Statistiques avancées » par étage, voir plus haut) : un stat-card
+« Notices récolées » (`st-etage-<gid>`, `updateMagasinEtageStats()`) dans
+chacun des 3 groupes magasin de `advGroupTemplate()` (absent du groupe
+Réserve) détaille la progression de ce magasin physique. Nécessaire car
+`catalogByGroup.magasin` reste un catalogue **unique**, non scindé par
+étage (voir « Reconnaissance de code-barre par un second catalogue » plus
+haut) — chaque exemplaire y est donc reclassé a posteriori sur deux axes
+différents selon qu'on compte le numérateur ou le dénominateur
+(`magasinFloorStats(group)`, `group` valant `'magasin-2e'`/`'magasin-5e'`/
+`'magasin-6e'`) :
 
 - **Récolé** (numérateur) : d'après la travée réelle du scan
-  (`magasinEtageOfTravee()`, préfixe `M2-`/`M5-`/`M6-` du `record.travee`)
-  — le terrain, exactement ce que le récolement vérifie physiquement.
-- **Total** (dénominateur) : d'après la cote (`magasinEtageOfDigitRun()`,
+  (`traveeGroupOf()`, préfixe `M2-`/`M5-`/`M6-` du `record.travee` — même
+  fonction que celle qui scinde tout le reste des « Statistiques
+  avancées » par groupe) — le terrain, exactement ce que le récolement
+  vérifie physiquement.
+- **Total** (dénominateur) : d'après la cote (`magasinEtageGroupOfDigitRun()`,
   appliqué à `coteDigitRun` — propagé dans `buildCatalogFromItems()` depuis
   `_coteDigitRun` de `data/magasins.json`, mêmes seuils
   `MAGASIN_ETAGE_THRESHOLDS` que `ETAGE_THRESHOLDS` dans `magasins.html`) —
   seule information disponible côté catalogue, qui lui n'a pas de notion
   d'emplacement physique tant qu'un exemplaire n'a pas été scanné au moins
-  une fois.
+  une fois. Même fonction utilisée par `notScannedList()` pour filtrer par
+  étage la liste « jamais scannés » de chaque groupe magasin.
 
 Ces deux axes ne sont volontairement pas garantis cohérents entre eux : un
 exemplaire dont la cote indique "2e étage" mais scanné sous une travée
@@ -1179,10 +1221,11 @@ exemplaire dont la cote indique "2e étage" mais scanné sous une travée
 partie du total attendu du 2e étage (axe cote) — un léger écart de ce type
 peut donc apparaître sans qu'il s'agisse d'une anomalie de classement au
 sens de `ADV_CATS.horssection` (qui, elle, porte sur la section Syracuse,
-pas sur l'étage). `MAGASIN_ETAGE_THRESHOLDS`/`MAGASIN_ETAGES`/les fonctions
-`magasinEtageOfDigitRun()`/`magasinEtageOfTravee()`/`magasinEtageStats()`
-sont déclarées tôt dans le script, au même endroit et pour la même raison
-que `ADV_GROUPS`/`ADV_CATS` ci-dessus (temporal dead zone).
+pas sur l'étage). `MAGASIN_ETAGE_THRESHOLDS`/`MAGASIN_ADV_GROUPS`/les
+fonctions `magasinEtageGroupOfDigitRun()`/`magasinFloorStats()`/
+`updateMagasinEtageStats()`/`catalogGroupOf()` sont déclarées tôt dans le
+script, au même endroit et pour la même raison que `ADV_GROUPS`/`ADV_CATS`
+ci-dessus (temporal dead zone).
 
 ### Livres sans code-barre
 
@@ -1207,18 +1250,14 @@ de chaque `catalogByGroup`) :
   aucun effet sur la progression/l'occupation, uniquement une entrée dans la
   liste d'export.
 
-`noBarcodeList(group)` (utilisée par `ADV_CATS.nobarcode`, un 4e panneau
-ajouté automatiquement aux deux groupes de "Statistiques avancées" via la
-même génération de template que les 3 autres) réunit les deux sources :
+`noBarcodeList(group)` (utilisée par `ADV_CATS.nobarcode`, un panneau
+ajouté automatiquement à tous les groupes de "Statistiques avancées" via la
+même génération de template que les autres) réunit les deux sources :
 `scans` filtrés par `sansCodeBarre` (cotes trouvées, comptées comme
-récolées) et `noBarcodeCotes` (cotes absentes). Contrairement aux 3 autres
-listes, **pas de suivi réglé/rouvert** (`ADV_CATS.nobarcode.resolvable:
-false` — demande explicite, liste volontairement simple) : `advDetailsTemplate()`
-et `refreshAdvList()` sautent la case "Afficher aussi les réglés" et la
-colonne d'action quand `resolvable===false`. L'export (`exportField:'cote'`)
-télécharge des **cotes**, pas des codes-barres — contrairement aux 3 autres
-catégories — puisque le but est justement de savoir sur quels documents
-recoller un code-barre.
+récolées) et `noBarcodeCotes` (cotes absentes). L'export
+(`exportField:'cote'`) télécharge des **cotes**, pas des codes-barres —
+contrairement aux autres catégories — puisque le but est justement de
+savoir sur quels documents recoller un code-barre.
 
 `noBarcodeCotes` suit le même patron que les autres catégories du bundle
 `recolement.json` : synchronisé vers R2 via un nouveau patch `noBarcode`

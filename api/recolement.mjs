@@ -1,8 +1,8 @@
 /**
  * État partagé du récolement, stocké dans R2 sous la clé "recolement.json"
  * (même forme que l'export de recolement.html : {scans, nonCatalogues,
- * videShelves, nonRangeShelves, lastShelves, resolvedIssues, noBarcodeCotes},
- * chaque valeur un tableau).
+ * videShelves, nonRangeShelves, lastShelves, noBarcodeCotes}, chaque valeur
+ * un tableau).
  *
  * GET  → l'état courant (accessible sans authentification : mêmes données
  *        que celles déjà lisibles via data/recolement.json committé).
@@ -23,7 +23,7 @@ class BadRequest extends Error {
 }
 
 function emptyState() {
-  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], resolvedIssues: [], noBarcodeCotes: [] };
+  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], noBarcodeCotes: [] };
 }
 
 function locKey(row) {
@@ -35,15 +35,6 @@ function locKey(row) {
 // locKey ci-dessus.
 function colKey(row) {
   return `${row.travee}|${row.colonne}`;
-}
-
-// resolvedIssues marque qu'un problème listé dans les "statistiques
-// avancées" de recolement.html (code-barre endommagé, scanné-non-catalogué,
-// jamais scanné) a été traité par quelqu'un de l'équipe — indépendant de
-// `category` (un même code-barre peut apparaître dans plusieurs catégories
-// à des moments différents), d'où la clé composite.
-function issueKey(row) {
-  return `${row.category}|${row.barcode}`;
 }
 
 // noBarcodeCotes (livres sans code-barre, voir recolement.html) est keyé par
@@ -69,7 +60,7 @@ function fromMap(m) {
 // tirées de l'état courant) — factorisé pour être rejoué plusieurs fois de
 // suite par le cas 'batch' ci-dessous sans relire/réécrire R2 à chaque fois.
 function applyOne(maps, patch) {
-  const { scans, nonCat, vide, nonrange, lastShelf, resolved, nobarcode } = maps;
+  const { scans, nonCat, vide, nonrange, lastShelf, nobarcode } = maps;
   switch (patch.type) {
     case 'scan':
       if (!patch.record || !patch.record.barcode) throw new BadRequest('scan : record.barcode requis.');
@@ -103,11 +94,6 @@ function applyOne(maps, patch) {
       if (patch.record) lastShelf[patch.key] = patch.record;
       else delete lastShelf[patch.key];
       break;
-    case 'resolveIssue':
-      if (!patch.key) throw new BadRequest('resolveIssue : key requis.');
-      if (patch.record) resolved[patch.key] = patch.record;
-      else delete resolved[patch.key];
-      break;
     case 'noBarcode':
       if (!patch.key) throw new BadRequest('noBarcode : key requis.');
       if (patch.record) nobarcode[patch.key] = patch.record;
@@ -125,7 +111,6 @@ function applyOne(maps, patch) {
       const incomingVide = Array.isArray(patch.data.videShelves) ? patch.data.videShelves : [];
       const incomingNonRange = Array.isArray(patch.data.nonRangeShelves) ? patch.data.nonRangeShelves : [];
       const incomingLastShelves = Array.isArray(patch.data.lastShelves) ? patch.data.lastShelves : [];
-      const incomingResolved = Array.isArray(patch.data.resolvedIssues) ? patch.data.resolvedIssues : [];
       const incomingNoBarcode = Array.isArray(patch.data.noBarcodeCotes) ? patch.data.noBarcodeCotes : [];
 
       incomingScans.forEach(r => {
@@ -142,11 +127,6 @@ function applyOne(maps, patch) {
       });
       incomingLastShelves.forEach(r => {
         if (r.travee && r.colonne !== undefined && r.etage !== undefined) lastShelf[colKey(r)] = r;
-      });
-      incomingResolved.forEach(r => {
-        if (!r.category || !r.barcode) return;
-        const existing = resolved[issueKey(r)];
-        if (!existing || !existing.ts || (r.ts || 0) > existing.ts) resolved[issueKey(r)] = r;
       });
       incomingNoBarcode.forEach(r => {
         if (!r.cote) return;
@@ -169,7 +149,6 @@ function applyPatch(state, patch) {
     vide: toMap(state.videShelves, locKey),
     nonrange: toMap(state.nonRangeShelves, locKey),
     lastShelf: toMap(state.lastShelves, colKey),
-    resolved: toMap(state.resolvedIssues, issueKey),
     nobarcode: toMap(state.noBarcodeCotes, coteKey),
   };
 
@@ -189,7 +168,6 @@ function applyPatch(state, patch) {
     videShelves: fromMap(maps.vide),
     nonRangeShelves: fromMap(maps.nonrange),
     lastShelves: fromMap(maps.lastShelf),
-    resolvedIssues: fromMap(maps.resolved),
     noBarcodeCotes: fromMap(maps.nobarcode),
   };
 }

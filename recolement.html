@@ -125,11 +125,6 @@
   .log-toggle{font-size:.72rem;color:#666;display:flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer}
   .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s;white-space:nowrap}
   .export-btn:hover{background:#f5f5f5;border-color:#999}
-  .log-resolve{background:none;border:1px solid #c8e6c9;color:#2e7d32;cursor:pointer;font-size:.68rem;padding:2px 8px;border-radius:12px;white-space:nowrap}
-  .log-resolve:hover{background:#e8f5e9}
-  .log-reopen{background:none;border:1px solid #ddd;color:#888;cursor:pointer;font-size:.68rem;padding:2px 8px;border-radius:12px;white-space:nowrap}
-  .log-reopen:hover{background:#f0f0f0}
-  .adv-row-resolved td{opacity:.5}
   .adv-pager{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.5rem .9rem;border-top:1px solid #e8e8e8;font-size:.75rem;color:#777;flex-wrap:wrap}
   .adv-pager-btns{display:flex;align-items:center;gap:.4rem}
   .adv-pager button{font-family:inherit;font-size:.75rem;padding:.3rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#333}
@@ -410,7 +405,6 @@ const LS_NONCAT = 'rp_recolement_noncat';
 const LS_VIDE   = 'rp_recolement_vide';
 const LS_NONRANGE = 'rp_recolement_nonrange';
 const LS_LASTSHELF = 'rp_recolement_lastshelf';
-const LS_RESOLVED = 'rp_recolement_resolved';
 const LS_NOBARCODE = 'rp_recolement_nobarcode';
 const LS_PENDING = 'rp_recolement_pending_sync';
 const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "temps réel" arrête de comptabiliser (voir updateTimeStats)
@@ -426,7 +420,6 @@ let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {trav
 let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
 let lastShelves = loadJSON(LS_LASTSHELF, {});  // "travee|colonne" -> {travee,colonne,etage,ts} (dernière étagère réelle de la colonne)
-let resolvedIssues = loadJSON(LS_RESOLVED, {}); // "categorie|barcode" -> {category,barcode,ts} — voir "LISTES AVANCÉES"
 let noBarcodeCotes = loadJSON(LS_NOBARCODE, {}); // cote normalisée -> {cote,travee,colonne,etage,ts} — voir "LIVRES SANS CODE-BARRE"
 let pendingSync = loadJSON(LS_PENDING, []);   // patches en attente d'envoi à /api/recolement
 
@@ -441,7 +434,6 @@ function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); 
 function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShelves)); }
 function saveNonRangeShelves(){ localStorage.setItem(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
 function saveLastShelves(){ localStorage.setItem(LS_LASTSHELF, JSON.stringify(lastShelves)); }
-function saveResolvedIssues(){ localStorage.setItem(LS_RESOLVED, JSON.stringify(resolvedIssues)); }
 function saveNoBarcodeCotes(){ localStorage.setItem(LS_NOBARCODE, JSON.stringify(noBarcodeCotes)); }
 function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
 function normalizeCote(s){ return (s||'').trim().toUpperCase(); }
@@ -604,10 +596,17 @@ function buildCatalogFromItems(items, fondsOverride){
       // applyReliureCascade(). Absent du catalogue magasins (pas de
       // reliures manuelles pour ce fonds).
       relies: Array.isArray(it._relies) ? it._relies : [],
+      // Champ Syracuse "Piège" (ex. "Pilon", "Braderie", "En magasin") — posé
+      // par build-inventory.mjs (résolu depuis les codes MARC 921$a/$b) ou
+      // build-magasins.mjs (déjà résolu côté GESMARC), voir CLAUDE.md.
+      // Affiché dans les tableaux d'anomalies des "Statistiques avancées"
+      // pour repérer un exemplaire à traiter sans avoir à rouvrir Syracuse.
+      piege: it._piege || '',
       // Répercuté depuis data/magasins.json (voir build-magasins.mjs) —
-      // utilisé uniquement par magasinEtageStats() ci-dessous pour classer un
-      // exemplaire 2e/5e étage (présent) vs 6e étage (absent). undefined pour
-      // la réserve, sans effet là où ce champ n'est pas lu.
+      // utilisé uniquement par magasinFloorStats()/notScannedList() plus bas
+      // pour classer un exemplaire 2e/5e étage (présent) vs 6e étage
+      // (absent). undefined pour la réserve, sans effet là où ce champ n'est
+      // pas lu.
       coteDigitRun: it._coteDigitRun || null,
     };
     // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
@@ -702,71 +701,79 @@ fetch('data/magasins.json').then(r=>r.json()).then(data=>{
 });
 
 /* ADV_GROUPS/ADV_CATS + génération du HTML de "Statistiques avancées"
-   (voir "LISTES AVANCÉES" plus bas pour le reste — issueKey, damagedList,
+   (voir "LISTES AVANCÉES" plus bas pour le reste — damagedList,
    renderAdvTable, etc.) : déclarés ici, tôt dans le script, et pas plus bas
    avec le reste de cette section, parce qu'updateStats() (qui lit
    ADV_GROUPS) est déjà appelée pendant l'initialisation synchrone de la
    page ci-dessous (setLocType(loc.locType) à la fin de la section
    "EMPLACEMENT") — les déclarer plus bas provoquait un ReferenceError
    (temporal dead zone) dès le chargement de la page, qui interrompait tout
-   le reste du script (scan, mini-plan, etc. jamais initialisés). */
+   le reste du script (scan, mini-plan, etc. jamais initialisés).
+
+   Depuis 2026-08-27, les magasins ne forment plus un seul groupe combiné
+   mais trois groupes distincts (un panneau complet — occupation, temps,
+   listes de problèmes — par étage physique 2e/5e/6e), pour pouvoir consulter
+   et exporter les anomalies de chaque magasin indépendamment (demande
+   explicite). `catalogGroup` indique, pour chaque groupe de statistiques
+   avancées, quel catalogue de reconnaissance (catalogByGroup, voir plus
+   haut — lui reste binaire reserve/magasin, non scindé par étage) utiliser :
+   catalogGroupOf() ci-dessous fait la traduction id-de-groupe-stats →
+   id-de-catalogue. */
 const ADV_GROUPS = [
   { id:'reserve', label:'Réserve' },
-  { id:'magasin', label:'Magasins (2e/5e/6e étage)' },
+  { id:'magasin-2e', label:'Magasin — 2e étage', catalogGroup:'magasin' },
+  { id:'magasin-5e', label:'Magasin — 5e étage', catalogGroup:'magasin' },
+  { id:'magasin-6e', label:'Magasin — 6e étage', catalogGroup:'magasin' },
 ];
+const MAGASIN_ADV_GROUPS = ADV_GROUPS.filter(g=>g.catalogGroup==='magasin');
+const ADV_GROUP_BY_ID = {};
+ADV_GROUPS.forEach(g=>{ ADV_GROUP_BY_ID[g.id] = g; });
+function catalogGroupOf(advGroupId){ return (ADV_GROUP_BY_ID[advGroupId]||{}).catalogGroup || 'reserve'; }
 
-/* Répartition "notices récolées" par magasin physique distinct (2e/5e/6e
-   étage), en plus du total groupé ci-dessus — catalogByGroup.magasin reste
-   un catalogue UNIQUE, non scindé par étage (voir CLAUDE.md), donc on
-   reclasse chaque exemplaire a posteriori, sur deux axes différents :
+/* "Notices récolées" par magasin physique distinct (2e/5e/6e étage) — un
+   stat-card dédié dans chacun des 3 panneaux magasin ci-dessus.
+   catalogByGroup.magasin reste un catalogue UNIQUE, non scindé par étage
+   (voir CLAUDE.md), donc on reclasse chaque exemplaire a posteriori, sur
+   deux axes différents :
    - récolé (numérateur) : d'après la travée réelle du scan (préfixe
-     M2-/M5-/M6-, terrain — exactement ce que le récolement vérifie).
+     M2-/M5-/M6-, terrain — exactement ce que le récolement vérifie,
+     traveeGroupOf() plus bas).
    - total (dénominateur) : d'après la cote (coteDigitRun, propagé depuis
      _coteDigitRun de data/magasins.json dans buildCatalogFromItems — mêmes
      seuils que magasins.html/ETAGE_THRESHOLDS), seule information
      disponible côté catalogue, qui lui n'a pas de notion d'emplacement
      physique tant qu'un exemplaire n'a pas été scanné.
-   Déclaré ici, tôt comme ADV_GROUPS/ADV_CATS ci-dessous, pour la même
-   raison (temporal dead zone, voir commentaire plus bas). */
+   Déclaré ici, tôt comme ADV_GROUPS/ADV_CATS, pour la même raison (temporal
+   dead zone, voir commentaire ci-dessus) — magasinFloorStats() appelle
+   traveeGroupOf(), déclarée plus bas, mais c'est une `function` (hoisted),
+   donc l'ordre ne compte que pour les `const`/appels immédiats. */
 const MAGASIN_ETAGE_THRESHOLDS = { 5: 13830, 6: 133530 };
-function magasinEtageOfDigitRun(digitRun){
-  if(!digitRun) return '6e';
+function magasinEtageGroupOfDigitRun(digitRun){
+  if(!digitRun) return 'magasin-6e';
   const threshold = MAGASIN_ETAGE_THRESHOLDS[digitRun.length];
-  if(!threshold) return '6e';
+  if(!threshold) return 'magasin-6e';
   const num = parseInt(digitRun, 10) || 0;
-  return num <= threshold ? '2e' : '5e';
+  return num <= threshold ? 'magasin-2e' : 'magasin-5e';
 }
-function magasinEtageOfTravee(travee){
-  if(!travee) return null;
-  if(travee.startsWith('M2-')) return '2e';
-  if(travee.startsWith('M5-')) return '5e';
-  if(travee.startsWith('M6-')) return '6e';
-  return null;
-}
-const MAGASIN_ETAGES = [
-  { id:'2e', label:'2e étage' },
-  { id:'5e', label:'5e étage' },
-  { id:'6e', label:'6e étage' },
-];
-function magasinEtageStats(){
+function magasinFloorStats(group){
   const cat = catalogByGroup.magasin;
-  const totals = { '2e':0, '5e':0, '6e':0 };
-  if(cat){
-    Object.values(cat).forEach(entry=>{ totals[magasinEtageOfDigitRun(entry.coteDigitRun)]++; });
-  }
-  const scannedNotices = { '2e':new Set(), '5e':new Set(), '6e':new Set() };
+  if(!cat) return { scanned:0, total:0 };
+  let total = 0;
+  Object.values(cat).forEach(entry=>{ if(magasinEtageGroupOfDigitRun(entry.coteDigitRun)===group) total++; });
+  const scannedNotices = new Set();
   Object.values(scans).forEach(r=>{
-    const et = magasinEtageOfTravee(r.travee);
-    if(!et || !cat) return;
+    if(traveeGroupOf(r.travee)!==group) return;
     const entry = cat[r.barcode];
-    if(entry) scannedNotices[et].add(entry.noticeId);
+    if(entry) scannedNotices.add(entry.noticeId);
   });
-  return MAGASIN_ETAGES.map(e=>({ id:e.id, label:e.label, scanned:scannedNotices[e.id].size, total:totals[e.id] }));
+  return { scanned: scannedNotices.size, total };
 }
 function updateMagasinEtageStats(){
-  if(!document.getElementById('st-etage-2e')) return; // groupe 'reserve' : bloc non rendu, voir advGroupTemplate()
-  magasinEtageStats().forEach(r=>{
-    document.getElementById('st-etage-'+r.id).textContent = r.total
+  MAGASIN_ADV_GROUPS.forEach(g=>{
+    const el = document.getElementById('st-etage-'+g.id);
+    if(!el) return; // sécurité, toujours présent pour ces 3 groupes (voir advGroupTemplate())
+    const r = magasinFloorStats(g.id);
+    el.textContent = r.total
       ? `${r.scanned.toLocaleString('fr-FR')} / ${r.total.toLocaleString('fr-FR')}`
       : r.scanned.toLocaleString('fr-FR');
   });
@@ -776,57 +783,56 @@ const ADV_CATS = {
   abime: {
     title: 'Codes-barres endommagés',
     desc: 'Documents dont le code-barre a été saisi à la main (illisible au scanner)',
-    placeholder: 'Filtrer (cote, titre, code-barre)…',
-    headers: ['Cote','Titre','Emplacement','Code-barre',''],
+    placeholder: 'Filtrer (cote, titre, code-barre, piège)…',
+    headers: ['Cote','Titre','Emplacement','Code-barre','Piège'],
     colspan: 5,
     emptyMsg: 'Aucun code-barre endommagé pour l\'instant.',
-    filterFields: ['cote','titre','barcode'],
+    filterFields: ['cote','titre','barcode','piege'],
     filePrefix: 'codes-barres-endommages',
     needsCatalog: false,
     listFn: damagedList,
-    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+    rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${advActionCell('abime', r)}</td>
+      <td>${esc(r.piege)||'—'}</td>
     </tr>`,
   },
   manualcote: {
     title: 'Scannés, non catalogués, cote saisie à la main',
     desc: 'Code-barre absent du catalogue au moment du scan : seule la cote a été renseignée à la main, sans titre ni auteur',
     placeholder: 'Filtrer (cote, code-barre)…',
-    headers: ['Cote','Emplacement','Code-barre',''],
-    colspan: 4,
+    headers: ['Cote','Emplacement','Code-barre'],
+    colspan: 3,
     emptyMsg: 'Aucun code-barre dans ce cas pour l\'instant.',
     filterFields: ['cote','barcode'],
     filePrefix: 'codes-barres-non-catalogues',
     needsCatalog: true,
     listFn: manualCoteList,
-    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+    rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${advActionCell('manualcote', r)}</td>
     </tr>`,
   },
   notscanned: {
     title: 'Jamais scannés — dans le catalogue mais pas encore récolés',
     desc: 'Codes-barres du catalogue absents des scans : potentiellement perdus, ou récolement pas encore effectué',
-    placeholder: 'Filtrer (cote, titre, auteur, code-barre)…',
-    headers: ['Cote','Titre','Auteur','Code-barre',''],
+    placeholder: 'Filtrer (cote, titre, auteur, code-barre, piège)…',
+    headers: ['Cote','Titre','Auteur','Code-barre','Piège'],
     colspan: 5,
     emptyMsg: 'Tout le catalogue a été scanné au moins une fois.',
-    filterFields: ['cote','titre','auteur','barcode'],
+    filterFields: ['cote','titre','auteur','barcode','piege'],
     filePrefix: 'codes-barres-jamais-scannes',
     needsCatalog: true,
     listFn: notScannedList,
-    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+    rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
       <td>${esc(r.auteur)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${advActionCell('notscanned', r)}</td>
+      <td>${esc(r.piege)||'—'}</td>
     </tr>`,
   },
   nobarcode: {
@@ -840,7 +846,6 @@ const ADV_CATS = {
     filePrefix: 'cotes-sans-code-barre',
     exportField: 'cote',
     needsCatalog: false,
-    resolvable: false,
     listFn: noBarcodeList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
@@ -852,21 +857,21 @@ const ADV_CATS = {
   horssection: {
     title: 'Anomalies de classement (hors magasin selon Syracuse)',
     desc: 'Code-barre scanné dans un magasin mais catalogué dans Syracuse sous une autre section que Magasin/Magasin Jeunesse (colonne "Section réelle") — à vérifier : mauvais classement côté catalogue, ou document à ranger ailleurs.',
-    placeholder: 'Filtrer (cote, titre, section, code-barre)…',
-    headers: ['Cote','Titre','Section réelle','Emplacement','Code-barre',''],
+    placeholder: 'Filtrer (cote, titre, section, code-barre, piège)…',
+    headers: ['Cote','Titre','Section réelle','Emplacement','Code-barre','Piège'],
     colspan: 6,
     emptyMsg: 'Aucune anomalie de classement détectée pour l\'instant.',
-    filterFields: ['cote','titre','sectionReelle','barcode'],
+    filterFields: ['cote','titre','sectionReelle','barcode','piege'],
     filePrefix: 'anomalies-classement-magasin',
     needsCatalog: false,
     listFn: horsSectionList,
-    rowHtml: r => `<tr class="${r._resolved?'adv-row-resolved':''}">
+    rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
       <td>${esc(r.sectionReelle)||'—'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${advActionCell('horssection', r)}</td>
+      <td>${esc(r.piege)||'—'}</td>
     </tr>`,
   },
 };
@@ -1110,6 +1115,7 @@ function handleScan(barcode, damaged, opts){
     auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
     fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
     etat: cat ? cat.etat : (prev ? prev.etat : ''),
+    piege: cat ? cat.piege : (prev ? prev.piege : ''),
     manuel: cat ? !!cat.manuel : (prev ? !!prev.manuel : false),
     kind: loc.locType,
     travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
@@ -1172,6 +1178,7 @@ function applyReliureCascade(sourceBarcode, siblingBarcodes, fields){
       auteur: sibCat ? sibCat.auteur : (sibPrev ? sibPrev.auteur : ''),
       fonds: sibCat ? sibCat.fonds : (sibPrev ? sibPrev.fonds : ''),
       etat: sibCat ? sibCat.etat : (sibPrev ? sibPrev.etat : ''),
+      piege: sibCat ? sibCat.piege : (sibPrev ? sibPrev.piege : ''),
       manuel: sibCat ? !!sibCat.manuel : (sibPrev ? !!sibPrev.manuel : false),
       kind: loc.locType,
       travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
@@ -1840,14 +1847,19 @@ function updateStats(){
 // que la barre empilée totalise toujours exactement 100 % sans double compte
 // — même dans le cas marginal où un emplacement a été scanné puis marqué
 // vide après coup (les scans n'y sont jamais effacés automatiquement).
-// Groupe d'un emplacement/scan à partir de sa travée : 'magasin' pour les
-// travées préfixées M2-/M5-/M6- (magasins 2e/5e/6e étage), 'reserve' pour
-// tout le reste (patrimoniale, Douaisienne RD-, armoires, tiroirs,
-// hors-réserve) — voir catalogGroupOfReserve() dans js/reserve-shared.js
-// pour l'équivalent côté catalogue. Sert à scinder "Statistiques avancées"
-// par groupe.
+// Groupe d'un emplacement/scan à partir de sa travée : 'magasin-2e'/
+// 'magasin-5e'/'magasin-6e' pour les travées préfixées M2-/M5-/M6-
+// (magasins d'étage, un groupe par étage physique), 'reserve' pour tout le
+// reste (patrimoniale, Douaisienne RD-, armoires, tiroirs, hors-réserve) —
+// à ne pas confondre avec catalogGroupOfReserve() dans js/reserve-shared.js
+// (binaire reserve/magasin, sert au CATALOGUE de reconnaissance au scan,
+// pas scindé par étage). Sert à scinder "Statistiques avancées" par groupe
+// (voir ADV_GROUPS plus haut).
 function traveeGroupOf(travee){
-  return (travee && (travee.startsWith('M2-') || travee.startsWith('M5-') || travee.startsWith('M6-'))) ? 'magasin' : 'reserve';
+  if(travee && travee.startsWith('M2-')) return 'magasin-2e';
+  if(travee && travee.startsWith('M5-')) return 'magasin-5e';
+  if(travee && travee.startsWith('M6-')) return 'magasin-6e';
+  return 'reserve';
 }
 
 function computeShelfBreakdown(group){
@@ -1909,8 +1921,8 @@ function formatDuration(ms){
 }
 
 function updateTimeStats(group){
-  // st-abime-<group> est mis à jour par updateAdvListsCount() (compte les
-  // seuls endommagés non réglés — voir "LISTES AVANCÉES" plus bas).
+  // st-abime-<group> est mis à jour par updateAdvListsCount() — voir
+  // "LISTES AVANCÉES" plus bas.
   const list = Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group).map(r=>r.ts).filter(t=>t).sort((a,b)=>a-b);
   const elStart=document.getElementById('st-start-'+group), elLast=document.getElementById('st-last-'+group),
         elSpan=document.getElementById('st-span-'+group), elReal=document.getElementById('st-realtime-'+group),
@@ -1934,88 +1946,56 @@ function updateTimeStats(group){
 }
 
 /* ════════════ LISTES AVANCÉES (endommagés / cote manuelle / jamais scannés) ════════════
-   Le panneau "Statistiques avancées" (occupation, temps, et les 3 listes
-   ci-dessous) est dupliqué en deux groupes indépendants — ADV_GROUPS,
-   'reserve' (patrimoniale/Douaisienne/armoires/tiroirs/hors-réserve) et
-   'magasin' (magasins 2e/5e étage) — même découpage que catalogGroupOfReserve()
-   côté catalogue (js/reserve-shared.js) et syncActiveCatalog() plus haut,
-   déterminé par traveeGroupOf() sur la travée de chaque scan. Le HTML des
-   deux groupes est généré une fois au chargement (advGroupTemplate(),
-   injecté dans #adv-groups) plutôt qu'écrit deux fois à la main, pour
-   n'avoir qu'une seule source de vérité pour la structure d'un groupe —
-   tous les id sont suffixés "-reserve"/"-magasin" (ex. "adv-abime-reserve").
+   Le panneau "Statistiques avancées" (occupation, temps, et les listes
+   ci-dessous) est dupliqué en plusieurs groupes indépendants — ADV_GROUPS :
+   'reserve' (patrimoniale/Douaisienne/armoires/tiroirs/hors-réserve) et un
+   groupe par magasin d'étage ('magasin-2e'/'magasin-5e'/'magasin-6e') —
+   déterminé par traveeGroupOf() sur la travée de chaque scan (catalogGroupOf()
+   fait le lien vers catalogByGroup, lui resté binaire reserve/magasin — voir
+   ADV_GROUPS plus haut). Le HTML de chaque groupe est généré une fois au
+   chargement (advGroupTemplate(), injecté dans #adv-groups) plutôt qu'écrit
+   à la main pour chacun, pour n'avoir qu'une seule source de vérité pour la
+   structure d'un groupe — tous les id sont suffixés par l'id du groupe (ex.
+   "adv-abime-magasin-2e").
 
    Les compteurs (stat-card + badge dans le <summary>) sont recalculés à
    chaque updateStats() : simples filtres sur scans/catalogByGroup, coût
    négligeable même avec un catalogue de plusieurs milliers d'entrées. Les
    tableaux détaillés, eux, ne sont construits/rendus que si le <details>
    correspondant est déjà ouvert — reconstruire des milliers de lignes de DOM
-   à chaque scan serait inutile et coûteux tant que le panneau est fermé.
-
-   Chaque ligne peut être marquée "réglée" individuellement (bouton ✓, voir
-   advActionCell) : état partagé (`resolvedIssues`, synchronisé vers R2 comme
-   scans/nonCat/etc. — voir patch 'resolveIssue' dans api/recolement.mjs),
-   indépendant des données elles-mêmes (marquer réglé un "scanné non
-   catalogué" ne modifie pas le scan : le vrai catalogage reste à faire
-   ailleurs, ceci ne fait que retirer l'entrée de la liste des problèmes à
-   traiter). Les lignes réglées restent consultables via la case "Afficher
-   aussi les réglés" de chaque panneau, avec un bouton pour les rouvrir.
-   La clé `category|barcode` (sans groupe) suffit : un barcode donné
-   n'appartient qu'à un seul groupe (via la travée de son scan), pas
-   d'ambiguïté possible entre les deux panneaux. */
-function issueKey(category, barcode){ return category + '|' + barcode; }
-function isResolved(category, barcode){ return !!resolvedIssues[issueKey(category, barcode)]; }
-
-function setIssueResolved(category, barcode, resolved){
-  const key = issueKey(category, barcode);
-  if(resolved){
-    const record = { category, barcode, ts: Date.now() };
-    resolvedIssues[key] = record;
-    saveResolvedIssues();
-    queuePatch({ type:'resolveIssue', key, record });
-  } else {
-    delete resolvedIssues[key];
-    saveResolvedIssues();
-    queuePatch({ type:'resolveIssue', key, record:null });
-  }
-  updateAdvListsCount();
-}
-
-function advActionCell(category, r){
-  return r._resolved
-    ? `<button type="button" class="log-reopen" data-category="${category}" data-reopen="${esc(r.barcode)}">↺ Rouvrir</button>`
-    : `<button type="button" class="log-resolve" data-category="${category}" data-resolve="${esc(r.barcode)}">✓ Réglé</button>`;
-}
-
+   à chaque scan serait inutile et coûteux tant que le panneau est fermé. */
 function damagedList(group){
   return Object.values(scans).filter(r=>r.barcodeAbime && traveeGroupOf(r.travee)===group)
-    .map(r=>Object.assign({}, r, { _resolved: isResolved('abime', r.barcode) }))
     .sort((a,b)=>b.ts-a.ts);
 }
 function manualCoteList(group){
   // Scanné, mais absent du catalogue *actuel* du groupe (comparaison en
-  // direct contre catalogByGroup[group], pas figée sur les titre/auteur
-  // enregistrés au moment du scan) : la cote a été saisie à la main via le
-  // champ "Renseigner" du feedback (voir showFeedback/manual-save) parce que
-  // le code-barre était introuvable dans le catalogue à ce moment-là.
-  // Comparer au catalogue courant plutôt qu'au scan figé permet à un
-  // exemplaire de sortir tout seul de cette liste dès qu'un nouvel export
+  // direct contre catalogByGroup[catalogGroupOf(group)], pas figée sur les
+  // titre/auteur enregistrés au moment du scan) : la cote a été saisie à la
+  // main via le champ "Renseigner" du feedback (voir showFeedback/manual-save)
+  // parce que le code-barre était introuvable dans le catalogue à ce
+  // moment-là. Comparer au catalogue courant plutôt qu'au scan figé permet à
+  // un exemplaire de sortir tout seul de cette liste dès qu'un nouvel export
   // Syracuse le fait apparaître (ex. correction d'une mauvaise localisation
   // côté SIGB), sans avoir à le rescanner physiquement. Exclut les
   // exemplaires "manuel" (créés via exemplarisation.html), qui sont dans le
   // catalogue mais pas une vraie notice Syracuse.
-  const cat = catalogByGroup[group];
+  const cat = catalogByGroup[catalogGroupOf(group)];
   if(!cat) return [];
   return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !cat[r.barcode])
-    .map(r=>Object.assign({}, r, { _resolved: isResolved('manualcote', r.barcode) }))
     .sort((a,b)=>b.ts-a.ts);
 }
 function notScannedList(group){
-  const cat = catalogByGroup[group];
+  const cat = catalogByGroup[catalogGroupOf(group)];
   if(!cat) return [];
+  // Pour un groupe magasin (2e/5e/6e), catalogByGroup.magasin reste un
+  // catalogue unique non scindé par étage (voir ADV_GROUPS plus haut) — on
+  // filtre donc en plus chaque entrée par son étage déduit de la cote
+  // (magasinEtageGroupOfDigitRun), même logique que magasinFloorStats().
+  const isMagasin = catalogGroupOf(group)==='magasin';
   return Object.keys(cat)
-    .filter(bc=>!scans[bc])
-    .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, _resolved: isResolved('notscanned', bc)}))
+    .filter(bc=>!scans[bc] && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group))
+    .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
 
@@ -2028,14 +2008,13 @@ function notScannedList(group){
 // CLAUDE.md), pas besoin d'une structure de données séparée.
 function horsSectionList(group){
   return Object.values(scans).filter(r=>r.horsSection && traveeGroupOf(r.travee)===group)
-    .map(r=>Object.assign({}, r, { sectionReelle:r.fonds, _resolved: isResolved('horssection', r.barcode) }))
+    .map(r=>Object.assign({}, r, { sectionReelle:r.fonds }))
     .sort((a,b)=>b.ts-a.ts);
 }
 
 // Livres sans code-barre : union des scans enregistrés via handleNoBarcodeCote()
 // quand la cote a été reconnue (sansCodeBarre:true, comptent comme récolés)
 // et des cotes non reconnues (noBarcodeCotes, ne comptent pas comme récolées).
-// Liste "simple" (pas de suivi réglé/rouvert, voir ADV_CATS.nobarcode.resolvable).
 function noBarcodeList(group){
   const foundRows = Object.values(scans)
     .filter(r=>r.sansCodeBarre && traveeGroupOf(r.travee)===group)
@@ -2046,8 +2025,8 @@ function noBarcodeList(group){
   return [...foundRows, ...notFoundRows].sort((a,b)=>b.ts-a.ts);
 }
 
-function advDetailsTemplate(id, spec){
-  const resolvable = spec.resolvable !== false;
+function advDetailsTemplate(id, spec, opts){
+  const showAllExport = !!(opts && opts.showAllExport);
   return `
     <details class="adv-details" id="adv-${id}">
       <summary>${esc(spec.title)} <span class="adv-count">(<span id="sum-${id}-count">0</span>)</span></summary>
@@ -2055,9 +2034,9 @@ function advDetailsTemplate(id, spec){
         <div class="log-header">
           <span class="log-title">${esc(spec.desc)}</span>
           <div class="log-header-actions">
-            ${resolvable ? `<label class="log-toggle"><input type="checkbox" id="${id}-showresolved"> Afficher aussi les réglés</label>` : ''}
             <input type="text" class="log-search" id="${id}-search" placeholder="${esc(spec.placeholder)}">
             <button type="button" class="export-btn" id="${id}-export">⬇ Exporter (.txt)</button>
+            ${showAllExport ? `<button type="button" class="export-btn" id="${id}-export-all" title="Réunit les codes-barres de cette catégorie pour les 3 magasins (2e/5e/6e), sans tenir compte de la recherche en cours">⬇ Exporter tous les magasins</button>` : ''}
           </div>
         </div>
         <div class="log-body"><table class="log-table">
@@ -2071,6 +2050,7 @@ function advDetailsTemplate(id, spec){
 
 function advGroupTemplate(g){
   const gid = g.id;
+  const isMagasin = g.catalogGroup==='magasin';
   return `
     <h3 class="adv-group-title">${esc(g.label)}</h3>
 
@@ -2097,6 +2077,7 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned-${gid}">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Livres sans code-barre</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Anomalies de classement</div><div class="stat-card-val" id="st-horssection-${gid}">0</div></div>
+      ${isMagasin ? `<div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-etage-${gid}" style="font-size:1.2rem">—</div></div>` : ''}
       <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start-${gid}" style="font-size:1rem">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last-${gid}" style="font-size:1rem">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Durée écoulée (calendaire)</div><div class="stat-card-val" id="st-span-${gid}" style="font-size:1.2rem">—</div></div>
@@ -2104,13 +2085,7 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Sessions de travail détectées</div><div class="stat-card-val" id="st-sessions-${gid}">—</div></div>
     </div>
 
-    ${gid==='magasin' ? `
-    <div class="stats-row" style="margin-bottom:0">
-      ${MAGASIN_ETAGES.map(e=>`<div class="stat-card"><div class="stat-card-label">Notices récolées — ${esc(e.label)}</div><div class="stat-card-val" id="st-etage-${e.id}" style="font-size:1.2rem">—</div></div>`).join('')}
-    </div>
-    ` : ''}
-
-    ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey])).join('')}
+    ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey], {showAllExport:isMagasin})).join('')}
   `;
 }
 
@@ -2125,10 +2100,9 @@ ADV_GROUPS.forEach(g=>{
   Object.keys(ADV_CATS).forEach(catKey=>{ advPage[g.id][catKey] = 1; });
 });
 
-function renderAdvTable(tbodyId, pagerId, category, rows, filterFields, filter, showResolved, rowHtml, colspan, emptyMsg, page, onPageChange){
+function renderAdvTable(tbodyId, pagerId, category, rows, filterFields, filter, rowHtml, colspan, emptyMsg, page, onPageChange){
   const q = (filter||'').trim().toLowerCase();
-  let filtered = showResolved ? rows : rows.filter(r=>!r._resolved);
-  if(q) filtered = filtered.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q)));
+  let filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
   const tbody = document.getElementById(tbodyId);
   const pager = document.getElementById(pagerId);
   if(!filtered.length){
@@ -2140,8 +2114,6 @@ function renderAdvTable(tbodyId, pagerId, category, rows, filterFields, filter, 
   const curPage = Math.min(Math.max(1, page), totalPages);
   const start = (curPage-1) * ADV_PAGE_SIZE;
   tbody.innerHTML = filtered.slice(start, start+ADV_PAGE_SIZE).map(rowHtml).join('');
-  tbody.querySelectorAll('[data-resolve]').forEach(b=>b.addEventListener('click', ()=>setIssueResolved(b.dataset.category, b.dataset.resolve, true)));
-  tbody.querySelectorAll('[data-reopen]').forEach(b=>b.addEventListener('click', ()=>setIssueResolved(b.dataset.category, b.dataset.reopen, false)));
 
   pager.innerHTML = `
     <span>${filtered.length.toLocaleString('fr-FR')} résultat${filtered.length>1?'s':''} — page ${curPage} / ${totalPages}</span>
@@ -2157,61 +2129,56 @@ function refreshAdvList(group, catKey){
   const spec = ADV_CATS[catKey];
   const id = `${catKey}-${group}`;
   if(!document.getElementById('adv-'+id).open) return;
-  if(spec.needsCatalog && !catalogByGroup[group]){
+  if(spec.needsCatalog && !catalogByGroup[catalogGroupOf(group)]){
     document.getElementById('log-'+id).innerHTML = `<tr><td class="log-empty" colspan="${spec.colspan}">Chargement du catalogue…</td></tr>`;
     document.getElementById(id+'-pager').innerHTML = '';
     return;
   }
-  const showResolved = spec.resolvable !== false ? document.getElementById(id+'-showresolved').checked : true;
   renderAdvTable('log-'+id, id+'-pager', catKey, spec.listFn(group), spec.filterFields,
-    document.getElementById(id+'-search').value, showResolved, spec.rowHtml, spec.colspan, spec.emptyMsg,
+    document.getElementById(id+'-search').value, spec.rowHtml, spec.colspan, spec.emptyMsg,
     advPage[group][catKey], p=>{ advPage[group][catKey]=p; refreshAdvList(group, catKey); });
 }
 
 ADV_GROUPS.forEach(g=>{
   Object.keys(ADV_CATS).forEach(catKey=>{
     const id = `${catKey}-${g.id}`;
-    const spec = ADV_CATS[catKey];
     document.getElementById('adv-'+id).addEventListener('toggle', ()=>refreshAdvList(g.id, catKey));
     document.getElementById(id+'-search').addEventListener('input', function(){ advPage[g.id][catKey]=1; refreshAdvList(g.id, catKey); });
-    if(spec.resolvable !== false){
-      document.getElementById(id+'-showresolved').addEventListener('change', function(){ advPage[g.id][catKey]=1; refreshAdvList(g.id, catKey); });
-    }
   });
 });
 
 function updateAdvListsCount(){
   ADV_GROUPS.forEach(g=>{
-    const abimeUnresolved = damagedList(g.id).filter(r=>!r._resolved).length;
-    document.getElementById('st-abime-'+g.id).textContent = abimeUnresolved.toLocaleString('fr-FR');
-    document.getElementById('sum-abime-'+g.id+'-count').textContent = abimeUnresolved.toLocaleString('fr-FR');
+    const abimeCount = damagedList(g.id).length;
+    document.getElementById('st-abime-'+g.id).textContent = abimeCount.toLocaleString('fr-FR');
+    document.getElementById('sum-abime-'+g.id+'-count').textContent = abimeCount.toLocaleString('fr-FR');
 
-    if(catalogByGroup[g.id]){
-      const manualCoteUnresolved = manualCoteList(g.id).filter(r=>!r._resolved).length;
-      document.getElementById('st-manualcote-'+g.id).textContent = manualCoteUnresolved.toLocaleString('fr-FR');
-      document.getElementById('sum-manualcote-'+g.id+'-count').textContent = manualCoteUnresolved.toLocaleString('fr-FR');
+    if(catalogByGroup[catalogGroupOf(g.id)]){
+      const manualCoteCount = manualCoteList(g.id).length;
+      document.getElementById('st-manualcote-'+g.id).textContent = manualCoteCount.toLocaleString('fr-FR');
+      document.getElementById('sum-manualcote-'+g.id+'-count').textContent = manualCoteCount.toLocaleString('fr-FR');
 
-      const notScannedUnresolved = Object.keys(catalogByGroup[g.id]).filter(bc=>!scans[bc] && !isResolved('notscanned', bc)).length;
-      document.getElementById('st-notscanned-'+g.id).textContent = notScannedUnresolved.toLocaleString('fr-FR');
-      document.getElementById('sum-notscanned-'+g.id+'-count').textContent = notScannedUnresolved.toLocaleString('fr-FR');
+      const notScannedCount = notScannedList(g.id).length;
+      document.getElementById('st-notscanned-'+g.id).textContent = notScannedCount.toLocaleString('fr-FR');
+      document.getElementById('sum-notscanned-'+g.id+'-count').textContent = notScannedCount.toLocaleString('fr-FR');
     }
 
     const nobarcodeCount = noBarcodeList(g.id).length;
     document.getElementById('st-nobarcode-'+g.id).textContent = nobarcodeCount.toLocaleString('fr-FR');
     document.getElementById('sum-nobarcode-'+g.id+'-count').textContent = nobarcodeCount.toLocaleString('fr-FR');
 
-    const horsSectionUnresolved = horsSectionList(g.id).filter(r=>!r._resolved).length;
-    document.getElementById('st-horssection-'+g.id).textContent = horsSectionUnresolved.toLocaleString('fr-FR');
-    document.getElementById('sum-horssection-'+g.id+'-count').textContent = horsSectionUnresolved.toLocaleString('fr-FR');
+    const horsSectionCount = horsSectionList(g.id).length;
+    document.getElementById('st-horssection-'+g.id).textContent = horsSectionCount.toLocaleString('fr-FR');
+    document.getElementById('sum-horssection-'+g.id+'-count').textContent = horsSectionCount.toLocaleString('fr-FR');
 
     Object.keys(ADV_CATS).forEach(catKey=>refreshAdvList(g.id, catKey));
   });
 }
 
 /* Export .txt : un code-barre par ligne, respectant le filtre de recherche
-   et la case "Afficher aussi les réglés" en cours (pas de plafond à 300
-   lignes ici, contrairement à l'affichage à l'écran — un export doit
-   contenir tout ce qui correspond, pas juste l'aperçu). */
+   en cours (pas de plafond à 300 lignes ici, contrairement à l'affichage à
+   l'écran — un export doit contenir tout ce qui correspond, pas juste
+   l'aperçu). */
 function downloadTxt(text, filename){
   const blob = new Blob([text], {type:'text/plain'});
   const a = document.createElement('a');
@@ -2220,10 +2187,9 @@ function downloadTxt(text, filename){
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 300);
 }
-function exportAdvBarcodes(rows, filterFields, filter, showResolved, filenamePrefix, field){
+function exportAdvBarcodes(rows, filterFields, filter, filenamePrefix, field){
   const q = (filter||'').trim().toLowerCase();
-  let filtered = showResolved ? rows : rows.filter(r=>!r._resolved);
-  if(q) filtered = filtered.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q)));
+  const filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
   if(!filtered.length){ alert('Aucun élément à exporter pour ce filtre.'); return; }
   const d = new Date(), pad = n => String(n).padStart(2,'0');
   downloadTxt(filtered.map(r=>r[field||'barcode']).join('\n'),
@@ -2234,10 +2200,21 @@ ADV_GROUPS.forEach(g=>{
     const id = `${catKey}-${g.id}`;
     const spec = ADV_CATS[catKey];
     document.getElementById(id+'-export').addEventListener('click', ()=>{
-      const showResolved = spec.resolvable !== false ? document.getElementById(id+'-showresolved').checked : true;
       exportAdvBarcodes(spec.listFn(g.id), spec.filterFields, document.getElementById(id+'-search').value,
-        showResolved, `${spec.filePrefix}-${g.id}`, spec.exportField);
+        `${spec.filePrefix}-${g.id}`, spec.exportField);
     });
+    // Bouton "Exporter tous les magasins" (2e+5e+6e réunis, voir
+    // advDetailsTemplate) — présent uniquement dans les 3 groupes magasin,
+    // ignore volontairement la recherche en cours de CE groupe précis (le
+    // résultat mélange les 3 étages, garder un seul filtre n'aurait pas de
+    // sens univoque).
+    if(g.catalogGroup==='magasin'){
+      const allBtn = document.getElementById(id+'-export-all');
+      if(allBtn) allBtn.addEventListener('click', ()=>{
+        const allRows = MAGASIN_ADV_GROUPS.flatMap(mg=>spec.listFn(mg.id));
+        exportAdvBarcodes(allRows, spec.filterFields, '', `${spec.filePrefix}-magasins-tous-etages`, spec.exportField);
+      });
+    }
   });
 });
 
@@ -2256,7 +2233,6 @@ function exportPayload(){
     videShelves: Object.values(videShelves),
     nonRangeShelves: Object.values(nonRangeShelves),
     lastShelves: Object.values(lastShelves),
-    resolvedIssues: Object.values(resolvedIssues),
     noBarcodeCotes: Object.values(noBarcodeCotes)
   };
 }
@@ -2353,7 +2329,6 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
   const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
   const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
-  const resolvedRows = Array.isArray(data) ? [] : (data.resolvedIssues||[]);
   const noBarcodeRows = Array.isArray(data) ? [] : (data.noBarcodeCotes||[]);
 
   let added=0, updated=0;
@@ -2377,13 +2352,6 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   lastShelfRows.forEach(r=>{ if(r.travee && r.colonne!==undefined && r.etage!==undefined) lastShelves[lastShelfKey(r)] = r; });
   saveLastShelves();
 
-  resolvedRows.forEach(r=>{
-    if(!r.category || !r.barcode) return;
-    const key = issueKey(r.category, r.barcode);
-    if(!resolvedIssues[key] || !resolvedIssues[key].ts || (r.ts||0) > resolvedIssues[key].ts) resolvedIssues[key] = r;
-  });
-  saveResolvedIssues();
-
   noBarcodeRows.forEach(r=>{
     if(!r.cote) return;
     const key = normalizeCote(r.cote);
@@ -2394,11 +2362,11 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
   updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 
-  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || resolvedRows.length || noBarcodeRows.length)){
-    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, resolvedIssues:resolvedRows, noBarcodeCotes:noBarcodeRows } });
+  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || noBarcodeRows.length)){
+    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, noBarcodeCotes:noBarcodeRows } });
   }
 
-  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length, resolved: resolvedRows.length, noBarcode: noBarcodeRows.length };
+  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length, noBarcode: noBarcodeRows.length };
 }
 
 document.getElementById('file-resume').addEventListener('change', function(e){
@@ -2440,7 +2408,6 @@ document.getElementById('btn-reset').addEventListener('click', ()=>{
   videShelves = {}; saveVideShelves();
   nonRangeShelves = {}; saveNonRangeShelves();
   lastShelves = {}; saveLastShelves();
-  resolvedIssues = {}; saveResolvedIssues();
   noBarcodeCotes = {}; saveNoBarcodeCotes();
   pendingSync = []; savePendingSync(); updateSyncIndicator();
   renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
