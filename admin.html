@@ -109,6 +109,24 @@
       margin-bottom: 0.35rem;
     }
     .admin-tool-card p { font-size: 0.88rem; color: var(--text-light); line-height: 1.55; }
+    .admin-tool-card-full {
+      display: flex; align-items: flex-start; gap: 0.9rem;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.4rem; text-decoration: none;
+      box-shadow: var(--shadow); transition: box-shadow var(--transition), transform var(--transition);
+      margin-top: 1.1rem;
+    }
+    .admin-tool-card-full:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+    .admin-tool-card-full .admin-tool-icon {
+      flex-shrink: 0; font-size: 1.6rem; line-height: 1;
+      width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
+      background: var(--accent-light); border-radius: 50%;
+    }
+    .admin-tool-card-full h3 {
+      font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; color: var(--ink);
+      margin-bottom: 0.35rem;
+    }
+    .admin-tool-card-full p { font-size: 0.88rem; color: var(--text-light); line-height: 1.55; }
   </style>
 </head>
 <body>
@@ -136,8 +154,8 @@
 
   <section class="admin-section">
     <div class="admin-section-head">
-      <h2>Récolement &amp; plan de la réserve</h2>
-      <p>Pour localiser les collections dans la réserve patrimoniale et visualiser où elles se trouvent.</p>
+      <h2>Magasins</h2>
+      <p>Récolement et désherbage des collections (réserve patrimoniale, Réserve Douaisienne et magasins 2e/5e/6e étage), et le plan qui en résulte.</p>
     </div>
     <div class="admin-tools-grid">
       <a href="recolement.html" class="admin-tool-card">
@@ -147,13 +165,43 @@
           <p>Scannez les codes-barres avec une scannette pour enregistrer la travée, la colonne et l'étage de chaque document.</p>
         </span>
       </a>
-      <a href="reserve.html" class="admin-tool-card">
-        <span class="admin-tool-icon">🗺️</span>
+      <a href="rotobib.html" class="admin-tool-card">
+        <span class="admin-tool-icon">♻️</span>
         <span>
-          <h3>Plan de la Réserve</h3>
-          <p>Le plan des travées, colonnes et armoires, avec le taux d'occupation calculé d'après le récolement.</p>
+          <h3>Rotobib — Désherbage assisté</h3>
+          <p>Scannez un code-barre pour voir sa fiche, sa date de parution et son historique de prêts, puis décidez : conserver, pilon, braderie ou relocalisation. Export .txt par traitement pour ajout panier SIGB.</p>
         </span>
       </a>
+    </div>
+    <a href="reserve.html" class="admin-tool-card-full">
+      <span class="admin-tool-icon">🗺️</span>
+      <span>
+        <h3>Plan des Magasins</h3>
+        <p>Le plan des travées, colonnes et armoires de la réserve patrimoniale, de la Réserve Douaisienne et des magasins 2e/5e/6e étage, avec le taux d'occupation calculé d'après le récolement.</p>
+      </span>
+    </a>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2>Catalogue</h2>
+      <p>Le catalogue, séparé de la réserve patrimoniale, des collections conservées aux 2e, 5e et 6e étages (adulte et jeunesse), extrait de l'export complet de la bibliothèque.</p>
+    </div>
+    <a href="magasins.html" class="admin-tool-card-full">
+      <span class="admin-tool-icon">📚</span>
+      <span>
+        <h3>Catalogue des magasins</h3>
+        <p>Recherchez, triez et parcourez les exemplaires des magasins 2e, 5e et 6e étage (adulte et jeunesse).</p>
+      </span>
+    </a>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2>Autres outils</h2>
+      <p>Exemplarisation, reliures, analyse du classement, transfert du 2e étage, préparation des scans et suivi des ouvrages à restituer.</p>
+    </div>
+    <div class="admin-tools-grid">
       <a href="exemplarisation.html" class="admin-tool-card">
         <span class="admin-tool-icon">🏷️</span>
         <span>
@@ -168,20 +216,25 @@
           <p>Reliez à la main des documents catalogués séparément mais physiquement dans le même volume, pour que le récolement les récole automatiquement ensemble. Signale aussi les groupes dont les emplacements récolés ne concordent pas.</p>
         </span>
       </a>
-    </div>
-  </section>
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <h2>Autres outils réserve</h2>
-      <p>Analyse du classement, préparation des scans et suivi des ouvrages à restituer.</p>
-    </div>
-    <div class="admin-tools-grid">
       <a href="analyse-cotes.html" class="admin-tool-card">
         <span class="admin-tool-icon">📐</span>
         <span>
           <h3>Analyse des cotes</h3>
           <p>Repère les trous, les disponibilités et les doublons de cotes, calculés à partir du récolement.</p>
+        </span>
+      </a>
+      <a href="transfert-magasins.html" class="admin-tool-card">
+        <span class="admin-tool-icon">📦</span>
+        <span>
+          <h3>Transfert 2e étage → Réserve</h3>
+          <p>Recopiez depuis le registre papier les livres non catalogués à ramener du 2e étage, puis exemplarisez-les (cote, code-barre, emplacement) une fois retrouvés en réserve patrimoniale.</p>
+        </span>
+      </a>
+      <a href="desherbage-stats.html" class="admin-tool-card">
+        <span class="admin-tool-icon">📊</span>
+        <span>
+          <h3>Statistiques de prêt</h3>
+          <p>Vue d'ensemble purement statistique de l'export de désherbage : prêts totaux par année, répartition des exemplaires par usage, et liste triable pour repérer le livre le plus emprunté.</p>
         </span>
       </a>
       <a href="livres-spolies.html" class="admin-tool-card">
@@ -196,59 +249,6 @@
         <span>
           <h3>ScanDocs — Rognage &amp; renommage</h3>
           <p>Prépare les images scannées (rognage, renommage par cote) avant intégration au fonds numérisé.</p>
-        </span>
-      </a>
-    </div>
-  </section>
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <h2>Magasins 2e/5e/6e étage</h2>
-      <p>Le catalogue, séparé de la réserve patrimoniale, des collections conservées aux 2e, 5e et 6e étages (adulte et jeunesse), extrait de l'export complet de la bibliothèque.</p>
-    </div>
-    <div class="admin-tools-grid">
-      <a href="magasins.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📚</span>
-        <span>
-          <h3>Catalogue des magasins</h3>
-          <p>Recherchez, triez et parcourez les exemplaires des magasins 2e, 5e et 6e étage (adulte et jeunesse).</p>
-        </span>
-      </a>
-      <a href="transfert-magasins.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📦</span>
-        <span>
-          <h3>Transfert 2e étage → Réserve</h3>
-          <p>Recopiez depuis le registre papier les livres non catalogués à ramener du 2e étage, puis exemplarisez-les (cote, code-barre, emplacement) une fois retrouvés en réserve patrimoniale.</p>
-        </span>
-      </a>
-      <a href="rotobib.html" class="admin-tool-card">
-        <span class="admin-tool-icon">♻️</span>
-        <span>
-          <h3>Rotobib — Désherbage assisté</h3>
-          <p>Scannez un code-barre pour voir sa fiche, sa date de parution et son historique de prêts, puis décidez : conserver, pilon, braderie ou relocalisation. Export .txt par traitement pour ajout panier SIGB.</p>
-        </span>
-      </a>
-      <a href="desherbage-stats.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📊</span>
-        <span>
-          <h3>Statistiques de prêt</h3>
-          <p>Vue d'ensemble purement statistique de l'export de désherbage : prêts totaux par année, répartition des exemplaires par usage, et liste triable pour repérer le livre le plus emprunté.</p>
-        </span>
-      </a>
-    </div>
-  </section>
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <h2>Cotes numériques</h2>
-      <p>Repérage des exemplaires de toute la bibliothèque dont la cote est un numéro d'enregistrement à 5 ou 6 chiffres, pour un tri impossible à faire aussi finement dans le SIGB.</p>
-    </div>
-    <div class="admin-tools-grid">
-      <a href="cotes-numeriques.html" class="admin-tool-card">
-        <span class="admin-tool-icon">🔢</span>
-        <span>
-          <h3>Cotes numériques</h3>
-          <p>Recherchez, triez et exportez (.txt, pour ajout panier dans le SIGB) les codes-barres des exemplaires à cote numérique 5/6 chiffres commençant par « 1 ».</p>
         </span>
       </a>
     </div>
@@ -310,26 +310,27 @@
     var patrimoniale = s.reservePatrimoniale;
     var douaisienne = s.reserveDouaisienne;
     var magasins = ms.kept;
-    var total = (patrimoniale != null && douaisienne != null && magasins != null)
-      ? patrimoniale + douaisienne + magasins : null;
+    var reserves = (patrimoniale != null && douaisienne != null)
+      ? patrimoniale + douaisienne : null;
+    var total = ms.keptTotalDouai;
 
     var patrimonialePrev = sp.reservePatrimoniale;
     var douaisiennePrev = sp.reserveDouaisienne;
     var magasinsPrev = msp.kept;
-    var totalPrev = (patrimonialePrev != null && douaisiennePrev != null && magasinsPrev != null)
-      ? patrimonialePrev + douaisiennePrev + magasinsPrev : null;
+    var reservesPrev = (patrimonialePrev != null && douaisiennePrev != null)
+      ? patrimonialePrev + douaisiennePrev : null;
+    var totalPrev = msp.keptTotalDouai;
 
     var html = '';
     html += '<div class="admin-total-card">' +
       '<div class="value">' + (total != null ? total.toLocaleString('fr-FR') : '—') + '</div>' +
-      '<div class="label">documents au total</div>' +
+      '<div class="label">documents au total (export complet)</div>' +
       deltaBadge(total, totalPrev) +
       '</div>';
 
     html += '<div class="admin-stats-grid">';
-    html += branchCard('Réserve patrimoniale', patrimoniale, patrimonialePrev);
-    html += branchCard('Réserve Douaisienne', douaisienne, douaisiennePrev);
     html += branchCard('Magasins 2e/5e/6e étage', magasins, magasinsPrev);
+    html += branchCard('Réserves (patrimoniale + Douaisienne)', reserves, reservesPrev);
     html += '</div>';
 
     html += '<div class="admin-export-dates">';
