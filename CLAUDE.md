@@ -1372,3 +1372,28 @@ est sécurisé au-delà de ce qui est décrit ici.
   dans `recolement.html`) : pour un magasin, chaque code-barre compte
   individuellement (déjà garanti unique par l'état R2, keyé par
   code-barre), sans déduplication supplémentaire.
+- Incident du 2026-08-27 : le build `npm run build:magasins` du commit
+  `51f36be` a committé un `data/magasins.json` amputé de 61 953
+  exemplaires de magasin (`kept` passé de 63 505 à 1 552 ; `totalItems`,
+  qui compte tous les `<item>` de `xml/bib.xml` avant même le filtre
+  bibliothèque, de 199 688 à 54 743) — toutes les statistiques dérivées
+  (magasins.html, recolement.html, admin.html) faussées en conséquence.
+  Cause : `data/xml/bib.xml` en local avait été tronqué à 476 987 392
+  octets (au lieu des 773 723 195 octets réels de l'objet R2, vérifié via
+  `r2List`) — coupé en plein milieu d'un `<item>`, sans `</items>` final.
+  `r2Get()` (`lib/r2.mjs`) avait résolu la promesse normalement (`res.on
+  ('end')` déclenché) malgré la coupure, sans jamais lever d'erreur — et
+  `syncXmlFromR2()` dans `build-magasins.mjs`/`build-cotes-numeriques.mjs`
+  ne retélécharge de toute façon `xml/bib.xml` que si le fichier local est
+  *absent* (`existsSync`), donc une fois ce fichier tronqué écrit sur
+  disque, tout rebuild suivant le réutilisait tel quel sans jamais
+  retenter le téléchargement. `data/cotes-numeriques.json`, généré depuis
+  le même `bib.xml` mais *avant* que le fichier local ne soit tronqué,
+  n'a pas été affecté (vérifié : contenu identique avant/après ce
+  correctif). Réparé en retéléchargeant `xml/bib.xml` en entier
+  (`SYRACUSE_FORCE=1 npm run build:magasins`, 773,7 Mo, correspond
+  exactement à la taille R2) et en recommitant `data/magasins.json`.
+  Root cause corrigée dans `r2Get()` : compare désormais la taille reçue
+  au header `Content-Length` de la réponse et lève une erreur explicite en
+  cas d'écart, pour qu'un futur téléchargement tronqué fasse échouer le
+  build au lieu de produire silencieusement des données incomplètes.
