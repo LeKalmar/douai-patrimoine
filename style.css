@@ -23,7 +23,7 @@
   --shadow-hover: 0 8px 32px rgba(26,26,46,0.12);
   --radius: 12px;
   --radius-lg: 20px;
-  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-display: 'Moret', 'DM Serif Display', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1148,7 +1148,7 @@ ul { list-style: none; }
   align-self: flex-start;
 }
 .collection-body h3 {
-  font-family: 'DM Serif Display', serif;
+  font-family: 'Moret', 'DM Serif Display', serif;
   font-size: 1.15rem;
 }
 .collection-desc {
@@ -1181,7 +1181,7 @@ ul { list-style: none; }
     }
 
     .venir-heading {
-      font-family: 'DM Serif Display', Georgia, serif;
+      font-family: 'Moret', 'DM Serif Display', Georgia, serif;
       font-size: 0.95rem;
       font-weight: 400;
       letter-spacing: 0.08em;
@@ -1386,7 +1386,7 @@ ul { list-style: none; }
     }
 
     .accordion-label h2 {
-      font-family: 'DM Serif Display', Georgia, serif;
+      font-family: 'Moret', 'DM Serif Display', Georgia, serif;
       font-size: clamp(1.2rem, 2.8vw, 2rem);
       font-weight: 400;
       color: #1a1410;
@@ -1533,7 +1533,7 @@ ul { list-style: none; }
     .expo-slide-inner { max-width: 600px; }
 
     .expo-slide-title {
-      font-family: 'DM Serif Display', Georgia, serif;
+      font-family: 'Moret', 'DM Serif Display', Georgia, serif;
       font-size: clamp(1.6rem, 3.5vw, 2.6rem);
       font-weight: 400;
       color: #f0e8d8;

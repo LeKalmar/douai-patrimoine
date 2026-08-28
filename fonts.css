@@ -1,0 +1,74 @@
+/* Police officielle du patrimoine — Moret. Utilisée pour tous les titres
+   (variable --font-display dans style.css, et en dur dans les pages qui
+   ont leur propre <style> inline sans lien vers style.css). */
+
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-Book.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-BookOblique.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-RegularOblique.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-SemiboldOblique.otf') format('opentype');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-BoldOblique.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-Extrabold.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Moret';
+  src: url('font/Moret-ExtraboldOblique.otf') format('opentype');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
