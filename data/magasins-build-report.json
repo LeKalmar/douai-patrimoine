@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-27T10:30:08.740Z",
-  "durationMs": 36033,
+  "generatedAt": "2026-09-01T09:07:03.643Z",
+  "durationMs": 41665,
   "stats": {
     "totalItems": 199688,
-    "kept": 63505,
+    "kept": 88739,
     "keptTotalDouai": 199583,
     "bySection": {
       "Adulte": 35220,
@@ -74,8 +74,8 @@
       "Objethèque": 5
     },
     "byEtage": {
-      "2e/5e": 13798,
-      "6e": 49707
+      "2e/5e": 38417,
+      "6e": 50322
     }
   },
   "keptEdgeSample": [
