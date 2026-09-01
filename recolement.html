@@ -294,6 +294,7 @@
           <div id="scan-mode-zone">
             <div class="scan-row">
               <input type="text" id="scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
+              <button type="button" class="tool-btn" id="test-sound-btn" title="Joue le son de validation, indépendamment d'un scan — pour vérifier que le son fonctionne sur ce poste">🔊 Tester le son</button>
               <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
             </div>
             <div class="feedback" id="feedback"></div>
@@ -1212,6 +1213,10 @@ function beepError(){
 }
 
 /* ════════════ SCAN ════════════ */
+// Bouton indépendant d'un scan, pour vérifier que le son sort bien sur ce
+// poste (casque débranché, onglet mis en sourdine, sortie audio changée par
+// une autre appli…) sans devoir scanner un vrai livre pour tester.
+document.getElementById('test-sound-btn').addEventListener('click', ()=>{ beep(880, .3); });
 scanInput.addEventListener('keydown', e=>{
   if(e.key==='Enter'){
     e.preventDefault();
