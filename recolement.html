@@ -171,6 +171,13 @@
   .shelf-legend-dot.nonrange{background:#8E24AA}
   .shelf-legend-val{font-weight:700;color:#1a1a1a}
   .shelf-legend-pct{color:#999}
+  .shelf-bar-seg.notice-recolees{background:linear-gradient(90deg,#12157A,#2b30c9)}
+  .shelf-bar-seg.notice-noncat{background:linear-gradient(90deg,#f9a825,#ffca28)}
+  .shelf-bar-seg.notice-jamais{background:#c6c6d0}
+  .shelf-legend-dot.notice-recolees{background:#12157A}
+  .shelf-legend-dot.notice-noncat{background:#f9a825}
+  .shelf-legend-dot.notice-jamais{background:#c6c6d0}
+  .notice-progress-block{margin-bottom:1.5rem}
 
   .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem}
   .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
@@ -260,9 +267,24 @@
   <div class="section">
     <div class="container">
 
+      <div class="notice-progress-block shelf-bar-block">
+        <div class="shelf-bar-heading">
+          <span class="shelf-bar-heading-label" id="notice-progress-label">Progression — Réserve</span>
+          <span class="shelf-bar-heading-total" id="notice-progress-total"></span>
+        </div>
+        <div class="shelf-bar" id="notice-progress-bar">
+          <div class="shelf-bar-seg notice-recolees" id="seg-notice-recolees" style="width:0%" title="Récolées"></div>
+          <div class="shelf-bar-seg notice-noncat" id="seg-notice-noncat" style="width:0%" title="À cataloguer"></div>
+          <div class="shelf-bar-seg notice-jamais" id="seg-notice-jamais" style="width:0%" title="Jamais récolées"></div>
+        </div>
+        <div class="shelf-legend">
+          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-recolees"></span>Récolées : <span class="shelf-legend-val" id="leg-notice-recolees">0</span> <span class="shelf-legend-pct" id="leg-notice-recolees-pct"></span></span>
+          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-noncat"></span>À cataloguer : <span class="shelf-legend-val" id="leg-notice-noncat">0</span> <span class="shelf-legend-pct" id="leg-notice-noncat-pct"></span></span>
+          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-jamais"></span>Jamais récolées : <span class="shelf-legend-val" id="leg-notice-jamais">0</span> <span class="shelf-legend-pct" id="leg-notice-jamais-pct"></span></span>
+        </div>
+      </div>
+
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-card-label">Scans enregistrés</div><div class="stat-card-val" id="st-total">0</div></div>
-        <div class="stat-card"><div class="stat-card-label" id="st-catalog-label">Notices cataloguées</div><div class="stat-card-val" id="st-catalog">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Progression</div><div class="stat-card-val" id="st-progress">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-notices-scanned" style="font-size:1.2rem">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Sur cet emplacement</div><div class="stat-card-val" id="st-here">0</div></div>
@@ -638,7 +660,6 @@ function buildCatalogFromItems(items, fondsOverride){
 let catalogByGroup = { reserve:null, magasin:null };
 let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
 let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas encore chargé" (—) de "échec" (indisponible)
-const CATALOG_LABELS = { reserve:'Notices cataloguées', magasin:'Notices cataloguées (magasins)' };
 
 // Catalogue de reconnaissance "large", distinct de catalogByGroup.magasin :
 // depuis 2026-08-26, data/magasins.json couvre toute la bibliothèque de
@@ -672,10 +693,6 @@ function syncActiveCatalog(){
   const group = catalogGroupOfReserve(loc.reserve);
   catalog = catalogByGroup[group];
   catalogNoticeCount = catalogNoticeCountByGroup[group];
-  document.getElementById('st-catalog-label').textContent = CATALOG_LABELS[group] || CATALOG_LABELS.reserve;
-  document.getElementById('st-catalog').textContent = catalog
-    ? catalogNoticeCount.toLocaleString('fr-FR')
-    : (catalogFailedGroup[group] ? 'indisponible' : '—');
 }
 
 Promise.all([
@@ -794,6 +811,65 @@ function updateMagasinEtageStats(){
       ? `${r.scanned.toLocaleString('fr-FR')} / ${r.total.toLocaleString('fr-FR')}`
       : r.scanned.toLocaleString('fr-FR');
   });
+}
+
+/* ════════════ PROGRESSION EN HAUT DE PAGE, PAR ÉTAGE ════════════
+   Les cartes récapitulatives et la barre de progression en tête de page ne
+   portent plus sur un catalogue "reserve"/"magasin" global (auparavant
+   trompeur : sélectionner "Magasin — 5e étage" affichait une progression
+   mêlant les 2e/5e/6e étage, catalogByGroup.magasin n'étant pas scindé par
+   étage) mais sur le même groupe que les "Statistiques avancées" plus bas
+   (ADV_GROUPS/traveeGroupOf) — déduit ici directement de loc.reserve pour
+   éviter de dépendre de loc.travee (pas toujours pertinent, ex. armoires).
+   Réutilise magasinFloorStats() pour les 3 étages de magasin ; pour la
+   réserve (patrimoniale + Douaisienne + armoires/tiroirs + hors-réserve,
+   qui partagent un seul catalogByGroup.reserve non scindé), même calcul
+   que l'ancien code de mise à jour de "Progression"/"Notices récolées". */
+function currentStatsGroup(){
+  if(loc.reserve==='magasin2') return 'magasin-2e';
+  if(loc.reserve==='magasin5') return 'magasin-5e';
+  if(loc.reserve==='magasin6') return 'magasin-6e';
+  return 'reserve';
+}
+
+function catalogStatsForGroup(group){
+  if(group==='reserve'){
+    const cat = catalogByGroup.reserve;
+    if(!cat) return null;
+    const noticesScanned = new Set(
+      Object.keys(scans).map(bc=>cat[bc] && cat[bc].noticeId).filter(Boolean)
+    );
+    return { scanned: noticesScanned.size, total: catalogNoticeCountByGroup.reserve };
+  }
+  if(!catalogByGroup.magasin) return null;
+  return magasinFloorStats(group);
+}
+
+function nonCatTotalForGroup(group){
+  return Object.keys(nonCat)
+    .filter(k=>traveeGroupOf(k.split('|')[0])===group)
+    .reduce((s,k)=>s+nonCat[k].count, 0);
+}
+
+function updateNoticeProgressBar(group, catStats, nonCatCount){
+  document.getElementById('notice-progress-label').textContent = 'Progression — ' + (ADV_GROUP_BY_ID[group] || ADV_GROUP_BY_ID.reserve).label;
+  const catalogTotal = catStats ? catStats.total : 0;
+  const scanned = catStats ? catStats.scanned : 0;
+  const jamais = Math.max(0, catalogTotal - scanned);
+  const total = catalogTotal + nonCatCount;
+  const pct = n => total ? Math.round(n/total*100) : 0;
+  document.getElementById('seg-notice-recolees').style.width = pct(scanned)+'%';
+  document.getElementById('seg-notice-noncat').style.width = pct(nonCatCount)+'%';
+  document.getElementById('seg-notice-jamais').style.width = pct(jamais)+'%';
+  document.getElementById('leg-notice-recolees').textContent = scanned.toLocaleString('fr-FR');
+  document.getElementById('leg-notice-noncat').textContent = nonCatCount.toLocaleString('fr-FR');
+  document.getElementById('leg-notice-jamais').textContent = jamais.toLocaleString('fr-FR');
+  document.getElementById('leg-notice-recolees-pct').textContent = total ? `(${pct(scanned)} %)` : '';
+  document.getElementById('leg-notice-noncat-pct').textContent = total ? `(${pct(nonCatCount)} %)` : '';
+  document.getElementById('leg-notice-jamais-pct').textContent = total ? `(${pct(jamais)} %)` : '';
+  document.getElementById('notice-progress-total').textContent = total
+    ? `${total.toLocaleString('fr-FR')} au total`
+    : (catStats ? 'aucune notice pour l\'instant' : (catalogFailedGroup[catalogGroupOf(group)] ? 'catalogue indisponible' : 'chargement du catalogue…'));
 }
 
 const ADV_CATS = {
@@ -1897,26 +1973,28 @@ function deleteScan(barcode){
 
 /* ════════════ STATS ════════════ */
 function updateStats(){
-  const total = Object.keys(scans).length;
-  document.getElementById('st-total').textContent = total.toLocaleString('fr-FR');
   const fields = locFieldsOf(loc);
   const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
   document.getElementById('st-here').textContent = here;
-  if(catalog){
-    // Basé sur des notices distinctes, pas sur le nombre brut de scans : une
-    // notice avec plusieurs exemplaires ne compte qu'une fois dès qu'un de
-    // ses exemplaires est récolé, et un même exemplaire rescanné plusieurs
-    // fois (vérification, erreur) ne gonfle jamais la progression.
-    const noticesScanned = new Set(
-      Object.keys(scans).map(bc=>catalog[bc] && catalog[bc].noticeId).filter(Boolean)
-    );
-    document.getElementById('st-progress').textContent = catalogNoticeCount ? Math.round(noticesScanned.size/catalogNoticeCount*100)+' %' : '—';
-    document.getElementById('st-notices-scanned').textContent = catalogNoticeCount
-      ? `${noticesScanned.size.toLocaleString('fr-FR')} / ${catalogNoticeCount.toLocaleString('fr-FR')}`
-      : noticesScanned.size.toLocaleString('fr-FR');
+
+  // Progression/notices récolées/non catalogués : scopés à l'étage/groupe
+  // actuellement sélectionné (voir "PROGRESSION EN HAUT DE PAGE, PAR ÉTAGE"
+  // plus haut) plutôt qu'au catalogue reserve/magasin global.
+  const group = currentStatsGroup();
+  const catStats = catalogStatsForGroup(group);
+  const nonCatCount = nonCatTotalForGroup(group);
+  if(catStats){
+    document.getElementById('st-progress').textContent = catStats.total ? Math.round(catStats.scanned/catStats.total*100)+' %' : '—';
+    document.getElementById('st-notices-scanned').textContent = catStats.total
+      ? `${catStats.scanned.toLocaleString('fr-FR')} / ${catStats.total.toLocaleString('fr-FR')}`
+      : catStats.scanned.toLocaleString('fr-FR');
+  } else {
+    document.getElementById('st-progress').textContent = '—';
+    document.getElementById('st-notices-scanned').textContent = '—';
   }
-  const nonCatTotal = Object.values(nonCat).reduce((s,r)=>s+r.count, 0);
-  document.getElementById('st-noncat').textContent = nonCatTotal.toLocaleString('fr-FR');
+  document.getElementById('st-noncat').textContent = nonCatCount.toLocaleString('fr-FR');
+  updateNoticeProgressBar(group, catStats, nonCatCount);
+
   ADV_GROUPS.forEach(g=>{ updateShelfBar(g.id); updateTimeStats(g.id); });
   updateMagasinEtageStats();
   updateAdvListsCount();
