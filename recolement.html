@@ -1180,6 +1180,12 @@ let audioCtx = null;
 function beep(freq, dur){
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    // Le navigateur suspend parfois le contexte tout seul (économie d'énergie,
+    // onglet repassé au premier plan…) sans jamais le remettre en route :
+    // start()/stop() ne lèvent alors aucune erreur, juste aucun son. resume()
+    // est sans effet s'il tourne déjà — on l'appelle systématiquement plutôt
+    // que de vérifier audioCtx.state, par sécurité.
+    audioCtx.resume();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type='sine'; o.frequency.value=freq;
     g.gain.setValueAtTime(.15, audioCtx.currentTime);
@@ -1191,6 +1197,7 @@ function beep(freq, dur){
 function beepError(){
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    audioCtx.resume();
     const now = audioCtx.currentTime;
     [0, .16].forEach(offset=>{
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
