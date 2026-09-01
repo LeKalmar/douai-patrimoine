@@ -69,7 +69,12 @@
     .room-section{margin-bottom:2rem}
     .room-section-title{font-family:'Moret','DM Serif Display',serif;font-size:1.15rem;font-weight:400;margin:0 0 .75rem;color:#333;display:flex;align-items:center;gap:.6rem}
     .room-section-title::after{content:'';flex:1;height:1px;background:#e0e0e0}
+    details.room-section > summary.room-section-title{cursor:pointer;list-style:none}
+    details.room-section > summary.room-section-title::-webkit-details-marker{display:none}
+    details.room-section > summary.room-section-title::before{content:'▸ ';color:#999}
+    details.room-section[open] > summary.room-section-title::before{content:'▾ '}
     .room-plan{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem 1rem;overflow-x:auto}
+    .room-placeholder{color:#999;font-style:italic;font-size:.875rem;text-align:center;padding:1rem 0;margin:0}
     .room-inner{display:flex;flex-wrap:nowrap;gap:.9rem;align-items:flex-end;min-width:max-content}
     .travee-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
     .travee-wrap:hover .tv-box{border-color:#555;box-shadow:0 2px 6px rgba(0,0,0,.08)}
@@ -186,42 +191,10 @@
       <div class="search-results" id="sres"></div>
 
       <div class="room-group">
-        <h2 class="room-group-title">Réserve</h2>
-
-        <div class="room-section">
-          <h3 class="room-section-title">Réserve patrimoniale</h3>
-          <div class="room-plan">
-            <div class="room-inner" id="room-travees"></div>
-          </div>
-        </div>
-
-        <div class="room-section">
-          <h3 class="room-section-title">Armoires (bois)</h3>
-          <div class="room-plan">
-            <div class="room-inner" id="room-armoires"></div>
-          </div>
-        </div>
-
-        <div class="room-section">
-          <h3 class="room-section-title">Armoires à tiroirs</h3>
-          <div class="room-plan">
-            <div class="room-inner" id="room-tiroirs"></div>
-          </div>
-        </div>
-
-        <div class="room-section">
-          <h3 class="room-section-title">Réserve Douaisienne</h3>
-          <div class="room-plan">
-            <div class="room-inner" id="room-travees-douaisienne"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="room-group">
-        <h2 class="room-group-title">Magasin — 2e étage</h2>
+        <h2 class="room-group-title">Magasin — 6e étage</h2>
         <div class="room-section">
           <div class="room-plan">
-            <div class="room-inner" id="room-travees-magasin2"></div>
+            <div class="room-inner" id="room-travees-magasin6"></div>
           </div>
         </div>
       </div>
@@ -236,10 +209,51 @@
       </div>
 
       <div class="room-group">
-        <h2 class="room-group-title">Magasin — 6e étage</h2>
+        <h2 class="room-group-title">Périodiques — 3e / 4e étage</h2>
         <div class="room-section">
           <div class="room-plan">
-            <div class="room-inner" id="room-travees-magasin6"></div>
+            <p class="room-placeholder">Non couvert par cet outil de récolement.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="room-group">
+        <h2 class="room-group-title">Magasin — 2e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-magasin2"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="room-group">
+        <h2 class="room-group-title">Réserve — 1er étage</h2>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Réserve patrimoniale</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees"></div>
+          </div>
+        </div>
+
+        <details class="room-section">
+          <summary class="room-section-title">Armoires (bois)</summary>
+          <div class="room-plan">
+            <div class="room-inner" id="room-armoires"></div>
+          </div>
+        </details>
+
+        <details class="room-section">
+          <summary class="room-section-title">Armoires à tiroirs</summary>
+          <div class="room-plan">
+            <div class="room-inner" id="room-tiroirs"></div>
+          </div>
+        </details>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Réserve Douaisienne</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-douaisienne"></div>
           </div>
         </div>
       </div>
@@ -745,6 +759,15 @@ function updateStats(){
 /* ════════════ DÉTAIL TRAVÉE ════════════ */
 function selectTravee(tid,tDef,cols){
   selId=tid; buildPlan();
+  // Armoires (bois) et armoires à tiroirs sont repliées par défaut (<details>,
+  // voir CLAUDE.md) : sans ça, un résultat de recherche pointant vers l'une
+  // d'elles mettrait à jour le panneau de détail sans jamais rendre visible
+  // la travée sélectionnée dans le plan.
+  if(tid==='ARMOIRE'||tid==='TIROIR'){
+    const room=document.getElementById(tid==='ARMOIRE'?'room-armoires':'room-tiroirs');
+    const det=room&&room.closest('details.room-section');
+    if(det) det.open=true;
+  }
   const panel=document.getElementById('detail');
   const known=hasData(tid);
   let total=0;
