@@ -1187,7 +1187,6 @@ function beep(freq, dur){
     // est sans effet s'il tourne déjà — on l'appelle systématiquement plutôt
     // que de vérifier audioCtx.state, par sécurité.
     audioCtx.resume();
-    console.debug('[beep] state avant lecture :', audioCtx.state);
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type='sine'; o.frequency.value=freq;
     g.gain.setValueAtTime(.15, audioCtx.currentTime);
@@ -1290,6 +1289,19 @@ function handleScan(barcode, damaged, opts){
   else if(prev) status = 'moved';
   else status = 'ok';
 
+  // Le bip doit partir tout de suite, avant tout travail synchrone coûteux :
+  // saveScans() sérialise en JSON l'intégralité de l'objet scans (des
+  // dizaines de milliers d'entrées sur un récolement avancé) à chaque scan
+  // réussi. Ce travail, s'il passe avant le bip, bloque assez longtemps le
+  // thread principal pour que les 120ms programmées du son de validation
+  // s'écoulent avant même que le rendu audio ne démarre réellement — le son
+  // reste "programmé" (audioCtx.state affiche bien 'running', aucune
+  // erreur) mais ne sort jamais. Le bip d'erreur, lui, n'était jamais
+  // précédé de saveScans()/queuePatch() (sautés pour un code-barre inconnu)
+  // et restait donc toujours audible — c'est ce qui a permis d'isoler la
+  // cause (2026-09-01).
+  if(status==='unknown') beepError(); else beep(880, .12);
+
   if(status!=='unknown'){
     scans[barcode] = record;
     saveScans();
@@ -1306,7 +1318,6 @@ function handleScan(barcode, damaged, opts){
     : [];
 
   showFeedback(record, status, prev, reliureRecords);
-  if(status==='unknown') beepError(); else beep(880, .12);
 
   renderExpected();
   renderHereLog();
@@ -1468,6 +1479,11 @@ function handleScanHorsReserve(barcode, damaged){
     ts: Date.now()
   };
 
+  // Voir le commentaire de handleScan() : le bip doit partir avant
+  // saveScans()/queuePatch(), sinon la sérialisation de tout l'objet scans
+  // peut suffire à rendre le son de 120ms inaudible.
+  if(known) beep(880, .12); else beepError();
+
   if(known){
     scans[barcode] = record;
     saveScans();
@@ -1475,7 +1491,6 @@ function handleScanHorsReserve(barcode, damaged){
   }
 
   showHorsReserveFeedback(record, !known);
-  if(known) beep(880, .12); else beepError();
 
   renderHereLog();
   updateStats();
@@ -1538,9 +1553,9 @@ function saveNonCatCount(){
   noncatInput.value = count;
   if(count === 0) delete nonCat[key];
   else nonCat[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, count, ts:Date.now() };
+  beep(880, .12);
   saveNonCat();
   showNonCatFeedback(count);
-  beep(880, .12);
   updateStats();
   buildMiniPlan();
   queuePatch({type:'nonCat', key, record: nonCat[key] || null});
