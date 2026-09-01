@@ -163,12 +163,14 @@
   .shelf-bar-seg.recoled{background:linear-gradient(90deg,#12157A,#2b30c9)}
   .shelf-bar-seg.vide{background:linear-gradient(90deg,#2e7d32,#4caf50)}
   .shelf-bar-seg.nonrange{background:linear-gradient(90deg,#6a1b9a,#8E24AA)}
+  .shelf-bar-seg.nontraite{background:#e4e4ec}
   .shelf-legend{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;margin-top:.65rem}
   .shelf-legend-item{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#555}
   .shelf-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
   .shelf-legend-dot.recoled{background:#12157A}
   .shelf-legend-dot.vide{background:var(--ok)}
   .shelf-legend-dot.nonrange{background:#8E24AA}
+  .shelf-legend-dot.nontraite{background:#c2c2cc}
   .shelf-legend-val{font-weight:700;color:#1a1a1a}
   .shelf-legend-pct{color:#999}
   .shelf-bar-seg.notice-recolees{background:linear-gradient(90deg,#12157A,#2b30c9)}
@@ -2002,6 +2004,22 @@ function traveeGroupOf(travee){
   return 'reserve';
 }
 
+// Nombre total d'emplacements possibles (étagères) d'un groupe, d'après la
+// géométrie par défaut de js/reserve-shared.js (nbCols × defaultMaxEtageOf
+// par travée/meuble) — sert de dénominateur à computeShelfBreakdown() pour
+// afficher aussi la part JAMAIS traitée, pas seulement la répartition parmi
+// les emplacements déjà traités. Approximatif par nature (comme maxEtageOf()
+// de reserve.html) : une travée dont la colonne réelle dépasse le maxEt par
+// défaut compte quand même intégralement grâce au Math.max() dans
+// computeShelfBreakdown() ci-dessous.
+function totalSlotsForGroup(group){
+  const defs = group==='magasin-2e' ? TRAVEES_MAGASIN2
+    : group==='magasin-5e' ? TRAVEES_MAGASIN5
+    : group==='magasin-6e' ? TRAVEES_MAGASIN6
+    : [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_TIROIR];
+  return defs.reduce((s,def)=>s + def.nbCols * defaultMaxEtageOf(def), 0);
+}
+
 function computeShelfBreakdown(group){
   const contentKeys = new Set();
   Object.values(scans).forEach(r=>{
@@ -2020,22 +2038,32 @@ function computeShelfBreakdown(group){
     else if(nonRangeShelves[k]) nonrange++;
     else if(videShelves[k]) vide++;
   });
-  return { recoled, vide, nonrange, total: allKeys.size };
+  const treated = allKeys.size;
+  // Au moins autant que le traité réel, au cas où les données dépassent la
+  // géométrie par défaut (colonne réellement plus profonde que son maxEt).
+  const possible = Math.max(totalSlotsForGroup(group), treated);
+  const nontraite = possible - treated;
+  return { recoled, vide, nonrange, nontraite, treated, possible };
 }
 
 function updateShelfBar(group){
-  const { recoled, vide, nonrange, total } = computeShelfBreakdown(group);
-  const pct = n => total ? Math.round(n/total*100) : 0;
+  const { recoled, vide, nonrange, nontraite, treated, possible } = computeShelfBreakdown(group);
+  const pct = n => possible ? Math.round(n/possible*100) : 0;
   document.getElementById('seg-recoled-'+group).style.width = pct(recoled)+'%';
   document.getElementById('seg-vide-'+group).style.width = pct(vide)+'%';
   document.getElementById('seg-nonrange-'+group).style.width = pct(nonrange)+'%';
+  document.getElementById('seg-nontraite-'+group).style.width = pct(nontraite)+'%';
   document.getElementById('leg-recoled-'+group).textContent = recoled.toLocaleString('fr-FR');
   document.getElementById('leg-vide-'+group).textContent = vide.toLocaleString('fr-FR');
   document.getElementById('leg-nonrange-'+group).textContent = nonrange.toLocaleString('fr-FR');
-  document.getElementById('leg-recoled-pct-'+group).textContent = total ? `(${pct(recoled)} %)` : '';
-  document.getElementById('leg-vide-pct-'+group).textContent = total ? `(${pct(vide)} %)` : '';
-  document.getElementById('leg-nonrange-pct-'+group).textContent = total ? `(${pct(nonrange)} %)` : '';
-  document.getElementById('shelf-bar-total-'+group).textContent = total ? `${total.toLocaleString('fr-FR')} au total` : 'aucun emplacement traité pour l\'instant';
+  document.getElementById('leg-nontraite-'+group).textContent = nontraite.toLocaleString('fr-FR');
+  document.getElementById('leg-recoled-pct-'+group).textContent = possible ? `(${pct(recoled)} %)` : '';
+  document.getElementById('leg-vide-pct-'+group).textContent = possible ? `(${pct(vide)} %)` : '';
+  document.getElementById('leg-nonrange-pct-'+group).textContent = possible ? `(${pct(nonrange)} %)` : '';
+  document.getElementById('leg-nontraite-pct-'+group).textContent = possible ? `(${pct(nontraite)} %)` : '';
+  document.getElementById('shelf-bar-total-'+group).textContent = possible
+    ? `${treated.toLocaleString('fr-FR')} / ${possible.toLocaleString('fr-FR')} (${pct(treated)} %)`
+    : 'aucun emplacement pour l\'instant';
 }
 
 /* ════════════ STATISTIQUES AVANCÉES (temps) ════════════
@@ -2205,18 +2233,20 @@ function advGroupTemplate(g){
 
     <div class="shelf-bar-block">
       <div class="shelf-bar-heading">
-        <span class="shelf-bar-heading-label">Répartition des emplacements traités</span>
+        <span class="shelf-bar-heading-label">Répartition des emplacements</span>
         <span class="shelf-bar-heading-total" id="shelf-bar-total-${gid}"></span>
       </div>
       <div class="shelf-bar" id="shelf-bar-${gid}">
         <div class="shelf-bar-seg recoled" id="seg-recoled-${gid}" style="width:0%" title="Récolés"></div>
         <div class="shelf-bar-seg vide" id="seg-vide-${gid}" style="width:0%" title="Vides"></div>
         <div class="shelf-bar-seg nonrange" id="seg-nonrange-${gid}" style="width:0%" title="Non rangés"></div>
+        <div class="shelf-bar-seg nontraite" id="seg-nontraite-${gid}" style="width:0%" title="Jamais traités"></div>
       </div>
       <div class="shelf-legend" id="shelf-legend-${gid}">
         <span class="shelf-legend-item"><span class="shelf-legend-dot recoled"></span>Récolés : <span class="shelf-legend-val" id="leg-recoled-${gid}">0</span> <span class="shelf-legend-pct" id="leg-recoled-pct-${gid}"></span></span>
         <span class="shelf-legend-item"><span class="shelf-legend-dot vide"></span>Vides : <span class="shelf-legend-val" id="leg-vide-${gid}">0</span> <span class="shelf-legend-pct" id="leg-vide-pct-${gid}"></span></span>
         <span class="shelf-legend-item"><span class="shelf-legend-dot nonrange"></span>Non rangés : <span class="shelf-legend-val" id="leg-nonrange-${gid}">0</span> <span class="shelf-legend-pct" id="leg-nonrange-pct-${gid}"></span></span>
+        <span class="shelf-legend-item"><span class="shelf-legend-dot nontraite"></span>Jamais traités : <span class="shelf-legend-val" id="leg-nontraite-${gid}">0</span> <span class="shelf-legend-pct" id="leg-nontraite-pct-${gid}"></span></span>
       </div>
     </div>
 
