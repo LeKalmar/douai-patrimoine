@@ -96,6 +96,21 @@ function secteurLabel(section) {
   return section === 'Magasin Jeunesse' ? 'Jeunesse' : 'Adulte';
 }
 
+// Le piège "en réserve" (Syracuse 921$b code 2 — voir PIEGE_B_LABELS dans
+// build-inventory.mjs) compte aussi comme "en magasin", en plus des deux
+// sections normales : demande explicite de l'équipe, un exemplaire marqué
+// ainsi est physiquement traité comme du magasin même si sa Section (Libellé)
+// Syracuse n'est pas "Magasin"/"Magasin Jeunesse". Champ "Pièges" en texte
+// libre (peut combiner plusieurs pièges, ex. "Exclu DEFINITIVEMENT du prêt en
+// réserve") — d'où un test par sous-chaîne insensible à la casse plutôt qu'une
+// égalité stricte. Ne matche pas "Réserve Patrimoniale"/"Réserve Saint
+// Exupery" (pas de "en" devant "réserve" dans ces libellés-là).
+const PIEGE_EN_RESERVE_RE = /en réserve/i;
+
+function isPiegeEnReserve(piege) {
+  return !!piege && PIEGE_EN_RESERVE_RE.test(piege);
+}
+
 function fondsLabel(digitRun, section) {
   const etage = digitRun ? '2e/5e étage' : '6e étage';
   return `Magasin — ${etage} (${secteurLabel(section)})`;
@@ -129,7 +144,8 @@ async function buildItems(path) {
     const barcode = (props['Code-barres (valeur)'] || '').trim();
     if (!barcode) continue;
 
-    const isMagasin = CONFIG.magasinSections.includes(section);
+    const piege = (props['Pièges'] || '').trim() || null;
+    const isMagasin = CONFIG.magasinSections.includes(section) || isPiegeEnReserve(piege);
 
     const cote1 = props['Cote n° 1'] || '';
     const cote2 = props['Cote n° 2'] || '';
@@ -167,7 +183,9 @@ async function buildItems(path) {
       // codes ici, contrairement à build-inventory.mjs qui repart du
       // MARC-XML brut). Repris tel quel par recolement.html pour signaler un
       // exemplaire à traiter (pilon/braderie…) dans les tableaux d'anomalies.
-      _piege: (props['Pièges'] || '').trim() || null,
+      // Un piège "en réserve" fait aussi basculer _isMagasin à true (voir
+      // isPiegeEnReserve() plus haut), même si Section (Libellé) diffère.
+      _piege: piege,
       // Pour un exemplaire hors magasin, le "fonds" affiché est sa vraie
       // section Syracuse (ex. "Adulte", "Réserve"…) plutôt qu'un libellé de
       // magasin — c'est justement ce qui rend une anomalie de classement

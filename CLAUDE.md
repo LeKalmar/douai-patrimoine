@@ -367,7 +367,9 @@ DEFINITIVEMENT du prêt Consultation sur place") ; côté réserve,
 `build-inventory.mjs` les résout à la main via `PIEGE_A_LABELS`/
 `PIEGE_B_LABELS` (table relevée exhaustivement depuis les couples
 (Code)/(Libellé) de `bib.xml` — les deux exports partagent la même table de
-codes Syracuse) et les concatène dans le même format que le champ
+codes Syracuse ; le code `3` de `PIEGE_A_LABELS` fait exception, sans
+libellé dans cette table côté Syracuse — mappé en dur vers `"Magasin"`,
+2026-09-01, confirmé par l'équipe) et les concatène dans le même format que le champ
 « Pièges » de GESMARC, pour un rendu identique côté `recolement.html` quel
 que soit le fonds d'origine. Chaque panneau a un bouton d'export (`.txt`,
 un code-barre par ligne, respectant la recherche en cours). Il n'y a
@@ -424,7 +426,17 @@ filtre d'exclusion) :
 2026-08-26** (demande explicite) : `data/magasins.json` garde en réalité
 TOUS les exemplaires de la bibliothèque de Douai, avec un flag `_isMagasin`
 qui distingue ceux dont `Section (Libellé)` vaut Magasin/Magasin Jeunesse
-du reste. `magasins.html` filtre lui-même sur `_isMagasin` côté client à la
+du reste. Depuis 2026-09-01, `_isMagasin` vaut aussi `true` pour un
+exemplaire dont le piège (`props['Pièges']`, texte libre — voir plus haut
+« Le code couleur du plan » pour la mécanique générale du champ `piege`)
+contient « en réserve » (`isPiegeEnReserve()`/`PIEGE_EN_RESERVE_RE` dans
+`build-magasins.mjs`, test par sous-chaîne insensible à la casse — le champ
+peut combiner plusieurs pièges en texte libre, ex. « Exclu DEFINITIVEMENT du
+prêt en réserve »), même si sa `Section (Libellé)` Syracuse n'est pas
+Magasin/Magasin Jeunesse : demande explicite de l'équipe, un exemplaire
+ainsi marqué doit compter comme du magasin. Ne matche pas « Réserve
+Patrimoniale »/« Réserve Saint Exupery » (pas de « en » devant « réserve »
+dans ces libellés-là, eux-mêmes des pièges Syracuse distincts). `magasins.html` filtre lui-même sur `_isMagasin` côté client à la
 réception du fetch, donc son comportement affiché ne change pas ; le flag
 `_secteur` reste la section brute (pas forcément Adulte/Jeunesse pour un
 exemplaire hors magasin). Raison de ce changement : `recolement.html`

@@ -91,6 +91,7 @@ const CONFIG = {
 const PIEGE_A_LABELS = {
   1: 'Exclu du prêt temporairement',
   2: 'Exclu DEFINITIVEMENT du prêt',
+  3: 'Magasin', // Sans libellé dans la table Syracuse (bib.xml) — confirmé par l'équipe.
   4: 'Non réservable',
 };
 const PIEGE_B_LABELS = {
