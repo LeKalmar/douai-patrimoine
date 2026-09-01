@@ -41,6 +41,7 @@
   .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
 
   .locbar{position:sticky;top:0;z-index:20;background:#F5F5FF;border-bottom:1px solid #ddd;padding:.75rem 0;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  main{display:block;padding-top:1rem}
   .locbar .container{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
   .loc-sel{font-family:inherit;font-size:.85rem;padding:.4rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
   .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
@@ -89,7 +90,7 @@
   #noncat-mode-zone{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0}
   .noncat-label{font-size:.9rem;color:#333}
   #stp-noncat-wrap{padding:.15rem .3rem}
-  #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit}
+  #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit;-moz-appearance:textfield}
   #noncat-input::-webkit-inner-spin-button,#noncat-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 
   .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
@@ -113,6 +114,19 @@
   .expected-panel{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem;margin-bottom:1.25rem}
   .expected-title{font-size:.8rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
   .expected-count{font-weight:400;text-transform:none;letter-spacing:0;color:#888;font-size:.78rem}
+  /* Panneaux repliables "Attendu à cet emplacement"/"Scans récents ici"/
+     "Tous les scans" (2026-09-01) : <details>/<summary> natifs, même
+     mécanique que .adv-details plus bas — mais le marqueur ▸/▾ est posé sur
+     le premier enfant du <summary> plutôt que sur le <summary> lui-même
+     (qui reste en display:flex/space-between hérité de .expected-title/
+     .log-header) : le poser directement dessus en ferait un item flex à
+     part entière, écarté du titre par justify-content:space-between.
+     summary::marker natif retiré (list-style:none + masquage webkit) pour
+     ne garder que ce marqueur maison, cohérent visuellement avec .adv-details. */
+  .expected-panel > summary, .log-wrap > summary{cursor:pointer;list-style:none}
+  .expected-panel > summary::-webkit-details-marker, .log-wrap > summary::-webkit-details-marker{display:none}
+  .expected-panel > summary > .expected-title-text::before, .log-wrap > summary > .log-title::before{content:'▸ ';color:#999}
+  .expected-panel[open] > summary > .expected-title-text::before, .log-wrap[open] > summary > .log-title::before{content:'▾ '}
   .adv-group-title{font-size:.95rem;font-weight:700;color:#12157A;margin:1.5rem 0 .75rem;padding-top:1.25rem;border-top:2px solid #ddd}
   .adv-group-title:first-child{margin-top:0;padding-top:0;border-top:none}
   .adv-details{border-top:1px solid #e5e5e5;padding-top:.75rem;margin-top:.9rem}
@@ -284,7 +298,6 @@
                 <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric">
                 <button type="button" id="noncat-plus">+</button>
               </div>
-              <button type="button" class="tool-btn" id="noncat-save">Enregistrer</button>
             </div>
             <div class="feedback" id="noncat-feedback"></div>
           </div>
@@ -308,33 +321,35 @@
         </div>
       </div>
 
-      <div class="expected-panel">
-        <div class="expected-title">
-          <span>Attendu à cet emplacement <span class="expected-count" id="exp-count"></span></span>
-        </div>
+      <details class="expected-panel">
+        <summary class="expected-title">
+          <span class="expected-title-text">Attendu à cet emplacement <span class="expected-count" id="exp-count"></span></span>
+        </summary>
         <div class="exp-list" id="exp-list"><p class="exp-empty">Aucune donnée de référence importée — chargez un récolement de référence pour comparer.</p></div>
-      </div>
+      </details>
 
-      <div class="log-wrap">
-        <div class="log-header">
+      <details class="log-wrap">
+        <summary class="log-header">
           <span class="log-title">Scans récents ici</span>
-        </div>
+        </summary>
         <div class="log-body"><table class="log-table">
           <thead><tr><th>Cote</th><th>Titre</th><th>Heure</th><th>Code-barre</th><th></th></tr></thead>
           <tbody id="log-here"></tbody>
         </table></div>
-      </div>
+      </details>
 
-      <div class="log-wrap">
-        <div class="log-header">
+      <details class="log-wrap">
+        <summary class="log-header">
           <span class="log-title">Tous les scans</span>
+        </summary>
+        <div class="log-header-actions" style="padding:.5rem .9rem;border-bottom:1px solid #e0e0e0">
           <input type="text" class="log-search" id="log-search" placeholder="Filtrer (cote, titre, code-barre)…">
         </div>
         <div class="log-body"><table class="log-table">
           <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
           <tbody id="log-all"></tbody>
         </table></div>
-      </div>
+      </details>
 
       <div class="expected-panel">
         <div class="expected-title"><span>Statistiques avancées du récolement</span></div>
@@ -837,6 +852,25 @@ const ADV_CATS = {
       <td>${esc(r.piege)||'—'}</td>
     </tr>`,
   },
+  scanned: {
+    title: 'Récolés — codes-barres déjà scannés',
+    desc: 'Tous les documents déjà récolés dans ce groupe (scan physique, y compris exemplarisation rapide et cascade de reliures) — export utile pour ajout panier SIGB ou recoupement avec une autre liste',
+    placeholder: 'Filtrer (cote, titre, auteur, code-barre)…',
+    headers: ['Cote','Titre','Auteur','Emplacement','Code-barre'],
+    colspan: 5,
+    emptyMsg: 'Aucun document récolé pour l\'instant.',
+    filterFields: ['cote','titre','auteur','barcode'],
+    filePrefix: 'codes-barres-recoles',
+    needsCatalog: false,
+    listFn: scannedList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${esc(r.auteur)}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+    </tr>`,
+  },
   nobarcode: {
     title: 'Livres sans code-barre',
     desc: 'Cotes saisies à la main pour des documents sans code-barre physique — récolés automatiquement si la cote est reconnue dans le catalogue actif, sinon juste listés ici pour savoir où en recoller un.',
@@ -877,7 +911,33 @@ const ADV_CATS = {
     </tr>`,
   },
 };
-document.getElementById('adv-groups').innerHTML = ADV_GROUPS.map(advGroupTemplate).join('');
+document.getElementById('adv-groups').innerHTML = ADV_GROUPS
+  .map(g=>`<div class="adv-group" id="adv-group-${g.id}">${advGroupTemplate(g)}</div>`).join('');
+
+// N'affiche que le groupe de statistiques avancées correspondant à
+// l'emplacement actuellement sélectionné (loc.reserve) — demande explicite
+// (2026-09-01) : les 4 panneaux (Réserve, Magasin 2e/5e/6e) affichés en même
+// temps rendaient la page trop longue à parcourir pour ne consulter que
+// celui qui correspond à l'étage où l'on se trouve physiquement. La
+// correspondance suit RESERVES → ADV_GROUPS : patrimoniale/douaisienne/
+// horsreserve → 'reserve' (même regroupement que catalogGroupOfReserve(),
+// resté binaire reserve/magasin — voir plus haut), magasin2/5/6 → leur
+// groupe dédié. Les autres groupes restent dans le DOM (juste masqués,
+// display:none) plutôt que retirés : rebasculer de réserve n'a pas besoin
+// de reconstruire leur HTML/écouteurs.
+function advGroupIdForReserve(reserveId){
+  if(reserveId==='magasin2') return 'magasin-2e';
+  if(reserveId==='magasin5') return 'magasin-5e';
+  if(reserveId==='magasin6') return 'magasin-6e';
+  return 'reserve';
+}
+function applyAdvGroupVisibility(){
+  const activeId = advGroupIdForReserve(loc.reserve);
+  ADV_GROUPS.forEach(g=>{
+    const el = document.getElementById('adv-group-'+g.id);
+    if(el) el.style.display = (g.id===activeId) ? '' : 'none';
+  });
+}
 
 /* ════════════ EMPLACEMENT ════════════
    Le scan code-barre et le comptage des non-catalogués sont deux outils
@@ -951,6 +1011,7 @@ function applyReserveVisibility(){
   document.querySelector('.expected-panel').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
   updateVideRowVisibility();
+  applyAdvGroupVisibility();
 }
 
 selReserve.addEventListener('change', ()=>{
@@ -1082,12 +1143,14 @@ scanInput.addEventListener('keydown', e=>{
   }
 });
 document.addEventListener('click', e=>{
-  // .adv-details (menus dépliables des statistiques avancées) est exclu :
-  // refocuser scanInput (en haut de la page, hors de vue une fois qu'on a
-  // scrollé jusqu'aux statistiques avancées) forçait le navigateur à faire
-  // défiler la page jusqu'à lui à chaque clic sur un <summary> ou une ligne
-  // de tableau — sensation de "téléportation" en haut de page.
-  if(!e.target.closest('input,select,button,a,label,.adv-details')) scanInput.focus();
+  // .adv-details (menus dépliables des statistiques avancées), et depuis
+  // 2026-09-01 .expected-panel/.log-wrap (également des <details> repliables
+  // — "Attendu à cet emplacement"/"Scans récents ici"/"Tous les scans") sont
+  // exclus : refocuser scanInput (en haut de la page, hors de vue une fois
+  // qu'on a scrollé plus bas) forçait le navigateur à faire défiler la page
+  // jusqu'à lui à chaque clic sur un <summary> ou une ligne de tableau —
+  // sensation de "téléportation" en haut de page.
+  if(!e.target.closest('input,select,button,a,label,.adv-details,.expected-panel,.log-wrap')) scanInput.focus();
 });
 
 function handleScan(barcode, damaged, opts){
@@ -1407,15 +1470,25 @@ function showNonCatFeedback(count){
     : `<div class="fb-top"><span class="fb-badge ok">✓ Enregistré</span></div><div class="fb-titre">Emplacement marqué sans livre non catalogué.</div>`;
 }
 
-document.getElementById('noncat-save').addEventListener('click', saveNonCatCount);
+// Enregistrement automatique dès que la valeur change, avec un petit délai
+// pour ne pas envoyer une requête réseau à chaque clic quand on incrémente
+// plusieurs fois de suite (voir queuePatch/flushPendingSync plus haut).
+let noncatSaveTimer = null;
+function scheduleNonCatSave(){
+  clearTimeout(noncatSaveTimer);
+  noncatSaveTimer = setTimeout(saveNonCatCount, 600);
+}
+noncatInput.addEventListener('input', scheduleNonCatSave);
 noncatInput.addEventListener('keydown', e=>{
-  if(e.key==='Enter'){ e.preventDefault(); saveNonCatCount(); }
+  if(e.key==='Enter'){ e.preventDefault(); clearTimeout(noncatSaveTimer); saveNonCatCount(); }
 });
 document.getElementById('noncat-minus').addEventListener('click', ()=>{
   noncatInput.value = Math.max(0, (parseInt(noncatInput.value,10)||0) - 1);
+  scheduleNonCatSave();
 });
 document.getElementById('noncat-plus').addEventListener('click', ()=>{
   noncatInput.value = (parseInt(noncatInput.value,10)||0) + 1;
+  scheduleNonCatSave();
 });
 
 /* ════════════ ÉTAGÈRES VIDES / NON RANGÉES ════════════
@@ -1430,14 +1503,14 @@ function isCurrentNonRange(){ return !!nonRangeShelves[emplacementKey(locFieldsO
 function updateVideUI(){
   const btn = document.getElementById('btn-vide');
   const marked = isCurrentVide();
-  btn.textContent = marked ? '☑ Emplacement marqué vide' : '☐ Marquer cet emplacement comme vide';
+  btn.textContent = marked ? '☑ Vide' : '☐ Vide';
   btn.classList.toggle('active', marked);
 }
 
 function updateNonRangeUI(){
   const btn = document.getElementById('btn-nonrange');
   const marked = isCurrentNonRange();
-  btn.textContent = marked ? '☑ Emplacement marqué non rangé' : '☐ Marquer comme non rangé';
+  btn.textContent = marked ? '☑ Non rangé' : '☐ Non rangé';
   btn.classList.toggle('active', marked);
 }
 
@@ -1494,9 +1567,9 @@ function updateLastShelfUI(){
   const rec = currentLastShelfRecord();
   const markedHere = rec && String(rec.etage) === String(loc.etage);
   btn.classList.toggle('active', markedHere);
-  if(markedHere) btn.textContent = '☑ Dernière étagère de cette colonne';
-  else if(rec) btn.textContent = `☐ Marquer comme dernière étagère (actuellement : étage ${rec.etage})`;
-  else btn.textContent = '☐ Marquer comme dernière étagère de cette colonne';
+  if(markedHere) btn.textContent = '☑ Dernière étagère';
+  else if(rec) btn.textContent = `☐ Dernière étagère (étage ${rec.etage})`;
+  else btn.textContent = '☐ Dernière étagère';
 }
 
 document.getElementById('btn-lastshelf').addEventListener('click', ()=>{
@@ -2008,6 +2081,15 @@ function notScannedList(group){
     .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
+// Complément direct de notScannedList() : tous les codes-barres déjà récolés
+// (présents dans `scans`) pour ce groupe, quel que soit leur statut par
+// ailleurs (catalogué, exemplarisé rapide, cascade reliures via
+// viaReliure…) — sert à exporter d'un coup tout ce qui a été traité, par ex.
+// pour ajout panier SIGB ou recoupement avec une autre liste.
+function scannedList(group){
+  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group)
+    .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
+}
 
 // Anomalies de classement : scans dont handleScan() a posé horsSection:true
 // (voir plus haut) — le code-barre existe dans magasinWideCatalog mais pas
@@ -2085,6 +2167,7 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote-${gid}">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned-${gid}">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Récolés (codes-barres scannés)</div><div class="stat-card-val" id="st-scanned-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Livres sans code-barre</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Anomalies de classement</div><div class="stat-card-val" id="st-horssection-${gid}">0</div></div>
       ${isMagasin ? `<div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-etage-${gid}" style="font-size:1.2rem">—</div></div>` : ''}
@@ -2162,6 +2245,10 @@ function updateAdvListsCount(){
     const abimeCount = damagedList(g.id).length;
     document.getElementById('st-abime-'+g.id).textContent = abimeCount.toLocaleString('fr-FR');
     document.getElementById('sum-abime-'+g.id+'-count').textContent = abimeCount.toLocaleString('fr-FR');
+
+    const scannedCount = scannedList(g.id).length;
+    document.getElementById('st-scanned-'+g.id).textContent = scannedCount.toLocaleString('fr-FR');
+    document.getElementById('sum-scanned-'+g.id+'-count').textContent = scannedCount.toLocaleString('fr-FR');
 
     if(catalogByGroup[catalogGroupOf(g.id)]){
       const manualCoteCount = manualCoteList(g.id).length;

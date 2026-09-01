@@ -1157,6 +1157,31 @@ fois. Il n'y a plus de suivi « réglé/rouvert » par ligne (retiré le
 l'état brut, sans notion de problème « traité » séparée du vrai
 scan/catalogage.
 
+Depuis 2026-09-01, un seul groupe est visible à la fois — celui qui
+correspond à l'emplacement actuellement sélectionné dans le menu déroulant
+« Réserve » (`loc.reserve`) — plutôt que les 4 panneaux affichés en même
+temps : la page devenait trop longue à parcourir pour ne consulter que les
+stats de l'étage où l'on se trouve physiquement (demande explicite). Le
+HTML de chaque groupe reste généré une seule fois (`ADV_GROUPS.map(...)`,
+voir ci-dessus) mais chacun est maintenant enveloppé dans un
+`<div class="adv-group" id="adv-group-<id>">` ; `applyAdvGroupVisibility()`
+(appelée depuis `applyReserveVisibility()` — donc à l'init et à chaque
+changement de réserve) bascule leur `display` selon
+`advGroupIdForReserve(loc.reserve)` : `patrimoniale`/`douaisienne`/
+`horsreserve` → `'reserve'`, `magasin2`/`magasin5`/`magasin6` → leur groupe
+dédié — même correspondance que `catalogGroupOfReserve()`, mais celle-ci
+reste binaire reserve/magasin alors qu'`advGroupIdForReserve()` distingue
+les 3 étages de magasin. Les groupes masqués restent dans le DOM (juste
+`display:none`, jamais retirés/reconstruits) : rebasculer de réserve n'a
+donc pas de coût de re-rendu, et `updateAdvListsCount()`/`updateStats()`
+continuent de recalculer tous les groupes en arrière-plan qu'ils soient
+visibles ou non (pas de changement de leur côté) — seul l'affichage change.
+Ce filtrage a un effet de bord bénin sur `.adv-group-title:first-child`
+(bordure/marge du haut normalement réservée au tout premier groupe) : le
+`<h3>` de chaque groupe étant désormais le premier enfant de son propre
+`.adv-group`, la règle s'applique à chacun d'eux plutôt qu'au seul premier
+— sans conséquence visuelle vu qu'un seul groupe est affiché à la fois.
+
 « Notices récolées » par magasin physique (`magasinFloorStats()`, un
 stat-card dans chacun des 3 groupes magasin, id `st-etage-<gid>`) reprend
 le même calcul dual-axe qu'avant la scission par groupe (numérateur =
