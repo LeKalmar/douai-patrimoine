@@ -461,15 +461,45 @@ function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch(e){ return fallback; }
 }
-function saveScans(){ localStorage.setItem(LS_SCANS, JSON.stringify(scans)); }
-function saveLoc(){ localStorage.setItem(LS_LOC, JSON.stringify(loc)); }
-function saveBaseline(){ localStorage.setItem(LS_BASE, baseline ? JSON.stringify(baseline) : ''); }
-function saveNonCat(){ localStorage.setItem(LS_NONCAT, JSON.stringify(nonCat)); }
-function saveVideShelves(){ localStorage.setItem(LS_VIDE, JSON.stringify(videShelves)); }
-function saveNonRangeShelves(){ localStorage.setItem(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
-function saveLastShelves(){ localStorage.setItem(LS_LASTSHELF, JSON.stringify(lastShelves)); }
-function saveNoBarcodeCotes(){ localStorage.setItem(LS_NOBARCODE, JSON.stringify(noBarcodeCotes)); }
-function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
+// À true dès qu'une écriture localStorage échoue (quota dépassé — le
+// récolement dépasse maintenant régulièrement les ~5 Mo de quota localStorage
+// de certains navigateurs, voir safeSetLocal ci-dessous) : ne bloque plus
+// rien, juste affiché dans l'indicateur de synchro (updateSyncIndicator) pour
+// prévenir que le cache local de cet appareil n'est plus à jour.
+let localStorageBroken = false;
+// Ne JAMAIS laisser une erreur d'écriture localStorage remonter jusqu'à
+// l'appelant : saveScans()/queuePatch() sont appelés l'un après l'autre dans
+// handleScan(), et une exception ici interromprait la fonction avant
+// queuePatch() — le scan ne serait alors même plus envoyé au serveur (perdu
+// pour de bon, pas seulement absent du cache local). Incident du 2026-09-01 :
+// "quota has been exceeded" sur saveScans() faisait échouer le scan
+// entièrement ; en pratique le cache local (scans seuls) pèse maintenant
+// ~5,5 Mo sur l'état partagé complet, au ras ou au-delà du quota localStorage
+// de certains navigateurs/appareils. La sauvegarde locale devient best-effort
+// dans ce cas, mais la synchro serveur (source de vérité partagée, voir
+// queuePatch/flushPendingSync) continue normalement — et syncFromServer()
+// (appelée périodiquement) recharge depuis le serveur ce qui n'a pas pu être
+// gardé localement.
+function safeSetLocal(key, value){
+  try{
+    localStorage.setItem(key, value);
+    if(localStorageBroken){ localStorageBroken = false; updateSyncIndicator(); }
+    return true;
+  }catch(e){
+    console.error(`Écriture locale impossible (${key}), stockage best-effort désormais côté serveur :`, e);
+    if(!localStorageBroken){ localStorageBroken = true; updateSyncIndicator(); }
+    return false;
+  }
+}
+function saveScans(){ safeSetLocal(LS_SCANS, JSON.stringify(scans)); }
+function saveLoc(){ safeSetLocal(LS_LOC, JSON.stringify(loc)); }
+function saveBaseline(){ safeSetLocal(LS_BASE, baseline ? JSON.stringify(baseline) : ''); }
+function saveNonCat(){ safeSetLocal(LS_NONCAT, JSON.stringify(nonCat)); }
+function saveVideShelves(){ safeSetLocal(LS_VIDE, JSON.stringify(videShelves)); }
+function saveNonRangeShelves(){ safeSetLocal(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
+function saveLastShelves(){ safeSetLocal(LS_LASTSHELF, JSON.stringify(lastShelves)); }
+function saveNoBarcodeCotes(){ safeSetLocal(LS_NOBARCODE, JSON.stringify(noBarcodeCotes)); }
+function savePendingSync(){ safeSetLocal(LS_PENDING, JSON.stringify(pendingSync)); }
 function normalizeCote(s){ return (s||'').trim().toUpperCase(); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -492,9 +522,14 @@ let lastSyncError = null;
 function updateSyncIndicator(){
   const el = document.getElementById('sync-status');
   if(!el) return;
+  const storageWarning = localStorageBroken ? '⚠ stockage local plein, cache hors-ligne de cet appareil non à jour (la synchro serveur continue normalement)' : '';
   if(pendingSync.length){
     el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
     el.title = lastSyncError ? `Dernière erreur de synchro : ${lastSyncError}` : 'Synchronisation avec les autres postes (via R2)';
+    el.classList.add('pending');
+  } else if(storageWarning){
+    el.textContent = storageWarning;
+    el.title = storageWarning;
     el.classList.add('pending');
   } else {
     el.textContent = '✓ synchronisé';
