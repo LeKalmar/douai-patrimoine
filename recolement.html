@@ -417,7 +417,7 @@
 </footer>
 
 <script>
-(function(){
+(async function(){
 /* ════════════ AUTH ════════════ */
 if (sessionStorage.getItem('rp_admin_auth') !== '1') {
   window.location.href = 'index.html';
@@ -441,10 +441,26 @@ const LS_NONRANGE = 'rp_recolement_nonrange';
 const LS_LASTSHELF = 'rp_recolement_lastshelf';
 const LS_NOBARCODE = 'rp_recolement_nobarcode';
 const LS_PENDING = 'rp_recolement_pending_sync';
+const IDB_NAME = 'rp_recolement_idb';
+const IDB_VERSION = 1;
+const IDB_MIGRATED_KEY = 'rp_recolement_idb_migrated_v1';
+const IDB_MIGRATION_FAILCOUNT_KEY = 'rp_recolement_idb_migration_failcount';
 const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "temps réel" arrête de comptabiliser (voir updateTimeStats)
 
-let scans = loadJSON(LS_SCANS, {});           // barcode -> record
-let baseline = loadJSON(LS_BASE, null);       // barcode -> record, ou null
+// scans/baseline : remplis par initStorage() (IndexedDB, avec migration
+// rétroactive depuis localStorage la première fois — voir plus bas), pas par
+// loadJSON() directement comme les autres clés ci-dessous. scans à lui seul
+// pèse maintenant ~5,5 Mo en JSON (16 248 scans sur l'état partagé actuel) —
+// au ras ou au-delà du quota localStorage (~5-10 Mo) de certains
+// navigateurs/appareils (incident "quota has been exceeded" du 2026-09-01),
+// et resérialiser tout l'objet à CHAQUE scan (l'ancien saveScans()) coûtait
+// de plus en plus cher à mesure que le récolement avançait — cause aussi du
+// bug du bip inaudible (thread bloqué par ce JSON.stringify, voir plus bas).
+// IndexedDB n'a pas ce plafond bas et permet une écriture par scan (O(1))
+// plutôt qu'une réécriture de tout l'historique (O(n)).
+let scans = {};
+let baseline = null;
+let idbDb = null; // connexion IndexedDB ouverte, ou null si indisponible/repli localStorage classique
 let loc = loadJSON(LS_LOC, { locType:'etagere', reserve:'patrimoniale', travee:'I', colonne:1, etage:1 });
 loc.reserve = loc.reserve || 'patrimoniale';  // compat anciennes sessions sans champ "reserve"
 loc.locType = loc.locType || 'etagere';       // compat anciennes sessions (ex-loc.kind)
@@ -461,25 +477,25 @@ function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch(e){ return fallback; }
 }
-// À true dès qu'une écriture localStorage échoue (quota dépassé — le
-// récolement dépasse maintenant régulièrement les ~5 Mo de quota localStorage
-// de certains navigateurs, voir safeSetLocal ci-dessous) : ne bloque plus
-// rien, juste affiché dans l'indicateur de synchro (updateSyncIndicator) pour
-// prévenir que le cache local de cet appareil n'est plus à jour.
+// À true dès qu'une écriture localStorage échoue (quota dépassé) : ne
+// bloque plus rien, juste affiché dans l'indicateur de synchro
+// (updateSyncIndicator) pour prévenir que le cache local de cet appareil
+// n'est plus à jour. Ne concerne plus scans/baseline (IndexedDB, voir plus
+// bas) mais reste utile pour les petites clés encore sur localStorage
+// (nonCat, videShelves...) et pour le repli IndexedDB-indisponible.
 let localStorageBroken = false;
 // Ne JAMAIS laisser une erreur d'écriture localStorage remonter jusqu'à
-// l'appelant : saveScans()/queuePatch() sont appelés l'un après l'autre dans
-// handleScan(), et une exception ici interromprait la fonction avant
-// queuePatch() — le scan ne serait alors même plus envoyé au serveur (perdu
-// pour de bon, pas seulement absent du cache local). Incident du 2026-09-01 :
-// "quota has been exceeded" sur saveScans() faisait échouer le scan
-// entièrement ; en pratique le cache local (scans seuls) pèse maintenant
-// ~5,5 Mo sur l'état partagé complet, au ras ou au-delà du quota localStorage
-// de certains navigateurs/appareils. La sauvegarde locale devient best-effort
-// dans ce cas, mais la synchro serveur (source de vérité partagée, voir
-// queuePatch/flushPendingSync) continue normalement — et syncFromServer()
-// (appelée périodiquement) recharge depuis le serveur ce qui n'a pas pu être
-// gardé localement.
+// l'appelant : un save*()/queuePatch() est en général suivi d'autre code
+// dans son appelant, et une exception ici l'interromprait en plein milieu —
+// pour scans, ça pouvait même empêcher queuePatch() de s'exécuter, donc le
+// scan n'était même plus envoyé au serveur (perdu pour de bon, pas
+// seulement absent du cache local). Incident du 2026-09-01 : "quota has
+// been exceeded" sur l'ancien saveScans() (qui resérialisait tout l'objet
+// scans en JSON à CHAQUE scan) faisait échouer le scan entièrement ; le
+// cache local scans à lui seul pesait ~5,5 Mo, au ras ou au-delà du quota
+// localStorage (~5-10 Mo) de certains navigateurs/appareils. scans/baseline
+// sont passés à IndexedDB pour ça (voir plus bas) ; safeSetLocal() reste le
+// filet de sécurité pour les clés qui restent sur localStorage.
 function safeSetLocal(key, value){
   try{
     localStorage.setItem(key, value);
@@ -491,9 +507,7 @@ function safeSetLocal(key, value){
     return false;
   }
 }
-function saveScans(){ safeSetLocal(LS_SCANS, JSON.stringify(scans)); }
 function saveLoc(){ safeSetLocal(LS_LOC, JSON.stringify(loc)); }
-function saveBaseline(){ safeSetLocal(LS_BASE, baseline ? JSON.stringify(baseline) : ''); }
 function saveNonCat(){ safeSetLocal(LS_NONCAT, JSON.stringify(nonCat)); }
 function saveVideShelves(){ safeSetLocal(LS_VIDE, JSON.stringify(videShelves)); }
 function saveNonRangeShelves(){ safeSetLocal(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
@@ -502,6 +516,249 @@ function saveNoBarcodeCotes(){ safeSetLocal(LS_NOBARCODE, JSON.stringify(noBarco
 function savePendingSync(){ safeSetLocal(LS_PENDING, JSON.stringify(pendingSync)); }
 function normalizeCote(s){ return (s||'').trim().toUpperCase(); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ════════════ INDEXEDDB (scans / baseline) ════════════
+   scans/baseline sont trop volumineux pour continuer à resérialiser l'objet
+   entier en JSON dans localStorage à chaque scan (voir migrateLocalStorageToIdb
+   plus bas pour la migration rétroactive) — un object store IndexedDB par
+   barcode permet des écritures O(1) par scan (juste l'enregistrement
+   modifié) plutôt que O(n) (tout l'historique à chaque fois). Les autres
+   clés (nonCat, videShelves, pendingSync...) restent sur localStorage —
+   elles pèsent quelques dizaines de Ko max, largement sous le quota. */
+function openIdb(){
+  return new Promise((resolve, reject)=>{
+    if(!window.indexedDB){ reject(new Error('IndexedDB indisponible')); return; }
+    let settled = false;
+    // Filet de sécurité : onupgradeneeded/onsuccess/onerror ne se déclenchent
+    // jamais si une autre connexion (autre onglet resté ouvert sur une
+    // ancienne version) bloque l'upgrade (onblocked) — sans timeout, l'appel
+    // resterait bloqué indéfiniment et la page ne démarrerait jamais.
+    const timeout = setTimeout(()=>{
+      if(!settled){ settled = true; reject(new Error('IndexedDB open timeout (onblocked ?)')); }
+    }, 5000);
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains('scans')) db.createObjectStore('scans', {keyPath:'barcode'});
+      if(!db.objectStoreNames.contains('baseline')) db.createObjectStore('baseline', {keyPath:'barcode'});
+    };
+    req.onsuccess = ()=>{ if(!settled){ settled = true; clearTimeout(timeout); resolve(req.result); } };
+    req.onerror = ()=>{ if(!settled){ settled = true; clearTimeout(timeout); reject(req.error || new Error('IndexedDB open failed')); } };
+  });
+}
+function idbGetAll(storeName){
+  return new Promise((resolve, reject)=>{
+    const req = idbDb.transaction(storeName,'readonly').objectStore(storeName).getAll();
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function idbPut(storeName, record){
+  return new Promise((resolve, reject)=>{
+    const tx = idbDb.transaction(storeName,'readwrite');
+    tx.objectStore(storeName).put(record);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+function idbBulkPut(storeName, records){
+  return new Promise((resolve, reject)=>{
+    if(!records.length){ resolve(); return; }
+    const tx = idbDb.transaction(storeName,'readwrite');
+    const store = tx.objectStore(storeName);
+    records.forEach(r=>store.put(r));
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+function idbDelete(storeName, key){
+  return new Promise((resolve, reject)=>{
+    const tx = idbDb.transaction(storeName,'readwrite');
+    tx.objectStore(storeName).delete(key);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+function idbClear(storeName){
+  return new Promise((resolve, reject)=>{
+    const tx = idbDb.transaction(storeName,'readwrite');
+    tx.objectStore(storeName).clear();
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+
+// Repli si IndexedDB est indisponible/casse en cours de route (très vieux
+// navigateur, mode privé strict...) : identique au comportement d'avant
+// cette migration — jamais pire que ce qui était déjà en production.
+function saveScansLegacyWholeBlob(){ safeSetLocal(LS_SCANS, JSON.stringify(scans)); }
+
+function putScanRecord(record){
+  if(idbDb){
+    idbPut('scans', record).catch(e=>{
+      console.error('IndexedDB (scans, put) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+function bulkPutScanRecords(records){
+  if(!records || !records.length) return;
+  if(idbDb){
+    idbBulkPut('scans', records).catch(e=>{
+      console.error('IndexedDB (scans, bulkPut) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+function deleteScanRecord(barcode){
+  if(idbDb){
+    idbDelete('scans', barcode).catch(e=>{
+      console.error('IndexedDB (scans, delete) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+function clearAllScanRecords(){
+  if(idbDb){
+    idbClear('scans').catch(e=>{
+      console.error('IndexedDB (scans, clear) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+async function saveBaseline(){
+  if(idbDb){
+    try{
+      await idbClear('baseline');
+      await idbBulkPut('baseline', Object.values(baseline || {}));
+      return;
+    }catch(e){ console.error('IndexedDB (baseline) a échoué, repli localStorage :', e); idbDb = null; }
+  }
+  safeSetLocal(LS_BASE, baseline ? JSON.stringify(baseline) : '');
+}
+
+/* Charge scans/baseline au démarrage : depuis IndexedDB si disponible (avec
+   une migration rétroactive, une seule fois par appareil, depuis les
+   anciennes clés localStorage — voir migrateLocalStorageToIdb), sinon repli
+   sur l'ancien comportement localStorage pur. Awaited tout en bas de la
+   section STOCKAGE, avant tout le reste du script (voir la note à cet
+   endroit) : setLocType(loc.locType, true), plus bas dans la section
+   EMPLACEMENT, est appelée de façon synchrone pendant l'initialisation et
+   lit scans via updateStats() — elle doit donc être peuplée avant. */
+async function initStorage(){
+  try{
+    idbDb = await openIdb();
+  }catch(e){
+    console.error('IndexedDB indisponible, repli sur localStorage (comportement identique à avant cette migration) :', e);
+    idbDb = null;
+    scans = loadJSON(LS_SCANS, {});
+    baseline = loadJSON(LS_BASE, null);
+    return;
+  }
+  const migrated = localStorage.getItem(IDB_MIGRATED_KEY) === '1';
+  if(!migrated){
+    const ok = await migrateLocalStorageToIdb();
+    if(!ok){
+      scans = loadJSON(LS_SCANS, {});
+      baseline = loadJSON(LS_BASE, null);
+      return;
+    }
+  }
+  try{
+    const scanRows = await idbGetAll('scans');
+    scans = {};
+    scanRows.forEach(r=>{ scans[r.barcode] = r; });
+    const baseRows = await idbGetAll('baseline');
+    baseline = baseRows.length ? {} : null;
+    baseRows.forEach(r=>{ baseline[r.barcode] = r; });
+  }catch(e){
+    console.error('Lecture IndexedDB impossible, démarrage à vide (syncFromServer() rattrapera depuis le serveur) :', e);
+    idbDb = null;
+    scans = {};
+    baseline = null;
+  }
+}
+
+/* Migration rétroactive, une seule fois par appareil : reprend les données
+   déjà accumulées dans localStorage (clés LS_SCANS/LS_BASE) et les copie
+   dans IndexedDB, avec une sauvegarde de précaution téléchargée AVANT toute
+   modification (demande explicite : "en faisant une sauvegarde pour ne rien
+   supprimer"). Vérifie une comparaison profonde, pas seulement un décompte,
+   avant de toucher aux anciennes clés localStorage — même esprit que la
+   vérification Content-Length ajoutée dans r2Get() après l'incident de
+   troncature silencieuse de xml/bib.xml (voir CLAUDE.md) : ne jamais faire
+   confiance à une écriture qui n'a pas été relue et comparée. */
+async function migrateLocalStorageToIdb(){
+  const failCount = parseInt(localStorage.getItem(IDB_MIGRATION_FAILCOUNT_KEY) || '0', 10);
+  if(failCount >= 2){
+    console.error('Migration IndexedDB abandonnée après plusieurs échecs — mode localStorage classique conservé.');
+    idbDb = null;
+    return false;
+  }
+
+  const oldScans = loadJSON(LS_SCANS, {});
+  const oldBaseline = loadJSON(LS_BASE, null);
+  const scanCount = Object.keys(oldScans).length;
+  const baseCount = oldBaseline ? Object.keys(oldBaseline).length : 0;
+
+  if(scanCount || baseCount){
+    // Même format que "Exporter (fichier local)" (exportPayload(), voir la
+    // section EXPORT/IMPORT/RESET plus bas — hors ligne dans ce fichier,
+    // donc réutilisable ici malgré l'ordre textuel), plus un champ baseline
+    // additif (ignoré sans risque par un futur import, qui ne lit que les
+    // clés qu'il connaît).
+    downloadJSON({
+      scans: Object.values(oldScans),
+      nonCatalogues: Object.values(nonCat),
+      videShelves: Object.values(videShelves),
+      nonRangeShelves: Object.values(nonRangeShelves),
+      lastShelves: Object.values(lastShelves),
+      noBarcodeCotes: Object.values(noBarcodeCotes),
+      baseline: oldBaseline ? Object.values(oldBaseline) : []
+    }, 'recolement-backup-avant-migration-idb');
+  }
+
+  try{
+    if(scanCount) await idbBulkPut('scans', Object.values(oldScans));
+    if(baseCount) await idbBulkPut('baseline', Object.values(oldBaseline));
+
+    const reScans = await idbGetAll('scans');
+    const reBase = await idbGetAll('baseline');
+    if(reScans.length !== scanCount || reBase.length !== baseCount){
+      throw new Error(`décompte incohérent après migration (scans ${reScans.length}/${scanCount}, baseline ${reBase.length}/${baseCount})`);
+    }
+    const reScanMap = {}; reScans.forEach(r=>{ reScanMap[r.barcode] = r; });
+    for(const bc in oldScans){
+      if(JSON.stringify(oldScans[bc]) !== JSON.stringify(reScanMap[bc])) throw new Error(`enregistrement scans différent après relecture (${bc})`);
+    }
+    const reBaseMap = {}; reBase.forEach(r=>{ reBaseMap[r.barcode] = r; });
+    for(const bc in (oldBaseline || {})){
+      if(JSON.stringify(oldBaseline[bc]) !== JSON.stringify(reBaseMap[bc])) throw new Error(`enregistrement baseline différent après relecture (${bc})`);
+    }
+  }catch(e){
+    console.error('Migration IndexedDB avortée, localStorage laissé intact :', e);
+    try{ await idbClear('scans'); await idbClear('baseline'); }catch(_e){ /* best-effort */ }
+    localStorage.setItem(IDB_MIGRATION_FAILCOUNT_KEY, String(failCount + 1));
+    idbDb = null;
+    return false;
+  }
+
+  localStorage.removeItem(LS_SCANS);
+  localStorage.removeItem(LS_BASE);
+  localStorage.removeItem(IDB_MIGRATION_FAILCOUNT_KEY);
+  localStorage.setItem(IDB_MIGRATED_KEY, '1');
+
+  if(scanCount || baseCount){
+    alert(`Migration du stockage local terminée : ${scanCount} scan(s) et ${baseCount} emplacement(s) de référence déplacés vers un stockage plus robuste (IndexedDB).\n\nUne sauvegarde de sécurité a été téléchargée avant la migration (dossier de téléchargements de ce navigateur).`);
+  }
+  return true;
+}
+
+// Doit se terminer avant tout le reste du script : setLocType(loc.locType,
+// true), appelée de façon synchrone plus bas (section EMPLACEMENT) pendant
+// l'initialisation de la page, lit scans via updateStats() — sans cet
+// await ici, ce premier rendu verrait un objet scans vide.
+await initStorage();
 
 /* ════════════ SYNCHRONISATION PARTAGÉE (R2 via /api/recolement) ════════════
    Le localStorage reste la source de vérité locale (fonctionne hors ligne) ;
@@ -1331,22 +1588,24 @@ function handleScan(barcode, damaged, opts){
   else if(prev) status = 'moved';
   else status = 'ok';
 
-  // Le bip doit partir tout de suite, avant tout travail synchrone coûteux :
-  // saveScans() sérialise en JSON l'intégralité de l'objet scans (des
-  // dizaines de milliers d'entrées sur un récolement avancé) à chaque scan
-  // réussi. Ce travail, s'il passe avant le bip, bloque assez longtemps le
-  // thread principal pour que les 300ms programmées du son de validation
-  // s'écoulent avant même que le rendu audio ne démarre réellement — le son
-  // reste "programmé" (audioCtx.state affiche bien 'running', aucune
-  // erreur) mais ne sort jamais. Le bip d'erreur, lui, n'était jamais
-  // précédé de saveScans()/queuePatch() (sautés pour un code-barre inconnu)
-  // et restait donc toujours audible — c'est ce qui a permis d'isoler la
-  // cause (2026-09-01).
+  // Le bip doit partir tout de suite, avant tout autre traitement : avec
+  // l'ancien saveScans() (resérialisait en JSON l'intégralité de l'objet
+  // scans, des dizaines de milliers d'entrées sur un récolement avancé, à
+  // CHAQUE scan réussi), ce travail, s'il passait avant le bip, bloquait
+  // assez longtemps le thread principal pour que les 300ms programmées du
+  // son de validation s'écoulent avant même que le rendu audio ne démarre
+  // réellement — le son restait "programmé" (audioCtx.state affiche bien
+  // 'running', aucune erreur) mais ne sortait jamais. Le bip d'erreur, lui,
+  // n'était jamais précédé de saveScans()/queuePatch() (sautés pour un
+  // code-barre inconnu) et restait donc toujours audible — c'est ce qui a
+  // permis d'isoler la cause (2026-09-01). putScanRecord() (IndexedDB,
+  // migration du 2026-09-01) n'écrit plus qu'un seul enregistrement par
+  // scan, mais l'ordre est gardé par précaution.
   if(status==='unknown') beepError(); else beep(880, .3);
 
   if(status!=='unknown'){
     scans[barcode] = record;
-    saveScans();
+    putScanRecord(record);
     queuePatch({type:'scan', record});
   }
 
@@ -1395,7 +1654,7 @@ function applyReliureCascade(sourceBarcode, siblingBarcodes, fields){
     queuePatch({type:'scan', record: sibRecord});
     results.push(sibRecord);
   });
-  if(results.length) saveScans();
+  bulkPutScanRecords(results);
   return results;
 }
 
@@ -1432,7 +1691,7 @@ function showFeedback(record, status, prev, reliureRecords){
         record.cote = v;
         record.fonds = getFondsFromCote(v);
         scans[record.barcode] = record;
-        saveScans(); renderExpected(); renderHereLog(); updateStats(); buildMiniPlan();
+        putScanRecord(record); renderExpected(); renderHereLog(); updateStats(); buildMiniPlan();
         queuePatch({type:'scan', record});
       }
       scanInput.focus();
@@ -1522,13 +1781,12 @@ function handleScanHorsReserve(barcode, damaged){
   };
 
   // Voir le commentaire de handleScan() : le bip doit partir avant
-  // saveScans()/queuePatch(), sinon la sérialisation de tout l'objet scans
-  // peut suffire à rendre le son de 300ms inaudible.
+  // putScanRecord()/queuePatch(), par précaution.
   if(known) beep(880, .3); else beepError();
 
   if(known){
     scans[barcode] = record;
-    saveScans();
+    putScanRecord(record);
     queuePatch({type:'scan', record});
   }
 
@@ -1567,7 +1825,7 @@ function showHorsReserveFeedback(record, unknown){
         record.cote = v;
         record.fonds = getFondsFromCote(v);
         scans[record.barcode] = record;
-        saveScans(); updateStats();
+        putScanRecord(record); updateStats();
         queuePatch({type:'scan', record});
       }
       scanInput.focus();
@@ -2031,7 +2289,7 @@ document.getElementById('log-search').addEventListener('input', function(){ rend
 
 function deleteScan(barcode){
   delete scans[barcode];
-  saveScans();
+  deleteScanRecord(barcode);
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats(); buildMiniPlan();
   queuePatch({type:'deleteScan', barcode});
 }
@@ -2585,14 +2843,20 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
   const noBarcodeRows = Array.isArray(data) ? [] : (data.noBarcodeCotes||[]);
 
+  // N'écrit dans IndexedDB que ce qui a réellement changé (changedScans),
+  // pas tout l'objet scans à chaque appel : mergeIncomingData() est aussi
+  // appelée par syncFromServer() toutes les 45s (voir plus haut), où le cas
+  // courant est "rien de nouveau" — inutile de réécrire des dizaines de
+  // milliers d'enregistrements identiques à chaque poll.
   let added=0, updated=0;
+  const changedScans = [];
   scanRows.forEach(r=>{
     if(!r.barcode) return;
     if(scans[r.barcode]){
-      if(!scans[r.barcode].ts || (r.ts||0) > scans[r.barcode].ts) { scans[r.barcode]=r; updated++; }
-    } else { scans[r.barcode]=r; added++; }
+      if(!scans[r.barcode].ts || (r.ts||0) > scans[r.barcode].ts) { scans[r.barcode]=r; updated++; changedScans.push(r); }
+    } else { scans[r.barcode]=r; added++; changedScans.push(r); }
   });
-  saveScans();
+  bulkPutScanRecords(changedScans);
 
   nonCatRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonCat[nonCatKey(r)] = r; });
   saveNonCat();
@@ -2657,7 +2921,7 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
 
 document.getElementById('btn-reset').addEventListener('click', ()=>{
   if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués, tous les emplacements marqués vides ou non rangés, toutes les dernières étagères de colonne marquées et toutes les cotes sans code-barre sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
-  scans = {}; saveScans();
+  scans = {}; clearAllScanRecords();
   nonCat = {}; saveNonCat();
   videShelves = {}; saveVideShelves();
   nonRangeShelves = {}; saveNonRangeShelves();
