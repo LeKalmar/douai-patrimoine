@@ -1186,13 +1186,14 @@ function beep(freq, dur){
     // est sans effet s'il tourne déjà — on l'appelle systématiquement plutôt
     // que de vérifier audioCtx.state, par sécurité.
     audioCtx.resume();
+    console.debug('[beep] state avant lecture :', audioCtx.state);
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type='sine'; o.frequency.value=freq;
     g.gain.setValueAtTime(.15, audioCtx.currentTime);
     g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime+dur);
     o.connect(g); g.connect(audioCtx.destination);
     o.start(); o.stop(audioCtx.currentTime+dur);
-  }catch(e){}
+  }catch(e){ console.error('beep() a échoué :', e); }
 }
 function beepError(){
   try{
