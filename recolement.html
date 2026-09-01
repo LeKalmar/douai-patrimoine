@@ -294,7 +294,6 @@
           <div id="scan-mode-zone">
             <div class="scan-row">
               <input type="text" id="scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
-              <button type="button" class="tool-btn" id="test-sound-btn" title="Joue le son de validation, indépendamment d'un scan — pour vérifier que le son fonctionne sur ce poste">🔊 Tester le son</button>
               <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
             </div>
             <div class="feedback" id="feedback"></div>
@@ -1212,17 +1211,25 @@ function beepError(){
 }
 
 /* ════════════ SCAN ════════════ */
-// Bouton indépendant d'un scan, pour vérifier que le son sort bien sur ce
-// poste (casque débranché, onglet mis en sourdine, sortie audio changée par
-// une autre appli…) sans devoir scanner un vrai livre pour tester.
-document.getElementById('test-sound-btn').addEventListener('click', ()=>{ beep(880, .3); });
 scanInput.addEventListener('keydown', e=>{
   if(e.key==='Enter'){
     e.preventDefault();
-    if(loc.reserve==='horsreserve') handleScanHorsReserve(scanInput.value.trim(), damagedToggle.checked);
-    else handleScan(scanInput.value.trim(), damagedToggle.checked);
-    scanInput.value='';
-    damagedToggle.checked=false;
+    // Le champ DOIT être vidé même si handleScan()/handleScanHorsReserve()
+    // lève une exception (try/finally) : sans ça, le code-barre en cours
+    // reste dans le champ et le scan suivant vient s'y accoler tel quel —
+    // jusqu'à ce qu'un scan finisse par passer sans erreur, avec tous les
+    // codes-barres accumulés collés bout à bout comme un seul "inconnu du
+    // catalogue" (bug observé le 2026-09-01, cause exacte de l'exception
+    // encore à identifier via le console.error ci-dessous).
+    try{
+      if(loc.reserve==='horsreserve') handleScanHorsReserve(scanInput.value.trim(), damagedToggle.checked);
+      else handleScan(scanInput.value.trim(), damagedToggle.checked);
+    }catch(err){
+      console.error('Le scan a échoué, code-barre non enregistré :', err);
+    }finally{
+      scanInput.value='';
+      damagedToggle.checked=false;
+    }
   }
 });
 document.addEventListener('click', e=>{
@@ -1293,14 +1300,14 @@ function handleScan(barcode, damaged, opts){
   // saveScans() sérialise en JSON l'intégralité de l'objet scans (des
   // dizaines de milliers d'entrées sur un récolement avancé) à chaque scan
   // réussi. Ce travail, s'il passe avant le bip, bloque assez longtemps le
-  // thread principal pour que les 120ms programmées du son de validation
+  // thread principal pour que les 300ms programmées du son de validation
   // s'écoulent avant même que le rendu audio ne démarre réellement — le son
   // reste "programmé" (audioCtx.state affiche bien 'running', aucune
   // erreur) mais ne sort jamais. Le bip d'erreur, lui, n'était jamais
   // précédé de saveScans()/queuePatch() (sautés pour un code-barre inconnu)
   // et restait donc toujours audible — c'est ce qui a permis d'isoler la
   // cause (2026-09-01).
-  if(status==='unknown') beepError(); else beep(880, .12);
+  if(status==='unknown') beepError(); else beep(880, .3);
 
   if(status!=='unknown'){
     scans[barcode] = record;
@@ -1481,8 +1488,8 @@ function handleScanHorsReserve(barcode, damaged){
 
   // Voir le commentaire de handleScan() : le bip doit partir avant
   // saveScans()/queuePatch(), sinon la sérialisation de tout l'objet scans
-  // peut suffire à rendre le son de 120ms inaudible.
-  if(known) beep(880, .12); else beepError();
+  // peut suffire à rendre le son de 300ms inaudible.
+  if(known) beep(880, .3); else beepError();
 
   if(known){
     scans[barcode] = record;
@@ -1553,7 +1560,7 @@ function saveNonCatCount(){
   noncatInput.value = count;
   if(count === 0) delete nonCat[key];
   else nonCat[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, count, ts:Date.now() };
-  beep(880, .12);
+  beep(880, .3);
   saveNonCat();
   showNonCatFeedback(count);
   updateStats();
