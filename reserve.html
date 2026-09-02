@@ -96,6 +96,7 @@
     .notices-list{border:1px solid #ebebeb;border-radius:var(--radius-md);overflow:hidden;max-height:280px;overflow-y:auto}
     .notice-row{display:flex;align-items:flex-start;gap:.6rem;padding:.45rem .75rem;border-bottom:1px solid #f5f5f5;font-size:.78rem;transition:background .1s}
     .notice-row:last-child{border-bottom:none}.notice-row:hover{background:#fafafa}
+    .notice-row.hl{background:#fff9c4}.notice-row.hl:hover{background:#fff59d}
     .notice-cote{font-size:.68rem;color:#12157A;font-weight:700;white-space:nowrap;min-width:85px;flex-shrink:0;padding-top:2px;font-family:monospace}
     .notice-titre{flex:1;color:#1a1a1a;line-height:1.35}
     .notice-auteur{font-size:.7rem;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
@@ -292,6 +293,7 @@ document.getElementById('logout-btn').addEventListener('click', function(){
 /* ════════════ ÉTAT ════════════ */
 let CNT={}, CNT_MANUEL={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={}, LASTSHELF={};
 let selId=null, filter='all', csvLoaded=false;
+let hlBarcode=null;
 
 /* Hauteur de référence (en "nombre d'étages") partagée par toutes les
    travées dans le plan miniature — DEFAULT_MAX_ETAGE (js/reserve-shared.js),
@@ -411,8 +413,9 @@ function parseRecolement(rows){
     const etat  =(row.etat    ||'').trim().slice(0,30);
     const manuel=!!row.manuel;
     const barcode=(row.barcode||'').trim();
+    const ts=Number(row.ts)||0;
     if(!t || !etage) return;
-    const n={c:cote,t:titre,a:auteur,f:fonds,e:etat,m:manuel,b:barcode};
+    const n={c:cote,t:titre,a:auteur,f:fonds,e:etat,m:manuel,b:barcode,ts};
     const key = `${t}|${col}|${etage}`;
     if (!DET[key]) DET[key] = [];
 
@@ -754,10 +757,11 @@ function selectTravee(tid,tDef,cols){
    Affichées dans une modale (plutôt qu'injectées en bas du panneau de
    détail, qui peut se trouver loin en dessous du plan cliqué) : plus facile
    à consulter puis refermer sans perdre sa position de scroll dans le plan. */
-function showNotices(tid,col,etage){
+function showNotices(tid,col,etage,highlightBarcode){
   const modal=document.getElementById('notices-modal');
   const content=document.getElementById('notices-modal-content');
   if(!modal||!content) return;
+  hlBarcode=highlightBarcode||null;
   const key=`${tid}|${col}|${etage}`;
   const notices=DET[key]||[];
   const ncCount=NONCAT[key]||0;
@@ -784,12 +788,19 @@ function showNotices(tid,col,etage){
             <option value="cote">Cote</option>
             <option value="titre">Titre</option>
             <option value="auteur">Auteur</option>
+            <option value="ts">Ordre du récolement</option>
           </select>
         </div>
       </div>
       <div class="notices-list" id="nl-${key.replace(/\|/g,'_')}">${noticeRows(notices,'cote')}</div>
     </div>`;
   openNoticesModal();
+  scrollToHighlight(content);
+}
+function scrollToHighlight(content){
+  if(!hlBarcode) return;
+  const row=content.querySelector('.notice-row.hl');
+  if(row) row.scrollIntoView({block:'center'});
 }
 function openNoticesModal(){
   document.getElementById('notices-modal').hidden=false;
@@ -806,7 +817,9 @@ document.addEventListener('keydown',e=>{
 });
 function rerenderEtage(key,sort){
   const el=document.getElementById('nl-'+key.replace(/\|/g,'_'));
-  if(el) el.innerHTML=noticeRows(DET[key]||[],sort);
+  if(!el) return;
+  el.innerHTML=noticeRows(DET[key]||[],sort);
+  scrollToHighlight(el);
 }
 
 /* ════════════ RENDU DES LIGNES DE NOTICES ════════════ */
@@ -815,11 +828,21 @@ function noticeRows(notices,sort){
     if(sort==='cote')   return compareCotes(a.c,b.c);
     if(sort==='titre')  return (a.t||'').localeCompare(b.t||'','fr');
     if(sort==='auteur') return (a.a||'').localeCompare(b.a||'','fr');
+    if(sort==='ts')     return (a.ts||0)-(b.ts||0);
     return 0;
   });
   const MAX=60;
-  let html=sorted.slice(0,MAX).map(n=>`
-    <div class="notice-row">
+  let visible=sorted.slice(0,MAX);
+  // Si la notice recherchée (venant d'un résultat de recherche, voir hlBarcode)
+  // tombe au-delà des MAX premières lignes affichées, on la fait quand même
+  // apparaître (en dernière position) plutôt que de la laisser hors-écran :
+  // scrollToHighlight() ne trouverait sinon jamais l'élément .hl à cibler.
+  if(hlBarcode && !visible.some(n=>n.b===hlBarcode)){
+    const hit=sorted.find(n=>n.b===hlBarcode);
+    if(hit) visible=[...visible.slice(0,MAX-1),hit];
+  }
+  let html=visible.map(n=>`
+    <div class="notice-row${n.b&&n.b===hlBarcode?' hl':''}">
       <span class="notice-cote">${esc(n.c)}</span>
       <span class="notice-titre">${n.m?`<span style="color:var(--plan-manuel);font-weight:700" title="Exemplarisé rapidement, pas encore catalogué dans Syracuse">⚡</span> `:''}${esc(n.t)}${n.e?`<br><span style="font-size:.62rem;color:#bbb">${esc(n.e)}</span>`:''}</span>
       <span class="notice-auteur" title="${esc(n.a)}">${esc(n.a)}</span>
@@ -930,7 +953,7 @@ document.getElementById('sq').addEventListener('input',function(){
     for(const n of notices){
       if((n.c||'').toLowerCase().includes(q)||(n.t||'').toLowerCase().includes(q)||(n.a||'').toLowerCase().includes(q)||(n.b||'').toLowerCase().includes(q)){
         const[tid,col,etage]=key.split('|');
-        hits.push({type:'notice',label:n.t||n.c,sub:`${n.c} — ${travTitle(tid)}, col. ${col}, ${etageWordFor(tid)} ${etage}`,tid,col,etage});
+        hits.push({type:'notice',label:n.t||n.c,sub:`${n.c} — ${travTitle(tid)}, col. ${col}, ${etageWordFor(tid)} ${etage}`,tid,col,etage,barcode:n.b});
         nc++; break;
       }
     }
@@ -947,7 +970,7 @@ document.getElementById('sq').addEventListener('input',function(){
         else if(h.type==='notice'){
           const tDef=LOCATIONS_ALL.find(x=>x.id===h.tid);
           selectTravee(h.tid,tDef,colsOf(tDef));
-          setTimeout(()=>showNotices(h.tid,h.col,h.etage),60);
+          setTimeout(()=>showNotices(h.tid,h.col,h.etage,h.barcode),60);
         }
       });
     });
