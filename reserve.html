@@ -977,6 +977,16 @@ document.addEventListener('mouseout',e=>{
     hoverSlot=null;
   }
 });
+/* Cliquer directement sur une case du plan (l'étagère déjà prévisualisée au
+   survol) ouvre sa modale sans passer par la sélection de toute la travée —
+   capturé en phase de capture + stopPropagation pour empêcher le click du
+   wrap parent (qui appelle selectTravee) de se déclencher en plus. */
+document.addEventListener('click',e=>{
+  const s=e.target.closest('.tv-slot');
+  if(!s) return;
+  e.stopPropagation();
+  showNotices(s.dataset.tid,s.dataset.col,s.dataset.etage);
+},true);
 
 /* ════════════ FILTRE ════════════ */
 function setFilter(f){
