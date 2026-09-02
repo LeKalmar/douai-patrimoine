@@ -692,10 +692,8 @@ function makeTraveeEl(tid,tDef,cols){
       s.dataset.tid=tid; s.dataset.col=col; s.dataset.etage=String(e);
       cd.appendChild(s);
     }
-    if(known||!csvLoaded){
-      const colLbl=document.createElement('div');colLbl.className='tv-col-lbl';colLbl.textContent=col;
-      cd.appendChild(colLbl);
-    }
+    const colLbl=document.createElement('div');colLbl.className='tv-col-lbl';colLbl.textContent=col;
+    cd.appendChild(colLbl);
     box.appendChild(cd);
   });
   wrap.appendChild(box);

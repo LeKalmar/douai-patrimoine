@@ -2325,7 +2325,20 @@ function updateStats(){
 
   ADV_GROUPS.forEach(g=>{ updateShelfBar(g.id); updateTimeStats(g.id); });
   updateMagasinEtageStats();
-  updateAdvListsCount();
+  scheduleAdvListsCount();
+}
+
+// updateAdvListsCount() reste rapide depuis le passage aux fonctions *Count()
+// ci-dessous (plus de tri), mais handleScan() peut appeler updateStats()
+// plusieurs fois en rafale (scan physique rapide au pistolet). Un debounce
+// (dernier appel gagne, ~150 ms) laisse d'abord le navigateur peindre le
+// retour visuel immédiat du scan (showFeedback, mini-plan) avant de
+// recalculer ces compteurs, plutôt que de les empiler de façon synchrone
+// dans la pile d'appel de chaque scan.
+let advListsCountTimer = null;
+function scheduleAdvListsCount(){
+  if(advListsCountTimer) return;
+  advListsCountTimer = setTimeout(()=>{ advListsCountTimer = null; updateAdvListsCount(); }, 150);
 }
 
 // Emplacements distincts (étagère/armoire/tiroir) déjà traités : au moins un
@@ -2474,14 +2487,27 @@ function updateTimeStats(group){
    "adv-abime-magasin-2e").
 
    Les compteurs (stat-card + badge dans le <summary>) sont recalculés à
-   chaque updateStats() : simples filtres sur scans/catalogByGroup, coût
-   négligeable même avec un catalogue de plusieurs milliers d'entrées. Les
-   tableaux détaillés, eux, ne sont construits/rendus que si le <details>
-   correspondant est déjà ouvert — reconstruire des milliers de lignes de DOM
-   à chaque scan serait inutile et coûteux tant que le panneau est fermé. */
+   chaque updateStats() — mais UNIQUEMENT via les fonctions `*Count()`
+   ci-dessous (filtre seul, sans .map()/.sort()), jamais via `list.length`
+   sur les fonctions `*List()` complètes : celles-ci trient certaines listes
+   par cote avec localeCompare (notScannedList/probablyLostList/scannedList),
+   coûteux sur catalogByGroup.magasin (~89 000 exemplaires) — un tri inutile
+   puisque seule la longueur du résultat est affichée ici. Avant ce
+   correctif (2026-09-02), updateAdvListsCount() appelait list(...).length
+   sur ces fonctions triées, refaisant ce tri complet à CHAQUE scan, pour les
+   4 groupes, même panneau fermé — cause principale du lag ressenti pendant
+   le récolement des magasins. Les tableaux détaillés, eux, ne sont
+   construits/rendus que si le <details> correspondant est déjà ouvert
+   (refreshAdvList) — reconstruire des milliers de lignes de DOM à chaque
+   scan serait inutile et coûteux tant que le panneau est fermé. */
 function damagedList(group){
   return Object.values(scans).filter(r=>r.barcodeAbime && traveeGroupOf(r.travee)===group)
     .sort((a,b)=>b.ts-a.ts);
+}
+function damagedCount(group){
+  let n=0;
+  for(const bc in scans){ if(scans[bc].barcodeAbime && traveeGroupOf(scans[bc].travee)===group) n++; }
+  return n;
 }
 function manualCoteList(group){
   // Scanné, mais absent du catalogue *actuel* du groupe (comparaison en
@@ -2500,6 +2526,16 @@ function manualCoteList(group){
   return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !cat[r.barcode])
     .sort((a,b)=>b.ts-a.ts);
 }
+function manualCoteCount(group){
+  const cat = catalogByGroup[catalogGroupOf(group)];
+  if(!cat) return 0;
+  let n=0;
+  for(const bc in scans){
+    const r=scans[bc];
+    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !cat[r.barcode]) n++;
+  }
+  return n;
+}
 function notScannedList(group){
   const cat = catalogByGroup[catalogGroupOf(group)];
   if(!cat) return [];
@@ -2512,6 +2548,18 @@ function notScannedList(group){
     .filter(bc=>!scans[bc] && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group))
     .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
+}
+// Pas de .map()/.sort() : seule la longueur du résultat de notScannedList()
+// nous intéresse ici (voir la note en tête de section "LISTES AVANCÉES").
+function notScannedCount(group){
+  const cat = catalogByGroup[catalogGroupOf(group)];
+  if(!cat) return 0;
+  const isMagasin = catalogGroupOf(group)==='magasin';
+  let n=0;
+  for(const bc in cat){
+    if(!scans[bc] && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group)) n++;
+  }
+  return n;
 }
 // Sous-ensemble de notScannedList(), restreint aux magasins à cotes
 // numériques séquentielles (2e/5e étage — pas le 6e, cotes littérales/Dewey,
@@ -2526,17 +2574,26 @@ function notScannedList(group){
 // sans tenir compte de ce qui a déjà été parcouru). Ne renvoie rien tant que
 // ce groupe n'a pas au moins 2 cotes numériques scannées (pas de plage
 // définissable).
-function probablyLostList(group){
-  if(group!=='magasin-2e' && group!=='magasin-5e') return [];
+// Factorisé entre probablyLostList() et probablyLostCount() : la plage de
+// cotes déjà scannées dans ce groupe (bornée par min/max), coûte au plus
+// O(scans du groupe) — sans rapport avec la taille de catalogByGroup.magasin,
+// donc pas besoin d'une variante "count" séparée pour ce calcul-là.
+function scannedDigitRunRange(group){
   const cat = catalogByGroup.magasin;
-  if(!cat) return [];
+  if(!cat) return null;
   const scannedRuns = Object.values(scans)
     .filter(r=>traveeGroupOf(r.travee)===group)
     .map(r=>cat[r.barcode] && cat[r.barcode].coteDigitRun)
     .filter(Boolean)
     .map(run=>parseInt(run, 10));
-  if(scannedRuns.length < 2) return [];
-  const min = Math.min(...scannedRuns), max = Math.max(...scannedRuns);
+  if(scannedRuns.length < 2) return null;
+  return { cat, min: Math.min(...scannedRuns), max: Math.max(...scannedRuns) };
+}
+function probablyLostList(group){
+  if(group!=='magasin-2e' && group!=='magasin-5e') return [];
+  const range = scannedDigitRunRange(group);
+  if(!range) return [];
+  const { cat, min, max } = range;
   return Object.keys(cat)
     .filter(bc=>{
       if(scans[bc]) return false;
@@ -2548,6 +2605,22 @@ function probablyLostList(group){
     .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
+// Pas de .map()/.sort() — voir la note en tête de section "LISTES AVANCÉES".
+function probablyLostCount(group){
+  if(group!=='magasin-2e' && group!=='magasin-5e') return 0;
+  const range = scannedDigitRunRange(group);
+  if(!range) return 0;
+  const { cat, min, max } = range;
+  let n=0;
+  for(const bc in cat){
+    if(scans[bc]) continue;
+    const run = cat[bc].coteDigitRun;
+    if(!run || magasinEtageGroupOfDigitRun(run)!==group) continue;
+    const v = parseInt(run, 10);
+    if(v>=min && v<=max) n++;
+  }
+  return n;
+}
 // Complément direct de notScannedList() : tous les codes-barres déjà récolés
 // (présents dans `scans`) pour ce groupe, quel que soit leur statut par
 // ailleurs (catalogué, exemplarisé rapide, cascade reliures via
@@ -2556,6 +2629,11 @@ function probablyLostList(group){
 function scannedList(group){
   return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group)
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
+}
+function scannedCount(group){
+  let n=0;
+  for(const bc in scans){ if(traveeGroupOf(scans[bc].travee)===group) n++; }
+  return n;
 }
 
 // Anomalies de classement : scans dont handleScan() a posé horsSection:true
@@ -2570,6 +2648,11 @@ function horsSectionList(group){
     .map(r=>Object.assign({}, r, { sectionReelle:r.fonds }))
     .sort((a,b)=>b.ts-a.ts);
 }
+function horsSectionCount(group){
+  let n=0;
+  for(const bc in scans){ const r=scans[bc]; if(r.horsSection && traveeGroupOf(r.travee)===group) n++; }
+  return n;
+}
 
 // Livres sans code-barre : union des scans enregistrés via handleNoBarcodeCote()
 // quand la cote a été reconnue (sansCodeBarre:true, comptent comme récolés)
@@ -2582,6 +2665,12 @@ function noBarcodeList(group){
     .filter(r=>traveeGroupOf(r.travee)===group)
     .map(r=>({ cote:r.cote, titre:'', travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:false }));
   return [...foundRows, ...notFoundRows].sort((a,b)=>b.ts-a.ts);
+}
+function noBarcodeCount(group){
+  let n=0;
+  for(const bc in scans){ const r=scans[bc]; if(r.sansCodeBarre && traveeGroupOf(r.travee)===group) n++; }
+  for(const k in noBarcodeCotes){ if(traveeGroupOf(noBarcodeCotes[k].travee)===group) n++; }
+  return n;
 }
 
 function advDetailsTemplate(id, spec, opts){
@@ -2712,35 +2801,35 @@ ADV_GROUPS.forEach(g=>{
 
 function updateAdvListsCount(){
   ADV_GROUPS.forEach(g=>{
-    const abimeCount = damagedList(g.id).length;
-    document.getElementById('st-abime-'+g.id).textContent = abimeCount.toLocaleString('fr-FR');
-    document.getElementById('sum-abime-'+g.id+'-count').textContent = abimeCount.toLocaleString('fr-FR');
+    const nAbime = damagedCount(g.id);
+    document.getElementById('st-abime-'+g.id).textContent = nAbime.toLocaleString('fr-FR');
+    document.getElementById('sum-abime-'+g.id+'-count').textContent = nAbime.toLocaleString('fr-FR');
 
-    const scannedCount = scannedList(g.id).length;
-    document.getElementById('st-scanned-'+g.id).textContent = scannedCount.toLocaleString('fr-FR');
-    document.getElementById('sum-scanned-'+g.id+'-count').textContent = scannedCount.toLocaleString('fr-FR');
+    const nScanned = scannedCount(g.id);
+    document.getElementById('st-scanned-'+g.id).textContent = nScanned.toLocaleString('fr-FR');
+    document.getElementById('sum-scanned-'+g.id+'-count').textContent = nScanned.toLocaleString('fr-FR');
 
     if(catalogByGroup[catalogGroupOf(g.id)]){
-      const manualCoteCount = manualCoteList(g.id).length;
-      document.getElementById('st-manualcote-'+g.id).textContent = manualCoteCount.toLocaleString('fr-FR');
-      document.getElementById('sum-manualcote-'+g.id+'-count').textContent = manualCoteCount.toLocaleString('fr-FR');
+      const nManualCote = manualCoteCount(g.id);
+      document.getElementById('st-manualcote-'+g.id).textContent = nManualCote.toLocaleString('fr-FR');
+      document.getElementById('sum-manualcote-'+g.id+'-count').textContent = nManualCote.toLocaleString('fr-FR');
 
-      const notScannedCount = notScannedList(g.id).length;
-      document.getElementById('st-notscanned-'+g.id).textContent = notScannedCount.toLocaleString('fr-FR');
-      document.getElementById('sum-notscanned-'+g.id+'-count').textContent = notScannedCount.toLocaleString('fr-FR');
+      const nNotScanned = notScannedCount(g.id);
+      document.getElementById('st-notscanned-'+g.id).textContent = nNotScanned.toLocaleString('fr-FR');
+      document.getElementById('sum-notscanned-'+g.id+'-count').textContent = nNotScanned.toLocaleString('fr-FR');
 
-      const perdusCount = probablyLostList(g.id).length;
-      document.getElementById('st-perdus-'+g.id).textContent = perdusCount.toLocaleString('fr-FR');
-      document.getElementById('sum-perdus-'+g.id+'-count').textContent = perdusCount.toLocaleString('fr-FR');
+      const nPerdus = probablyLostCount(g.id);
+      document.getElementById('st-perdus-'+g.id).textContent = nPerdus.toLocaleString('fr-FR');
+      document.getElementById('sum-perdus-'+g.id+'-count').textContent = nPerdus.toLocaleString('fr-FR');
     }
 
-    const nobarcodeCount = noBarcodeList(g.id).length;
-    document.getElementById('st-nobarcode-'+g.id).textContent = nobarcodeCount.toLocaleString('fr-FR');
-    document.getElementById('sum-nobarcode-'+g.id+'-count').textContent = nobarcodeCount.toLocaleString('fr-FR');
+    const nNobarcode = noBarcodeCount(g.id);
+    document.getElementById('st-nobarcode-'+g.id).textContent = nNobarcode.toLocaleString('fr-FR');
+    document.getElementById('sum-nobarcode-'+g.id+'-count').textContent = nNobarcode.toLocaleString('fr-FR');
 
-    const horsSectionCount = horsSectionList(g.id).length;
-    document.getElementById('st-horssection-'+g.id).textContent = horsSectionCount.toLocaleString('fr-FR');
-    document.getElementById('sum-horssection-'+g.id+'-count').textContent = horsSectionCount.toLocaleString('fr-FR');
+    const nHorsSection = horsSectionCount(g.id);
+    document.getElementById('st-horssection-'+g.id).textContent = nHorsSection.toLocaleString('fr-FR');
+    document.getElementById('sum-horssection-'+g.id+'-count').textContent = nHorsSection.toLocaleString('fr-FR');
 
     Object.keys(ADV_CATS).forEach(catKey=>refreshAdvList(g.id, catKey));
   });
