@@ -46,6 +46,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { loadDotEnv } from './lib/dotenv.mjs';
+import { loadColumnar } from './lib/load-columnar.mjs';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
 import { iterateGesmarcItemsFromFile, parseGesmarcItem } from './lib/gesmarc.mjs';
 
@@ -199,7 +200,12 @@ async function main() {
   }
 
   mkdirSync(dirname(resolve(CONFIG.output.data)), { recursive: true });
-  writeFileSync(CONFIG.output.data, JSON.stringify(items), 'utf-8');
+  /* Conteneur colonnaire plutôt qu'un tableau d'objets plats : les noms de
+     champs cessent d'être répétés à chaque ligne et les colonnes à faible
+     cardinalité passent en dictionnaire. Aucun champ ne disparaît — voir
+     js/columnar.js et scripts/verify-columnar.mjs. Lu par cotes-numeriques.html. */
+  const columnar = loadColumnar();
+  writeFileSync(CONFIG.output.data, JSON.stringify(columnar.encode(items)), 'utf-8');
   console.log(`  · écrit ${CONFIG.output.data} (${items.length} entrées)`);
 
   // Archive le rapport précédent avant de l'écraser (même mécanique que

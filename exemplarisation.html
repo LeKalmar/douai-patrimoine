@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts.css">
+<script src="js/sync-queue.js"></script>
 <link rel="stylesheet" href="style.css">
 <script src="js/reserve-shared.js"></script>
 <style>
@@ -305,74 +306,25 @@ function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(EXEMPLAIRES));
 
 /* ════ File d'attente de synchro (deux endpoints possibles) ════ */
 const LS_PENDING = 'rp_exemplaires_manuels_pending_sync';
-let pendingSync = (function(){ try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch(e){ return []; } })();
-function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
-
-function authHeaders(){
-  const token = sessionStorage.getItem('rp_admin_token');
-  const h = { 'Content-Type': 'application/json' };
-  if(token) h['Authorization'] = 'Basic ' + token;
-  return h;
-}
-
-let lastSyncError = null;
-function updateSyncIndicator(){
-  const el = document.getElementById('sync-status');
-  if(pendingSync.length){
-    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
-    el.classList.add('pending');
-  } else {
-    el.textContent = '✓ synchronisé';
-    el.classList.remove('pending');
-  }
-}
-
-function queuePatch(item){
-  pendingSync.push(item);
-  savePendingSync();
-  updateSyncIndicator();
-  flushPendingSync();
-}
-
-let flushingSync = false;
-async function flushPendingSync(){
-  if(flushingSync) return;
-  flushingSync = true;
-  try{
-    while(pendingSync.length){
-      const item = pendingSync[0];
-      const url = item.endpoint === 'recolement' ? '/api/recolement' : '/api/exemplaires-manuels';
-      let res;
-      try{
-        res = await fetch(url, { method:'POST', headers: authHeaders(), body: JSON.stringify(item.patch) });
-      }catch(e){
-        lastSyncError = 'hors ligne ou serveur injoignable';
-        break;
-      }
-      if(res.status===401){
-        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
-        break;
-      }
-      if(res.status===503){
-        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
-        break;
-      }
-      if(!res.ok){
-        lastSyncError = `erreur serveur (${res.status})`;
-        break;
-      }
-      lastSyncError = null;
-      pendingSync.shift();
-      savePendingSync();
-    }
-  } finally {
-    flushingSync = false;
-    updateSyncIndicator();
-  }
-}
+/* File de synchronisation : implémentation commune aux cinq pages qui
+   écrivent dans un état partagé R2 — voir js/sync-queue.js (localStorage
+   comme source de vérité locale, rejeu à la reconnexion, indicateur
+   #sync-status). Ce bloc était auparavant recopié à l'identique dans chacune.
+   Deux endpoints : la création d'un exemplaire poste aussi un scan
+//   et un décrément de non-catalogués vers /api/recolement (voir CLAUDE.md,
+//   « Exemplarisation rapide »). D'où les éléments {endpoint, patch}. */
+const syncQueue = createSyncQueue({
+  storageKey: LS_PENDING,
+  endpoint: item => item.endpoint === 'recolement' ? '/api/recolement' : '/api/exemplaires-manuels',
+  bodyOf: item => item.patch,
+});
+const authHeaders = syncAuthHeaders;
+function queuePatch(item){ syncQueue.queue(item); }
+function flushPendingSync(){ return syncQueue.flush(); }
+function updateSyncIndicator(){ syncQueue.updateIndicator(); }
 
 function mergeIncoming(serverState){
-  const pendingBarcodes = new Set(pendingSync.filter(p => p.endpoint !== 'recolement').map(p => p.patch.record ? p.patch.record.barcode : p.patch.barcode));
+  const pendingBarcodes = new Set(syncQueue.items.filter(p => p.endpoint !== 'recolement').map(p => p.patch.record ? p.patch.record.barcode : p.patch.barcode));
   Object.keys(serverState || {}).forEach(bc => {
     if(!pendingBarcodes.has(bc)) EXEMPLAIRES[bc] = serverState[bc];
   });
@@ -388,8 +340,6 @@ async function syncFromServer(){
   }catch(e){ /* hors ligne : on reste sur le cache local */ }
 }
 
-window.addEventListener('online', flushPendingSync);
-setInterval(flushPendingSync, 20000);
 setInterval(()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } }, 45000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } });
 

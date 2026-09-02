@@ -1,73 +1,80 @@
 /* Police officielle du patrimoine — Moret. Utilisée pour tous les titres
    (variable --font-display dans style.css, et en dur dans les pages qui
-   ont leur propre <style> inline sans lien vers style.css). */
+   ont leur propre <style> inline sans lien vers style.css).
+
+   Servie en WOFF2 (2026-09-02) et non plus en OTF : même dessin, mêmes dix
+   graisses, mais ~40 % d'octets en moins grâce à la compression Brotli
+   intégrée au format — l'OTF, lui, est livré non compressé. Les dix faces
+   restent déclarées bien que seules 400 et 700 soient utilisées aujourd'hui :
+   un navigateur ne télécharge que les faces réellement appelées par le
+   texte affiché, une déclaration inutilisée ne coûte donc rien. */
 
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-Book.otf') format('opentype');
+  src: url('font/Moret-Book.woff2') format('woff2');
   font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-BookOblique.otf') format('opentype');
+  src: url('font/Moret-BookOblique.woff2') format('woff2');
   font-weight: 300;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-Regular.otf') format('opentype');
+  src: url('font/Moret-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-RegularOblique.otf') format('opentype');
+  src: url('font/Moret-RegularOblique.woff2') format('woff2');
   font-weight: 400;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-Semibold.otf') format('opentype');
+  src: url('font/Moret-Semibold.woff2') format('woff2');
   font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-SemiboldOblique.otf') format('opentype');
+  src: url('font/Moret-SemiboldOblique.woff2') format('woff2');
   font-weight: 600;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-Bold.otf') format('opentype');
+  src: url('font/Moret-Bold.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-BoldOblique.otf') format('opentype');
+  src: url('font/Moret-BoldOblique.woff2') format('woff2');
   font-weight: 700;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-Extrabold.otf') format('opentype');
+  src: url('font/Moret-Extrabold.woff2') format('woff2');
   font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Moret';
-  src: url('font/Moret-ExtraboldOblique.otf') format('opentype');
+  src: url('font/Moret-ExtraboldOblique.woff2') format('woff2');
   font-weight: 800;
   font-style: italic;
   font-display: swap;

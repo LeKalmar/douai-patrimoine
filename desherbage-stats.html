@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts.css">
+<script src="js/columnar.js"></script>
 <link rel="stylesheet" href="style.css">
 <style>
   :root{ --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
@@ -404,7 +405,9 @@ Promise.all([
   fetch('data/desherbage.json').then(r => r.ok ? r.json() : []),
   fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : {}),
 ]).then(([data, report]) => {
-  ROWS = data.map(normalize);
+  // Conteneur colonnaire (voir js/columnar.js) — parcours ligne à ligne.
+  ROWS = [];
+  columnar.forEachRow(data, rec => ROWS.push(normalize(rec)));
   FILTERED = ROWS;
   const referenceYear = (report && report.stats && report.stats.referenceYear) || new Date().getFullYear();
   buildStats(ROWS);

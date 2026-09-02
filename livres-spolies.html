@@ -7,6 +7,8 @@
   <title>Livres spoliés — Réserve patrimoniale</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="fonts.css">
+  <script src="js/columnar.js"></script>
+  <script src="js/sync-queue.js"></script>
   <style>
     :root {
       --warm: #c9a96e;
@@ -318,74 +320,19 @@ function saveOverrides(){
    En cas d'échec (hors ligne, R2 non configuré), le patch reste dans une
    file locale et sera retenté — rien n'est jamais perdu. */
 const LS_PENDING = 'rp_livres_spolies_pending_sync';
-let pendingSync = (function(){ try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch(e){ return []; } })();
-function savePendingSync(){ localStorage.setItem(LS_PENDING, JSON.stringify(pendingSync)); }
-
-function authHeaders(){
-  const token = sessionStorage.getItem('rp_admin_token');
-  const h = { 'Content-Type': 'application/json' };
-  if(token) h['Authorization'] = 'Basic ' + token;
-  return h;
-}
-
-let lastSyncError = null;
-
-function updateSyncIndicator(){
-  const el = document.getElementById('sync-status');
-  if(!el) return;
-  if(pendingSync.length){
-    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
-    el.title = lastSyncError ? `Dernière erreur de synchro : ${lastSyncError}` : 'Synchronisation avec les autres postes (via R2)';
-    el.classList.add('pending');
-  } else {
-    el.textContent = '✓ synchronisé';
-    el.title = 'Synchronisation avec les autres postes (via R2)';
-    el.classList.remove('pending');
-  }
-}
-
-function queuePatch(patch){
-  pendingSync.push(patch);
-  savePendingSync();
-  updateSyncIndicator();
-  flushPendingSync();
-}
-
-let flushingSync = false;
-async function flushPendingSync(){
-  if(flushingSync) return;
-  flushingSync = true;
-  try{
-    while(pendingSync.length){
-      const patch = pendingSync[0];
-      let res;
-      try{
-        res = await fetch('/api/spolies', { method:'POST', headers: authHeaders(), body: JSON.stringify(patch) });
-      }catch(e){
-        lastSyncError = 'hors ligne ou serveur injoignable';
-        break; // réseau indisponible : on retentera plus tard
-      }
-      if(res.status===401){
-        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
-        break;
-      }
-      if(res.status===503){
-        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
-        break;
-      }
-      if(!res.ok){
-        lastSyncError = `erreur serveur (${res.status})`;
-        break; // autre erreur serveur : on retentera plus tard
-      }
-      lastSyncError = null;
-      pendingSync.shift();
-      savePendingSync();
-    }
-  } finally {
-    flushingSync = false;
-    updateSyncIndicator();
-  }
-}
+/* File de synchronisation : implémentation commune aux cinq pages qui
+   écrivent dans un état partagé R2 — voir js/sync-queue.js (localStorage
+   comme source de vérité locale, rejeu à la reconnexion, indicateur
+   #sync-status). Ce bloc était auparavant recopié à l'identique dans chacune.
+   Un patch de livres-spolies est envoyé tel quel ({id, field, value}). */
+const syncQueue = createSyncQueue({
+  storageKey: LS_PENDING,
+  endpoint: '/api/spolies',
+});
+const authHeaders = syncAuthHeaders;
+function queuePatch(item){ syncQueue.queue(item); }
+function flushPendingSync(){ return syncQueue.flush(); }
+function updateSyncIndicator(){ syncQueue.updateIndicator(); }
 
 // Fusionne l'état partagé reçu du serveur, sans écraser un champ pour
 // lequel on a un patch local pas encore confirmé (évite qu'une saisie en
@@ -394,7 +341,7 @@ function mergeIncomingOverrides(serverOverrides){
   Object.keys(serverOverrides || {}).forEach(id => {
     const incoming = serverOverrides[id] || {};
     const localForId = OVERRIDES[id] || {};
-    const pendingFieldsForId = new Set(pendingSync.filter(p => String(p.id) === id).map(p => p.field));
+    const pendingFieldsForId = new Set(syncQueue.items.filter(p => String(p.id) === id).map(p => p.field));
     const merged = { ...localForId };
     Object.keys(incoming).forEach(field => {
       if(!pendingFieldsForId.has(field)) merged[field] = incoming[field];
@@ -418,8 +365,6 @@ async function syncFromServer(){
   }catch(e){ /* hors ligne ou API non disponible : on reste sur le cache local */ }
 }
 
-window.addEventListener('online', flushPendingSync);
-setInterval(flushPendingSync, 20000);
 // Lecture seule (GET) : espacée à 45s et suspendue pendant que l'onglet est en
 // arrière-plan, pour ne pas cumuler des requêtes R2 inutiles sur des postes
 // laissés ouverts toute la journée — avec un rafraîchissement immédiat au
@@ -524,18 +469,23 @@ function renderPieChart(){
 }
 
 /* ════ Recherche catalogue (data/inventaire.json + data/magasins.json) ════ */
+// forEachRow : accepte un tableau plat (inventaire) comme un conteneur
+// colonnaire (magasins, voir js/columnar.js) — et ne garde en mémoire que
+// l'index de recherche, pas les lignes brutes.
 function indexCatalogRows(rows, source){
-  return rows.map(r => {
+  const out = [];
+  columnar.forEachRow(rows, r => {
     const titre = r['200$a'] || '';
     const auteur = [r['700$a'], r['700$b']].filter(Boolean).join(' ');
     const cote = r['930$g'] || '';
     const annee = r['210$d'] || '';
     const type = r['200$b'] || '';
-    return {
+    out.push({
       titre, auteur, cote, annee, type, source,
       _search: norm([titre, auteur, cote].join(' ')),
-    };
+    });
   });
+  return out;
 }
 
 function buildCatalogIndex(inventaire, magasins){
@@ -850,7 +800,7 @@ document.getElementById('btn-reset').addEventListener('click', function(){
   if(!confirm("Effacer toutes les modifications enregistrées dans ce navigateur (retrouvé, ex-libris, cote BM, possesseur) ? Cette action ne peut pas être annulée. Pensez à exporter le JSON avant si besoin. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
   localStorage.removeItem(LS_KEY);
   OVERRIDES = {};
-  pendingSync = []; savePendingSync(); updateSyncIndicator();
+  syncQueue.clear();
   mergeRows();
   applyFilter(document.getElementById('search-input').value.trim());
   renderStats();

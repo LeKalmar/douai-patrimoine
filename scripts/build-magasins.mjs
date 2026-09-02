@@ -59,6 +59,7 @@ import { dirname, resolve } from 'node:path';
 import { loadDotEnv } from './lib/dotenv.mjs';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
 import { iterateGesmarcItemsFromFile, parseGesmarcItem } from './lib/gesmarc.mjs';
+import { loadColumnar } from './lib/load-columnar.mjs';
 
 loadDotEnv();
 
@@ -246,8 +247,24 @@ async function main() {
   }
 
   mkdirSync(dirname(resolve(CONFIG.output.magasins)), { recursive: true });
-  writeFileSync(CONFIG.output.magasins, JSON.stringify(items), 'utf-8');
-  console.log(`  · écrit ${CONFIG.output.magasins} (${items.length} entrées)`);
+  /* Écrit en conteneur colonnaire plutôt qu'en tableau d'objets plats : ~85 Mo
+     d'objets répétitifs deviennent ~20 Mo, sans qu'aucun champ ne disparaisse
+     (voir js/columnar.js, et scripts/verify-columnar.mjs qui contrôle le
+     round-trip ligne à ligne). Le gain porte sur les trois pages qui lisent ce
+     fichier — magasins.html, recolement.html, livres-spolies.html — et sur le
+     dépôt lui-même, où chaque build en committait une nouvelle copie.
+
+     `lien_num` est déclaré comme colonne dérivée : elle vaut toujours
+     `vignetteBaseUrl + code-barre + .jpg` (voir sa construction plus haut),
+     soit 14,4 Mo d'URL reconstituables à la lecture depuis 915$b. encode()
+     revérifie ce gabarit sur chaque ligne et retombe sur un stockage brut
+     s'il ne tient pas, donc une URL inattendue ne peut pas être perdue. */
+  const columnar = loadColumnar();
+  const encoded = columnar.encode(items, {
+    templates: [{ col: 'lien_num', from: '915$b', prefix: CONFIG.vignetteBaseUrl, suffix: '.jpg' }],
+  });
+  writeFileSync(CONFIG.output.magasins, JSON.stringify(encoded), 'utf-8');
+  console.log(`  · écrit ${CONFIG.output.magasins} (${items.length} entrées, format ${columnar.FORMAT})`);
 
   // Archive le rapport précédent avant de l'écraser (même mécanique que
   // build-inventory.mjs).

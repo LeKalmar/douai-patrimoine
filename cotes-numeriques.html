@@ -7,6 +7,7 @@
   <title>Cotes numériques — Réserve patrimoniale</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="fonts.css">
+  <script src="js/columnar.js"></script>
   <style>
     :root { --warm: #c9a96e; --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
     body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
@@ -352,7 +353,11 @@ function renderStats() {
 fetch('data/cotes-numeriques.json')
   .then(res => res.json())
   .then(data => {
-    ROWS = data.map(normalize);
+    // data/cotes-numeriques.json est un conteneur colonnaire (voir
+    // js/columnar.js) : on le parcourt ligne à ligne plutôt que de
+    // matérialiser d'abord les 45 299 objets bruts.
+    ROWS = [];
+    columnar.forEachRow(data, rec => ROWS.push(normalize(rec)));
     FILTERED = ROWS;
     rowsLoaded = true;
     render();

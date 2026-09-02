@@ -10,8 +10,7 @@
  *        pour que deux collègues qui écrivent en même temps ne s'écrasent
  *        pas mutuellement. Authentification requise (voir lib/auth.mjs).
  */
-import { r2Get, r2CasUpdate, r2Configured } from '../lib/r2.mjs';
-import { requireAuth } from '../lib/auth.mjs';
+import { createPatchEndpoint } from '../lib/patch-endpoint.mjs';
 
 const KEY = 'recolement.json';
 
@@ -172,34 +171,10 @@ function applyPatch(state, patch) {
   };
 }
 
-export default async function handler(req, res) {
-  if (!r2Configured()) {
-    res.status(503).json({ error: 'R2 non configuré côté serveur (variables R2_* manquantes sur Vercel).' });
-    return;
-  }
-  try {
-    if (req.method === 'GET') {
-      const current = await r2Get(KEY);
-      // Mis en cache brièvement sur le CDN Vercel : plusieurs collègues qui
-      // pollent la même route en même temps (recolement.html, reserve.html,
-      // exemplarisation.html, toutes les 45s) partagent alors une seule
-      // réponse au lieu de retélécharger l'état complet à chaque fois — voir
-      // "Fast Origin Transfer" dans CLAUDE.md.
-      res.setHeader('Cache-Control', 'public, s-maxage=20, stale-while-revalidate=60');
-      res.status(200).json(current ? JSON.parse(current.body) : emptyState());
-      return;
-    }
-    if (req.method === 'POST') {
-      requireAuth(req);
-      const patch = req.body;
-      if (!patch || typeof patch !== 'object') throw new BadRequest('Corps JSON attendu.');
-      const updated = await r2CasUpdate(KEY, state => applyPatch(state, patch), emptyState);
-      res.status(200).json(updated);
-      return;
-    }
-    res.setHeader('Allow', 'GET, POST');
-    res.status(405).json({ error: 'Méthode non supportée.' });
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Erreur serveur.' });
-  }
-}
+/* Handler = la fabrique partagée : GET (public, avec ETag/304), POST
+   authentifié fusionné en compare-and-swap. Voir lib/patch-endpoint.mjs. */
+export default createPatchEndpoint({
+  key: KEY,
+  emptyState,
+  applyPatch,
+});

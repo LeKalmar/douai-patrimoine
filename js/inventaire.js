@@ -582,7 +582,7 @@ function buildFondsBlock(fondsName, records) {
   const img = FONDS_IMAGES[fondsName];
   const iconSVG = `<span class="fonds-color-icon">
     ${img
-      ? `<img src="${img}" alt="${fondsName}" style="width:100%;height:100%;object-fit:cover;">`
+      ? `<img src="${img}" alt="${fondsName}" width="90" height="90" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;">`
       : `<svg viewBox="0 0 28 28"><polygon points="0,0 28,0 28,28" fill="${c2}"/><polygon points="0,0 0,28 28,28" fill="${c1}"/></svg>`
     }
   </span>`;

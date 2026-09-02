@@ -14,6 +14,50 @@ zéro dépendance npm — signature R2/S3 écrite à la main, voir
 synchronisation partagée du récolement et des livres spoliés (détails plus
 bas, section « Stockage partagé »).
 
+## Format des données et performances (2026-09-02)
+
+Trois choses à connaître avant de toucher aux gros jeux de données ou aux
+pages qui les lisent.
+
+**Les `data/*.json` volumineux sont colonnaires, plus des tableaux d'objets.**
+`data/magasins.json` (82,9 → 20,8 Mo), `data/cotes-numeriques.json`
+(11,6 → 4,9 Mo) et `data/desherbage.json` (6,1 → 4,2 Mo) sont écrits par
+`js/columnar.js` : les noms de champs cessent d'être répétés à chaque ligne,
+les colonnes à faible cardinalité passent en dictionnaire, celles qui sont
+constantes ne sont stockées qu'une fois, et `lien_num` (14,4 Mo d'URL R2
+identiques à un code-barre près) devient une colonne dérivée. Aucun champ
+n'est perdu : `scripts/verify-columnar.mjs <plat.json> <colonnaire.json>`
+compare ligne à ligne, clé à clé, présence comprise — les lignes d'un export
+MARC n'ayant pas toutes les mêmes clés, une clé absente doit le rester après
+décodage et ne pas ressortir à `null`.
+Côté page, `columnar.forEachRow(data, cb)` accepte aussi bien le conteneur
+que l'ancien tableau plat, et reconstruit les lignes à la volée sans
+matérialiser le tableau complet — c'est la voie à privilégier. `decode()`
+existe pour les rares cas où un vrai tableau est nécessaire (rotobib.html).
+`js/columnar.js` est un script navigateur ; les scripts de build l'évaluent
+via `scripts/lib/load-columnar.mjs` plutôt que d'en tenir une copie ESM, pour
+que l'encodeur et le décodeur ne puissent jamais diverger.
+
+**Le catalogue magasins de `recolement.html` est mis en cache dans
+IndexedDB.** Voir `js/catalog-cache.js`. La clé de fraîcheur est le
+`generatedAt` de `data/magasins-build-report.json` (quelques Ko, toujours
+téléchargé) : un `npm run build:magasins` invalide le cache tout seul. Au
+deuxième chargement, la page ne télécharge plus `data/magasins.json` du tout
+et ne fait aucun `JSON.parse` — 1 143 ms de CPU et 189 Mo de tas au pic
+deviennent 261 ms et 43 Mo. **Ce cache vit dans une base IndexedDB séparée
+(`rp_catalog_cache`), sans aucun rapport avec `rp_recolement_idb`** qui
+contient les scans : rien dans `js/catalog-cache.js` n'ouvre la base du
+récolement. Toute défaillance (IndexedDB indisponible, quota, entrée
+corrompue) ramène au comportement d'avant — fetch + build.
+
+**Il n'y a plus qu'un seul catalogue magasins en mémoire.** `catalogByGroup.magasin`
+et `magasinWideCatalog` faisaient 288 316 entrées matérialisées pour 199 583
+exemplaires. Désormais un seul catalogue complet, chaque entrée portant
+`isMagasin`, et `inGroupScope(entry)` partout où le périmètre « magasins »
+compte (statistiques de progression, jamais scannés, probablement égarés,
+index cote, anomalies de classement). Ne pas réintroduire un second catalogue
+filtré : la distinction se lit sur l'entrée.
+
 ## Démarrer / builder
 
 - `npm run build` — régénère `data/inventaire.json` et
@@ -99,6 +143,12 @@ bas, section « Stockage partagé »).
 leurs chemins et dépendances au préalable.
 
 ## Deux systèmes de style distincts
+
+Les polices Moret sont servies en **WOFF2** et non plus en OTF depuis le
+2026-09-02 (`fonts.css`, dossier `font/`) : même dessin, mêmes dix graisses,
+~40 % d'octets en moins grâce à la compression Brotli intégrée au format. Les
+dix faces restent déclarées bien que seules 400 et 700 soient utilisées
+aujourd'hui — un navigateur ne télécharge que les faces réellement appelées.
 
 - **`style.css`** (racine, ~2200 lignes) : design system principal
   (variables `--ink`, `--warm`, `--accent`…), utilisé par la quasi-totalité
@@ -190,6 +240,23 @@ casser d'anciens fichiers en circulation. C'est exactement cette même
 forme qui est stockée dans R2 sous la clé `recolement.json` (voir
 « Stockage partagé » ci-dessous) — l'export manuel produit toujours un
 fichier au même format, utile pour figer un instantané daté.
+
+Rendu du plan (`reserve.html`, 2026-09-02) : `buildPlan()` construit les
+~5 400 cases, `refreshPlan()` les met à jour. Le sondage de 45 s passe par le
+second : il compare une signature de structure (quelles colonnes, combien
+d'étages) et ne rebâtit le DOM que si elle a changé — sinon il se contente de
+repeindre `background`/`opacity`/`aria-label` des cases existantes, ce qui
+évite aussi de perdre survol et défilement à chaque cycle. `colsOf()`,
+`maxEtageOf()` et `hasData()` lisent un index (`GEO_COLS`/`GEO_MAXET`/
+`GEO_DEF`, reconstruit une fois par rafraîchissement par
+`rebuildGeometryIndex()`) au lieu de rebalayer les six dictionnaires de
+données à chaque appel — ils étaient appelés ~800 fois par rendu, soit des
+dizaines de millions de `split('|')` toutes les 45 s (183 ms → 2 ms sur un
+récolement de 1 900 scans, et l'écart croît avec le nombre de scans).
+Cet index inclut `CNT_MANUEL`, que l'ancien balayage oubliait : une étagère
+ne contenant que des exemplaires créés via `exemplarisation.html` n'étendait
+ni les colonnes ni les étages et disparaissait donc du plan — même nature
+d'oubli que le correctif du 2026-08-11 sur `colsOf`/`maxEtageOf`.
 
 Le code couleur du plan (`reserve.html`) est catégoriel, pas un dégradé de
 densité : chaque emplacement (travée/colonne/étage, ou meuble/étage pour
@@ -440,13 +507,14 @@ dans ces libellés-là, eux-mêmes des pièges Syracuse distincts). `magasins.ht
 réception du fetch, donc son comportement affiché ne change pas ; le flag
 `_secteur` reste la section brute (pas forcément Adulte/Jeunesse pour un
 exemplaire hors magasin). Raison de ce changement : `recolement.html`
-(section « Récolement des magasins d'étage » plus bas) construit désormais
-DEUX catalogues de reconnaissance à partir de ce même fichier — un filtré
-`_isMagasin` (pour les statistiques de progression, périmètre inchangé) et
-un complet `magasinWideCatalog` (repli uniquement, pour reconnaître un
-code-barre scanné dans un magasin même s'il est catalogué sous une autre
-section, et signaler l'anomalie plutôt que d'afficher « inconnu du
-catalogue »). Un exemplaire hors magasin porte un `_fondsLabel` = sa
+(section « Récolement des magasins d'étage » plus bas) a besoin de
+reconnaître au scan n'importe quel code-barre de la bibliothèque, même
+catalogué sous une autre section, pour signaler l'anomalie de classement
+plutôt que d'afficher « inconnu du catalogue ». Cette page en construit un
+catalogue unique couvrant tout le fichier, où `isMagasin` distingue le
+périmètre des statistiques de progression (il y a eu, du 2026-08-26 au
+2026-09-02, deux catalogues séparés pour cela — voir « Détection des
+anomalies de classement »). Un exemplaire hors magasin porte un `_fondsLabel` = sa
 section Syracuse réelle (`"Adulte"`, `"Réserve"`…) plutôt qu'un libellé de
 magasin, pour que cette anomalie soit lisible dès l'affichage du fonds au
 scan. Le rapport de build distingue les deux volumes : `stats.kept` reste
@@ -925,7 +993,15 @@ pour plusieurs choses indépendantes :
   temps sans export/import JSON manuel. Chaque page garde le `localStorage`
   comme source de vérité locale (fonctionne hors ligne, file d'attente
   `rp_*_pending_sync` rejouée à la reconnexion) et envoie en plus chaque
-  changement en arrière-plan.
+  changement en arrière-plan. Depuis 2026-09-02, cinq de ces pages
+  (`livres-spolies.html`, `exemplarisation.html`, `transfert-magasins.html`,
+  `reliures.html`, `rotobib.html`) partagent cette file via
+  `createSyncQueue()` dans `js/sync-queue.js` au lieu d'en recopier
+  l'implémentation. `recolement.html` garde délibérément la sienne : elle
+  regroupe les patchs par lots de 200 (patch `batch`), écrit via
+  `safeSetLocal()` et affiche en plus l'état « stockage local plein » — trois
+  comportements issus d'incidents réels sur le récolement, qu'il aurait fallu
+  reproduire derrière trois options utilisées par une seule page.
 - **`recolement-backups/<horodatage>.json`** : instantanés datés et
   immuables (un objet par sauvegarde, jamais réécrit), distincts de l'état
   partagé courant ci-dessus. Créés par le bouton « Sauvegarder ce
@@ -951,7 +1027,25 @@ d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit un
 le fusionne côté serveur via lecture+ETag+réécriture conditionnelle
 (`r2CasUpdate` dans `lib/r2.mjs`, compare-and-swap avec retry) — jamais un
 écrasement complet du fichier, pour qu'un scan pris par un collègue au même
-instant ne soit pas perdu. `reserve.html` lit `/api/recolement` en priorité
+instant ne soit pas perdu.
+
+Depuis 2026-09-02, les six endpoints « état partagé » (tous sauf
+`api/vignette.mjs`) partagent une seule implémentation,
+`createPatchEndpoint()` dans `lib/patch-endpoint.mjs` — ils étaient
+auparavant copiés ligne pour ligne, ne différant que par leur clé R2, leur
+état vide et leur `applyPatch()` (`api/reliures-manuelles.mjs` passe en plus
+un `normalizeState` pour son ancien format à plat). Un correctif profite donc
+aux six d'un coup. C'est notamment ce qui a permis d'ajouter partout un
+**ETag** : l'ETag de l'objet R2 (déjà renvoyé par `r2Get`) est propagé en
+en-tête, et un `If-None-Match` correspondant donne un **304 sans corps**. Le
+`Cache-Control` est `public, max-age=0, must-revalidate, s-maxage=20,
+stale-while-revalidate=60` — le navigateur revalide systématiquement (sans
+directive de fraîcheur explicite il appliquerait une heuristique), le CDN
+mutualise 20 s. Les pages n'ont rien à changer : `fetch()` continue de voir
+un 200 servi depuis le cache, le 304 lui est transparent. Sur un récolement
+avancé, un sondage à vide passe ainsi de plusieurs Mo (≈ 334 octets par scan,
+soit ~4 Mo à 13 000 scans, toutes les 45 s et par onglet) à quelques centaines
+d'octets d'en-têtes. `reserve.html` lit `/api/recolement` en priorité
 (rafraîchi toutes les 25 s), avec repli sur `data/recolement.json` si l'API
 échoue.
 
@@ -1064,18 +1158,21 @@ les deux groupes. Seule la liste « codes-barres endommagés » reste
 volontairement globale (non scindée par groupe) : c'est une liste
 d'action à corriger, pas une comparaison catalogue.
 
-Détection des anomalies de classement (2026-08-26) : `catalogByGroup.magasin`
-n'est construit qu'à partir des exemplaires `_isMagasin` de
-`data/magasins.json` (voir « Magasins 2e/5e/6e étage » — le fichier couvre
-en réalité toute la bibliothèque de Douai), pour que les statistiques de
-progression des magasins gardent le même périmètre qu'avant. Un second
-catalogue, `magasinWideCatalog`, est construit en parallèle à partir de
-la totalité de `data/magasins.json` (sans filtre) et sert uniquement de
-repli dans `handleScan()` : si un code-barre scanné pendant que
-`catalogGroupOfReserve(loc.reserve)==='magasin'` est absent de
-`catalogByGroup.magasin` mais présent dans `magasinWideCatalog`, il est
-quand même reconnu (titre/cote/fonds affichés, scan enregistré normalement)
-au lieu d'être traité comme « inconnu du catalogue » — le `fonds` affiché
+Détection des anomalies de classement (2026-08-26 ; catalogue unifié le
+2026-09-02) : `data/magasins.json` couvre toute la bibliothèque de Douai,
+pas seulement les magasins (voir « Magasins 2e/5e/6e étage »).
+`catalogByGroup.magasin` en contient désormais la **totalité**, chaque entrée
+portant un drapeau `isMagasin` ; `inGroupScope(entry)` filtre partout où le
+périmètre « magasins » doit être respecté, pour que les statistiques de
+progression gardent exactement le même périmètre qu'avant. Il y avait
+jusque-là DEUX catalogues construits depuis ce même fichier — celui-ci,
+filtré, et un `magasinWideCatalog` complet servant de repli au scan — soit
+288 316 entrées matérialisées pour 199 583 exemplaires et ~75 Mo de tas ;
+`magasinWideCatalog` n'existe plus. Dans `handleScan()`, si un code-barre
+scanné pendant que `catalogGroupOfReserve(loc.reserve)==='magasin'` a une
+entrée dont `isMagasin` est faux, il est quand même reconnu (titre/cote/fonds
+affichés, scan enregistré normalement) au lieu d'être traité comme
+« inconnu du catalogue » — le `fonds` affiché
 est alors la vraie section Syracuse de ce document (ex. « Adulte »), posée
 par `_fondsLabel` (voir plus haut) au lieu d'un libellé de magasin. Le
 `record` de ce scan porte en plus `horsSection:true`, affiché comme badge
@@ -1156,6 +1253,15 @@ fois. Il n'y a plus de suivi « réglé/rouvert » par ligne (retiré le
 2026-08-27, jugé inutile à l'usage) — ces tableaux reflètent toujours
 l'état brut, sans notion de problème « traité » séparée du vrai
 scan/catalogage.
+
+Depuis 2026-09-02, seul le groupe visible est **calculé** :
+`updateStats()` et `updateAdvListsCount()` ne traitent que
+`visibleAdvGroupId()` au lieu de boucler sur les quatre. C'était le point
+chaud du scan — pour chacun des 3 groupes magasin, `notScannedCount()` et
+`probablyLostCount()` parcourent le catalogue entier, soit environ un million
+de lectures par scan pour des chiffres masqués. Rien ne se périme :
+`refreshLoc()` rappelle `updateStats()` à chaque changement de réserve, donc
+un panneau est recalculé au moment précis où il devient visible.
 
 Depuis 2026-09-01, un seul groupe est visible à la fois — celui qui
 correspond à l'emplacement actuellement sélectionné dans le menu déroulant
@@ -1349,6 +1455,28 @@ est sécurisé au-delà de ce qui est décrit ici.
 
 ## Pièges connus / historique
 
+- Chantier de performance du 2026-09-02 (voir « Format des données et
+  performances » en tête de fichier pour le détail) : `data/magasins.json`
+  82,9 → 20,8 Mo, `data/cotes-numeriques.json` 11,6 → 4,9 Mo,
+  `data/desherbage.json` 6,1 → 4,2 Mo (format colonnaire) ; catalogue
+  magasins mis en cache dans IndexedDB ; ETag/304 sur les six endpoints
+  d'état partagé ; `images/` 19,5 → 0,6 Mo ; polices en WOFF2 ; rendu
+  incrémental du plan de `reserve.html`. **Aucune donnée n'a été
+  supprimée ni transformée en perte** — les fichiers de données sont
+  réécrits dans un autre rangement, vérifié ligne à ligne par
+  `scripts/verify-columnar.mjs`, et l'état partagé R2 (récolement compris)
+  n'a pas été touché.
+- Images (2026-09-02) : 23 fichiers de `images/` n'étaient référencés nulle
+  part (ni par le site, ni par `_archive`) — 10,8 Mo, retirés. Les 11
+  restants ont été redimensionnés à leur taille d'affichage réelle :
+  `documents.jpg` faisait 4624×2868 pour un bandeau de 220 px
+  (`.accordion-hover-bg`), et les vignettes de fonds jusqu'à 2293×2156 pour
+  un carré de 90 px (`.fonds-color-icon`). Vérifier la taille CSS d'affichage
+  avant d'ajouter une image ; toutes sont récupérables via git.
+- `index.html` chargeait PapaParse (45 Ko depuis cdnjs) sans jamais s'en
+  servir — `Papa.` n'apparaît que dans `generer_manifest.html` et
+  `js/main.js`, qui la chargent chacun de leur côté. Retiré le 2026-09-02,
+  avec son `preconnect`.
 - `js/geojson/douai-biblioth#U00e8ques.js` a été supprimé (2026-07-23) :
   doublon exact de `js/geojson/douai-bibliothèques.js` avec un nom de
   fichier corrompu (encodage `#U00e8` littéral), jamais référencé.
@@ -1392,6 +1520,25 @@ est sécurisé au-delà de ce qui est décrit ici.
   des données réelles. À cette occasion, ajout de la catégorie
   `lastShelves` (voir plus haut) pour le cas inverse : marquer qu'une
   colonne s'arrête réellement avant le `maxEt` par défaut de sa travée.
+- Corrigé (2026-09-02) : `recolement.html` était **entièrement inerte**
+  depuis le commit `a81fd2c` — mini-plan de travée jamais construit (panneau
+  vide, titre « — »), et plus aucun écouteur branché (scan, boutons
+  vide/non rangé, imports/exports, listes avancées). Symptôme visible côté
+  équipe : « la minimap est cassée ». Cause : le debounce
+  `let advListsCountTimer` introduit avec `scheduleAdvListsCount()` avait été
+  déclaré au milieu du script, alors qu'`updateStats()` — qui l'appelle —
+  tourne pendant l'initialisation synchrone de la page (`refreshLoc()`, fin
+  de la section « EMPLACEMENT »). `ReferenceError: Cannot access
+  'advListsCountTimer' before initialization` (temporal dead zone) levée
+  depuis l'IIFE `async` qui enveloppe tout le script, donc silencieuse : une
+  simple *unhandled rejection* en console, aucun message d'erreur visible, et
+  tout ce qui suit la ligne `refreshLoc()` jamais exécuté. Exactement le
+  piège déjà documenté pour `ADV_GROUPS`/`ADV_CATS` (voir « Piège rencontré
+  en construisant cette section », plus haut) : `advListsCountTimer` a été
+  déplacé dans le même bloc de déclarations précoces. **Toute nouvelle
+  `const`/`let` de ce script lue par `updateStats()` (ou par n'importe quelle
+  fonction appelée pendant l'init synchrone) doit être déclarée là-haut, pas
+  près du code qui l'utilise.** Les `function` restent libres (hoisting).
 - Corrigé (2026-08-27) : le compteur « catalogué » d'un emplacement de
   magasin (`reserve.html`, et le mini-plan de `recolement.html`) pouvait
   être très sous-évalué par rapport au nombre réel de scans reconnus — ex.

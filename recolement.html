@@ -13,6 +13,8 @@
 <script src="js/reserve-shared.js"></script>
 <script src="js/exemplaires-manuels-shared.js"></script>
 <script src="js/reliures-manuelles-shared.js"></script>
+<script src="js/columnar.js"></script>
+<script src="js/catalog-cache.js"></script>
 <style>
   :root{
     --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
@@ -883,10 +885,24 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFro
    ne pointent jamais directement vers un des deux catalogues construits
    ci-dessous, seulement vers celui du groupe actif — voir
    syncActiveCatalog(), appelée ici et à chaque changement de réserve. */
-function buildCatalogFromItems(items, fondsOverride){
+function buildCatalogFromItems(items, fondsOverride, opts){
+  // `scoped` (magasins uniquement) : data/magasins.json couvre toute la
+  // bibliothèque de Douai depuis 2026-08-26, pas seulement les magasins.
+  // Avant, on construisait DEUX catalogues à partir de ce même fichier — un
+  // filtré _isMagasin (statistiques) et un complet (reconnaissance au scan,
+  // ex-magasinWideCatalog) — soit 287 000 entrées matérialisées pour 199 583
+  // exemplaires, et ~75 Mo de tas. On n'en construit plus qu'un seul, où
+  // chaque entrée porte `isMagasin` ; inGroupScope() ci-dessous filtre
+  // partout où le périmètre « magasins » doit être respecté.
+  const scoped = !!(opts && opts.scoped);
   const cat = {};
   const noticeIds = new Set();
-  items.forEach(it=>{
+  // forEachRow accepte aussi bien un tableau plat (data/inventaire.json,
+  // exemplaires manuels) qu'un conteneur colonnaire (data/magasins.json
+  // depuis 2026-09-02, voir js/columnar.js) — et, dans ce second cas, il
+  // reconstruit chaque ligne à la volée sans jamais matérialiser les 199 583
+  // objets d'un coup.
+  window.columnar.forEachRow(items, it=>{
     const bc = (it['915$b'] || it['995$f'] || '').trim();
     if(!bc) return;
     // Jointe 930$g/h/i plutôt que $g seul : nécessaire pour les magasins
@@ -934,32 +950,45 @@ function buildCatalogFromItems(items, fondsOverride){
       // (absent). undefined pour la réserve, sans effet là où ce champ n'est
       // pas lu.
       coteDigitRun: it._coteDigitRun || null,
+      // Périmètre "magasins" (_isMagasin, posé par build-magasins.mjs) —
+      // toujours true pour le catalogue réserve, qui n'a pas cette notion.
+      // Un exemplaire à false est reconnu au scan (titre/cote affichés) mais
+      // exclu des statistiques de progression : c'est une anomalie de
+      // classement, voir handleScan()/ADV_CATS.horssection.
+      isMagasin: !scoped || it._isMagasin !== false,
     };
     // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
     // le compteur et la progression se basent sur des notices distinctes, pas
     // sur des scans bruts, pour qu'un même exemplaire rescanné par erreur ou
-    // pour vérification ne compte jamais deux fois.
-    noticeIds.add(noticeId);
+    // pour vérification ne compte jamais deux fois. Hors périmètre : exclu,
+    // pour que le total affiché reste celui des seuls magasins (identique à
+    // ce que comptait l'ancien catalogue filtré).
+    if(cat[bc].isMagasin) noticeIds.add(noticeId);
   });
   return { catalog: cat, noticeCount: noticeIds.size };
 }
+
+/* Une entrée de catalogue est-elle dans le périmètre du groupe ? Toujours
+   vrai pour la réserve (catalogue non filtré) ; pour les magasins, exclut
+   les exemplaires catalogués sous une autre section Syracuse (voir
+   `isMagasin` ci-dessus). Remplace l'ancien couple
+   catalogByGroup.magasin (filtré) / magasinWideCatalog (complet). */
+function inGroupScope(entry){ return !!entry && entry.isMagasin !== false; }
 
 let catalogByGroup = { reserve:null, magasin:null };
 let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
 let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas encore chargé" (—) de "échec" (indisponible)
 
-// Catalogue de reconnaissance "large", distinct de catalogByGroup.magasin :
-// depuis 2026-08-26, data/magasins.json couvre toute la bibliothèque de
-// Douai, pas seulement les magasins (voir build-magasins.mjs) — mais
-// catalogByGroup.magasin reste filtré aux seuls exemplaires _isMagasin pour
-// que les statistiques de progression des magasins (notices cataloguées,
-// "jamais scannés"…) restent basées sur le même périmètre qu'avant, sans
-// être noyées par le reste de la bibliothèque. magasinWideCatalog, lui,
-// contient TOUS les exemplaires — utilisé uniquement par handleScan() en
-// repli quand un code-barre scanné dans un magasin est absent de
-// catalogByGroup.magasin, pour détecter une anomalie de classement (voir
-// CLAUDE.md, section "Récolement des magasins d'étage").
-let magasinWideCatalog = null;
+/* Il n'y a plus qu'UN catalogue magasins (2026-09-02). Il y en avait deux,
+   construits depuis le même data/magasins.json : catalogByGroup.magasin
+   filtré aux exemplaires _isMagasin (statistiques de progression) et
+   magasinWideCatalog non filtré (reconnaissance au scan d'un code-barre
+   catalogué sous une autre section, pour signaler une anomalie de
+   classement plutôt qu'un "inconnu du catalogue"). Comme le second est un
+   sur-ensemble du premier, les matérialiser tous les deux coûtait 287 000
+   entrées pour 199 583 exemplaires — ~75 Mo de tas.
+   Désormais : un seul catalogue complet, chaque entrée portant `isMagasin`,
+   et inGroupScope() (voir plus haut) partout où le périmètre compte. */
 
 // Index inverse cote -> code-barre, un par catalogGroup — sert à
 // handleNoBarcodeCote() (voir "LIVRES SANS CODE-BARRE" plus bas) pour
@@ -970,6 +999,11 @@ let catalogCoteIndexByGroup = { reserve:null, magasin:null };
 function buildCoteIndex(cat){
   const idx = {};
   Object.keys(cat).forEach(bc=>{
+    // Hors périmètre exclu, comme quand cet index était construit à partir
+    // du catalogue magasins filtré : saisir la cote d'un document classé
+    // dans une autre section ne doit pas le récoler ici sans passer par un
+    // vrai scan (qui, lui, le marquera en anomalie de classement).
+    if(!inGroupScope(cat[bc])) return;
     const c = normalizeCote(cat[bc].cote);
     if(c && !idx[c]) idx[c] = bc;
   });
@@ -1000,23 +1034,110 @@ Promise.all([
   syncActiveCatalog();
 });
 
-fetch('data/magasins.json').then(r=>r.json()).then(data=>{
-  // Filtré aux seuls exemplaires _isMagasin : périmètre inchangé pour les
-  // statistiques de progression (notices cataloguées, "jamais scannés"…),
-  // voir magasinWideCatalog ci-dessus pour le reste de la bibliothèque.
-  // `!== false` plutôt que truthy strict : un ancien data/magasins.json
-  // généré avant l'ajout de ce flag n'a pas du tout de champ _isMagasin,
-  // mais ne contenait déjà que des magasins (voir magasins.html, même
-  // traitement). Pas de fondsOverride : chaque exemplaire porte déjà son
-  // propre _fondsLabel (étage + secteur), posé par build-magasins.mjs.
-  const built = buildCatalogFromItems(data.filter(it=>it._isMagasin !== false));
-  catalogByGroup.magasin = built.catalog;
-  catalogNoticeCountByGroup.magasin = built.noticeCount;
-  catalogCoteIndexByGroup.magasin = buildCoteIndex(built.catalog);
-  magasinWideCatalog = buildCatalogFromItems(data).catalog;
+/* ──────── CATALOGUE MAGASINS : cache IndexedDB ────────
+   data/magasins.json pèse ~85 Mo bruts (199 583 exemplaires). Le
+   retélécharger et le reparser à chaque ouverture de cette page coûtait
+   ~6,9 Mo de réseau, un JSON.parse de plusieurs secondes sur un poste
+   modeste, et ~112 Mo de tas pour un tableau intermédiaire dont on
+   n'extrait que 8 champs par exemplaire.
+
+   On met donc en cache le CATALOGUE CONSTRUIT (pas le JSON brut), sous
+   forme colonnaire, dans une base IndexedDB dédiée — voir
+   js/catalog-cache.js, qui détaille le format et pourquoi cette base est
+   séparée de celle du récolement.
+
+   Fraîcheur : la clé de version est le `generatedAt` de
+   data/magasins-build-report.json (quelques Ko, toujours téléchargé). Un
+   nouveau `npm run build:magasins` change cette date, donc le cache est
+   invalidé et le catalogue rechargé automatiquement. Si le rapport est
+   injoignable, on ne fait pas confiance au cache et on repasse par le
+   réseau — jamais l'inverse.
+
+   Dégradation : toute défaillance du cache (IndexedDB indisponible, quota
+   dépassé, entrée corrompue) ramène exactement au comportement d'avant,
+   fetch + build. Le cache n'est jamais une source de vérité, seulement une
+   copie reconstructible. */
+const MAGASIN_CACHE_NAME = 'magasins';
+
+function installMagasinCatalog(catalogObj, noticeCount){
+  catalogByGroup.magasin = catalogObj;
+  catalogNoticeCountByGroup.magasin = noticeCount;
+  catalogCoteIndexByGroup.magasin = buildCoteIndex(catalogObj);
   syncActiveCatalog();
   updateStats();
-}).catch(()=>{
+}
+
+async function loadMagasinCatalog(){
+  const cache = window.catalogCache || null;
+
+  // 1. Version courante des données (petit fichier, ~3 Ko).
+  let version = null;
+  try{
+    const res = await fetch('data/magasins-build-report.json');
+    if(res.ok){ const report = await res.json(); version = report && report.generatedAt || null; }
+  }catch(e){ /* rapport injoignable : on ira au réseau, sans toucher au cache */ }
+
+  // 2. Cache à jour ? Alors ni téléchargement ni JSON.parse.
+  if(cache && version){
+    const payload = await cache.read(MAGASIN_CACHE_NAME, version);
+    if(payload){
+      try{
+        const catalogObj = cache.decode(payload);
+        // Recompté plutôt que mis en cache : c'est une somme sur le
+        // catalogue restauré, pas une donnée à conserver — et la recompter
+        // garantit qu'elle reste cohérente avec ce qui a été décodé.
+        const notices = new Set();
+        for(const bc in catalogObj){
+          const e = catalogObj[bc];
+          if(e.isMagasin) notices.add(e.noticeId);
+        }
+        installMagasinCatalog(catalogObj, notices.size);
+        return;
+      }catch(e){
+        // Entrée illisible malgré la bonne version : on la jette et on
+        // repart du réseau plutôt que de démarrer sur un catalogue douteux.
+        console.warn('[catalogue magasins] cache illisible, rechargement réseau :', e && e.message);
+        cache.clear(MAGASIN_CACHE_NAME);
+      }
+    }
+  }
+
+  // 3. Chemin froid : téléchargement + construction, comme avant.
+  //    `scoped:true` : data/magasins.json couvre toute la bibliothèque de
+  //    Douai depuis 2026-08-26 (voir build-magasins.mjs) — chaque entrée
+  //    garde son drapeau isMagasin plutôt que d'être filtrée en amont, ce
+  //    qui permet de reconnaître au scan un code-barre catalogué sous une
+  //    autre section (anomalie de classement) sans second catalogue.
+  //    Pas de fondsOverride : chaque exemplaire porte déjà son propre
+  //    _fondsLabel (étage + secteur), posé par build-magasins.mjs.
+  const data = await fetch('data/magasins.json').then(r=>{
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  });
+  const built = buildCatalogFromItems(data, undefined, { scoped:true });
+  installMagasinCatalog(built.catalog, built.noticeCount);
+
+  // 4. Remplissage du cache, une fois la page déjà utilisable. Encoder puis
+  //    écrire ~16 Mo prend quelques centaines de ms : on laisse d'abord le
+  //    navigateur peindre et le premier scan passer, plutôt que de retarder
+  //    l'affichage pour un gain qui ne servira qu'au chargement suivant.
+  if(cache && version){
+    // requestIdleCallback doit rester appelé sur `window` : détacher la
+    // référence puis l'appeler nue lève "Illegal invocation" (le `this`
+    // attendu est l'objet global). D'où le passage par une lambda plutôt
+    // qu'un `window.requestIdleCallback || setTimeout`.
+    const later = typeof window.requestIdleCallback === 'function'
+      ? cb => window.requestIdleCallback(cb, { timeout:5000 })
+      : cb => setTimeout(cb, 2000);
+    later(()=>{
+      try{ cache.write(MAGASIN_CACHE_NAME, version, cache.encode(built.catalog)); }
+      catch(e){ console.warn('[catalogue magasins] mise en cache impossible :', e && e.message); }
+    });
+  }
+}
+
+loadMagasinCatalog().catch(err=>{
+  console.error('[catalogue magasins] indisponible :', err);
   catalogFailedGroup.magasin = true;
   syncActiveCatalog();
 });
@@ -1051,6 +1172,29 @@ const ADV_GROUP_BY_ID = {};
 ADV_GROUPS.forEach(g=>{ ADV_GROUP_BY_ID[g.id] = g; });
 function catalogGroupOf(advGroupId){ return (ADV_GROUP_BY_ID[advGroupId]||{}).catalogGroup || 'reserve'; }
 
+/* Debounce de updateAdvListsCount(). updateAdvListsCount() reste rapide
+   depuis le passage aux fonctions *Count() (plus de tri, voir "LISTES
+   AVANCÉES" plus bas), mais handleScan() peut appeler updateStats()
+   plusieurs fois en rafale (scan physique rapide au pistolet) : un debounce
+   (dernier appel gagne, ~150 ms) laisse d'abord le navigateur peindre le
+   retour visuel immédiat du scan (showFeedback, mini-plan) avant de
+   recalculer ces compteurs, plutôt que de les empiler de façon synchrone
+   dans la pile d'appel de chaque scan.
+
+   Déclaré ICI et pas avec le reste du debounce/des listes avancées plus bas,
+   pour exactement la même raison qu'ADV_GROUPS ci-dessus : updateStats()
+   appelle scheduleAdvListsCount() et tourne pendant l'initialisation
+   synchrone de la page (refreshLoc(), fin de la section "EMPLACEMENT"), donc
+   un `let` déclaré plus bas est encore en temporal dead zone à ce
+   moment-là — ReferenceError qui interrompait tout le reste du script
+   (mini-plan jamais construit, aucun écouteur de scan branché). Régression
+   introduite le 2026-09-02 avec ce debounce, corrigée le même jour. */
+let advListsCountTimer = null;
+function scheduleAdvListsCount(){
+  if(advListsCountTimer) return;
+  advListsCountTimer = setTimeout(()=>{ advListsCountTimer = null; updateAdvListsCount(); }, 150);
+}
+
 /* "Notices récolées" par magasin physique distinct (2e/5e/6e étage) — un
    stat-card dédié dans chacun des 3 panneaux magasin ci-dessus.
    catalogByGroup.magasin reste un catalogue UNIQUE, non scindé par étage
@@ -1080,17 +1224,29 @@ function magasinFloorStats(group){
   const cat = catalogByGroup.magasin;
   if(!cat) return { scanned:0, total:0 };
   let total = 0;
-  Object.values(cat).forEach(entry=>{ if(magasinEtageGroupOfDigitRun(entry.coteDigitRun)===group) total++; });
+  Object.values(cat).forEach(entry=>{
+    if(!inGroupScope(entry)) return;   // hors périmètre magasins : pas dans le total attendu
+    if(magasinEtageGroupOfDigitRun(entry.coteDigitRun)===group) total++;
+  });
   const scannedNotices = new Set();
   Object.values(scans).forEach(r=>{
     if(traveeGroupOf(r.travee)!==group) return;
     const entry = cat[r.barcode];
-    if(entry) scannedNotices.add(entry.noticeId);
+    // inGroupScope : un document scanné ici mais catalogué sous une autre
+    // section (anomalie de classement) ne compte pas comme récolé, puisqu'il
+    // ne compte pas non plus dans le total attendu ci-dessus — les deux axes
+    // restent cohérents entre eux.
+    if(inGroupScope(entry)) scannedNotices.add(entry.noticeId);
   });
   return { scanned: scannedNotices.size, total };
 }
-function updateMagasinEtageStats(){
-  MAGASIN_ADV_GROUPS.forEach(g=>{
+// `only` (facultatif) : ne rafraîchir que ce groupe — les trois cartes ne
+// sont jamais visibles en même temps, et chaque appel à magasinFloorStats()
+// parcourt tout le catalogue magasins. Sans argument, les trois sont
+// recalculées (comportement d'origine, conservé pour tout appelant futur).
+function updateMagasinEtageStats(only){
+  const groups = only ? MAGASIN_ADV_GROUPS.filter(g=>g.id===only) : MAGASIN_ADV_GROUPS;
+  groups.forEach(g=>{
     const el = document.getElementById('st-etage-'+g.id);
     if(!el) return; // sécurité, toujours présent pour ces 3 groupes (voir advGroupTemplate())
     const r = magasinFloorStats(g.id);
@@ -1559,17 +1715,16 @@ function handleScan(barcode, damaged, opts){
   const fields = locFieldsOf(loc);
   const group = catalogGroupOfReserve(loc.reserve);
   let cat = catalog ? catalog[barcode] : null;
-  // Anomalie de classement : ce code-barre n'est pas un exemplaire connu du
-  // magasin (catalogByGroup.magasin, filtré _isMagasin), mais on scanne bien
-  // dans un magasin — on regarde s'il existe ailleurs dans toute la
-  // bibliothèque (magasinWideCatalog, voir plus haut) avant de le déclarer
-  // "inconnu". S'il y est, c'est un document catalogué sous une autre
-  // section Syracuse que Magasin/Magasin Jeunesse alors qu'il est
-  // physiquement ici (ou l'inverse) — à faire remonter, pas une vraie
-  // absence du catalogue.
+  // Anomalie de classement : ce code-barre existe bien dans le catalogue
+  // magasins (qui couvre toute la bibliothèque de Douai depuis 2026-08-26),
+  // mais il y est catalogué sous une autre section Syracuse que
+  // Magasin/Magasin Jeunesse alors qu'on le scanne physiquement dans un
+  // magasin (ou l'inverse) — à faire remonter, ce n'est pas une absence du
+  // catalogue. Le scan est enregistré normalement, titre/cote affichés.
+  // Avant 2026-09-02 ce cas se détectait via un second catalogue complet
+  // (magasinWideCatalog) ; il se lit maintenant sur l'entrée elle-même.
   let horsSection = false;
-  if(!cat && group==='magasin' && magasinWideCatalog && magasinWideCatalog[barcode]){
-    cat = magasinWideCatalog[barcode];
+  if(cat && group==='magasin' && !inGroupScope(cat)){
     horsSection = true;
   }
   const prev = scans[barcode];
@@ -1594,9 +1749,8 @@ function handleScan(barcode, damaged, opts){
     // Section Syracuse réelle (record.fonds ci-dessus) différente de
     // Magasin/Magasin Jeunesse alors que ce scan a eu lieu dans un magasin —
     // voir ADV_CATS.horssection plus bas. Ne s'efface pas tout seul si le
-    // même code-barre est rescanné plus tard sans le retrouver dans
-    // magasinWideCatalog (ex. catalogue pas encore rechargé) : on conserve
-    // le dernier statut connu.
+    // même code-barre est rescanné plus tard sans que le catalogue soit
+    // chargé : on conserve le dernier statut connu.
     horsSection: horsSection || (prev ? !!prev.horsSection : false),
     ts: Date.now()
   };
@@ -2323,23 +2477,31 @@ function updateStats(){
   const nonCatCount = nonCatTotalForGroup(group);
   updateNoticeProgressBar(group, catStats, nonCatCount);
 
-  ADV_GROUPS.forEach(g=>{ updateShelfBar(g.id); updateTimeStats(g.id); });
-  updateMagasinEtageStats();
+  // Un seul panneau de "Statistiques avancées" est affiché à la fois depuis
+  // le 2026-09-01 (celui de la réserve sélectionnée, voir
+  // applyAdvGroupVisibility) — on ne recalcule donc que celui-là au lieu des
+  // quatre. Les trois autres gardaient des chiffres qui n'étaient de toute
+  // façon jamais lus, au prix, pour chaque groupe magasin, d'un parcours
+  // complet du catalogue (~200 000 entrées) à chaque scan.
+  // Rien ne se périme : refreshLoc() rappelle updateStats() à chaque
+  // changement de réserve, donc un panneau est toujours recalculé au moment
+  // précis où il devient visible.
+  const visible = visibleAdvGroupId();
+  updateShelfBar(visible);
+  updateTimeStats(visible);
+  updateMagasinEtageStats(visible);
   scheduleAdvListsCount();
 }
 
-// updateAdvListsCount() reste rapide depuis le passage aux fonctions *Count()
-// ci-dessous (plus de tri), mais handleScan() peut appeler updateStats()
-// plusieurs fois en rafale (scan physique rapide au pistolet). Un debounce
-// (dernier appel gagne, ~150 ms) laisse d'abord le navigateur peindre le
-// retour visuel immédiat du scan (showFeedback, mini-plan) avant de
-// recalculer ces compteurs, plutôt que de les empiler de façon synchrone
-// dans la pile d'appel de chaque scan.
-let advListsCountTimer = null;
-function scheduleAdvListsCount(){
-  if(advListsCountTimer) return;
-  advListsCountTimer = setTimeout(()=>{ advListsCountTimer = null; updateAdvListsCount(); }, 150);
-}
+/* Groupe de "Statistiques avancées" actuellement à l'écran. Déclarée en
+   `function` (donc hissée) : updateStats() tourne pendant l'initialisation
+   synchrone de la page, avant cette ligne — voir la note sur la temporal
+   dead zone en tête de la section CATALOGUE(S). */
+function visibleAdvGroupId(){ return advGroupIdForReserve(loc.reserve); }
+
+// Le debounce de updateAdvListsCount() (advListsCountTimer /
+// scheduleAdvListsCount) est déclaré tôt dans le script, avec ADV_GROUPS —
+// voir la note sur la temporal dead zone à cet endroit.
 
 // Emplacements distincts (étagère/armoire/tiroir) déjà traités : au moins un
 // scan (hors "Non rangé (hors réserve)", qui n'est pas un vrai emplacement),
@@ -2491,7 +2653,7 @@ function updateTimeStats(group){
    ci-dessous (filtre seul, sans .map()/.sort()), jamais via `list.length`
    sur les fonctions `*List()` complètes : celles-ci trient certaines listes
    par cote avec localeCompare (notScannedList/probablyLostList/scannedList),
-   coûteux sur catalogByGroup.magasin (~89 000 exemplaires) — un tri inutile
+   coûteux sur catalogByGroup.magasin (~200 000 exemplaires) — un tri inutile
    puisque seule la longueur du résultat est affichée ici. Avant ce
    correctif (2026-09-02), updateAdvListsCount() appelait list(...).length
    sur ces fonctions triées, refaisant ce tri complet à CHAQUE scan, pour les
@@ -2523,7 +2685,10 @@ function manualCoteList(group){
   // catalogue mais pas une vraie notice Syracuse.
   const cat = catalogByGroup[catalogGroupOf(group)];
   if(!cat) return [];
-  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !cat[r.barcode])
+  // inGroupScope plutôt qu'une simple présence dans `cat` : le catalogue
+  // magasins couvre toute la bibliothèque, un exemplaire d'une autre section
+  // doit rester compté ici comme il l'était quand ce catalogue était filtré.
+  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode]))
     .sort((a,b)=>b.ts-a.ts);
 }
 function manualCoteCount(group){
@@ -2532,7 +2697,7 @@ function manualCoteCount(group){
   let n=0;
   for(const bc in scans){
     const r=scans[bc];
-    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !cat[r.barcode]) n++;
+    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode])) n++;
   }
   return n;
 }
@@ -2545,7 +2710,7 @@ function notScannedList(group){
   // (magasinEtageGroupOfDigitRun), même logique que magasinFloorStats().
   const isMagasin = catalogGroupOf(group)==='magasin';
   return Object.keys(cat)
-    .filter(bc=>!scans[bc] && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group))
+    .filter(bc=>!scans[bc] && inGroupScope(cat[bc]) && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group))
     .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
 }
@@ -2557,7 +2722,7 @@ function notScannedCount(group){
   const isMagasin = catalogGroupOf(group)==='magasin';
   let n=0;
   for(const bc in cat){
-    if(!scans[bc] && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group)) n++;
+    if(!scans[bc] && inGroupScope(cat[bc]) && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group)) n++;
   }
   return n;
 }
@@ -2583,7 +2748,7 @@ function scannedDigitRunRange(group){
   if(!cat) return null;
   const scannedRuns = Object.values(scans)
     .filter(r=>traveeGroupOf(r.travee)===group)
-    .map(r=>cat[r.barcode] && cat[r.barcode].coteDigitRun)
+    .map(r=>inGroupScope(cat[r.barcode]) && cat[r.barcode].coteDigitRun)
     .filter(Boolean)
     .map(run=>parseInt(run, 10));
   if(scannedRuns.length < 2) return null;
@@ -2596,7 +2761,7 @@ function probablyLostList(group){
   const { cat, min, max } = range;
   return Object.keys(cat)
     .filter(bc=>{
-      if(scans[bc]) return false;
+      if(scans[bc] || !inGroupScope(cat[bc])) return false;
       const run = cat[bc].coteDigitRun;
       if(!run || magasinEtageGroupOfDigitRun(run)!==group) return false;
       const n = parseInt(run, 10);
@@ -2613,7 +2778,7 @@ function probablyLostCount(group){
   const { cat, min, max } = range;
   let n=0;
   for(const bc in cat){
-    if(scans[bc]) continue;
+    if(scans[bc] || !inGroupScope(cat[bc])) continue;
     const run = cat[bc].coteDigitRun;
     if(!run || magasinEtageGroupOfDigitRun(run)!==group) continue;
     const v = parseInt(run, 10);
@@ -2637,9 +2802,10 @@ function scannedCount(group){
 }
 
 // Anomalies de classement : scans dont handleScan() a posé horsSection:true
-// (voir plus haut) — le code-barre existe dans magasinWideCatalog mais pas
-// dans catalogByGroup.magasin, donc catalogué sous une autre section que
-// Magasin/Magasin Jeunesse alors qu'il est physiquement dans un magasin.
+// (voir plus haut) — le code-barre est bien dans le catalogue magasins mais
+// son entrée porte isMagasin:false, donc il est catalogué sous une autre
+// section que Magasin/Magasin Jeunesse alors qu'il est physiquement dans un
+// magasin.
 // record.fonds porte déjà le libellé de cette section réelle (_fondsLabel
 // posé par build-magasins.mjs pour les exemplaires hors magasin — voir
 // CLAUDE.md), pas besoin d'une structure de données séparée.
@@ -2800,7 +2966,12 @@ ADV_GROUPS.forEach(g=>{
 });
 
 function updateAdvListsCount(){
-  ADV_GROUPS.forEach(g=>{
+  // Idem updateStats() : seul le panneau visible est recalculé. C'était le
+  // point chaud du scan — pour chacun des 3 groupes magasin,
+  // notScannedCount() et probablyLostCount() parcourent le catalogue entier,
+  // soit ~1 million de lectures par scan pour des chiffres masqués.
+  const visibleId = visibleAdvGroupId();
+  ADV_GROUPS.filter(g=>g.id===visibleId).forEach(g=>{
     const nAbime = damagedCount(g.id);
     document.getElementById('st-abime-'+g.id).textContent = nAbime.toLocaleString('fr-FR');
     document.getElementById('sum-abime-'+g.id+'-count').textContent = nAbime.toLocaleString('fr-FR');

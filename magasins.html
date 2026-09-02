@@ -7,6 +7,7 @@
   <title>Magasins 2e/5e/6e étage — Réserve patrimoniale</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="fonts.css">
+  <script src="js/columnar.js"></script>
   <style>
     :root { --warm: #c9a96e; --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
     body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
@@ -328,7 +329,12 @@ fetch('data/magasins.json')
     // d'où ce filtre côté client. `!== false` (plutôt que truthy strict) :
     // un ancien data/magasins.json généré avant l'ajout de ce flag n'a pas
     // du tout de champ _isMagasin, mais ne contenait déjà que des magasins.
-    ROWS = data.filter(rec => rec._isMagasin !== false).map(normalize);
+    // forEachRow plutôt qu'un filter().map() : data/magasins.json est un
+    // conteneur colonnaire depuis 2026-09-02 (voir js/columnar.js), et le
+    // parcourir ligne à ligne évite de matérialiser les 199 583 objets bruts
+    // pour n'en garder ensuite que les ~88 000 de magasin.
+    ROWS = [];
+    columnar.forEachRow(data, rec => { if (rec._isMagasin !== false) ROWS.push(normalize(rec)); });
     FILTERED = ROWS;
     rowsLoaded = true;
     render();

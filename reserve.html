@@ -443,20 +443,23 @@ function parseRecolement(rows){
   document.getElementById('csv-loader').style.display='none';
   const total=Object.values(CNT).reduce((s,v)=>s+v,0) + Object.values(CNT_MANUEL).reduce((s,v)=>s+v,0);
   document.getElementById('sn').textContent=total.toLocaleString('fr-FR');
-  buildPlan();
+  // refreshPlan() plutôt que buildPlan() : au premier appel le plan n'existe
+  // pas encore et il bascule de lui-même sur une construction complète ;
+  // aux sondages suivants (toutes les 45 s) il se contente de repeindre.
+  refreshPlan();
 }
 
 /* ════════════ HELPERS ════════════ */
 function cnt(t,c,e){ return CNT[`${t}|${c}|${e}`]||0; }
 function cntManuel(t,c,e){ return CNT_MANUEL[`${t}|${c}|${e}`]||0; }
 function nc(t,c,e){ return NONCAT[`${t}|${c}|${e}`]||0; }
+/* GEO_COLS ne contient une travée que si au moins une donnée l'a mentionnée
+   (voir rebuildGeometryIndex) — c'est exactement la question que posait
+   l'ancienne version, qui balayait pour cela les six dictionnaires entiers à
+   chaque appel, une fois par travée et par rendu. */
 function hasData(tid){
-  return Object.keys(CNT).some(k=>k.startsWith(tid+'|'))
-    || Object.keys(CNT_MANUEL).some(k=>k.startsWith(tid+'|'))
-    || Object.keys(VIDE).some(k=>k.startsWith(tid+'|'))
-    || Object.keys(NONCAT).some(k=>k.startsWith(tid+'|'))
-    || Object.keys(NONRANGE).some(k=>k.startsWith(tid+'|'))
-    || Object.keys(LASTSHELF).some(k=>k.startsWith(tid+'|'));
+  const cols = GEO_COLS[tid];
+  return !!cols && cols.size > 0;
 }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -560,13 +563,55 @@ function traveeOccupancy(tid,cols){
    les autres colonnes (mêmes déjà connues via non-catalogués/vide/non
    rangé, ou simplement pas encore visitées) disparaissaient du plan au lieu
    d'apparaître en placeholder "non inventorié". */
+/* ════════════ INDEX DE GÉOMÉTRIE ════════════
+   colsOf() et maxEtageOf() reparcouraient l'intégralité des dictionnaires de
+   données (CNT, CNT_MANUEL, VIDE, NONCAT, NONRANGE, LASTSHELF) à CHAQUE
+   appel — et makeTraveeEl() appelle maxEtageOf() une fois par colonne, soit
+   ~800 fois par construction du plan. Sur un récolement avancé (plusieurs
+   dizaines de milliers d'entrées), cela faisait des dizaines de millions de
+   `split('|')` par rendu, répétés toutes les 45 s.
+
+   On construit donc l'index une seule fois par rafraîchissement de données :
+   un passage sur les dictionnaires, puis des lectures en O(1).
+
+   CNT_MANUEL est inclus dans ce parcours, contrairement à l'ancien code qui
+   ne regardait que [CNT, VIDE, NONCAT, NONRANGE] : une étagère ne contenant
+   que des exemplaires créés via exemplarisation.html (donc comptés dans
+   CNT_MANUEL et dans aucun autre dictionnaire) n'étendait ni les colonnes ni
+   les étages, et disparaissait donc du plan alors qu'elle porte de vraies
+   données. Même nature d'oubli que le correctif du 2026-08-11 sur
+   colsOf/maxEtageOf (voir CLAUDE.md) — l'union doit porter sur toutes les
+   données réelles. */
+let GEO_COLS = {};     // tid -> Set(colonne) rencontrée dans les données
+let GEO_MAXET = {};    // "tid|colonne" -> plus haut étage rencontré
+let GEO_DEF = {};      // tid -> définition (évite un find() linéaire par appel)
+
+function rebuildGeometryIndex(){
+  GEO_COLS = {}; GEO_MAXET = {}; GEO_DEF = {};
+  LOCATIONS_ALL.forEach(d=>{ GEO_DEF[d.id] = d; });
+  const note = (t,c,e)=>{
+    if(!t) return;
+    (GEO_COLS[t] || (GEO_COLS[t] = new Set())).add(c);
+    const n = parseInt(e, 10);
+    if(!isNaN(n)){
+      const k = `${t}|${c}`;
+      if(!(k in GEO_MAXET) || n > GEO_MAXET[k]) GEO_MAXET[k] = n;
+    }
+  };
+  [CNT, CNT_MANUEL, VIDE, NONCAT, NONRANGE].forEach(dict=>{
+    for(const k in dict){ const [t,c,e] = k.split('|'); note(t,c,e); }
+  });
+  // LASTSHELF est keyé "tid|colonne" (propriété de la colonne, pas d'un
+  // étage précis) : il fait connaître la colonne, mais n'étend pas le nombre
+  // d'étages — c'est maxEtageOf() qui s'en sert comme plancher.
+  for(const k in LASTSHELF){ const [t,c] = k.split('|'); if(t) (GEO_COLS[t] || (GEO_COLS[t] = new Set())).add(c); }
+}
+
 function colsOf(tDef){
   const from=new Set();
   for(let i=1;i<=tDef.nbCols;i++) from.add(String.fromCharCode(64+i));
-  [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
-    Object.keys(dict).forEach(k=>{const[t,c]=k.split('|');if(t===tDef.id) from.add(c);});
-  });
-  Object.keys(LASTSHELF).forEach(k=>{const[t,c]=k.split('|');if(t===tDef.id) from.add(c);});
+  const seen = GEO_COLS[tDef.id];
+  if(seen) seen.forEach(c=>from.add(c));
   return [...from].sort((a,b)=>{
     const na=parseInt(a),nb=parseInt(b);
     if(!isNaN(na)&&!isNaN(nb)) return na-nb;
@@ -583,17 +628,89 @@ function colsOf(tDef){
    réellement là, donc plus de placeholder au-delà — tout en restant
    étendue si des données réelles vont malgré tout plus loin. */
 function maxEtageOf(tid,col){
-  const d=LOCATIONS_ALL.find(x=>x.id===tid);
+  const d=GEO_DEF[tid] || LOCATIONS_ALL.find(x=>x.id===tid);
   const marked=parseInt(LASTSHELF[`${tid}|${col}`],10);
   let m=!isNaN(marked)?marked:defaultMaxEtageOf(d);
-  [CNT,VIDE,NONCAT,NONRANGE].forEach(dict=>{
-    Object.keys(dict).forEach(k=>{const[t,c,e]=k.split('|');if(t===tid&&c===col){const n=parseInt(e);if(!isNaN(n)&&n>m)m=n;}});
-  });
+  const seen=GEO_MAXET[`${tid}|${col}`];
+  if(seen!==undefined && seen>m) m=seen;
   return m;
 }
 
 /* ════════════ CONSTRUCTION DU PLAN ════════════ */
-function buildPlan(){ buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs(); buildMagasin2(); buildMagasin5(); buildMagasin6(); updateStats(); }
+
+/* Toutes les travées/meubles dessinés, dans l'ordre des sections — sert à
+   calculer la signature de structure ci-dessous sans dupliquer la liste des
+   groupes qu'assemble buildPlan(). */
+function allDrawnDefs(){
+  return [
+    ...GROUPES.flat().map(tid=>TRAVEES.find(x=>x.id===tid)),
+    ...TRAVEES_DOUAISIENNE,
+    EMPLACEMENTS_ARMOIRE[0], EMPLACEMENTS_TIROIR[0],
+    ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5, ...TRAVEES_MAGASIN6,
+  ].filter(Boolean);
+}
+
+/* Empreinte de la STRUCTURE du plan : quelles colonnes, et combien d'étages
+   chacune. Deux rafraîchissements qui partagent cette empreinte peuvent se
+   contenter de repeindre les cases existantes ; si elle change (un scan sur
+   une colonne encore jamais vue, une étagère au-delà du maximum connu, une
+   « dernière étagère » nouvellement marquée), il faut rebâtir. */
+function planStructureSignature(){
+  return allDrawnDefs().map(tDef=>{
+    const cols=colsOf(tDef);
+    return tDef.id+':'+cols.map(c=>c+'#'+maxEtageOf(tDef.id,c)).join(',');
+  }).join('|');
+}
+
+let planSignature=null;
+
+function buildPlan(){
+  rebuildGeometryIndex();
+  buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs();
+  buildMagasin2(); buildMagasin5(); buildMagasin6();
+  planSignature=planStructureSignature();
+  updateStats();
+}
+
+/* Rafraîchissement d'un plan déjà à l'écran (sondage toutes les 45 s).
+   Reconstruire les ~5 400 cases à chaque cycle coûtait autant de
+   createElement, de chaînes de style en ligne et de calculs d'aria-label,
+   pour un résultat presque toujours identique — et cela réinitialisait au
+   passage le survol et le défilement. On ne repeint donc que ce qui change ;
+   on ne rebâtit que si la structure a bougé. */
+function refreshPlan(){
+  rebuildGeometryIndex();
+  const sig=planStructureSignature();
+  if(sig!==planSignature || !document.querySelector('.travee-wrap')){ buildPlan(); return; }
+  document.querySelectorAll('.tv-slot').forEach(el=>{
+    const {tid,col,etage}=el.dataset;
+    const state=slotState(tid,col,etage);
+    const bg=slotColor(tid,col,etage,state);
+    let op='1';
+    if(filter==='occ'&&!(state==='cat'||state==='noncat'||state==='nonrange')) op='.15';
+    if(filter==='free'&&state!=='vide') op='.15';
+    // Comparaison sur la dernière valeur appliquée plutôt que sur
+    // el.style.background : le navigateur normalise les dégradés qu'on lui
+    // donne, si bien qu'une relecture ne redonne jamais la chaîne écrite et
+    // que le test serait toujours vrai.
+    if(el.__bg!==bg){ el.style.background=bg; el.__bg=bg; }
+    if(el.__op!==op){ el.style.opacity=op; el.__op=op; }
+    const label=slotTitle(tid,col,etage);
+    if(el.__lbl!==label){ el.setAttribute('aria-label',label); el.__lbl=label; }
+  });
+  document.querySelectorAll('.travee-wrap').forEach(wrap=>{
+    const tid=wrap.dataset.tid, tDef=GEO_DEF[tid];
+    if(!tDef) return;
+    const known=hasData(tid);
+    const pct=known?traveeOccupancy(tid,colsOf(tDef)):null;   // calculé une fois, lu deux fois
+    const occ=known?pct+'% occupé':'—';
+    const sub=wrap.querySelector('.tv-sublabel');
+    if(sub && sub.textContent!==occ) sub.textContent=occ;
+    const title=`${travTitle(tid)}${known?` — ${pct}% occupé`:' — non inventoriée'}`;
+    if(wrap.title!==title) wrap.title=title;
+  });
+  updateStats();
+}
 
 function buildTravees(){
   const room=document.getElementById('room-travees');
@@ -656,6 +773,9 @@ function buildTiroirs(){
 function makeTraveeEl(tid,tDef,cols){
   const wrap=document.createElement('div');
   wrap.className='travee-wrap'+(selId===tid?' sel':'');
+  // dataset.tid : permet à refreshPlan() de retrouver chaque travée sans
+  // reconstruire le DOM (voir plus bas).
+  wrap.dataset.tid=tid;
   wrap.setAttribute('role','button');wrap.setAttribute('tabindex','0');
   const box=document.createElement('div');box.className='tv-box';
   const known=hasData(tid);
@@ -688,7 +808,11 @@ function makeTraveeEl(tid,tDef,cols){
       if(filter==='occ'&&!(state==='cat'||state==='noncat'||state==='nonrange')) op='.15';
       if(filter==='free'&&state!=='vide') op='.15';
       s.style.cssText=`width:${w}px;height:${h}px;background:${bg};opacity:${op}`;
-      s.setAttribute('aria-label',slotTitle(tid,col,String(e)));
+      const lbl0=slotTitle(tid,col,String(e));
+      s.setAttribute('aria-label',lbl0);
+      // Valeurs appliquées, relues par refreshPlan() pour ne repeindre que
+      // ce qui a réellement changé.
+      s.__bg=bg; s.__op=op; s.__lbl=lbl0;
       s.dataset.tid=tid; s.dataset.col=col; s.dataset.etage=String(e);
       cd.appendChild(s);
     }
