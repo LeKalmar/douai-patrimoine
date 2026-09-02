@@ -5,21 +5,18 @@
   "framework": null,
   "headers": [
     {
-      "//": "Jeux de données du catalogue : volumineux, et ne changent qu'à un nouvel export Syracuse suivi d'un déploiement. Chaque déploiement Vercel sert depuis une URL d'origine distincte, donc un cache long ne peut pas retenir une version périmée après mise en ligne. must-revalidate évite qu'un onglet resté ouvert plusieurs jours travaille sur un catalogue obsolète.",
       "source": "/data/(.*).json",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }
       ]
     },
     {
-      "//": "Polices : le nom de fichier porte la graisse et le style, une révision de la police changerait ce nom. Immuable sur un an.",
       "source": "/font/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     },
     {
-      "//": "Images : servies telles quelles, remplacées par un nouveau déploiement.",
       "source": "/images/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=604800, must-revalidate" }
