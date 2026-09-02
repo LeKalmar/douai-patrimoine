@@ -117,6 +117,12 @@
     .placeholder-msg{font-size:.875rem;color:rgba(255,255,255,0.5);padding:.5rem 0;font-style:italic}
     .detail-meta{font-size:.75rem;color:#888;border-top:1px solid #f0f0f0;padding-top:.75rem;margin-top:.75rem}
     .shelf-hover{position:fixed;z-index:80;background:#fff;border:1px solid #ddd;border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.6rem .75rem;font-size:.72rem;width:280px;pointer-events:none}
+    .notices-modal{position:fixed;inset:0;background:rgba(26,26,46,0.55);display:flex;align-items:center;justify-content:center;padding:1.5rem;z-index:1000}
+    .notices-modal[hidden]{display:none}
+    .notices-modal-box{background:#fff;border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:640px;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25);position:relative}
+    .notices-modal-close{position:absolute;top:.75rem;right:.75rem;width:28px;height:28px;border:none;background:#f0f0f0;border-radius:50%;cursor:pointer;font-size:.9rem;color:#555;line-height:1}
+    .notices-modal-close:hover{background:#e0e0e0}
+    .notices-modal .notices-list{max-height:55vh}
     .sh-title{font-size:.74rem;font-weight:700;color:#1a1a1a;margin-bottom:.4rem;padding-bottom:.35rem;border-bottom:1px solid #f0f0f0}
     .sh-row{display:flex;align-items:flex-start;gap:.4rem;padding:.2rem 0}
     .sh-cote{font-family:monospace;font-size:.66rem;color:#12157A;font-weight:700;white-space:nowrap;flex-shrink:0;padding-top:1px}
@@ -267,6 +273,13 @@
 </main>
 
 <div id="shelf-hover" class="shelf-hover" style="display:none" aria-hidden="true"></div>
+
+<div id="notices-modal" class="notices-modal" hidden>
+  <div class="notices-modal-box" role="dialog" aria-modal="true" aria-labelledby="notices-modal-title">
+    <button type="button" class="notices-modal-close" id="notices-modal-close" aria-label="Fermer">✕</button>
+    <div id="notices-modal-content"></div>
+  </div>
+</div>
 
 <footer>
   <div class="container">
@@ -823,43 +836,64 @@ function selectTravee(tid,tDef,cols){
       <div class="detail-col-title">Col. ${col} <span style="font-weight:400;color:#bbb">${colTotal}</span></div>
       ${rows}</div>`;
   });
-  html+=`</div><div id="notices-zone"></div>
-  <div class="detail-meta">Cliquez sur un ${etageWordFor(tid)} pour afficher les documents.</div>`;
+  html+=`<div class="detail-meta">Cliquez sur un ${etageWordFor(tid)} pour afficher les documents dans une fenêtre.</div>`;
   panel.innerHTML=html;
 }
 
-/* ════════════ NOTICES D'UN EMPLACEMENT ════════════ */
+/* ════════════ NOTICES D'UN EMPLACEMENT ════════════
+   Affichées dans une modale (plutôt qu'injectées en bas du panneau de
+   détail, qui peut se trouver loin en dessous du plan cliqué) : plus facile
+   à consulter puis refermer sans perdre sa position de scroll dans le plan. */
 function showNotices(tid,col,etage){
-  const zone=document.getElementById('notices-zone');
-  if(!zone) return;
+  const modal=document.getElementById('notices-modal');
+  const content=document.getElementById('notices-modal-content');
+  if(!modal||!content) return;
   const key=`${tid}|${col}|${etage}`;
   const notices=DET[key]||[];
   const ncCount=NONCAT[key]||0;
   const spec=isNaN(parseInt(etage));
   const lbl=spec?etage:`${etageWordFor(tid)} ${etage}`;
+  const heading=`${esc(travTitle(tid))} · col. ${esc(col)}, ${esc(lbl)}`;
   if(!notices.length){
     let msg;
     if(ncCount) msg=`${ncCount} livre(s) non catalogué(s) estimé(s) sur cet emplacement (col. ${col}, ${lbl}) — aucune notice cataloguée.`;
     else if(NONRANGE[key]) msg=`Emplacement marqué non rangé lors du récolement (col. ${col}, ${lbl}) — documents de natures différentes en désordre, non comptés.`;
     else if(VIDE[key]) msg=`Emplacement confirmé vide lors du récolement (col. ${col}, ${lbl}).`;
     else msg=`Aucune notice pour col. ${col}, ${lbl}.`;
-    zone.innerHTML=`<p class="placeholder-msg" style="margin-top:.5rem">${msg}</p>`;
+    content.innerHTML=`<div class="detail-panel-title" id="notices-modal-title">${heading}</div>
+      <p class="placeholder-msg">${msg}</p>`;
+    openNoticesModal();
     return;
   }
-  zone.innerHTML=`<div class="notices-section">
-    <div class="notices-header">
-      <span class="notices-title">Col. ${col} — ${lbl} (${notices.length})${ncCount?` <span style="color:var(--plan-noncat);font-weight:400;text-transform:none;letter-spacing:0">+ ${ncCount} non catalogué(s)</span>`:''}</span>
-      <div class="notices-sort">Trier par&nbsp;
-        <select onchange="rerenderEtage('${key}',this.value)">
-          <option value="cote">Cote</option>
-          <option value="titre">Titre</option>
-          <option value="auteur">Auteur</option>
-        </select>
+  content.innerHTML=`<div class="detail-panel-title" id="notices-modal-title">${heading}</div>
+    <div class="notices-section">
+      <div class="notices-header">
+        <span class="notices-title">Col. ${col} — ${lbl} (${notices.length})${ncCount?` <span style="color:var(--plan-noncat);font-weight:400;text-transform:none;letter-spacing:0">+ ${ncCount} non catalogué(s)</span>`:''}</span>
+        <div class="notices-sort">Trier par&nbsp;
+          <select onchange="rerenderEtage('${key}',this.value)">
+            <option value="cote">Cote</option>
+            <option value="titre">Titre</option>
+            <option value="auteur">Auteur</option>
+          </select>
+        </div>
       </div>
-    </div>
-    <div class="notices-list" id="nl-${key.replace(/\|/g,'_')}">${noticeRows(notices,'cote')}</div>
-  </div>`;
+      <div class="notices-list" id="nl-${key.replace(/\|/g,'_')}">${noticeRows(notices,'cote')}</div>
+    </div>`;
+  openNoticesModal();
 }
+function openNoticesModal(){
+  document.getElementById('notices-modal').hidden=false;
+}
+function closeNoticesModal(){
+  document.getElementById('notices-modal').hidden=true;
+}
+document.getElementById('notices-modal-close').addEventListener('click',closeNoticesModal);
+document.getElementById('notices-modal').addEventListener('click',e=>{
+  if(e.target.id==='notices-modal') closeNoticesModal();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && !document.getElementById('notices-modal').hidden) closeNoticesModal();
+});
 function rerenderEtage(key,sort){
   const el=document.getElementById('nl-'+key.replace(/\|/g,'_'));
   if(el) el.innerHTML=noticeRows(DET[key]||[],sort);
@@ -906,7 +940,7 @@ function shelfHoverContent(tid,col,etage){
     else msg='Aucune donnée pour cet emplacement.';
     return html+`<div class="sh-empty">${msg}</div>`;
   }
-  const MAX=15;
+  const MAX=5;
   const sorted=[...notices].sort((a,b)=>compareCotes(a.c,b.c));
   html+=sorted.slice(0,MAX).map(n=>`<div class="sh-row"><span class="sh-cote">${esc(n.c)}</span><span class="sh-titre">${n.m?`<span style="color:var(--plan-manuel);font-weight:700">⚡</span> `:''}${esc(n.t)}</span></div>`).join('');
   if(sorted.length>MAX) html+=`<div class="sh-more">… et ${sorted.length-MAX} de plus</div>`;
