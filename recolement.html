@@ -996,6 +996,51 @@ let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas enc
 // catalogué. Premier code-barre trouvé pour une cote donnée en cas de
 // doublon (rare, cotes normalement uniques par exemplaire).
 let catalogCoteIndexByGroup = { reserve:null, magasin:null };
+
+// Second index, par RUN DE CHIFFRES de la cote (coteDigitRun, voir plus haut
+// — uniquement présent pour le catalogue magasins, data/inventaire.json n'a
+// pas d'équivalent) — sert de repli dans handleNoBarcodeCote() quand la cote
+// tapée à la main ne correspond pas EXACTEMENT à celle du catalogue mais que
+// son numéro séquentiel s'y retrouve (ex. "136854" tapé pour un exemplaire
+// dont la vraie cote est "136854 PUJ" ou "856.7 136854 PUJ" — un suffixe
+// auteur/une classification Dewey secondaire que l'utilisateur·rice ne
+// connaît pas forcément par cœur). extractCoteDigitRun() applique EXACTEMENT
+// le même algorithme que magasinDigitRun() de scripts/build-magasins.mjs
+// (fusion du séparateur de milliers, recherche d'un groupe de 5 ou 6
+// chiffres), pour que le numéro extrait du texte tapé et celui déjà stocké
+// sur chaque entrée du catalogue soient directement comparables.
+// Un run de chiffres n'est PAS garanti unique : un même numéro peut
+// désigner plusieurs volumes d'un même ensemble, distingués par un suffixe
+// ("133538-1", "133538-3"...). Dans ce cas on ne devine pas — le run est
+// retiré de l'index (jamais associé au hasard à l'un des volumes).
+function extractCoteDigitRun(str){
+  if(!str) return null;
+  const merged = String(str).replace(/(\d{1,2})\.(\d{3})(?!\d)/g, '$1$2');
+  const runs = merged.match(/\d+/g) || [];
+  for(let run of runs){
+    if(run.length===7 && run[0]==='0') run = run.slice(1);
+    if(run.length===5 || run.length===6) return run;
+  }
+  return null;
+}
+let catalogDigitRunIndexByGroup = { reserve:null, magasin:null };
+function buildDigitRunIndex(cat){
+  const idx = {};
+  const ambiguous = new Set();
+  Object.keys(cat).forEach(bc=>{
+    const entry = cat[bc];
+    if(!inGroupScope(entry) || !entry.coteDigitRun) return;
+    const run = entry.coteDigitRun;
+    if(ambiguous.has(run)) return;
+    if(idx[run] !== undefined){
+      delete idx[run];
+      ambiguous.add(run);
+      return;
+    }
+    idx[run] = bc;
+  });
+  return idx;
+}
 function buildCoteIndex(cat){
   const idx = {};
   Object.keys(cat).forEach(bc=>{
@@ -1027,6 +1072,7 @@ Promise.all([
   catalogByGroup.reserve = built.catalog;
   catalogNoticeCountByGroup.reserve = built.noticeCount;
   catalogCoteIndexByGroup.reserve = buildCoteIndex(built.catalog);
+  catalogDigitRunIndexByGroup.reserve = buildDigitRunIndex(built.catalog);
   syncActiveCatalog();
   updateStats();
 }).catch(()=>{
@@ -1063,6 +1109,7 @@ function installMagasinCatalog(catalogObj, noticeCount){
   catalogByGroup.magasin = catalogObj;
   catalogNoticeCountByGroup.magasin = noticeCount;
   catalogCoteIndexByGroup.magasin = buildCoteIndex(catalogObj);
+  catalogDigitRunIndexByGroup.magasin = buildDigitRunIndex(catalogObj);
   syncActiveCatalog();
   updateStats();
 }
@@ -1410,10 +1457,10 @@ const ADV_CATS = {
     </tr>`,
   },
   nobarcode: {
-    title: 'Livres sans code-barre',
-    desc: 'Cotes saisies à la main pour des documents sans code-barre physique — récolés automatiquement si la cote est reconnue dans le catalogue actif, sinon juste listés ici pour savoir où en recoller un.',
+    title: 'Mauvais numéro / code-barre absent',
+    desc: 'Cotes saisies à la main pour des documents sans code-barre physique — récolés automatiquement si la cote est reconnue dans le catalogue actif (exactement, ou par son seul numéro si un suffixe comme un code auteur ou une classification Dewey diffère), sinon juste listés ici pour savoir où en recoller un.',
     placeholder: 'Filtrer (cote)…',
-    headers: ['Cote','Titre','Emplacement','En base ?'],
+    headers: ['Cote','Titre','Emplacement','Statut'],
     colspan: 4,
     emptyMsg: 'Aucun livre sans code-barre pour l\'instant.',
     filterFields: ['cote','titre'],
@@ -1425,7 +1472,7 @@ const ADV_CATS = {
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||(r.foundInCatalog?'':'(absent du catalogue)')}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td>${r.foundInCatalog ? '<span style="color:#2e7d32">✓ trouvée — récolé</span>' : '<span style="color:#c62828">✗ absente</span>'}</td>
+      <td>${r.coteApprox ? '<span style="color:#f57f17" title="Numéro tapé différent de la cote complète du catalogue">≈ numéro approximatif — récolé</span>' : r.foundInCatalog ? '<span style="color:#2e7d32">✓ trouvée — récolé</span>' : '<span style="color:#c62828">✗ absente</span>'}</td>
     </tr>`,
   },
   horssection: {
@@ -1746,6 +1793,15 @@ function handleScan(barcode, damaged, opts){
     // CODE-BARRE" plus bas. Propagé sur le record pour que noBarcodeList()
     // puisse retrouver ces scans-là sans structure de données séparée.
     sansCodeBarre: !!(opts && opts.sansCodeBarre),
+    // Idem, mais pour le cas où la cote tapée dans "Livre sans code-barre"
+    // ne correspondait pas exactement à celle du catalogue et n'a été
+    // retrouvée que par son run de chiffres (voir extractCoteDigitRun() /
+    // handleNoBarcodeCote()) — à vérifier : le numéro tapé est peut-être
+    // erroné, ou la cote du catalogue porte un suffixe non relevé sur le
+    // document. Volontairement PAS "sticky" comme horsSection ci-dessous :
+    // un vrai scan physique ultérieur du code-barre (sans ces opts) doit
+    // faire disparaître ce doute, pas le conserver indéfiniment.
+    coteApprox: !!(opts && opts.coteApprox),
     // Section Syracuse réelle (record.fonds ci-dessus) différente de
     // Magasin/Magasin Jeunesse alors que ce scan a eu lieu dans un magasin —
     // voir ADV_CATS.horssection plus bas. Ne s'efface pas tout seul si le
@@ -1840,7 +1896,8 @@ function showFeedback(record, status, prev, reliureRecords){
     ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
     ${record.manuel ? `<span class="fb-badge" style="background:var(--plan-manuel);color:#fff" title="Créé via exemplarisation.html, pas encore une vraie notice Syracuse">⚡ Exemplarisé rapide</span>` : ''}
     ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}
-    ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Livres sans code-barre »">📎 Sans code-barre</span>` : ''}
+    ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Mauvais numéro / code-barre absent »">📎 Sans code-barre</span>` : ''}
+    ${record.coteApprox ? `<span class="fb-badge" style="background:#f57f17;color:#fff" title="La cote tapée ne correspondait pas exactement à celle du catalogue — retrouvé par son numéro, à vérifier">≈ Cote approximative</span>` : ''}
     ${record.horsSection ? `<span class="fb-badge" style="background:#c62828;color:#fff" title="Catalogué sous une autre section que Magasin/Magasin Jeunesse — à vérifier dans Syracuse">⚠ Anomalie de classement</span>` : ''}</div>`;
   html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
@@ -1874,17 +1931,28 @@ function showFeedback(record, status, prev, reliureRecords){
 
 /* ════════════ LIVRES SANS CODE-BARRE ════════════
    Pour les documents qui n'ont jamais eu de code-barre collé (courant dans
-   les magasins d'étage) : on saisit la cote plutôt que de scanner. Deux cas
-   (voir catalogCoteIndexByGroup ci-dessus) :
-   - la cote correspond à un exemplaire du catalogue actif → on le récole
-     normalement via handleScan() (même emplacement, même mécanique de
-     dup/déplacé, cascade reliures...), avec le flag sansCodeBarre:true sur
-     le record pour qu'il apparaisse *en plus* dans la liste d'export
-     "Livres sans code-barre" (voir noBarcodeList() et ADV_CATS.nobarcode).
-   - la cote ne correspond à rien de connu → pas de scan (rien à récoler,
-     on ne connaît même pas le titre), juste un enregistrement dans
-     noBarcodeCotes (clé = cote normalisée) pour la même liste d'export —
-     "et c'est tout", pas d'effet sur les statistiques de progression. */
+   les magasins d'étage) : on saisit la cote plutôt que de scanner. Trois cas,
+   dans cet ordre (voir catalogCoteIndexByGroup/catalogDigitRunIndexByGroup
+   ci-dessus) :
+   - la cote correspond EXACTEMENT à un exemplaire du catalogue actif → on
+     le récole normalement via handleScan() (même emplacement, même
+     mécanique de dup/déplacé, cascade reliures...), avec le flag
+     sansCodeBarre:true sur le record pour qu'il apparaisse *en plus* dans
+     la liste d'export "Mauvais numéro / code-barre absent" (voir
+     noBarcodeList() et ADV_CATS.nobarcode).
+   - sinon, le RUN DE CHIFFRES de la cote tapée correspond, sans ambiguïté, à
+     celui d'un exemplaire du catalogue (ex. "136854" tapé pour une cote
+     réelle "136854 PUJ" ou "856.7 136854 PUJ" — l'utilisateur·rice ne
+     connaît pas forcément le suffixe auteur ou la classification Dewey
+     secondaire recopiés sur la cote complète) → récolé de la même façon,
+     avec sansCodeBarre:true ET coteApprox:true, pour rester distinguable
+     d'une correspondance exacte (à vérifier : bon exemplaire ? cote du
+     catalogue à corriger ?).
+   - la cote ne correspond à rien de connu (même approximativement) → pas de
+     scan (rien à récoler, on ne connaît même pas le titre), juste un
+     enregistrement dans noBarcodeCotes (clé = cote normalisée) pour la même
+     liste d'export — "et c'est tout", pas d'effet sur les statistiques de
+     progression. */
 function handleNoBarcodeCote(coteRaw){
   const cote = (coteRaw||'').trim();
   if(!cote) return;
@@ -1892,8 +1960,14 @@ function handleNoBarcodeCote(coteRaw){
   const idx = catalogCoteIndexByGroup[group];
   const foundBarcode = idx ? idx[normalizeCote(cote)] : null;
 
+  const digitRunIdx = catalogDigitRunIndexByGroup[group];
+  const digitRun = !foundBarcode ? extractCoteDigitRun(cote) : null;
+  const approxBarcode = (!foundBarcode && digitRun && digitRunIdx) ? digitRunIdx[digitRun] : null;
+
   if(foundBarcode){
     handleScan(foundBarcode, false, { sansCodeBarre:true });
+  } else if(approxBarcode){
+    handleScan(approxBarcode, false, { sansCodeBarre:true, coteApprox:true });
   } else {
     const fields = locFieldsOf(loc);
     const record = { cote, travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
@@ -1913,7 +1987,7 @@ function showNoBarcodeFeedback(record){
   fb.innerHTML = `<div class="fb-top"><span class="fb-badge warn">⚠ Cote absente du catalogue</span>
     <span class="fb-cote">${esc(record.cote)}</span></div>
     <div class="fb-titre">(non catalogué)</div>
-    <div class="fb-meta">Ajouté à la liste « Livres sans code-barre » — pas compté comme récolé.</div>`;
+    <div class="fb-meta">Ajouté à la liste « Mauvais numéro / code-barre absent » — pas compté comme récolé.</div>`;
 }
 document.getElementById('nobarcode-save').addEventListener('click', ()=>{
   handleNoBarcodeCote(document.getElementById('nobarcode-input').value);
@@ -2887,10 +2961,10 @@ function horsSectionCount(group){
 function noBarcodeList(group){
   const foundRows = Object.values(scans)
     .filter(r=>r.sansCodeBarre && traveeGroupOf(r.travee)===group)
-    .map(r=>({ cote:r.cote, titre:r.titre, travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:true }));
+    .map(r=>({ cote:r.cote, titre:r.titre, travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:true, coteApprox:!!r.coteApprox }));
   const notFoundRows = Object.values(noBarcodeCotes)
     .filter(r=>traveeGroupOf(r.travee)===group)
-    .map(r=>({ cote:r.cote, titre:'', travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:false }));
+    .map(r=>({ cote:r.cote, titre:'', travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:false, coteApprox:false }));
   return [...foundRows, ...notFoundRows].sort((a,b)=>b.ts-a.ts);
 }
 function noBarcodeCount(group){
@@ -2954,7 +3028,7 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned-${gid}">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Probablement perdus</div><div class="stat-card-val" id="st-perdus-${gid}">—</div></div>
       <div class="stat-card"><div class="stat-card-label">Récolés (codes-barres scannés)</div><div class="stat-card-val" id="st-scanned-${gid}">0</div></div>
-      <div class="stat-card"><div class="stat-card-label">Livres sans code-barre</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
+      <div class="stat-card"><div class="stat-card-label">Mauvais numéro / code-barre absent</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
       <div class="stat-card"><div class="stat-card-label">Anomalies de classement</div><div class="stat-card-val" id="st-horssection-${gid}">0</div></div>
       ${isMagasin ? `<div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-etage-${gid}" style="font-size:1.2rem">—</div></div>` : ''}
       <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start-${gid}" style="font-size:1rem">—</div></div>
