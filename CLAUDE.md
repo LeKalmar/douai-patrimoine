@@ -1398,26 +1398,59 @@ vérifie la cote (normalisée par `normalizeCote()`, trim + majuscules) contre
 une fois par catalogue (`buildCoteIndex()`, appelé juste après le chargement
 de chaque `catalogByGroup`) :
 
-- **Cote trouvée** : le document est récolé comme un scan normal — on
-  appelle directement `handleScan(codeBarreTrouvé, false, {sansCodeBarre:true})`,
-  qui pose `record.sansCodeBarre = true` (toute la mécanique dup/déplacé/
-  cascade reliures s'applique normalement).
-- **Cote absente** : pas de scan possible (aucun code-barre à associer),
-  juste un enregistrement dans `noBarcodeCotes` (nouvelle catégorie du
-  bundle `recolement.json`, clé = cote normalisée — pas un emplacement,
-  contrairement à `nonCat`/`videShelves`/`nonRangeShelves`, puisque
-  plusieurs cotes distinctes peuvent coexister sur le même emplacement) —
-  aucun effet sur la progression/l'occupation, uniquement une entrée dans la
-  liste d'export.
+- **Cote trouvée exactement** : le document est récolé comme un scan normal
+  — on appelle directement
+  `handleScan(codeBarreTrouvé, false, {sansCodeBarre:true})`, qui pose
+  `record.sansCodeBarre = true` (toute la mécanique dup/déplacé/cascade
+  reliures s'applique normalement).
+- **Cote trouvée approximativement** (2026-09-03) : la cote tapée ne
+  correspond à rien exactement, mais son **run de chiffres** correspond sans
+  ambiguïté à celui d'un exemplaire du catalogue magasins — repli utile
+  quand l'utilisateur·rice tape le numéro séquentiel seul ("136854") alors
+  que la cote complète porte un suffixe qu'il/elle ne connaît pas par cœur
+  (code auteur "136854 PUJ", ou même une classification Dewey secondaire en
+  tête "856.7 136854 PUJ"). `extractCoteDigitRun()` (côté client) reproduit
+  EXACTEMENT `magasinDigitRun()` de `scripts/build-magasins.mjs` (fusion du
+  séparateur de milliers, recherche d'un groupe de 5 ou 6 chiffres) pour que
+  le numéro extrait du texte tapé et celui déjà stocké sur chaque entrée du
+  catalogue (`coteDigitRun`, uniquement présent côté magasins —
+  `data/inventaire.json` n'a pas cet équivalent, donc ce repli ne joue
+  jamais côté réserve) soient directement comparables. Recherché dans
+  `catalogDigitRunIndexByGroup[group]` (`buildDigitRunIndex()`, construit en
+  parallèle de `catalogCoteIndexByGroup` juste après le chargement de chaque
+  catalogue) : un run de chiffres qui désigne PLUSIEURS exemplaires (volumes
+  d'un même ensemble distingués par un suffixe, ex. "133538-1"/"133538-3")
+  est retiré de cet index plutôt que deviné au hasard — dans ce cas, comme
+  si aucune correspondance n'existait. Un match approximatif récole comme un
+  match exact (`handleScan(...,{sansCodeBarre:true, coteApprox:true})`), en
+  ajoutant `coteApprox:true` sur le `record` — volontairement **pas
+  "sticky"** comme `horsSection` : si le code-barre physique est scanné
+  normalement plus tard, ce nouveau `record` (sans `coteApprox` dans ses
+  `opts`) écrase le précédent et fait disparaître le doute, il n'y a pas de
+  raison de le conserver indéfiniment une fois confirmé. Badge dédié dans le
+  panneau de feedback du scan (`≈ Cote approximative`, à distinguer du badge
+  `📎 Sans code-barre` qui, lui, marque tout scan passé par ce flux qu'il
+  soit exact ou approximatif).
+- **Cote absente** (même approximativement) : pas de scan possible (aucun
+  code-barre à associer), juste un enregistrement dans `noBarcodeCotes`
+  (catégorie du bundle `recolement.json`, clé = cote normalisée — pas un
+  emplacement, contrairement à `nonCat`/`videShelves`/`nonRangeShelves`,
+  puisque plusieurs cotes distinctes peuvent coexister sur le même
+  emplacement) — aucun effet sur la progression/l'occupation, uniquement une
+  entrée dans la liste d'export.
 
 `noBarcodeList(group)` (utilisée par `ADV_CATS.nobarcode`, un panneau
 ajouté automatiquement à tous les groupes de "Statistiques avancées" via la
-même génération de template que les autres) réunit les deux sources :
-`scans` filtrés par `sansCodeBarre` (cotes trouvées, comptées comme
-récolées) et `noBarcodeCotes` (cotes absentes). L'export
-(`exportField:'cote'`) télécharge des **cotes**, pas des codes-barres —
-contrairement aux autres catégories — puisque le but est justement de
-savoir sur quels documents recoller un code-barre.
+même génération de template que les autres, titré **« Mauvais numéro /
+code-barre absent »** depuis 2026-09-03 — l'ancien titre "Livres sans
+code-barre" ne rendait plus compte du cas de correspondance approximative)
+réunit les deux sources : `scans` filtrés par `sansCodeBarre` (cotes
+trouvées — exactement ou approximativement (`coteApprox`), comptées comme
+récolées) et `noBarcodeCotes` (cotes absentes). La colonne "Statut" du
+tableau distingue les trois cas (✓ trouvée / ≈ numéro approximatif / ✗
+absente). L'export (`exportField:'cote'`) télécharge des **cotes**, pas des
+codes-barres — contrairement aux autres catégories — puisque le but est
+justement de savoir sur quels documents recoller un code-barre.
 
 `noBarcodeCotes` suit le même patron que les autres catégories du bundle
 `recolement.json` : synchronisé vers R2 via un nouveau patch `noBarcode`

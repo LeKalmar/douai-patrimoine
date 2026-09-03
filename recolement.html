@@ -1015,7 +1015,7 @@ let catalogCoteIndexByGroup = { reserve:null, magasin:null };
 // retiré de l'index (jamais associé au hasard à l'un des volumes).
 function extractCoteDigitRun(str){
   if(!str) return null;
-  const merged = String(str).replace(/(\d{1,2})\.(\d{3})(?!\d)/g, '$1$2');
+  const merged = String(str).replace(/(?<!\d)(\d{1,2})\.(\d{3})(?!\d)/g, '$1$2');
   const runs = merged.match(/\d+/g) || [];
   for(let run of runs){
     if(run.length===7 && run[0]==='0') run = run.slice(1);
@@ -2505,7 +2505,7 @@ function renderHereLog(){
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#f57f17">≈</span>':''}</td>
       <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
     </tr>`).join('');
   tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
@@ -2527,7 +2527,7 @@ function renderAllLog(filter){
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#f57f17">≈</span>':''}</td>
       <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
     </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${filtered.length-300} de plus (affinez la recherche)</td></tr>` : '');
   tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
