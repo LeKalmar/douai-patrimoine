@@ -2761,6 +2761,33 @@ function notScannedCount(group){
 // l'emplacement réellement visité est celui du code-barre scanné. Ces
 // scans restent bien comptés comme "trouvés" ailleurs (via `scans[bc]`),
 // seule leur contribution à la plage explorée est écartée ici.
+// Un simple min/max sur les cotes scannées reste fragile face à un livre
+// isolé mal rangé : un seul exemplaire physiquement égaré au milieu d'un
+// rayon par ailleurs parfaitement continu suffit à étendre artificiellement
+// toute la plage jusqu'à sa propre cote. Vérifié sur le 5e étage
+// (2026-09-03) : un rayon scanné en continu de 133531 à 136824 (écarts
+// quasi toujours ≤ 20 entre deux cotes consécutives) contenait deux livres
+// mal rangés à 136989 et 137665 (écarts de 165 et 676 avec leur voisin) —
+// suffisant pour faire passer ~840 documents jamais rencontrés comme
+// "probablement perdus" alors que le rayon n'avait pas été parcouru
+// jusque-là. SCAN_GAP_CLUSTER_THRESHOLD (100, entre les deux) sépare les
+// écarts normaux d'un livre isolé : on ne retient, pour définir min/max,
+// que le plus grand groupe de cotes scannées consécutives (une fois
+// triées) dont chaque écart reste sous ce seuil — les cotes isolées hors de
+// ce groupe restent comptées comme "trouvées" ailleurs, seule leur
+// contribution à la plage explorée est écartée.
+const SCAN_GAP_CLUSTER_THRESHOLD = 100;
+function largestGapCluster(sortedRuns){
+  let bestStart = 0, bestLen = 1, curStart = 0;
+  for(let i=1;i<=sortedRuns.length;i++){
+    if(i===sortedRuns.length || sortedRuns[i]-sortedRuns[i-1] > SCAN_GAP_CLUSTER_THRESHOLD){
+      const len = i - curStart;
+      if(len > bestLen){ bestLen = len; bestStart = curStart; }
+      curStart = i;
+    }
+  }
+  return { min: sortedRuns[bestStart], max: sortedRuns[bestStart + bestLen - 1] };
+}
 function scannedDigitRunRange(group){
   const cat = catalogByGroup.magasin;
   if(!cat) return null;
@@ -2770,6 +2797,7 @@ function scannedDigitRunRange(group){
     .forEach(r=>{
       const entry = cat[r.barcode];
       if(!entry || !inGroupScope(entry) || !entry.coteDigitRun) return;
+      if(magasinEtageGroupOfDigitRun(entry.coteDigitRun)!==group) return;
       const len = entry.coteDigitRun.length;
       (runsByLen[len] || (runsByLen[len] = [])).push(parseInt(entry.coteDigitRun, 10));
     });
@@ -2777,7 +2805,8 @@ function scannedDigitRunRange(group){
   for(const len in runsByLen){
     const runs = runsByLen[len];
     if(runs.length < 2) continue;
-    ranges[len] = { min: Math.min(...runs), max: Math.max(...runs) };
+    runs.sort((a,b)=>a-b);
+    ranges[len] = largestGapCluster(runs);
   }
   if(!Object.keys(ranges).length) return null;
   return { cat, ranges };
