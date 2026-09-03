@@ -2752,12 +2752,21 @@ function notScannedCount(group){
 // aberrante : un grand format scanné à 14521 combiné à des cotes 6 chiffres
 // 133726-136824 donnait une plage 14521-136824, qui engloutissait alors la
 // quasi-totalité du catalogue du magasin comme "probablement perdu".
+// Les scans posés par applyReliureCascade() (record.viaReliure) sont exclus
+// de ce calcul de plage : ils héritent de l'emplacement du code-barre
+// effectivement scanné, mais portent LEUR PROPRE cote catalographique — qui
+// peut être très éloignée de celle du document scanné si les deux notices
+// reliées ont été cataloguées à des moments différents. Les inclure ferait
+// croire que le rayon a été parcouru jusqu'à cette cote alors que
+// l'emplacement réellement visité est celui du code-barre scanné. Ces
+// scans restent bien comptés comme "trouvés" ailleurs (via `scans[bc]`),
+// seule leur contribution à la plage explorée est écartée ici.
 function scannedDigitRunRange(group){
   const cat = catalogByGroup.magasin;
   if(!cat) return null;
   const runsByLen = {};
   Object.values(scans)
-    .filter(r=>traveeGroupOf(r.travee)===group)
+    .filter(r=>traveeGroupOf(r.travee)===group && !r.viaReliure)
     .forEach(r=>{
       const entry = cat[r.barcode];
       if(!entry || !inGroupScope(entry) || !entry.coteDigitRun) return;
