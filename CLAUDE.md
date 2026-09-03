@@ -58,6 +58,23 @@ compte (statistiques de progression, jamais scannés, probablement égarés,
 index cote, anomalies de classement). Ne pas réintroduire un second catalogue
 filtré : la distinction se lit sur l'entrée.
 
+**Les en-têtes `Cache-Control` des fichiers statiques sont dans
+`vercel.json`** (bloc `headers`). Rappel : le schéma Vercel refuse toute
+propriété supplémentaire dans une entrée de `headers` — pas de clé `"//"`
+en guise de commentaire, le déploiement échoue (« should NOT have
+additional property »). D'où le report ici des trois raisonnements :
+`/data/*.json` — jeux de données du catalogue, volumineux, qui ne changent
+qu'à un nouvel export Syracuse suivi d'un déploiement ; chaque déploiement
+Vercel sert depuis une URL d'origine distincte, donc un cache long ne peut
+pas retenir une version périmée après mise en ligne, et `must-revalidate`
+évite qu'un onglet resté ouvert plusieurs jours travaille sur un catalogue
+obsolète (1 h). `/font/*` — le nom de fichier porte la graisse et le style,
+une révision de la police changerait ce nom : immuable sur un an.
+`/images/*` — servies telles quelles, remplacées par un nouveau déploiement
+(1 semaine). Ces en-têtes ne concernent que les fichiers statiques ; les six
+endpoints d'état partagé posent le leur dans le code (voir « Stockage
+partagé »).
+
 ## Démarrer / builder
 
 - `npm run build` — régénère `data/inventaire.json` et

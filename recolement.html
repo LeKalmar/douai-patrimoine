@@ -2743,29 +2743,50 @@ function notScannedCount(group){
 // cotes déjà scannées dans ce groupe (bornée par min/max), coûte au plus
 // O(scans du groupe) — sans rapport avec la taille de catalogByGroup.magasin,
 // donc pas besoin d'une variante "count" séparée pour ce calcul-là.
+// Une plage par LONGUEUR de cote (5 chiffres = grands formats, 6 chiffres =
+// cotes séquentielles normales) plutôt qu'une seule plage globale : ce sont
+// deux séquences d'enregistrement indépendantes (même principe que
+// ETAGE_THRESHOLDS dans cotes-numeriques.html — voir CLAUDE.md, "comparer un
+// numéro à 5 chiffres et un numéro à 6 chiffres sur une même échelle n'aurait
+// aucun sens"). Les mélanger dans un même min/max produit une plage
+// aberrante : un grand format scanné à 14521 combiné à des cotes 6 chiffres
+// 133726-136824 donnait une plage 14521-136824, qui engloutissait alors la
+// quasi-totalité du catalogue du magasin comme "probablement perdu".
 function scannedDigitRunRange(group){
   const cat = catalogByGroup.magasin;
   if(!cat) return null;
-  const scannedRuns = Object.values(scans)
+  const runsByLen = {};
+  Object.values(scans)
     .filter(r=>traveeGroupOf(r.travee)===group)
-    .map(r=>inGroupScope(cat[r.barcode]) && cat[r.barcode].coteDigitRun)
-    .filter(Boolean)
-    .map(run=>parseInt(run, 10));
-  if(scannedRuns.length < 2) return null;
-  return { cat, min: Math.min(...scannedRuns), max: Math.max(...scannedRuns) };
+    .forEach(r=>{
+      const entry = cat[r.barcode];
+      if(!entry || !inGroupScope(entry) || !entry.coteDigitRun) return;
+      const len = entry.coteDigitRun.length;
+      (runsByLen[len] || (runsByLen[len] = [])).push(parseInt(entry.coteDigitRun, 10));
+    });
+  const ranges = {};
+  for(const len in runsByLen){
+    const runs = runsByLen[len];
+    if(runs.length < 2) continue;
+    ranges[len] = { min: Math.min(...runs), max: Math.max(...runs) };
+  }
+  if(!Object.keys(ranges).length) return null;
+  return { cat, ranges };
 }
 function probablyLostList(group){
   if(group!=='magasin-2e' && group!=='magasin-5e') return [];
   const range = scannedDigitRunRange(group);
   if(!range) return [];
-  const { cat, min, max } = range;
+  const { cat, ranges } = range;
   return Object.keys(cat)
     .filter(bc=>{
       if(scans[bc] || !inGroupScope(cat[bc])) return false;
       const run = cat[bc].coteDigitRun;
       if(!run || magasinEtageGroupOfDigitRun(run)!==group) return false;
+      const r = ranges[run.length];
+      if(!r) return false;
       const n = parseInt(run, 10);
-      return n>=min && n<=max;
+      return n>=r.min && n<=r.max;
     })
     .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
     .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
@@ -2775,14 +2796,16 @@ function probablyLostCount(group){
   if(group!=='magasin-2e' && group!=='magasin-5e') return 0;
   const range = scannedDigitRunRange(group);
   if(!range) return 0;
-  const { cat, min, max } = range;
+  const { cat, ranges } = range;
   let n=0;
   for(const bc in cat){
     if(scans[bc] || !inGroupScope(cat[bc])) continue;
     const run = cat[bc].coteDigitRun;
     if(!run || magasinEtageGroupOfDigitRun(run)!==group) continue;
+    const r = ranges[run.length];
+    if(!r) continue;
     const v = parseInt(run, 10);
-    if(v>=min && v<=max) n++;
+    if(v>=r.min && v<=r.max) n++;
   }
   return n;
 }
