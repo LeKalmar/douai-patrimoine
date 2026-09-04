@@ -1265,6 +1265,27 @@ function scheduleAdvListsCount(){
    traveeGroupOf(), déclarée plus bas, mais c'est une `function` (hoisted),
    donc l'ordre ne compte que pour les `const`/appels immédiats. */
 const MAGASIN_ETAGE_THRESHOLDS = { 5: 13830, 6: 133530 };
+
+// Sous-découpage additionnel du groupe "Magasin — 5e étage", pour l'export
+// de la seule catégorie "Récolés" (ADV_CATS.scanned) — demande explicite de
+// l'équipe : pouvoir exporter séparément trois tranches de travées plutôt
+// que tout l'étage d'un coup. TRAVEES_MAGASIN5 (js/reserve-shared.js) va de
+// M5-I à M5-XIX plus M5-ALPHA ; "le reste" est défini par exclusion (tout ce
+// qui n'est ni dans la 1re ni dans la 2e tranche) plutôt que listé en dur,
+// pour rester correct si la géométrie du 5e étage change un jour. Déclaré
+// ici, tôt comme MAGASIN_ETAGE_THRESHOLDS juste au-dessus (même raison,
+// temporal dead zone) : advGroupTemplate() le lit, et advGroupTemplate() est
+// appelée dès la ligne `document.getElementById('adv-groups').innerHTML = …`
+// plus bas, avant que d'éventuelles déclarations tardives ne soient
+// initialisées.
+const MAGASIN5_RANGE_1 = ['M5-I','M5-II','M5-III','M5-IV','M5-V'];
+const MAGASIN5_RANGE_2 = ['M5-VI','M5-VII','M5-VIII','M5-IX','M5-X','M5-XI','M5-XII','M5-XIII','M5-XIV','M5-XV','M5-XVI','M5-XVII'];
+const MAGASIN5_TRAVEE_RANGES = [
+  { key:'travee-i-v',     label:'Travée I à V',      test: t => MAGASIN5_RANGE_1.includes(t) },
+  { key:'travee-vi-xvii', label:'Travée VI à XVII',  test: t => MAGASIN5_RANGE_2.includes(t) },
+  { key:'reste',          label:'Le reste',          test: t => !MAGASIN5_RANGE_1.includes(t) && !MAGASIN5_RANGE_2.includes(t) },
+];
+
 function magasinEtageGroupOfDigitRun(digitRun){
   if(!digitRun) return 'magasin-6e';
   const threshold = MAGASIN_ETAGE_THRESHOLDS[digitRun.length];
@@ -2997,6 +3018,7 @@ function noBarcodeCount(group){
 
 function advDetailsTemplate(id, spec, opts){
   const showAllExport = !!(opts && opts.showAllExport);
+  const rangeExports = (opts && opts.rangeExports) || [];
   return `
     <details class="adv-details" id="adv-${id}">
       <summary>${esc(spec.title)} <span class="adv-count">(<span id="sum-${id}-count">0</span>)</span></summary>
@@ -3007,6 +3029,7 @@ function advDetailsTemplate(id, spec, opts){
             <input type="text" class="log-search" id="${id}-search" placeholder="${esc(spec.placeholder)}">
             <button type="button" class="export-btn" id="${id}-export">⬇ Exporter (.txt)</button>
             ${showAllExport ? `<button type="button" class="export-btn" id="${id}-export-all" title="Réunit les codes-barres de cette catégorie pour les 3 magasins (2e/5e/6e), sans tenir compte de la recherche en cours">⬇ Exporter tous les magasins</button>` : ''}
+            ${rangeExports.map(rg=>`<button type="button" class="export-btn" id="${id}-export-${rg.key}" title="N'exporte que les codes-barres de ${esc(rg.label)}, en respectant la recherche en cours">⬇ ${esc(rg.label)}</button>`).join('')}
           </div>
         </div>
         <div class="log-body"><table class="log-table">
@@ -3059,7 +3082,10 @@ function advGroupTemplate(g){
       <div class="stat-card"><div class="stat-card-label">Sessions de travail détectées</div><div class="stat-card-val" id="st-sessions-${gid}">—</div></div>
     </div>
 
-    ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey], {showAllExport:isMagasin})).join('')}
+    ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey], {
+      showAllExport:isMagasin,
+      rangeExports: (gid==='magasin-5e' && catKey==='scanned') ? MAGASIN5_TRAVEE_RANGES : []
+    })).join('')}
   `;
 }
 
@@ -3174,9 +3200,10 @@ function downloadTxt(text, filename){
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 300);
 }
-function exportAdvBarcodes(rows, filterFields, filter, filenamePrefix, field){
+function exportAdvBarcodes(rows, filterFields, filter, filenamePrefix, field, extraFilterFn){
   const q = (filter||'').trim().toLowerCase();
-  const filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
+  let filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
+  if(extraFilterFn) filtered = filtered.filter(extraFilterFn);
   if(!filtered.length){ alert('Aucun élément à exporter pour ce filtre.'); return; }
   const d = new Date(), pad = n => String(n).padStart(2,'0');
   downloadTxt(filtered.map(r=>r[field||'barcode']).join('\n'),
@@ -3200,6 +3227,21 @@ ADV_GROUPS.forEach(g=>{
       if(allBtn) allBtn.addEventListener('click', ()=>{
         const allRows = MAGASIN_ADV_GROUPS.flatMap(mg=>spec.listFn(mg.id));
         exportAdvBarcodes(allRows, spec.filterFields, '', `${spec.filePrefix}-magasins-tous-etages`, spec.exportField);
+      });
+    }
+    // Boutons par tranche de travées (voir MAGASIN5_TRAVEE_RANGES) — pour
+    // l'instant uniquement "Récolés" du 5e étage, seule combinaison demandée.
+    // Respecte la recherche en cours, contrairement au bouton "tous les
+    // magasins" ci-dessus : ici on reste dans le même groupe, un filtre de
+    // travée en plus du texte tapé garde un sens univoque.
+    if(g.id==='magasin-5e' && catKey==='scanned'){
+      MAGASIN5_TRAVEE_RANGES.forEach(rg=>{
+        const rangeBtn = document.getElementById(id+'-export-'+rg.key);
+        if(!rangeBtn) return;
+        rangeBtn.addEventListener('click', ()=>{
+          exportAdvBarcodes(spec.listFn(g.id), spec.filterFields, document.getElementById(id+'-search').value,
+            `${spec.filePrefix}-${g.id}-${rg.key}`, spec.exportField, r=>rg.test(r.travee));
+        });
       });
     }
   });
