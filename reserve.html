@@ -93,6 +93,8 @@
     .notices-title{font-size:.75rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
     .notices-sort{font-size:.7rem;color:#999;display:flex;align-items:center;gap:.3rem}
     .notices-sort select{font-size:.7rem;border:1px solid #ddd;border-radius:4px;padding:1px 4px;background:#fff;font-family:inherit;color:#555}
+    .notices-export-btn{font-family:inherit;font-size:.68rem;padding:.2rem .55rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s;white-space:nowrap}
+    .notices-export-btn:hover{background:#f5f5f5;border-color:#999}
     .notices-list{border:1px solid #ebebeb;border-radius:var(--radius-md);overflow:hidden;max-height:280px;overflow-y:auto}
     .notice-row{display:flex;align-items:flex-start;gap:.6rem;padding:.45rem .75rem;border-bottom:1px solid #f5f5f5;font-size:.78rem;transition:background .1s}
     .notice-row:last-child{border-bottom:none}.notice-row:hover{background:#fafafa}
@@ -905,7 +907,9 @@ function showNotices(tid,col,etage,highlightBarcode){
     <div class="notices-section">
       <div class="notices-header">
         <span class="notices-title">Col. ${col} — ${lbl} (${notices.length})${ncCount?` <span style="color:var(--plan-noncat);font-weight:400;text-transform:none;letter-spacing:0">+ ${ncCount} non catalogué(s)</span>`:''}</span>
-        <div class="notices-sort">Trier par&nbsp;
+        <div class="notices-sort">
+          <button type="button" class="notices-export-btn" onclick="exportShelfBarcodes('${key}')">⬇ Exporter (.txt)</button>
+          Trier par&nbsp;
           <select onchange="rerenderEtage('${key}',this.value)">
             <option value="cote">Cote</option>
             <option value="titre">Titre</option>
@@ -942,6 +946,27 @@ function rerenderEtage(key,sort){
   if(!el) return;
   el.innerHTML=noticeRows(DET[key]||[],sort);
   scrollToHighlight(el);
+}
+
+function downloadTxt(text, filename){
+  const blob = new Blob([text], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+}
+// Codes-barres de l'emplacement affiché dans la modale (mêmes notices que
+// noticeRows(), pas seulement les MAX=60 premières lignes visibles à
+// l'écran), un par ligne — pour aller les rajouter en panier dans le SIGB.
+function exportShelfBarcodes(key){
+  const notices=DET[key]||[];
+  if(!notices.length){ alert('Aucun code-barre catalogué sur cet emplacement.'); return; }
+  const [tid,col,etage]=key.split('|');
+  const slug=travTitle(tid).replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase();
+  const d=new Date(), pad=n=>String(n).padStart(2,'0');
+  downloadTxt(notices.map(n=>n.b).filter(Boolean).join('\n'),
+    `codes-barres-${slug}-col${col}-${etage}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
 }
 
 /* ════════════ RENDU DES LIGNES DE NOTICES ════════════ */

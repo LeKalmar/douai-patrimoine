@@ -64,6 +64,8 @@
   .mp-header{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.75rem}
   .mp-title{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1rem;color:#12157A;line-height:1.25}
   .mp-occ{font-size:.75rem;color:#888;white-space:nowrap}
+  .mp-actions{display:flex;justify-content:flex-end;margin-bottom:.5rem}
+  .mp-actions .export-btn{font-size:.68rem;padding:.25rem .6rem}
   .mp-room{flex:1;display:flex;align-items:center;justify-content:center;overflow-x:auto;min-height:120px;padding-bottom:.25rem}
   .mp-box{border:1px solid #ccc;border-radius:var(--radius-sm);padding:4px;background:#fafafa;display:flex;flex-direction:row;gap:4px}
   .mp-col{display:flex;flex-direction:column;gap:2px;align-items:center}
@@ -326,6 +328,9 @@
           <div class="mp-header">
             <span class="mp-title" id="mp-title">—</span>
             <span class="mp-occ" id="mp-occ"></span>
+          </div>
+          <div class="mp-actions" id="mp-actions">
+            <button type="button" class="export-btn" id="mp-export-btn">⬇ Exporter (.txt)</button>
           </div>
           <div class="mp-room" id="mp-room"></div>
           <div class="mp-legend" id="mp-legend">
@@ -2401,7 +2406,7 @@ function miniSlotTitle(tDef,col,e,state,maps){
 function buildMiniPlan(){
   const titleEl=document.getElementById('mp-title'), occEl=document.getElementById('mp-occ'),
         room=document.getElementById('mp-room'), legend=document.getElementById('mp-legend'),
-        hintEl=document.getElementById('mp-hint');
+        hintEl=document.getElementById('mp-hint'), actionsEl=document.getElementById('mp-actions');
 
   if(loc.reserve==='horsreserve'){
     titleEl.textContent='Non rangé (hors réserve)';
@@ -2410,9 +2415,11 @@ function buildMiniPlan(){
     legend.style.display='none';
     hintEl.style.display='';
     hintEl.textContent='Pas de plan pour les documents hors réserve — aucun emplacement associé.';
+    if(actionsEl) actionsEl.style.display='none';
     return;
   }
   legend.style.display='';
+  if(actionsEl) actionsEl.style.display='';
   hintEl.style.display='none';
 
   const tDef=currentLocDef(), tid=tDef.id;
@@ -2451,6 +2458,20 @@ function buildMiniPlan(){
   room.appendChild(box);
   occEl.textContent = total ? Math.round(filled/total*100)+'% occupé' : '';
 }
+
+// Codes-barres scannés sur l'étagère actuellement sélectionnée (même filtre
+// que renderHereLog()), un par ligne — pour aller les rajouter en panier
+// dans le SIGB sans les retaper à la main.
+function exportMiniPlanBarcodes(){
+  const fields = locFieldsOf(loc);
+  const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage);
+  if(!here.length){ alert('Aucun code-barre scanné sur cet emplacement.'); return; }
+  const slug = displayTraveeId(fields.travee).replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase();
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  downloadTxt(here.map(r=>r.barcode).join('\n'),
+    `codes-barres-${slug}-col${fields.colonne}-${fields.etage}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+}
+document.getElementById('mp-export-btn').addEventListener('click', exportMiniPlanBarcodes);
 
 /* ════════════ ATTENDU ICI ════════════ */
 function renderExpected(){
