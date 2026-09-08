@@ -13,137 +13,132 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
   <style>
-    body { background: var(--cream); }
-    .admin-page { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
-    .admin-topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border);
-      flex-wrap: wrap; gap: 1rem;
+    :root{ --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
+    body { font-family:'DM Sans',sans-serif; color:#1a1a1a; background:#fff; margin:0; }
+
+    .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+    .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.8rem,4vw,2.4rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
+    .page-lead{font-size:.9rem;color:rgba(255,255,255,0.7);margin:0;max-width:560px;line-height:1.6}
+    .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+    .hero-actions a,.hero-actions button{
+      font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+      background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+      padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
     }
-    .admin-topbar h1 {
-      font-family: var(--font-display); font-size: 1.9rem; color: var(--ink);
-    }
-    .admin-topbar .admin-actions { display: flex; gap: 0.6rem; }
-    .admin-intro {
-      font-size: 1rem; color: var(--text-light); line-height: 1.6;
-      margin: -1.25rem 0 2.25rem;
-    }
-    .admin-section { margin-bottom: 3rem; }
+    .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+    .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+
+    .admin-page { padding: 2rem 0 4rem; }
+    .admin-section { margin-bottom: 2.75rem; }
     .admin-section-head { margin-bottom: 1.1rem; }
     .admin-section-head h2 {
-      font-family: var(--font-display); font-size: 1.35rem; color: var(--ink);
-      display: flex; align-items: center; gap: 0.55rem;
+      font-family:'Moret','DM Serif Display',serif; font-style:italic; font-weight:400;
+      font-size: 1.35rem; color:#12157A;
+      display:flex; align-items:center; gap:.6rem;
     }
-    .admin-section-head .admin-section-icon { font-size: 1.3rem; }
+    .admin-section-head h2::after{content:'';flex:1;height:2px;background:linear-gradient(to right,#12157A,transparent)}
     .admin-section-head p {
-      font-size: 0.9rem; color: var(--text-light); margin-top: 0.3rem; max-width: 60ch;
+      font-size: 0.85rem; color: #777; margin-top: 0.35rem; max-width: 60ch;
     }
     .admin-stats-grid {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 1rem;
     }
     .admin-stat-card {
-      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 1.1rem; box-shadow: var(--shadow);
+      background:#F5F5FF; border:1px solid #ebebeb; border-radius: var(--radius-md);
+      padding: 1.1rem;
     }
     .admin-stat-card .value {
-      font-family: var(--font-display); font-size: 1.6rem; color: var(--accent);
+      font-family:'Moret','DM Serif Display',serif; font-size: 1.6rem; color:#12157A;
     }
     .admin-stat-card .label {
-      font-size: 0.75rem; color: var(--text-light); margin-top: 0.2rem;
+      font-size: 0.75rem; color: #888; margin-top: 0.2rem;
     }
     .admin-stat-note {
-      font-size: 0.8rem; color: var(--text-light); margin-top: 0.75rem;
+      font-size: 0.8rem; color: #888; margin-top: 0.75rem;
     }
     .admin-total-card {
-      background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
-      padding: 1.5rem 1.75rem; box-shadow: var(--shadow); margin-bottom: 1rem;
+      background:#F5F5FF; border:1px solid #ebebeb; border-radius: var(--radius-lg);
+      padding: 1.5rem 1.75rem; margin-bottom: 1rem;
       display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap;
     }
     .admin-total-card .value {
-      font-family: var(--font-display); font-size: 2.4rem; color: var(--accent);
+      font-family:'Moret','DM Serif Display',serif; font-size: 2.4rem; color:#12157A;
       line-height: 1;
     }
     .admin-total-card .label {
-      font-size: 1rem; color: var(--text-light);
+      font-size: 1rem; color: #777;
     }
-    .admin-delta { font-size: 0.85rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; }
-    .admin-delta.up { background: var(--accent-light); color: var(--accent); }
+    .admin-delta { font-size: 0.8rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; }
+    .admin-delta.up { background: #e6f0ec; color: #2d5a4a; }
     .admin-delta.down { background: #fbe9e7; color: #a04030; }
-    .admin-delta.flat { background: var(--border); color: var(--text-light); }
+    .admin-delta.flat { background: #ececf7; color: #888; }
     .admin-branch-card .label { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
     .admin-export-dates {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 1rem; margin-top: 1.25rem;
     }
     .admin-export-card {
-      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 1rem 1.15rem; box-shadow: var(--shadow);
+      background:#F5F5FF; border:1px solid #ebebeb; border-radius: var(--radius-md);
+      padding: 1rem 1.15rem;
     }
     .admin-export-card h4 {
-      font-size: 0.85rem; font-weight: 700; color: var(--ink); margin-bottom: 0.5rem;
+      font-size: 0.8rem; font-weight: 700; color:#1a1a1a; margin-bottom: 0.5rem;
     }
     .admin-export-card .row {
       display: flex; justify-content: space-between; gap: 0.5rem;
-      font-size: 0.82rem; color: var(--text-light); padding: 0.15rem 0;
+      font-size: 0.8rem; color: #777; padding: 0.15rem 0;
     }
-    .admin-export-card .row strong { color: var(--ink); font-weight: 600; }
+    .admin-export-card .row strong { color:#1a1a1a; font-weight: 600; }
     .admin-tech-note {
-      font-size: 0.75rem; color: var(--text-light); margin-top: 1rem;
+      font-size: 0.75rem; color: #999; margin-top: 1rem;
     }
     .admin-tools-grid {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1.1rem;
+      gap: 1rem;
     }
-    .admin-tool-card {
+    .admin-tool-card, .admin-tool-card-full {
       display: flex; align-items: flex-start; gap: 0.9rem;
-      background: #fff; border: 1px solid var(--border);
-      border-radius: var(--radius-lg); padding: 1.4rem; text-decoration: none;
-      box-shadow: var(--shadow); transition: box-shadow var(--transition), transform var(--transition);
+      background: #fff; border: 1px solid #ebebeb; color: inherit;
+      border-radius: var(--radius-md); padding: 1.25rem; text-decoration: none;
+      transition: border-color .15s, box-shadow .15s, transform .15s;
     }
-    .admin-tool-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
-    .admin-tool-card .admin-tool-icon {
-      flex-shrink: 0; font-size: 1.3rem; line-height: 1; color: var(--blue);
+    .admin-tool-card:hover, .admin-tool-card-full:hover {
+      border-color:#12157A; box-shadow: 0 4px 12px rgba(18,21,122,.1); transform: translateY(-2px);
+    }
+    .admin-tool-card-full { margin-top: 1rem; }
+    .admin-tool-card .admin-tool-icon, .admin-tool-card-full .admin-tool-icon {
+      flex-shrink: 0; font-size: 1.3rem; line-height: 1; color:#12157A;
       width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
-      background: rgba(58, 124, 165, 0.12); border-radius: 50%;
+      background: rgba(18,21,122,.08); border-radius: 50%;
     }
-    .admin-tool-card h3 {
-      font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; color: var(--ink);
+    .admin-tool-card h3, .admin-tool-card-full h3 {
+      font-family:'DM Sans',sans-serif; font-weight: 700; font-size: 1.05rem; color:#1a1a1a;
       margin-bottom: 0.35rem;
     }
-    .admin-tool-card p { font-size: 0.88rem; color: var(--text-light); line-height: 1.55; }
-    .admin-tool-card-full {
-      display: flex; align-items: flex-start; gap: 0.9rem;
-      background: #fff; border: 1px solid var(--border);
-      border-radius: var(--radius-lg); padding: 1.4rem; text-decoration: none;
-      box-shadow: var(--shadow); transition: box-shadow var(--transition), transform var(--transition);
-      margin-top: 1.1rem;
-    }
-    .admin-tool-card-full:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
-    .admin-tool-card-full .admin-tool-icon {
-      flex-shrink: 0; font-size: 1.3rem; line-height: 1; color: var(--blue);
-      width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
-      background: rgba(58, 124, 165, 0.12); border-radius: 50%;
-    }
-    .admin-tool-card-full h3 {
-      font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; color: var(--ink);
-      margin-bottom: 0.35rem;
-    }
-    .admin-tool-card-full p { font-size: 0.88rem; color: var(--text-light); line-height: 1.55; }
+    .admin-tool-card p, .admin-tool-card-full p { font-size: 0.88rem; color: #777; line-height: 1.55; }
+
+    footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;font-size:.8rem;text-align:center}
+    footer a{color: var(--warm);text-decoration:none}
   </style>
 </head>
 <body>
 
-<div class="admin-page">
-  <div class="admin-topbar">
-    <h1>Espace professionnel</h1>
-    <div class="admin-actions">
-      <a href="index.html" class="admin-btn-secondary" style="text-decoration:none;display:inline-block;">← Retour au site</a>
-      <button type="button" id="admin-logout" class="admin-btn-primary">Se déconnecter</button>
+<div class="page-hero">
+  <div class="container">
+    <div>
+      <h1 class="page-title">Espace professionnel</h1>
+      <p class="page-lead">Bienvenue ! Retrouvez ici les outils utilisés par l'équipe pour la réserve patrimoniale et les magasins 2e/5e/6e étage.</p>
+    </div>
+    <div class="hero-actions">
+      <a href="index.html">← Retour au site</a>
+      <button type="button" id="admin-logout">Se déconnecter</button>
     </div>
   </div>
+</div>
 
-  <p class="admin-intro">Bienvenue ! Retrouvez ici les outils utilisés par l'équipe pour la réserve patrimoniale et les magasins 2e/5e/6e étage.</p>
+<div class="container admin-page">
 
   <section class="admin-section">
     <div class="admin-section-head">
@@ -256,7 +251,14 @@
       </a>
     </div>
   </section>
+
 </div>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale</p>
+  </div>
+</footer>
 
 <script>
 (function() {
