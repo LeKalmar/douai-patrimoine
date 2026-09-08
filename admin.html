@@ -13,251 +13,276 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
   <style>
-    :root{ --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
-    body { font-family:'DM Sans',sans-serif; color:#1a1a1a; background:#fff; margin:0; }
+    /* Espace pro — planche 2b de « Révision design » (2026-09-08).
+       « Traitement B généralisé » : les trois outils du quotidien passent en
+       grandes cartes en tête, tout le reste descend en second rang. Les
+       couleurs viennent des tokens de style.css. */
 
-    .page-hero{background:#12157A;color:#fff;padding:1.75rem 0}
-    .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-    .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.8rem,4vw,2.4rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
-    .page-lead{font-size:.9rem;color:rgba(255,255,255,0.7);margin:0;max-width:560px;line-height:1.6}
-    .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap}
-    .hero-actions a,.hero-actions button{
-      font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
-      background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
-      padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
-    }
-    .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
-    .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+    body { background: var(--papier); color: var(--text); --ad-gutter: clamp(1.25rem, 4vw, 2.5rem); }
 
-    .admin-page { padding: 2rem 0 4rem; }
-    .admin-section { margin-bottom: 2.75rem; }
-    .admin-section-head { margin-bottom: 1.1rem; }
-    .admin-section-head h2 {
-      font-family:'Moret','DM Serif Display',serif; font-style:italic; font-weight:400;
-      font-size: 1.35rem; color:#12157A;
-      display:flex; align-items:center; gap:.6rem;
+    .ad-shell { max-width: 1180px; margin: 0 auto; }
+
+    /* ── Bandeau ─────────────────────────────────────────────────────── */
+    .ad-head { background: var(--bleu); color: #fff; }
+    .ad-head-inner {
+      max-width: 1180px; margin: 0 auto; padding: 1.4rem var(--ad-gutter);
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 1.25rem; flex-wrap: wrap;
     }
-    .admin-section-head h2::after{content:'';flex:1;height:2px;background:linear-gradient(to right,#12157A,transparent)}
-    .admin-section-head p {
-      font-size: 0.85rem; color: #777; margin-top: 0.35rem; max-width: 60ch;
+    .ad-eyebrow {
+      font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--rose); margin-bottom: 0.5rem;
     }
-    .admin-stats-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
+    .ad-head h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.125rem; line-height: 1; }
+    .ad-head-actions { display: flex; gap: 0.5rem; align-items: center; font-size: 0.75rem; flex-wrap: wrap; }
+    .ad-sync { display: flex; align-items: center; gap: 0.4rem; color: rgba(255,255,255,0.8); }
+    .ad-sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #7BE0A0; flex-shrink: 0; }
+    .ad-sync-dot--off { background: #F9A825; }
+    .ad-head-actions a, .ad-head-actions button {
+      border: 1px solid rgba(255,255,255,0.28); background: none; color: #fff;
+      padding: 0.45rem 0.8rem; font-family: inherit; font-size: 0.75rem; cursor: pointer;
+      transition: background var(--transition);
     }
-    .admin-stat-card {
-      background:#F5F5FF; border:1px solid #ebebeb; border-radius: var(--radius-md);
-      padding: 1.1rem;
+    .ad-head-actions a:hover, .ad-head-actions button:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+    .ad-page { padding: 1.6rem var(--ad-gutter) 2.5rem; }
+
+    /* ── Chiffres d'inventaire ───────────────────────────────────────── */
+    .ad-stats { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0.875rem; margin-bottom: 0.875rem; }
+    .ad-stat-total { background: var(--encre); color: #fff; padding: 1.25rem 1.375rem; }
+    .ad-stat-label {
+      font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(255,255,255,0.6); margin-bottom: 0.6rem;
     }
-    .admin-stat-card .value {
-      font-family:'Moret','DM Serif Display',serif; font-size: 1.6rem; color:#12157A;
+    .ad-stat-total .ad-stat-value {
+      font-family: var(--font-display); font-weight: 700; font-size: 2.875rem; line-height: 1;
     }
-    .admin-stat-card .label {
-      font-size: 0.75rem; color: #888; margin-top: 0.2rem;
+    .ad-stat-row { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+    .ad-stat-note { font-size: 0.72rem; color: rgba(255,255,255,0.6); margin-top: 0.6rem; }
+    .ad-stat-card { background: #fff; border: 1px solid #E3DED4; padding: 1.25rem 1.375rem; }
+    .ad-stat-card .ad-stat-label { color: var(--text-light); }
+    .ad-stat-card .ad-stat-value {
+      font-family: var(--font-display); font-weight: 700; font-size: 2rem; line-height: 1; color: var(--bleu);
     }
-    .admin-stat-note {
-      font-size: 0.8rem; color: #888; margin-top: 0.75rem;
+    .ad-stat-card .ad-delta { display: block; margin-top: 0.6rem; }
+    .ad-delta { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.5rem; }
+    .ad-delta--up { background: #7BE0A0; color: var(--encre); }
+    .ad-delta--down { background: #FBE3E6; color: #A0182F; }
+    .ad-delta--flat { background: transparent; color: #8A8A99; padding-left: 0; }
+
+    /* ── Avancement du récolement ────────────────────────────────────── */
+    .ad-progress { background: #fff; border: 1px solid #E3DED4; padding: 1.25rem 1.375rem; margin-bottom: 1.6rem; }
+    .ad-progress-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap;
     }
-    .admin-total-card {
-      background:#F5F5FF; border:1px solid #ebebeb; border-radius: var(--radius-lg);
-      padding: 1.5rem 1.75rem; margin-bottom: 1rem;
-      display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap;
+    .ad-progress-title {
+      font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-light);
     }
-    .admin-total-card .value {
-      font-family:'Moret','DM Serif Display',serif; font-size: 2.4rem; color:#12157A;
-      line-height: 1;
+    .ad-progress-sub { font-size: 0.75rem; color: #8A8A99; }
+    .ad-bar { display: flex; height: 14px; overflow: hidden; background: var(--papier-ombre); }
+    .ad-bar span { display: block; height: 100%; }
+    .ad-legend {
+      display: flex; gap: 1.4rem; margin-top: 0.75rem; flex-wrap: wrap;
+      font-size: 0.78rem; color: var(--text);
     }
-    .admin-total-card .label {
-      font-size: 1rem; color: #777;
+    .ad-legend span.ad-legend-item { display: flex; align-items: center; gap: 0.45rem; }
+    .ad-swatch { width: 9px; height: 9px; flex-shrink: 0; }
+    .ad-legend strong { color: var(--encre); }
+    .ad-legend em { color: #9A9AA8; font-style: normal; }
+
+    /* ── Outils ──────────────────────────────────────────────────────── */
+    .ad-hero-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.875rem; margin-bottom: 1.6rem; }
+    .ad-hero-tool {
+      background: var(--encre); color: #fff; padding: 1.4rem 1.375rem 1.25rem;
+      display: flex; flex-direction: column; gap: 0.75rem; min-height: 13.25rem;
+      transition: transform var(--transition), box-shadow var(--transition);
     }
-    .admin-delta { font-size: 0.8rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; }
-    .admin-delta.up { background: #e6f0ec; color: #2d5a4a; }
-    .admin-delta.down { background: #fbe9e7; color: #a04030; }
-    .admin-delta.flat { background: #ececf7; color: #888; }
-    .admin-branch-card .label { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-    .admin-export-dates {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1rem; margin-top: 1.25rem;
+    .ad-hero-tool:hover {
+      color: #fff; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(20,24,63,0.22);
     }
-    .admin-export-card {
-      background:#F5F5FF; border:1px solid #ebebeb; border-radius: var(--radius-md);
-      padding: 1rem 1.15rem;
+    .ad-hero-icon {
+      width: 44px; height: 44px; flex-shrink: 0;
+      background: var(--corail); color: var(--encre);
+      display: flex; align-items: center; justify-content: center; font-size: 1.15rem;
     }
-    .admin-export-card h4 {
-      font-size: 0.8rem; font-weight: 700; color:#1a1a1a; margin-bottom: 0.5rem;
+    .ad-hero-title { font-family: var(--font-display); font-weight: 600; font-size: 1.4rem; line-height: 1.1; }
+    .ad-hero-desc { font-size: 0.78rem; color: rgba(255,255,255,0.76); line-height: 1.6; flex: 1; }
+    .ad-hero-foot {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem;
+      padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.18);
     }
-    .admin-export-card .row {
+    .ad-hero-meta { font-size: 0.7rem; color: var(--rose); }
+    .ad-hero-open { font-size: 0.78rem; font-weight: 700; color: var(--corail); white-space: nowrap; }
+
+    .ad-section-head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.875rem; }
+    .ad-section-title {
+      font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--carmin);
+      white-space: nowrap;
+    }
+    .ad-section-rule { flex: 1; height: 1px; background: var(--trait); }
+
+    .ad-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+    .ad-tool {
+      background: #fff; border: 1px solid #E3DED4; border-top: 3px solid var(--bleu);
+      padding: 0.95rem 1rem; color: inherit; display: block;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+    .ad-tool:hover {
+      color: inherit; box-shadow: 0 4px 14px rgba(20,24,63,0.10); transform: translateY(-2px);
+      border-top-color: var(--carmin);
+    }
+    .ad-tool-icon { display: block; font-size: 0.95rem; color: var(--bleu); margin-bottom: 0.55rem; }
+    .ad-tool-name { display: block; font-size: 0.85rem; font-weight: 700; color: var(--encre); line-height: 1.25; }
+    .ad-tool-desc { display: block; font-size: 0.72rem; color: var(--text-light); line-height: 1.5; margin-top: 0.3rem; }
+
+    .ad-foot {
+      background: var(--encre); color: rgba(255,255,255,0.7);
+      padding: 1.5rem var(--ad-gutter); font-size: 0.75rem; text-align: center;
+    }
+
+    .ad-export-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+    .ad-export-card { background: #fff; border: 1px solid #E3DED4; padding: 0.9rem 1rem; }
+    .ad-export-card h3 { font-size: 0.72rem; font-weight: 700; color: var(--encre); margin-bottom: 0.45rem; }
+    .ad-export-row {
       display: flex; justify-content: space-between; gap: 0.5rem;
-      font-size: 0.8rem; color: #777; padding: 0.15rem 0;
+      font-size: 0.72rem; color: var(--text-light); padding: 0.1rem 0;
     }
-    .admin-export-card .row strong { color:#1a1a1a; font-weight: 600; }
-    .admin-tech-note {
-      font-size: 0.75rem; color: #999; margin-top: 1rem;
-    }
-    .admin-tools-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
-    }
-    .admin-tool-card, .admin-tool-card-full {
-      display: flex; align-items: flex-start; gap: 0.9rem;
-      background: #fff; border: 1px solid #ebebeb; color: inherit;
-      border-radius: var(--radius-md); padding: 1.25rem; text-decoration: none;
-      transition: border-color .15s, box-shadow .15s, transform .15s;
-    }
-    .admin-tool-card:hover, .admin-tool-card-full:hover {
-      border-color:#12157A; box-shadow: 0 4px 12px rgba(18,21,122,.1); transform: translateY(-2px);
-    }
-    .admin-tool-card-full { margin-top: 1rem; }
-    .admin-tool-card .admin-tool-icon, .admin-tool-card-full .admin-tool-icon {
-      flex-shrink: 0; font-size: 1.3rem; line-height: 1; color:#12157A;
-      width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
-      background: rgba(18,21,122,.08); border-radius: 50%;
-    }
-    .admin-tool-card h3, .admin-tool-card-full h3 {
-      font-family:'DM Sans',sans-serif; font-weight: 700; font-size: 1.05rem; color:#1a1a1a;
-      margin-bottom: 0.35rem;
-    }
-    .admin-tool-card p, .admin-tool-card-full p { font-size: 0.88rem; color: #777; line-height: 1.55; }
+    .ad-export-row strong { color: var(--encre); font-weight: 600; }
+    .ad-tech { font-size: 0.7rem; color: #9A9AA8; margin-top: 0.9rem; }
 
-    footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 0;font-size:.8rem;text-align:center}
-    footer a{color: var(--warm);text-decoration:none}
+    @media (max-width: 60rem) {
+      .ad-stats { grid-template-columns: 1fr 1fr; }
+      .ad-hero-tools { grid-template-columns: 1fr; }
+      .ad-tools { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 40rem) {
+      .ad-stats { grid-template-columns: 1fr; }
+      .ad-tools { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
 
-<div class="page-hero">
-  <div class="container">
+<header class="ad-head">
+  <div class="ad-head-inner">
     <div>
-      <h1 class="page-title">Espace professionnel</h1>
-      <p class="page-lead">Bienvenue ! Retrouvez ici les outils utilisés par l'équipe pour la réserve patrimoniale et les magasins 2e/5e/6e étage.</p>
+      <p class="ad-eyebrow">Espace professionnel</p>
+      <h1>Réserve &amp; magasins</h1>
     </div>
-    <div class="hero-actions">
-      <a href="index.html">← Retour au site</a>
-      <button type="button" id="admin-logout">Se déconnecter</button>
+    <div class="ad-head-actions">
+      <span class="ad-sync" id="ad-sync">
+        <span class="ad-sync-dot" id="ad-sync-dot" aria-hidden="true"></span>
+        <span id="ad-sync-text">Synchronisation…</span>
+      </span>
+      <a href="index.html">← Site public</a>
+      <button type="button" id="admin-logout">Déconnexion</button>
     </div>
+  </div>
+</header>
+
+<div class="ad-shell">
+  <div class="ad-page">
+
+    <!-- ── Chiffres d'inventaire (rapports de build) ── -->
+    <div id="ad-inventory">
+      <p class="ad-tech">Chargement des rapports de build…</p>
+    </div>
+
+    <!-- ── Avancement du récolement ── -->
+    <section class="ad-progress" id="ad-progress" hidden>
+      <div class="ad-progress-head">
+        <span class="ad-progress-title">Avancement du récolement — réserve</span>
+        <span class="ad-progress-sub" id="ad-progress-sub"></span>
+      </div>
+      <div class="ad-bar" id="ad-bar"></div>
+      <div class="ad-legend" id="ad-legend"></div>
+    </section>
+
+    <!-- ── Trois outils du quotidien ── -->
+    <div class="ad-hero-tools">
+      <a href="reserve.html" class="ad-hero-tool">
+        <span class="ad-hero-icon"><i class="fa-solid fa-map" aria-hidden="true"></i></span>
+        <span class="ad-hero-title">Plan des magasins</span>
+        <span class="ad-hero-desc">Travées, colonnes, armoires et taux d'occupation de la réserve patrimoniale, de la Réserve Douaisienne et des magasins 2e/5e/6e étage, calculés d'après le récolement.</span>
+        <span class="ad-hero-foot">
+          <span class="ad-hero-meta">5 locaux couverts</span>
+          <span class="ad-hero-open">Ouvrir →</span>
+        </span>
+      </a>
+      <a href="recolement.html" class="ad-hero-tool">
+        <span class="ad-hero-icon"><i class="fa-solid fa-barcode" aria-hidden="true"></i></span>
+        <span class="ad-hero-title">Récolement</span>
+        <span class="ad-hero-desc">Scannez les codes-barres pour enregistrer la travée, la colonne et l'étage de chaque document, et compter les non-catalogués.</span>
+        <span class="ad-hero-foot">
+          <span class="ad-hero-meta" id="ad-meta-recolement">—</span>
+          <span class="ad-hero-open">Ouvrir →</span>
+        </span>
+      </a>
+      <a href="rotobib.html" class="ad-hero-tool">
+        <span class="ad-hero-icon"><i class="fa-solid fa-recycle" aria-hidden="true"></i></span>
+        <span class="ad-hero-title">Rotobib</span>
+        <span class="ad-hero-desc">Fiche, date de parution, historique de prêts, puis décision : conserver, pilon, braderie ou relocalisation. Export .txt par traitement pour le panier SIGB.</span>
+        <span class="ad-hero-foot">
+          <span class="ad-hero-meta" id="ad-meta-rotobib">—</span>
+          <span class="ad-hero-open">Ouvrir →</span>
+        </span>
+      </a>
+    </div>
+
+    <!-- ── Catalogue & autres outils ── -->
+    <div class="ad-section-head">
+      <span class="ad-section-title">Catalogue &amp; autres outils</span>
+      <span class="ad-section-rule" aria-hidden="true"></span>
+    </div>
+    <div class="ad-tools">
+      <a href="magasins.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-book" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">Catalogue des magasins</span>
+        <span class="ad-tool-desc">Exemplaires des 2e, 5e et 6e étage (adulte et jeunesse).</span>
+      </a>
+      <a href="exemplarisation.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-tag" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">Exemplarisation rapide</span>
+        <span class="ad-tool-desc">Créer un exemplaire (cote, code-barre, emplacement, photo) sans notice complète.</span>
+      </a>
+      <a href="reliures.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-link" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">Gestion des reliures</span>
+        <span class="ad-tool-desc">Grouper les documents reliés dans un même volume, et repérer les groupes en conflit.</span>
+      </a>
+      <a href="analyse-cotes.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-ruler-combined" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">Analyse des cotes</span>
+        <span class="ad-tool-desc">Trous, disponibilités et doublons de cotes.</span>
+      </a>
+      <a href="transfert-magasins.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-box" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">Transfert 2e étage</span>
+        <span class="ad-tool-desc">Registre papier, puis exemplarisation une fois le livre retrouvé.</span>
+      </a>
+      <a href="desherbage-stats.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-chart-column" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">Statistiques de prêt</span>
+        <span class="ad-tool-desc">Prêts par année, répartition par usage, liste triable.</span>
+      </a>
+      <a href="livres-spolies.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">Livres spoliés</span>
+        <span class="ad-tool-desc">Recherche croisée et suivi des restitutions.</span>
+      </a>
+      <a href="scan-docs.html" class="ad-tool">
+        <span class="ad-tool-icon"><i class="fa-solid fa-crop-simple" aria-hidden="true"></i></span>
+        <span class="ad-tool-name">ScanDocs</span>
+        <span class="ad-tool-desc">Rognage et renommage des images numérisées.</span>
+      </a>
+    </div>
+
   </div>
 </div>
 
-<div class="container admin-page">
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <h2>État de l'inventaire</h2>
-      <p>Le nombre de documents connus, réparti par réserve, avec l'évolution depuis le dernier export Syracuse.</p>
-    </div>
-    <div id="admin-inventory">
-      <p class="admin-stat-note">Chargement des rapports de build…</p>
-    </div>
-  </section>
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <h2>Magasins</h2>
-      <p>Récolement et désherbage des collections (réserve patrimoniale, Réserve Douaisienne et magasins 2e/5e/6e étage), et le plan qui en résulte.</p>
-    </div>
-    <div class="admin-tools-grid">
-      <a href="recolement.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-barcode"></i></span>
-        <span>
-          <h3>Récolement</h3>
-          <p>Scannez les codes-barres avec une scannette pour enregistrer la travée, la colonne et l'étage de chaque document.</p>
-        </span>
-      </a>
-      <a href="rotobib.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-recycle"></i></span>
-        <span>
-          <h3>Rotobib — Désherbage assisté</h3>
-          <p>Scannez un code-barre pour voir sa fiche, sa date de parution et son historique de prêts, puis décidez : conserver, pilon, braderie ou relocalisation. Export .txt par traitement pour ajout panier SIGB.</p>
-        </span>
-      </a>
-    </div>
-    <a href="reserve.html" class="admin-tool-card-full">
-      <span class="admin-tool-icon"><i class="fa-solid fa-map"></i></span>
-      <span>
-        <h3>Plan des Magasins</h3>
-        <p>Le plan des travées, colonnes et armoires de la réserve patrimoniale, de la Réserve Douaisienne et des magasins 2e/5e/6e étage, avec le taux d'occupation calculé d'après le récolement.</p>
-      </span>
-    </a>
-  </section>
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <h2>Catalogue</h2>
-      <p>Le catalogue, séparé de la réserve patrimoniale, des collections conservées aux 2e, 5e et 6e étages (adulte et jeunesse), extrait de l'export complet de la bibliothèque.</p>
-    </div>
-    <a href="magasins.html" class="admin-tool-card-full">
-      <span class="admin-tool-icon"><i class="fa-solid fa-book"></i></span>
-      <span>
-        <h3>Catalogue des magasins</h3>
-        <p>Recherchez, triez et parcourez les exemplaires des magasins 2e, 5e et 6e étage (adulte et jeunesse).</p>
-      </span>
-    </a>
-  </section>
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <h2>Autres outils</h2>
-      <p>Exemplarisation, reliures, analyse du classement, transfert du 2e étage, préparation des scans et suivi des ouvrages à restituer.</p>
-    </div>
-    <div class="admin-tools-grid">
-      <a href="exemplarisation.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-tag"></i></span>
-        <span>
-          <h3>Exemplarisation rapide</h3>
-          <p>Créez un exemplaire (titre, auteur, date, cote, code-barre, emplacement, photo) sans notice bibliographique complète, en attendant son vrai catalogage.</p>
-        </span>
-      </a>
-      <a href="reliures.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-link"></i></span>
-        <span>
-          <h3>Gestion des reliures</h3>
-          <p>Reliez à la main des documents catalogués séparément mais physiquement dans le même volume, pour que le récolement les récole automatiquement ensemble. Signale aussi les groupes dont les emplacements récolés ne concordent pas.</p>
-        </span>
-      </a>
-      <a href="analyse-cotes.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-ruler-combined"></i></span>
-        <span>
-          <h3>Analyse des cotes</h3>
-          <p>Repère les trous, les disponibilités et les doublons de cotes, calculés à partir du récolement.</p>
-        </span>
-      </a>
-      <a href="transfert-magasins.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-box"></i></span>
-        <span>
-          <h3>Transfert 2e étage → Réserve</h3>
-          <p>Recopiez depuis le registre papier les livres non catalogués à ramener du 2e étage, puis exemplarisez-les (cote, code-barre, emplacement) une fois retrouvés en réserve patrimoniale.</p>
-        </span>
-      </a>
-      <a href="desherbage-stats.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-chart-column"></i></span>
-        <span>
-          <h3>Statistiques de prêt</h3>
-          <p>Vue d'ensemble purement statistique de l'export de désherbage : prêts totaux par année, répartition des exemplaires par usage, et liste triable pour repérer le livre le plus emprunté.</p>
-        </span>
-      </a>
-      <a href="livres-spolies.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-book-open"></i></span>
-        <span>
-          <h3>Livres spoliés</h3>
-          <p>Recherche croisée avec le catalogue et suivi (retrouvé, ex-libris, ancien possesseur) des ouvrages à restituer.</p>
-        </span>
-      </a>
-      <a href="scan-docs.html" class="admin-tool-card">
-        <span class="admin-tool-icon"><i class="fa-solid fa-crop-simple"></i></span>
-        <span>
-          <h3>ScanDocs — Rognage &amp; renommage</h3>
-          <p>Prépare les images scannées (rognage, renommage par cote) avant intégration au fonds numérisé.</p>
-        </span>
-      </a>
-    </div>
-  </section>
-
-</div>
-
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale</p>
-  </div>
+<footer class="ad-foot">
+  <p>Bibliothèques de Douai — Réserve patrimoniale</p>
 </footer>
 
 <script>
@@ -283,15 +308,18 @@
     return iso ? new Date(iso).toLocaleString('fr-FR') : '—';
   }
 
+  function nf(n) { return n != null ? n.toLocaleString('fr-FR') : '—'; }
+
   function deltaBadge(current, previous) {
     if (current == null || previous == null) return '';
     var diff = current - previous;
-    if (diff === 0) return '<span class="admin-delta flat">= inchangé</span>';
-    var cls = diff > 0 ? 'up' : 'down';
+    if (diff === 0) return '<span class="ad-delta ad-delta--flat">= inchangé</span>';
+    var cls = diff > 0 ? 'ad-delta--up' : 'ad-delta--down';
     var sign = diff > 0 ? '+' : '';
-    return '<span class="admin-delta ' + cls + '">' + sign + diff + ' depuis l\'export précédent</span>';
+    return '<span class="ad-delta ' + cls + '">' + sign + nf(diff) + '</span>';
   }
 
+  // ══ Chiffres d'inventaire (identiques à avant : rapports de build) ══
   Promise.all([
     fetchJsonOrNull('data/build-report.json'),
     fetchJsonOrNull('data/build-report-previous.json'),
@@ -302,8 +330,8 @@
     var magCurrent = results[2], magPrevious = results[3];
 
     if (!current && !magCurrent) {
-      document.getElementById('admin-inventory').innerHTML =
-        '<p class="admin-stat-note">Rapports de build indisponibles.</p>';
+      document.getElementById('ad-inventory').innerHTML =
+        '<p class="ad-tech">Rapports de build indisponibles.</p>';
       return;
     }
 
@@ -315,8 +343,7 @@
     var patrimoniale = s.reservePatrimoniale;
     var douaisienne = s.reserveDouaisienne;
     var magasins = ms.kept;
-    var reserves = (patrimoniale != null && douaisienne != null)
-      ? patrimoniale + douaisienne : null;
+    var reserves = (patrimoniale != null && douaisienne != null) ? patrimoniale + douaisienne : null;
     var total = ms.keptTotalDouai;
 
     var patrimonialePrev = sp.reservePatrimoniale;
@@ -326,48 +353,128 @@
       ? patrimonialePrev + douaisiennePrev : null;
     var totalPrev = msp.keptTotalDouai;
 
-    var html = '';
-    html += '<div class="admin-total-card">' +
-      '<div class="value">' + (total != null ? total.toLocaleString('fr-FR') : '—') + '</div>' +
-      '<div class="label">documents au total (export complet)</div>' +
-      deltaBadge(total, totalPrev) +
+    var html = '<div class="ad-stats">';
+
+    html += '<div class="ad-stat-total">' +
+      '<div class="ad-stat-label">Documents au total</div>' +
+      '<div class="ad-stat-row">' +
+        '<span class="ad-stat-value">' + nf(total) + '</span>' +
+        deltaBadge(total, totalPrev) +
+      '</div>' +
+      '<div class="ad-stat-note">Export complet de la bibliothèque · ' +
+        formatDate(magCurrent && magCurrent.generatedAt) + '</div>' +
       '</div>';
 
-    html += '<div class="admin-stats-grid">';
-    html += branchCard('Magasins 2e/5e/6e étage', magasins, magasinsPrev);
-    html += branchCard('Réserves (patrimoniale + Douaisienne)', reserves, reservesPrev);
+    html += statCard('Magasins 2e/5e/6e', magasins, magasinsPrev);
+    html += statCard('Réserves patrimoniale + Douaisienne', reserves, reservesPrev);
     html += '</div>';
 
-    html += '<div class="admin-export-dates">';
+    html += '<div class="ad-export-cards">';
     html += exportCard('Réserve (patrimoniale + Douaisienne)', current, previous);
     html += exportCard('Magasins 2e/5e/6e étage', magCurrent, magPrevious);
     html += '</div>';
 
     if (s.joinRate != null || (ms.byEtage && ms.byEtage['6e'] != null)) {
-      html += '<p class="admin-tech-note">Détails techniques : ' +
+      html += '<p class="ad-tech">Détails techniques : ' +
         (s.joinRate != null ? 'taux de jointure réserve ' + s.joinRate + '% (' + (s.orphans || 0) + ' orphelins)' : '') +
         (s.joinRate != null && ms.byEtage ? ' — ' : '') +
-        (ms.byEtage ? 'magasins : ' + (ms.byEtage['2e/5e'] || 0) + ' au 2e/5e étage, ' + (ms.byEtage['6e'] || 0) + ' au 6e étage' : '') +
+        (ms.byEtage ? 'magasins : ' + nf(ms.byEtage['2e/5e'] || 0) + ' au 2e/5e étage, ' + nf(ms.byEtage['6e'] || 0) + ' au 6e étage' : '') +
         '.</p>';
     }
 
-    document.getElementById('admin-inventory').innerHTML = html;
+    document.getElementById('ad-inventory').innerHTML = html;
+
+    /* Le dénominateur de la barre d'avancement, c'est le nombre de notices de
+       la réserve — il vient du même rapport de build. */
+    loadRecolement(s.notices);
   });
 
-  function branchCard(label, value, previousValue) {
-    return '<div class="admin-stat-card admin-branch-card">' +
-      '<div class="value">' + (value != null ? value.toLocaleString('fr-FR') : '—') + '</div>' +
-      '<div class="label">' + label + ' ' + deltaBadge(value, previousValue) + '</div>' +
+  function statCard(label, value, previousValue) {
+    return '<div class="ad-stat-card">' +
+      '<div class="ad-stat-label">' + label + '</div>' +
+      '<div class="ad-stat-value">' + nf(value) + '</div>' +
+      deltaBadge(value, previousValue) +
       '</div>';
   }
 
   function exportCard(label, current, previous) {
-    return '<div class="admin-export-card">' +
-      '<h4>' + label + '</h4>' +
-      '<div class="row"><span>Export Syracuse actuel</span><strong>' + formatDate(current && current.generatedAt) + '</strong></div>' +
-      '<div class="row"><span>Export précédent</span><strong>' + formatDate(previous && previous.generatedAt) + '</strong></div>' +
+    return '<div class="ad-export-card">' +
+      '<h3>' + label + '</h3>' +
+      '<div class="ad-export-row"><span>Export Syracuse actuel</span><strong>' + formatDate(current && current.generatedAt) + '</strong></div>' +
+      '<div class="ad-export-row"><span>Export précédent</span><strong>' + formatDate(previous && previous.generatedAt) + '</strong></div>' +
       '</div>';
   }
+
+  // ══ Avancement du récolement ══════════════════════════════════════════
+  /* Deux segments seulement — « récolées » et « jamais récolées » — là où la
+     planche 2b en montrait trois. Le troisième (« à cataloguer ») ne
+     correspond à aucune donnée réelle : les estimations `nonCatalogues` du
+     récolement comptent des documents qui, par définition, ne sont PAS dans le
+     catalogue, donc pas dans le dénominateur. Les additionner aurait produit un
+     pourcentage faux sur un tableau de bord que l'équipe lit comme une source
+     de vérité. Voir « Statistiques avancées » de recolement.html pour le
+     détail par catégorie. */
+  function setSync(ok, text) {
+    document.getElementById('ad-sync-dot').classList.toggle('ad-sync-dot--off', !ok);
+    document.getElementById('ad-sync-text').textContent = text;
+  }
+
+  function isMagasinTravee(t) {
+    return /^M[256]-/.test(String(t || ''));
+  }
+
+  function loadRecolement(noticesReserve) {
+    fetch('/api/recolement')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(state) {
+        if (!state) { setSync(false, 'État partagé indisponible'); return; }
+
+        var scans = state.scans || [];
+        var reserveBarcodes = new Set();
+        scans.forEach(function(s) {
+          if (!isMagasinTravee(s.travee)) reserveBarcodes.add(s.barcode);
+        });
+
+        setSync(true, 'Synchronisé · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+        document.getElementById('ad-meta-recolement').textContent =
+          nf(scans.length) + ' scans enregistrés';
+
+        if (noticesReserve == null || !noticesReserve) return;
+
+        var done = Math.min(reserveBarcodes.size, noticesReserve);
+        var rest = noticesReserve - done;
+        var pct = Math.round(100 * done / noticesReserve);
+
+        document.getElementById('ad-progress-sub').textContent =
+          nf(noticesReserve) + ' notices de réserve';
+        document.getElementById('ad-bar').innerHTML =
+          '<span style="width:' + pct + '%;background:var(--bleu)"></span>' +
+          '<span style="width:' + (100 - pct) + '%;background:#D9D4C8"></span>';
+        document.getElementById('ad-legend').innerHTML =
+          legendItem('var(--bleu)', 'Récolées', done, pct) +
+          legendItem('#D9D4C8', 'Jamais récolées', rest, 100 - pct);
+        document.getElementById('ad-progress').hidden = false;
+      })
+      .catch(function() { setSync(false, 'État partagé injoignable'); });
+  }
+
+  function legendItem(color, label, n, pct) {
+    return '<span class="ad-legend-item">' +
+      '<span class="ad-swatch" style="background:' + color + '"></span>' +
+      label + ' <strong>' + nf(n) + '</strong> <em>' + pct + ' %</em>' +
+      '</span>';
+  }
+
+  // ══ Compteur Rotobib ══════════════════════════════════════════════════
+  fetch('/api/desherbage')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(state) {
+      if (!state) return;
+      var n = Object.keys(state).length;
+      document.getElementById('ad-meta-rotobib').textContent =
+        nf(n) + ' traitement' + (n > 1 ? 's' : '') + ' enregistré' + (n > 1 ? 's' : '');
+    })
+    .catch(function() { /* le compteur reste à « — » */ });
 })();
 </script>
 

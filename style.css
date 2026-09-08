@@ -4,21 +4,48 @@
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Palette « Révision design » (planche 1d, 2026-09-08).
+   Elle remplace l'ancienne palette or/vert par celle du rollup patrimoine.
+
+   Point de vigilance qui motive tout le reste : le corail #F44E62 du rollup
+   ne monte qu'à 3,0:1 sur le papier #F7F5F0 — en dessous du seuil de lecture
+   de 4,5:1, donc illisible en texte courant pour beaucoup de lecteurs. Il est
+   réservé aux APLATS et aux très gros titres posés sur le bleu (3,6:1, ce qui
+   passe le seuil « grande taille » de 3:1). Pour tout ce qui est réellement
+   lu — liens, surtitres, emphase, petits libellés — c'est le carmin #B4213C
+   (6,1:1) qui sert : même famille chromatique, mais lisible.
+
+   Les noms historiques (--warm, --accent…) sont conservés : ils sont employés
+   dans une quinzaine de pages, les renommer aurait touché tout le projet sans
+   rien changer au rendu. --warm porte donc désormais le carmin, et --accent le
+   bleu Patrimoine. Les tokens explicites ci-dessous (--carmin, --corail…) sont
+   là pour le code neuf, qui n'a plus à deviner ce que « warm » veut dire. */
 :root {
-  --ink: #1a1a2e;
-  --ink-soft: #2a2a44;
-  --paper: #faf8f4;
-  --cream: #f3efe8;
-  --warm: #c9a96e;
-  --warm-light: #e8d5b0;
-  --warm-dark: #a07d3f;
-  --accent: #2d5a4a;
-  --accent-light: #e6f0ec;
-  --red: #b94a48;
-  --blue: #3a7ca5;
-  --text: #3a3a4a;
-  --text-light: #6e6e7e;
-  --border: #e4dfd6;
+  --ink: #14183F;
+  --ink-soft: #3E3E52;
+  --paper: #F7F5F0;
+  --cream: #EFEBE2;
+  --warm: #B4213C;
+  --warm-light: #FFCAD7;
+  --warm-dark: #8E1A30;
+  --accent: #101E8C;
+  --accent-light: #E6E8F7;
+  --red: #A0182F;
+  --blue: #101E8C;
+  --text: #3E3E52;
+  --text-light: #6B6B7B;
+  --border: #DDD8CD;
+
+  /* Tokens nommés de la planche 1d — à préférer dans tout code nouveau. */
+  --papier: #F7F5F0;         /* fond de toutes les pages */
+  --papier-ombre: #EFEBE2;   /* sections alternées, barres latérales */
+  --encre: #14183F;          /* texte, bandeaux, boutons pleins */
+  --bleu: #101E8C;           /* titres de données, chiffres, bandeaux */
+  --carmin: #B4213C;         /* emphase, liens, surtitres — 6,1:1 sur papier */
+  --corail: #F44E62;         /* APLATS et très gros titres sur bleu, jamais en texte */
+  --rose: #FFCAD7;           /* surtitres et italiques sur bleu */
+  --trait: #DDD8CD;          /* filets et séparateurs sur papier */
+  --trait-fort: #D6D0C3;     /* bordures de champs et de cartes sur papier ombré */
   --shadow: 0 2px 20px rgba(26,26,46,0.06);
   --shadow-hover: 0 8px 32px rgba(26,26,46,0.12);
   --radius: 12px;
@@ -2210,3 +2237,270 @@ ul { list-style: none; }
       line-height: 1.5;
     }
     .maplibregl-popup-content strong { font-size: .9rem; }
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCUEIL ÉDITORIAL — planche 1a de « Révision design » (2026-09-08)
+
+   Remplace l'ancien accueil (hero + carrousel d'expositions + accordéon
+   « Venir consulter » / « Trouver un document »). L'inventaire a quitté cette
+   page pour inventaire.html ; les informations pratiques de l'accordéon sont
+   descendues dans le bloc .rp-pratique en bas de page.
+
+   Les règles .page-hero / .accordion-* / .expo-* / .inventory-toolbar plus
+   haut dans ce fichier ne servent donc plus à aucune page live. Elles sont
+   laissées en place volontairement : elles font ~400 lignes, ne coûtent rien
+   à l'exécution, et _archive/ n'a pas été revérifié page par page.
+
+   Angles droits partout : la planche ne pose de rayon que sur les pastilles
+   (--radius reste défini pour les autres pages, qui s'en servent encore).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rp-header,
+.rp-hero,
+.rp-expo,
+.rp-fonds,
+.rp-pratique { --rp-gutter: clamp(1.25rem, 4vw, 2.5rem); }
+
+/* ── En-tête ─────────────────────────────────────────────────────────────── */
+.rp-header {
+  background: var(--encre);
+  color: #fff;
+}
+.rp-header-inner {
+  max-width: 1240px; margin: 0 auto;
+  padding: 0.9rem var(--rp-gutter);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem; flex-wrap: wrap;
+}
+.rp-brand { display: flex; align-items: center; gap: 0.7rem; color: #fff; }
+.rp-brand-mark {
+  width: 34px; height: 34px; flex-shrink: 0;
+  /* Corail en aplat, avec l'encre par-dessus : le seul emploi du corail qui
+     tienne le contraste (cf. l'en-tête de la planche 1a). */
+  background: var(--corail); color: var(--encre);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.2rem;
+  line-height: 1;
+}
+.rp-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+.rp-brand-name { font-family: var(--font-display); font-weight: 400; font-size: 1rem; }
+.rp-brand-sub {
+  font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: rgba(255,255,255,0.62); margin-top: 0.15rem;
+}
+.rp-nav { display: flex; align-items: center; gap: 1.6rem; flex-wrap: wrap; }
+.rp-nav-link {
+  font-size: 0.8rem; font-weight: 500; color: rgba(255,255,255,0.7);
+  padding-bottom: 3px; border-bottom: 2px solid transparent;
+  transition: color var(--transition), border-color var(--transition);
+}
+.rp-nav-link:hover { color: #fff; }
+.rp-nav-link--current { color: #fff; border-bottom-color: var(--corail); }
+.rp-nav-cta {
+  font-size: 0.8rem; font-weight: 500; color: #fff;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 0.4rem 0.8rem;
+  transition: background var(--transition);
+}
+.rp-nav-cta:hover { background: rgba(255,255,255,0.22); }
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.rp-hero {
+  display: grid; grid-template-columns: 1.15fr 0.85fr; align-items: stretch;
+  background: var(--papier);
+}
+.rp-hero-editorial { padding: clamp(2.5rem, 5vw, 3.5rem) var(--rp-gutter); }
+.rp-eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--carmin); margin-bottom: 1.4rem;
+}
+.rp-hero-title {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(3rem, 7.5vw, 5.125rem); line-height: 0.86;
+  letter-spacing: -0.02em; color: var(--encre); margin-bottom: 1.25rem;
+}
+.rp-hero-title span { color: var(--carmin); }
+.rp-hero-lead {
+  font-size: 1rem; line-height: 1.65; color: var(--ink-soft);
+  max-width: 44ch; margin-bottom: 1.6rem;
+}
+.rp-hero-actions { display: flex; gap: 0.65rem; flex-wrap: wrap; }
+.rp-btn { font-size: 0.85rem; font-weight: 600; display: inline-block; }
+.rp-btn--solid {
+  background: var(--encre); color: #fff; padding: 0.85rem 1.4rem;
+  transition: background var(--transition);
+}
+.rp-btn--solid:hover { background: var(--bleu); color: #fff; }
+.rp-btn--outline {
+  border: 1.5px solid var(--encre); color: var(--encre); padding: 0.72rem 1.4rem;
+  transition: background var(--transition), color var(--transition);
+}
+.rp-btn--outline:hover { background: var(--encre); color: #fff; }
+.rp-hero-stats {
+  display: flex; gap: clamp(1.5rem, 4vw, 2.25rem); flex-wrap: wrap;
+  margin-top: 2.4rem; padding-top: 1.6rem; border-top: 1px solid var(--trait);
+}
+.rp-stat-value {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 1.875rem; line-height: 1; color: var(--bleu);
+}
+.rp-stat-label {
+  font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-light); margin-top: 0.4rem;
+}
+
+/* Portrait : image désaturée en fond de bleu, voilée de corail vers le bas,
+   plus un léger tramage horizontal — le traitement de la planche 1a. */
+.rp-hero-portrait { position: relative; background: var(--bleu); overflow: hidden; min-height: 32.5rem; }
+.rp-hero-portrait > span { position: absolute; inset: 0; display: block; }
+.rp-hero-portrait-img {
+  background-size: cover; background-position: center 18%;
+  filter: grayscale(1) contrast(1.25);
+  mix-blend-mode: screen; opacity: 0.9;
+}
+.rp-hero-portrait-wash {
+  background: linear-gradient(180deg, rgba(16,30,140,0.15) 0%, rgba(244,78,98,0.42) 78%, rgba(244,78,98,0.6) 100%);
+  mix-blend-mode: multiply;
+}
+.rp-hero-portrait-lines {
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,0.12) 0 1px, transparent 1px 4px);
+}
+.rp-hero-portrait-caption {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 1.6rem 1.75rem;
+  background: linear-gradient(180deg, transparent, rgba(16,30,140,0.92));
+}
+.rp-hero-portrait-name {
+  font-family: var(--font-display); font-weight: 400; font-style: italic;
+  font-size: 1.3rem; color: var(--rose); line-height: 1.25;
+}
+.rp-hero-portrait-meta {
+  font-size: 0.72rem; color: rgba(255,255,255,0.78); margin-top: 0.4rem;
+}
+
+/* ── Bandeau exposition ──────────────────────────────────────────────────── */
+.rp-expo {
+  background: var(--encre); color: #fff;
+  padding: 1.6rem var(--rp-gutter);
+  display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap;
+}
+.rp-expo-eyebrow {
+  font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--corail);
+}
+.rp-expo-title {
+  font-family: var(--font-display); font-weight: 400; font-size: 1.6rem;
+  flex: 1; min-width: 17.5rem; line-height: 1.2;
+}
+.rp-expo-cta {
+  background: var(--corail); color: var(--encre);
+  font-size: 0.82rem; font-weight: 700; padding: 0.7rem 1.25rem;
+  transition: filter var(--transition);
+}
+.rp-expo-cta:hover { filter: brightness(1.08); color: var(--encre); }
+
+/* ── Les fonds ───────────────────────────────────────────────────────────── */
+.rp-fonds { padding: clamp(2.25rem, 5vw, 2.875rem) var(--rp-gutter); background: var(--papier); }
+.rp-section-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.4rem; }
+.rp-section-title {
+  font-family: var(--font-display); font-weight: 600; font-size: 1.625rem;
+  color: var(--encre);
+}
+.rp-section-rule { flex: 1; height: 1px; background: var(--trait); }
+.rp-section-link { font-size: 0.78rem; font-weight: 600; color: var(--carmin); white-space: nowrap; }
+.rp-section-link:hover { color: var(--encre); }
+
+.rp-fonds-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.15rem; }
+.rp-fonds-card {
+  background: #fff; border: 1px solid #E3DED4;
+  display: flex; flex-direction: column; color: inherit;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.rp-fonds-card:hover {
+  border-color: var(--bleu); box-shadow: 0 6px 20px rgba(20,24,63,0.10);
+  transform: translateY(-2px); color: inherit;
+}
+.rp-fonds-cover {
+  display: block; height: 8.25rem; position: relative;
+  background-size: cover; background-position: center;
+}
+.rp-fonds-era {
+  position: absolute; left: 0; bottom: 0;
+  background: var(--encre); color: #fff;
+  font-size: 0.66rem; letter-spacing: 0.1em; padding: 0.32rem 0.6rem;
+}
+.rp-fonds-body {
+  padding: 1rem 1.05rem 1.15rem;
+  display: flex; flex-direction: column; gap: 0.45rem; flex: 1;
+}
+.rp-fonds-name {
+  font-family: var(--font-display); font-weight: 600; font-size: 1.125rem;
+  color: var(--encre); line-height: 1.2;
+}
+.rp-fonds-desc { font-size: 0.82rem; line-height: 1.6; color: var(--text); flex: 1; }
+.rp-fonds-more { font-size: 0.78rem; font-weight: 600; color: var(--carmin); margin-top: 0.25rem; }
+
+/* ── Informations pratiques ──────────────────────────────────────────────── */
+.rp-pratique {
+  background: var(--papier-ombre); border-top: 1px solid var(--trait);
+  padding: clamp(2.25rem, 5vw, 2.875rem) var(--rp-gutter) 0;
+}
+.rp-pratique-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.125rem; }
+.rp-pratique-title {
+  font-family: var(--font-body);
+  font-size: 0.7rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--carmin);
+  padding-bottom: 0.55rem; border-bottom: 1px solid var(--trait-fort); margin-bottom: 0.9rem;
+}
+.rp-pratique-title--second { margin-top: 1.5rem; }
+.rp-horaire {
+  display: flex; justify-content: space-between; gap: 1rem;
+  font-size: 0.82rem; padding: 0.32rem 0;
+  border-bottom: 1px dotted var(--trait-fort); color: var(--ink-soft);
+}
+.rp-horaire dt { font-weight: 500; }
+.rp-horaire--closed { color: #9A9AA8; }
+.rp-pratique-note { font-size: 0.78rem; color: var(--text-light); margin-top: 0.9rem; line-height: 1.6; }
+.rp-dashed li {
+  font-size: 0.82rem; line-height: 1.55; color: var(--ink-soft);
+  padding-left: 0.9rem; position: relative; margin-bottom: 0.55rem;
+}
+.rp-dashed li::before { content: '—'; position: absolute; left: 0; color: var(--carmin); }
+.rp-adresse { font-size: 0.82rem; line-height: 1.6; color: var(--ink-soft); margin-bottom: 0.9rem; }
+.rp-map {
+  height: 11.25rem; border: 1px solid var(--trait-fort); background: #fff; margin-bottom: 0.9rem;
+}
+.rp-contact { font-size: 0.82rem; line-height: 1.9; }
+.rp-contact a { color: var(--carmin); font-weight: 600; }
+.rp-contact a:hover { color: var(--encre); }
+
+.rp-pratique-foot {
+  margin-top: 2.25rem; padding: 1.1rem 0;
+  border-top: 1px solid var(--trait-fort);
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  font-size: 0.75rem; color: var(--text-light);
+}
+.rp-admin-trigger {
+  width: 2rem; height: 2rem; flex-shrink: 0;
+  border: 1px solid var(--trait-fort); background: #fff; color: var(--text-light);
+  font-size: 0.9rem; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color var(--transition), color var(--transition);
+}
+.rp-admin-trigger:hover { border-color: var(--bleu); color: var(--bleu); }
+
+/* ── Adaptatif ───────────────────────────────────────────────────────────── */
+@media (max-width: 60rem) {
+  .rp-hero { grid-template-columns: 1fr; }
+  .rp-hero-portrait { min-height: 20rem; order: -1; }
+  .rp-fonds-grid { grid-template-columns: 1fr 1fr; }
+  .rp-pratique-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 40rem) {
+  .rp-header-inner { flex-direction: column; align-items: flex-start; gap: 0.9rem; }
+  .rp-nav { gap: 1rem; }
+  .rp-fonds-grid { grid-template-columns: 1fr; }
+  .rp-pratique-grid { grid-template-columns: 1fr; }
+  .rp-expo { flex-direction: column; align-items: flex-start; }
+}
