@@ -167,7 +167,6 @@
         <div class="stat-card"><div class="stat-card-label">Notices localisées</div><div class="stat-card-val" id="sn">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Emplacements totaux</div><div class="stat-card-val" id="st">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Catalogués</div><div class="stat-card-val cat" id="so">—</div></div>
-        <div class="stat-card"><div class="stat-card-label">Exemplarisés rapidement</div><div class="stat-card-val manuel" id="so-manuel">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Non catalogués (estimé)</div><div class="stat-card-val noncat" id="so-noncat">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Vides confirmés</div><div class="stat-card-val green" id="sv">—</div></div>
         <div class="stat-card"><div class="stat-card-label">Non rangés</div><div class="stat-card-val nonrange" id="so-nonrange">—</div></div>
@@ -857,7 +856,6 @@ function updateStats(){
   });
   document.getElementById('st').textContent=total.toLocaleString('fr-FR');
   document.getElementById('so').textContent=cat.toLocaleString('fr-FR');
-  document.getElementById('so-manuel').textContent=manuel.toLocaleString('fr-FR');
   document.getElementById('so-noncat').textContent=noncat.toLocaleString('fr-FR');
   document.getElementById('sv').textContent=vide.toLocaleString('fr-FR');
   document.getElementById('so-nonrange').textContent=nonrange.toLocaleString('fr-FR');
