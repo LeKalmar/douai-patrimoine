@@ -26,7 +26,7 @@
 (function () {
   'use strict';
 
-  var PAGE_SIZE = 20;
+  var PAGE_SIZE = 10;
 
   /* Nombre de valeurs listées par facette. Au-delà, la traîne est faite de
      variantes d'orthographe à un ou deux exemplaires (« Parisiis », « A
