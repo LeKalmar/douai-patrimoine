@@ -113,6 +113,15 @@
     .notices-modal-close{position:absolute;top:.75rem;right:.75rem;width:28px;height:28px;border:none;background:#f0f0f0;border-radius:50%;cursor:pointer;font-size:.9rem;color:#555;line-height:1}
     .notices-modal-close:hover{background:#e0e0e0}
     .notices-modal .notices-list{max-height:55vh}
+    /* Publication en iframe (voir js/parent-page-height.js) : une surcouche
+       `position:fixed` se placerait par rapport à l'iframe ENTIÈRE, haute
+       comme le document et non comme l'écran — donc hors de vue. Rendue
+       absolue, elle se cale sur le document, et openNoticesModal() amène la
+       page hôte sur la boîte de dialogue. Les hauteurs en vh vaudraient de
+       même une fraction de la hauteur du document : en pixels ici. */
+    html.rp-embedded .notices-modal{position:absolute}
+    html.rp-embedded .notices-modal-box{max-height:520px}
+    html.rp-embedded .notices-modal .notices-list{max-height:340px}
     .sh-title{font-size:.74rem;font-weight:700;color:#1a1a1a;margin-bottom:.4rem;padding-bottom:.35rem;border-bottom:1px solid #f0f0f0}
     .sh-row{display:flex;align-items:flex-start;gap:.4rem;padding:.2rem 0}
     .sh-cote{font-family:monospace;font-size:.66rem;color:#12157A;font-weight:700;white-space:nowrap;flex-shrink:0;padding-top:1px}
@@ -123,6 +132,11 @@
     footer a{color: var(--warm);text-decoration:none}
     @media(max-width:600px){.stats-row{grid-template-columns:repeat(2,1fr)}}
   </style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
 </head>
 <body>
 
@@ -927,7 +941,16 @@ function scrollToHighlight(content){
   if(row) row.scrollIntoView({block:'center'});
 }
 function openNoticesModal(){
-  document.getElementById('notices-modal').hidden=false;
+  const modal=document.getElementById('notices-modal');
+  modal.hidden=false;
+  /* En iframe, la modale est posée dans le document (voir le CSS
+     .rp-embedded plus haut) : on amène la page hôte dessus, sinon elle
+     s'ouvrirait à un endroit de la page que le visiteur ne regarde pas.
+     scrollIntoView traverse la frontière d'iframe. */
+  if(window.rpEmbed && window.rpEmbed.isEmbedded){
+    modal.querySelector('.notices-modal-box')
+         .scrollIntoView({behavior:'smooth', block:'center'});
+  }
 }
 function closeNoticesModal(){
   document.getElementById('notices-modal').hidden=true;

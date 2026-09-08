@@ -2505,17 +2505,22 @@ ul { list-style: none; }
 }
 
 /* ── Publication en iframe ───────────────────────────────────────────────────
-   La classe .rp-embedded est posée sur <html> par js/parent-page-height.js
-   quand la page est ouverte dans une iframe (site du réseau des
-   bibliothèques). Règle de base de ce mode : à l'intérieur de l'iframe, plus
-   aucun défilement de page — la hauteur du document est envoyée au site hôte
-   qui redimensionne l'iframe, et le visiteur ne fait défiler que le site hôte.
-   Une page calée sur la hauteur de l'écran (html/body en height:100% +
-   overflow:hidden) rendrait cette mesure impossible : elle vaudrait toujours
-   la hauteur actuelle de l'iframe, sans jamais refléter le contenu. */
-html.rp-embedded,
-html.rp-embedded body {
-  height: auto;
-  min-height: 0;
-  overflow: visible;
+   Les pages du site sont affichées dans une iframe sur le site du réseau des
+   bibliothèques ; js/parent-page-height.js envoie la hauteur du contenu à la
+   page hôte, qui redimensionne l'iframe — un seul défilement, celui du site
+   hôte. La règle de base du mode (rendre au document une hauteur naturelle,
+   donc mesurable) est injectée par le script lui-même : toutes les pages du
+   projet ne chargent pas cette feuille. Ne restent ici que les corrections
+   propres aux pages qui la chargent.
+
+   Une surcouche `position:fixed; inset:0` n'a plus de sens dans une iframe
+   dimensionnée d'après son contenu : elle se place par rapport à l'iframe
+   ENTIÈRE — haute comme le document, pas comme l'écran — donc le plus souvent
+   hors de ce que le visiteur a sous les yeux. La modale de connexion à
+   l'espace pro est ancrée en bas du document, là où se trouve le bouton ⚙ qui
+   vient de l'ouvrir : le visiteur regarde justement cette zone. */
+html.rp-embedded .admin-modal {
+  position: absolute;
+  inset: auto 0 0 0;
+  min-height: 22rem;
 }

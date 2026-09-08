@@ -108,7 +108,21 @@
   }
   #loupe canvas { position: absolute; top: 0; left: 0; }
   @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* Publication en iframe (voir js/parent-page-height.js) : la page est bâtie
+     comme une application plein écran (header + main en flex:1). Une fois la
+     hauteur d'écran retirée pour que le contenu soit mesurable, main n'a plus
+     rien à occuper et se replierait — on lui fixe donc une hauteur, en pixels
+     et jamais en vh : dans une iframe dimensionnée d'après son contenu, vh
+     dépendrait de ce contenu. Hors iframe, rien ne change. */
+  html.rp-embedded main{height:700px}
+  @media (max-width:900px){html.rp-embedded main{height:560px}}
 </style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
 </head>
 <body>
 <header>

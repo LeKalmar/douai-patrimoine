@@ -123,6 +123,11 @@
     .gaps-filter-info.visible{display:block}
     .export-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
   </style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
 </head>
 <body>
 

@@ -222,6 +222,11 @@
   footer a{color:#c9a96e;text-decoration:none}
   @media(max-width:640px){.loc-readout{margin-left:0;order:99;width:100%;text-align:center}.travee-mini-panel{max-width:none}}
 </style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
 </head>
 <body>
 

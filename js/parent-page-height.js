@@ -43,6 +43,28 @@
 
     if (embedded && document.documentElement) {
         document.documentElement.classList.add('rp-embedded');
+        injectBaseStyle();
+    }
+
+    /* Règle de base du mode intégré, injectée ici plutôt que posée dans une
+       feuille de styles : les pages du projet ne chargent pas toutes les mêmes
+       (six d'entre elles ignorent style.css), et cette règle est indissociable
+       du mécanisme — une page qui inclut le script doit l'avoir, quels que
+       soient ses styles. Elle rend au document une hauteur naturelle : une
+       page calée sur la hauteur de l'écran (html/body en height:100% ou
+       min-height:100vh, + overflow:hidden) mesurerait toujours la hauteur
+       actuelle de l'iframe, jamais celle de son contenu.
+       La spécificité (0,1,1) / (0,1,2) passe devant les `html, body { … }` des
+       pages, où qu'ils soient déclarés. */
+    function injectBaseStyle() {
+        var host = document.head || document.documentElement;
+        if (!host || document.getElementById('rp-embed-base-style')) return;
+        var style = document.createElement('style');
+        style.id = 'rp-embed-base-style';
+        style.textContent =
+            'html.rp-embedded, html.rp-embedded body {' +
+            ' height: auto; min-height: 0; overflow: visible; }';
+        host.appendChild(style);
     }
 
     /* Petite API pour le reste du site : js/inventaire.js s'en sert pour

@@ -184,8 +184,7 @@ aujourd'hui — un navigateur ne télécharge que les faces réellement appelée
 
 ## Publication en iframe sur le site du réseau
 
-Les pages publiques (`index.html`, `inventaire.html`, `histoire-du-livre.html`)
-ne sont pas seulement servies par Vercel : elles sont affichées dans une
+Le site n'est pas seulement servi par Vercel : il est affiché dans une
 **iframe** sur le site du réseau des bibliothèques. Une iframe garde la
 hauteur que lui donne la page hôte — dès que le contenu est plus haut, elle
 se dote de sa propre barre de défilement et le visiteur se retrouve avec deux
@@ -200,49 +199,59 @@ du contenu et l'envoie à la page hôte, qui redimensionne l'iframe. Message —
 sans ce bout de code côté hôte, rien de tout ceci n'opère et l'iframe garde
 sa hauteur fixe.
 
-Quatre choses à savoir avant de toucher à une page publique :
+Le script est inclus **dans `<head>`, sans `defer`**, sur **toutes les pages
+du site sauf `visionneuse.html`** (2026-09-08 ; seule `index.html` l'avait
+auparavant — d'où le double défilement dès qu'on ouvrait `inventaire.html` ou
+`histoire-du-livre.html`, la navigation se faisant à l'intérieur de la même
+iframe). Toute nouvelle page doit l'inclure de la même façon. L'exception :
+`visionneuse.html` est toujours affichée dans un cadre à hauteur fixe — la
+modale/le bloc de `js/inventaire.js`, ou l'iframe du site hôte — et ce cadre
+EST son écran ; son `height: calc(100vh)` est donc correct tel quel, et lui
+faire mesurer sa propre hauteur n'aurait aucun sens.
 
-- **Le script s'inclut dans `<head>`, sans `defer`** (2026-09-08). Il pose la
-  classe `rp-embedded` sur `<html>` avant le premier rendu — c'est elle qui
-  déclenche les mises en page d'intégration ci-dessous. Toute **nouvelle page
-  publique** susceptible d'être ouverte dans l'iframe doit l'inclure : la
-  navigation se fait à l'intérieur de la même iframe, une page qui n'enverrait
-  pas sa hauteur ramènerait le double défilement (c'était le cas d'
-  `inventaire.html` et de `histoire-du-livre.html` jusqu'au 2026-09-08 — seule
-  `index.html` l'incluait).
+Quatre choses à savoir avant de toucher à une page :
+
+- **La classe `rp-embedded`** est posée sur `<html>` par le script, avant le
+  premier rendu (d'où le chargement sans `defer`). C'est elle qui déclenche
+  les mises en page d'intégration. Le script injecte lui-même la règle de base
+  du mode — `html.rp-embedded, html.rp-embedded body { height:auto;
+  min-height:0; overflow:visible }` — plutôt que de la laisser dans
+  `style.css` : six pages du projet ne chargent pas cette feuille, et cette
+  règle est indissociable du mécanisme.
 - **La hauteur se mesure sur `<body>`, jamais sur
   `documentElement.scrollHeight`** : ce dernier vaut au minimum la hauteur que
   la page hôte vient de donner à l'iframe, il ne redescendrait donc jamais
   quand le contenu raccourcit (changement de page de résultats, filtre,
   fermeture d'un panneau) — la hauteur ne ferait que grandir à chaque mesure.
-  Corollaire : une page qui se cale sur la hauteur de l'écran
-  (`html, body { height:100%; overflow:hidden }`) n'est pas mesurable ; le bloc
-  `.rp-embedded` de `style.css` lui rend une hauteur naturelle.
+  Corollaire : une page calée sur la hauteur de l'écran
+  (`html, body { height:100%; overflow:hidden }`, ou `min-height:100vh`) n'est
+  pas mesurable ; c'est ce que la règle de base ci-dessus neutralise.
 - **Pas d'unité `vh` dans une mise en page d'intégration.** L'iframe est
   dimensionnée d'après son contenu, donc `1vh` vaut 1 % d'une hauteur qui
   dépend elle-même du contenu : la page grandirait un peu à chaque mesure.
-  Les hauteurs de `.rp-embedded` sont en pixels.
-  `histoire-du-livre.html` est le cas type : bâtie comme une application plein
-  écran (`#main-container` en `flex:1`), elle se replierait sur presque rien
-  une fois la hauteur d'écran retirée. `css/main.css` lui donne, sous
-  `html.rp-embedded`, une hauteur explicite (640 px, 520 px sous 900 px de
-  large, 420 px sous 600 px). **Hors iframe, rien ne change** : la page reste
-  en plein écran comme avant.
+  Toutes les hauteurs sous `.rp-embedded` sont en pixels. Deux pages sont
+  bâties comme des applications plein écran et se replieraient sans hauteur
+  d'écran à occuper : `histoire-du-livre.html` (`#main-container`, 640 px —
+  520 px sous 900 px de large, 420 px sous 600 px, dans `css/main.css`) et
+  `scan-docs.html` (`main`, 700 px / 560 px, dans sa propre balise `<style>`).
+  **Hors iframe, ces deux pages ne changent pas** : elles restent plein écran.
 - **`position: fixed` ne veut plus rien dire** dans une iframe dimensionnée
   d'après son contenu : la surcouche se place par rapport à l'iframe ENTIÈRE
   (dont la hauteur vaut celle du document, pas celle de l'écran), donc le plus
   souvent hors de ce que le visiteur a sous les yeux — le clic semble n'avoir
-  aucun effet. D'où le double rendu de la visionneuse dans `js/inventaire.js`
-  (2026-09-08) : surcouche plein écran hors iframe
-  (`openVisionneuse()`), bloc inséré dans le flux sous la notice en iframe
-  (`openVisionneuseInline()`, hauteur en pixels elle aussi, puis
-  `scrollIntoView()` — qui, lui, traverse la frontière d'iframe et fait
-  défiler la page hôte). `window.rpEmbed` (`isEmbedded`, `refresh()`) est la
-  petite API exposée par `js/parent-page-height.js` pour ces cas. **Reste
-  connu** : la modale de connexion à l'espace pro d'`index.html`
-  (`.admin-modal`, `position:fixed`) n'a pas été traitée — elle s'ouvre hors
-  écran quand la page hôte est défilée jusqu'au bouton ⚙ ; l'équipe passe par
-  l'URL Vercel directe.
+  aucun effet. Trois traitements dans le projet : la visionneuse de
+  `js/inventaire.js` a un second rendu, **dans le flux** sous la notice
+  (`openVisionneuseInline()`, puis `scrollIntoView()` — qui, lui, traverse la
+  frontière d'iframe et fait défiler la page hôte) ; la modale de connexion à
+  l'espace pro d'`index.html` est **ancrée en bas du document** (`style.css`,
+  `html.rp-embedded .admin-modal`), là où se trouve le bouton ⚙ qui vient de
+  l'ouvrir ; la modale des notices de `reserve.html` passe en `absolute` et
+  `openNoticesModal()` amène la page hôte dessus. Une surcouche positionnée
+  d'après la souris (loupes de `scan-docs.html`/`exemplarisation.html`,
+  infobulles de `reserve.html`/`desherbage-stats.html`) n'a en revanche rien à
+  changer : sans défilement interne, coordonnées client et coordonnées
+  document coïncident. `window.rpEmbed` (`isEmbedded`, `refresh()`) est la
+  petite API exposée par le script pour ces cas.
 
 Les deux cartes MapLibre (`js/main.js` pour l'exposition, la carte « Nous
 trouver » d'`index.html`) passent en **gestes coopératifs**
@@ -252,6 +261,14 @@ visiteur se croit bloqué. Ctrl (⌘) + molette continue de zoomer. Textes
 d'aide en français — passés dans l'option elle-même en MapLibre 3.6.2
 (exposition), via `locale` en 4.7.1 (accueil) : l'API a changé entre les deux
 versions épinglées.
+
+Limite assumée : un élément `position: sticky; top: 0` calé sur le défilement
+de la page (la barre d'emplacement `.locbar` de `recolement.html`) ne colle
+plus une fois intégré — il n'y a plus de défilement de page à l'intérieur de
+l'iframe, et le défilement du site hôte est hors de portée. Les en-têtes de
+tableaux collants, eux, sont dans des conteneurs à défilement interne et
+continuent de fonctionner. L'équipe utilise de toute façon l'URL Vercel
+directe pour les outils internes.
 
 ## Flux de données
 
