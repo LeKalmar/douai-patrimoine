@@ -45,7 +45,7 @@
      « Livres d'Artiste ». */
   var FONDS_IMAGES_EXTRA = {
     'Imprimés': 'images/documents.jpg',
-    "Livres d'Artiste": 'images/patrimoine-2.jpg',
+    "Livres d'Artiste": 'images/patrimoine-3.jpg',
     'Réserve Douaisienne': 'images/hospice.jpg'
   };
 

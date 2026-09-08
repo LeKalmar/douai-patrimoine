@@ -2477,7 +2477,6 @@ ul { list-style: none; }
 
 .rp-pratique-foot {
   margin-top: 2.25rem; padding: 1.1rem 0;
-  border-top: 1px solid var(--trait-fort);
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   font-size: 0.75rem; color: var(--text-light);
 }
