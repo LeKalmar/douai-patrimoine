@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
   <style>
     body { background: var(--cream); }
     .admin-page { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
@@ -101,9 +103,9 @@
     }
     .admin-tool-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
     .admin-tool-card .admin-tool-icon {
-      flex-shrink: 0; font-size: 1.6rem; line-height: 1;
+      flex-shrink: 0; font-size: 1.3rem; line-height: 1; color: var(--blue);
       width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
-      background: var(--accent-light); border-radius: 50%;
+      background: rgba(58, 124, 165, 0.12); border-radius: 50%;
     }
     .admin-tool-card h3 {
       font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; color: var(--ink);
@@ -119,9 +121,9 @@
     }
     .admin-tool-card-full:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
     .admin-tool-card-full .admin-tool-icon {
-      flex-shrink: 0; font-size: 1.6rem; line-height: 1;
+      flex-shrink: 0; font-size: 1.3rem; line-height: 1; color: var(--blue);
       width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
-      background: var(--accent-light); border-radius: 50%;
+      background: rgba(58, 124, 165, 0.12); border-radius: 50%;
     }
     .admin-tool-card-full h3 {
       font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; color: var(--ink);
@@ -160,14 +162,14 @@
     </div>
     <div class="admin-tools-grid">
       <a href="recolement.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📷</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-barcode"></i></span>
         <span>
           <h3>Récolement</h3>
           <p>Scannez les codes-barres avec une scannette pour enregistrer la travée, la colonne et l'étage de chaque document.</p>
         </span>
       </a>
       <a href="rotobib.html" class="admin-tool-card">
-        <span class="admin-tool-icon">♻️</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-recycle"></i></span>
         <span>
           <h3>Rotobib — Désherbage assisté</h3>
           <p>Scannez un code-barre pour voir sa fiche, sa date de parution et son historique de prêts, puis décidez : conserver, pilon, braderie ou relocalisation. Export .txt par traitement pour ajout panier SIGB.</p>
@@ -175,7 +177,7 @@
       </a>
     </div>
     <a href="reserve.html" class="admin-tool-card-full">
-      <span class="admin-tool-icon">🗺️</span>
+      <span class="admin-tool-icon"><i class="fa-solid fa-map"></i></span>
       <span>
         <h3>Plan des Magasins</h3>
         <p>Le plan des travées, colonnes et armoires de la réserve patrimoniale, de la Réserve Douaisienne et des magasins 2e/5e/6e étage, avec le taux d'occupation calculé d'après le récolement.</p>
@@ -189,7 +191,7 @@
       <p>Le catalogue, séparé de la réserve patrimoniale, des collections conservées aux 2e, 5e et 6e étages (adulte et jeunesse), extrait de l'export complet de la bibliothèque.</p>
     </div>
     <a href="magasins.html" class="admin-tool-card-full">
-      <span class="admin-tool-icon">📚</span>
+      <span class="admin-tool-icon"><i class="fa-solid fa-book"></i></span>
       <span>
         <h3>Catalogue des magasins</h3>
         <p>Recherchez, triez et parcourez les exemplaires des magasins 2e, 5e et 6e étage (adulte et jeunesse).</p>
@@ -204,49 +206,49 @@
     </div>
     <div class="admin-tools-grid">
       <a href="exemplarisation.html" class="admin-tool-card">
-        <span class="admin-tool-icon">🏷️</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-tag"></i></span>
         <span>
           <h3>Exemplarisation rapide</h3>
           <p>Créez un exemplaire (titre, auteur, date, cote, code-barre, emplacement, photo) sans notice bibliographique complète, en attendant son vrai catalogage.</p>
         </span>
       </a>
       <a href="reliures.html" class="admin-tool-card">
-        <span class="admin-tool-icon">🔗</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-link"></i></span>
         <span>
           <h3>Gestion des reliures</h3>
           <p>Reliez à la main des documents catalogués séparément mais physiquement dans le même volume, pour que le récolement les récole automatiquement ensemble. Signale aussi les groupes dont les emplacements récolés ne concordent pas.</p>
         </span>
       </a>
       <a href="analyse-cotes.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📐</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-ruler-combined"></i></span>
         <span>
           <h3>Analyse des cotes</h3>
           <p>Repère les trous, les disponibilités et les doublons de cotes, calculés à partir du récolement.</p>
         </span>
       </a>
       <a href="transfert-magasins.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📦</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-box"></i></span>
         <span>
           <h3>Transfert 2e étage → Réserve</h3>
           <p>Recopiez depuis le registre papier les livres non catalogués à ramener du 2e étage, puis exemplarisez-les (cote, code-barre, emplacement) une fois retrouvés en réserve patrimoniale.</p>
         </span>
       </a>
       <a href="desherbage-stats.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📊</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-chart-column"></i></span>
         <span>
           <h3>Statistiques de prêt</h3>
           <p>Vue d'ensemble purement statistique de l'export de désherbage : prêts totaux par année, répartition des exemplaires par usage, et liste triable pour repérer le livre le plus emprunté.</p>
         </span>
       </a>
       <a href="livres-spolies.html" class="admin-tool-card">
-        <span class="admin-tool-icon">📖</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-book-open"></i></span>
         <span>
           <h3>Livres spoliés</h3>
           <p>Recherche croisée avec le catalogue et suivi (retrouvé, ex-libris, ancien possesseur) des ouvrages à restituer.</p>
         </span>
       </a>
       <a href="scan-docs.html" class="admin-tool-card">
-        <span class="admin-tool-icon">🖼️</span>
+        <span class="admin-tool-icon"><i class="fa-solid fa-crop-simple"></i></span>
         <span>
           <h3>ScanDocs — Rognage &amp; renommage</h3>
           <p>Prépare les images scannées (rognage, renommage par cote) avant intégration au fonds numérisé.</p>
