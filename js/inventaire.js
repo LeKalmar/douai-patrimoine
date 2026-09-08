@@ -983,7 +983,9 @@ function buildExpandedContent(rec, lienNum) {
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Consulter le document numérisé`;
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      openVisionneuse(numVal, rec['200$a'] || '');
+      // Le bouton sert d'ancre : en iframe, la visionneuse s'ouvre juste
+      // sous cette notice plutôt qu'en surcouche (voir openVisionneuse).
+      openVisionneuse(numVal, rec['200$a'] || '', btn);
     });
     infoCol.appendChild(btn);
   }
@@ -1182,15 +1184,53 @@ function compareCotes(a, b) {
 }
 
 // ══════════════════════════════════════════
-//  Modale visionneuse
+//  Visionneuse (surcouche ou dans le flux)
 // ══════════════════════════════════════════
 
+const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>`;
+
 /**
- * Ouvre la visionneuse patrimoniale dans une modale plein-écran.
- * @param {string} dossier  – valeur de la colonne "num" (identifiant du dossier dans le manifeste)
- * @param {string} titre    – titre du document, pour l'aria-label
+ * Vrai quand la page est affichée dans l'iframe du site hôte.
+ * js/parent-page-height.js pose window.rpEmbed ; le repli couvre le cas où
+ * cette page serait ouverte sans ce script.
  */
-function openVisionneuse(dossier, titre) {
+function isEmbedded() {
+  if (window.rpEmbed && typeof window.rpEmbed.isEmbedded === 'boolean') {
+    return window.rpEmbed.isEmbedded;
+  }
+  try { return window.self !== window.top; } catch (e) { return true; }
+}
+
+/** Prévient le site hôte que la hauteur du contenu vient de changer. */
+function notifyHeight() {
+  if (window.rpEmbed && window.rpEmbed.refresh) window.rpEmbed.refresh();
+}
+
+/**
+ * Ouvre la visionneuse patrimoniale.
+ *
+ * Deux rendus selon le contexte :
+ *  - hors iframe : la surcouche plein écran habituelle ;
+ *  - dans l'iframe du site hôte : un bloc inséré dans le flux, sous la
+ *    notice. Une surcouche `position:fixed` s'y placerait par rapport à
+ *    l'iframe ENTIÈRE — dont la hauteur vaut celle du contenu, pas celle de
+ *    l'écran — donc le plus souvent très au-dessus de ce que le visiteur a
+ *    sous les yeux : le clic semblerait n'avoir aucun effet.
+ *
+ * @param {string}  dossier    – valeur de la colonne "num" (identifiant du dossier dans le manifeste)
+ * @param {string}  titre      – titre du document, pour l'aria-label
+ * @param {Element} [anchorEl] – bouton d'où part l'ouverture ; sert, en mode
+ *                               intégré, à insérer la visionneuse juste sous
+ *                               la notice concernée.
+ */
+function openVisionneuse(dossier, titre, anchorEl) {
+  if (isEmbedded()) {
+    openVisionneuseInline(dossier, titre, anchorEl);
+    return;
+  }
+
   // Créer la modale si elle n'existe pas encore
   let overlay = document.getElementById('visionneuse-overlay');
   if (!overlay) {
@@ -1203,9 +1243,7 @@ function openVisionneuse(dossier, titre) {
         <div class="visionneuse-modal-bar">
           <span class="visionneuse-modal-title" id="visionneuse-modal-title"></span>
           <button class="visionneuse-close-btn" id="visionneuse-close-btn" aria-label="Fermer la visionneuse">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            ${CLOSE_ICON}
             Fermer
           </button>
         </div>
@@ -1218,94 +1256,7 @@ function openVisionneuse(dossier, titre) {
       if (e.target === overlay) closeVisionneuse();
     });
 
-    // Injecter le CSS de la modale
-    if (!document.getElementById('visionneuse-modal-style')) {
-      const style = document.createElement('style');
-      style.id = 'visionneuse-modal-style';
-      style.textContent = `
-        #visionneuse-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 9999;
-          background: rgba(20, 16, 12, 0.78);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5rem;
-          backdrop-filter: blur(3px);
-          animation: visionneuse-fadein 0.18s ease;
-        }
-        @keyframes visionneuse-fadein {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        .visionneuse-modal {
-          background: #1a1714;
-          border-radius: 10px;
-          width: 100%;
-          max-width: 1400px;
-          height: calc(100vh - 3rem);
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          box-shadow: 0 24px 64px rgba(0,0,0,0.6);
-          animation: visionneuse-slidein 0.2s ease;
-        }
-        @keyframes visionneuse-slidein {
-          from { transform: translateY(12px) scale(0.98); opacity: 0; }
-          to   { transform: none; opacity: 1; }
-        }
-        .visionneuse-modal-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.55rem 1rem 0.55rem 1.25rem;
-          background: #111;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
-          flex-shrink: 0;
-        }
-        .visionneuse-modal-title {
-          font-family: Georgia, serif;
-          font-size: 0.85rem;
-          color: rgba(255,255,255,0.65);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: calc(100% - 140px);
-        }
-        .visionneuse-close-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.35rem;
-          padding: 0.3rem 0.75rem;
-          border: 1px solid rgba(255,255,255,0.18);
-          border-radius: 20px;
-          background: transparent;
-          color: rgba(255,255,255,0.75);
-          font-family: inherit;
-          font-size: 0.78rem;
-          cursor: pointer;
-          transition: background 0.15s, color 0.15s;
-          flex-shrink: 0;
-        }
-        .visionneuse-close-btn:hover {
-          background: rgba(255,255,255,0.1);
-          color: #fff;
-        }
-        .visionneuse-iframe {
-          flex: 1;
-          border: none;
-          width: 100%;
-          display: block;
-        }
-        @media (max-width: 600px) {
-          #visionneuse-overlay { padding: 0; }
-          .visionneuse-modal { border-radius: 0; height: 100vh; }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
+    ensureVisionneuseStyle();
     document.body.appendChild(overlay);
     document.getElementById('visionneuse-close-btn').addEventListener('click', closeVisionneuse);
   }
@@ -1314,8 +1265,7 @@ function openVisionneuse(dossier, titre) {
   document.getElementById('visionneuse-modal-title').textContent = titre || 'Document numérisé';
   overlay.setAttribute('aria-label', `Visionneuse — ${titre || 'Document numérisé'}`);
 
-  const src = `visionneuse.html?dossier=${encodeURIComponent(dossier)}`;
-  document.getElementById('visionneuse-iframe').src = src;
+  document.getElementById('visionneuse-iframe').src = visionneuseSrc(dossier);
 
   overlay.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -1325,10 +1275,82 @@ function openVisionneuse(dossier, titre) {
   document.addEventListener('keydown', overlay._escHandler);
 }
 
+/**
+ * Rendu « dans le flux », utilisé quand le site est publié en iframe : la
+ * visionneuse s'ouvre sous la notice, la page grandit, le site hôte
+ * redimensionne l'iframe et le visiteur ne fait défiler que la page hôte.
+ * Sa hauteur est fixée en pixels et jamais en vh : dans une iframe
+ * dimensionnée d'après son contenu, vh dépend de ce contenu (voir le bloc
+ * .rp-embedded de css/main.css).
+ */
+function openVisionneuseInline(dossier, titre, anchorEl) {
+  ensureVisionneuseStyle();
+  closeVisionneuse();               // une seule visionneuse ouverte à la fois
+
+  const label = titre || 'Document numérisé';
+
+  const box = document.createElement('section');
+  box.id = 'visionneuse-inline';
+  box.className = 'visionneuse-inline';
+  box.setAttribute('role', 'region');
+  box.setAttribute('aria-label', `Visionneuse — ${label}`);
+  box.innerHTML = `
+    <div class="visionneuse-modal-bar">
+      <span class="visionneuse-modal-title"></span>
+      <button type="button" class="visionneuse-close-btn" aria-label="Fermer la visionneuse">
+        ${CLOSE_ICON}
+        Fermer
+      </button>
+    </div>
+    <iframe class="visionneuse-inline-frame" title="Visionneuse patrimoniale" allowfullscreen></iframe>`;
+
+  box.querySelector('.visionneuse-modal-title').textContent = label;
+  box.querySelector('.visionneuse-close-btn').addEventListener('click', closeVisionneuse);
+  box.querySelector('iframe').src = visionneuseSrc(dossier);
+  box._escHandler = e => { if (e.key === 'Escape') closeVisionneuse(); };
+  document.addEventListener('keydown', box._escHandler);
+  if (anchorEl) box._anchor = anchorEl;
+
+  /* Insertion : après le bloc de détail de la notice quand la structure de la
+     page le permet (inventaire.html : .inv-item > .inv-row + .inv-detail),
+     sinon juste après le bouton — le rendu en tableau de cette bibliothèque
+     place le détail dans un <tr>, où un <section> frère serait invalide. */
+  const detail = anchorEl && anchorEl.closest('.inv-detail, .inv-row-expanded');
+  const item   = detail && detail.closest('.inv-item');
+  if (item && detail.parentNode === item) {
+    item.insertBefore(box, detail.nextSibling);
+  } else if (anchorEl && anchorEl.parentNode) {
+    anchorEl.parentNode.insertBefore(box, anchorEl.nextSibling);
+  } else {
+    document.body.appendChild(box);
+  }
+
+  /* La hauteur part tout de suite vers le site hôte ; on n'amène la
+     visionneuse à l'écran qu'ensuite, une fois l'iframe agrandie, sinon le
+     défilement viserait une position qui n'existe pas encore. */
+  notifyHeight();
+  setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
+}
+
+/** Ferme la visionneuse, quel que soit son mode d'ouverture. */
 function closeVisionneuse() {
+  const box = document.getElementById('visionneuse-inline');
+  if (box) {
+    // Vider l'iframe avant de retirer le bloc pour libérer les ressources
+    const frame = box.querySelector('iframe');
+    if (frame) frame.src = '';
+    if (box._escHandler) document.removeEventListener('keydown', box._escHandler);
+    const anchor = box._anchor;
+    box.remove();
+    notifyHeight();
+    if (anchor && anchor.isConnected) {
+      anchor.focus({ preventScroll: true });
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
   const overlay = document.getElementById('visionneuse-overlay');
   if (!overlay) return;
-  // Vider l'iframe avant de cacher pour libérer les ressources
   const iframe = document.getElementById('visionneuse-iframe');
   if (iframe) iframe.src = '';
   overlay.style.display = 'none';
@@ -1337,6 +1359,118 @@ function closeVisionneuse() {
     document.removeEventListener('keydown', overlay._escHandler);
     overlay._escHandler = null;
   }
+}
+
+function visionneuseSrc(dossier) {
+  return `visionneuse.html?dossier=${encodeURIComponent(dossier)}`;
+}
+
+/** Injecte (une seule fois) le CSS des deux rendus de la visionneuse. */
+function ensureVisionneuseStyle() {
+  if (document.getElementById('visionneuse-modal-style')) return;
+  const style = document.createElement('style');
+  style.id = 'visionneuse-modal-style';
+  style.textContent = `
+    #visionneuse-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(20, 16, 12, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      backdrop-filter: blur(3px);
+      animation: visionneuse-fadein 0.18s ease;
+    }
+    @keyframes visionneuse-fadein {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .visionneuse-modal {
+      background: #1a1714;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 1400px;
+      height: calc(100vh - 3rem);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      animation: visionneuse-slidein 0.2s ease;
+    }
+    @keyframes visionneuse-slidein {
+      from { transform: translateY(12px) scale(0.98); opacity: 0; }
+      to   { transform: none; opacity: 1; }
+    }
+    .visionneuse-modal-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 1rem 0.55rem 1.25rem;
+      background: #111;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .visionneuse-modal-title {
+      font-family: Georgia, serif;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.65);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: calc(100% - 140px);
+    }
+    .visionneuse-close-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.75rem;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 20px;
+      background: transparent;
+      color: rgba(255,255,255,0.75);
+      font-family: inherit;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .visionneuse-close-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .visionneuse-iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
+      display: block;
+    }
+    @media (max-width: 600px) {
+      #visionneuse-overlay { padding: 0; }
+      .visionneuse-modal { border-radius: 0; height: 100vh; }
+    }
+
+    /* ── Rendu dans le flux (site publié en iframe) ──────────────────── */
+    .visionneuse-inline {
+      display: flex;
+      flex-direction: column;
+      background: #1a1714;
+      border: 1px solid #E3DED4;
+      border-top: none;
+      overflow: hidden;
+      animation: visionneuse-fadein 0.18s ease;
+    }
+    .visionneuse-inline-frame {
+      border: none;
+      width: 100%;
+      display: block;
+      height: 720px;
+    }
+    @media (max-width: 900px) { .visionneuse-inline-frame { height: 560px; } }
+    @media (max-width: 600px) { .visionneuse-inline-frame { height: 440px; } }
+  `;
+  document.head.appendChild(style);
 }
 
 // Exposer globalement (utile si appelé depuis d'autres scripts)

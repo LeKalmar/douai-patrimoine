@@ -769,3 +769,40 @@ body {
     outline-offset: 2px;
     filter: brightness(1.3) drop-shadow(0 0 6px rgba(255,255,255,0.8));
 }
+#portal .panel-body {
+  padding-top: 0;
+}
+
+/* ========================================================
+   PUBLICATION EN IFRAME
+   --------------------------------------------------------
+   Cette page est bâtie comme une application plein écran : html/body en
+   height:100% + overflow:hidden, #main-container en flex:1 pour occuper
+   ce qui reste de l'écran. Dans l'iframe du site hôte, cette hauteur
+   d'écran n'existe plus — js/parent-page-height.js rend au document sa
+   hauteur naturelle pour pouvoir la mesurer (voir le bloc .rp-embedded de
+   style.css), et #main-container, qui n'avait que `flex:1`, se replierait
+   alors sur la hauteur de son contenu le plus court, c'est-à-dire à peu
+   près rien : la carte disparaîtrait.
+
+   On lui donne donc ici une hauteur explicite, EN PIXELS. Surtout pas en
+   vh : dans une iframe redimensionnée d'après son contenu, 1vh vaut 1 %
+   de la hauteur de l'iframe, qui dépend elle-même de la hauteur du
+   contenu — la page grandirait un peu à chaque mesure.
+
+   La classe .rp-embedded est posée par js/parent-page-height.js. Hors
+   iframe (site ouvert directement), rien ne change : la page reste en
+   plein écran comme avant.
+   ======================================================== */
+html.rp-embedded #main-container {
+    flex: none;
+    height: 640px;
+}
+
+@media (max-width: 900px) {
+    html.rp-embedded #main-container { height: 520px; }
+}
+
+@media (max-width: 600px) {
+    html.rp-embedded #main-container { height: 420px; }
+}

@@ -111,11 +111,25 @@ function formatTitle(str) {
 /* ============================================================
    INITIALISATION DE LA CARTE
    ============================================================ */
+/* Publication en iframe (voir js/parent-page-height.js) : le seul défilement
+   est alors celui du site hôte. Sans « gestes coopératifs », la molette
+   au-dessus de la carte zoomerait au lieu de faire défiler la page — un
+   visiteur qui arrive sur la carte se croirait bloqué au milieu de
+   l'exposition. Ctrl (⌘ sur Mac) + molette continue de zoomer, et un seul
+   doigt sur mobile fait défiler la page au lieu de déplacer la carte.
+   Hors iframe, la carte garde son comportement habituel. */
+const EMBEDDED = document.documentElement.classList.contains('rp-embedded');
+
 const map = new maplibregl.Map({
     container: 'map',
     style: 'js/douai-livres-style.json',
     center: [3.0799, 50.3693],
-    zoom: 15
+    zoom: 15,
+    cooperativeGestures: EMBEDDED && {
+        windowsHelpText: 'Utilisez Ctrl + molette pour zoomer',
+        macHelpText:     'Utilisez ⌘ + molette pour zoomer',
+        mobileHelpText:  'Utilisez deux doigts pour déplacer la carte'
+    }
 });
 
 map.on('load', async () => {

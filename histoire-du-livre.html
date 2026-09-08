@@ -22,6 +22,12 @@
 
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="style.css">
+
+    <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+         qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+         Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+         rendu. Voir js/parent-page-height.js. -->
+    <script src="js/parent-page-height.js"></script>
 </head>
 <body>
     <section class="page-hero">

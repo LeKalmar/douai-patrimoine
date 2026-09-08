@@ -2503,3 +2503,19 @@ ul { list-style: none; }
   .rp-pratique-grid { grid-template-columns: 1fr; }
   .rp-expo { flex-direction: column; align-items: flex-start; }
 }
+
+/* ── Publication en iframe ───────────────────────────────────────────────────
+   La classe .rp-embedded est posée sur <html> par js/parent-page-height.js
+   quand la page est ouverte dans une iframe (site du réseau des
+   bibliothèques). Règle de base de ce mode : à l'intérieur de l'iframe, plus
+   aucun défilement de page — la hauteur du document est envoyée au site hôte
+   qui redimensionne l'iframe, et le visiteur ne fait défiler que le site hôte.
+   Une page calée sur la hauteur de l'écran (html/body en height:100% +
+   overflow:hidden) rendrait cette mesure impossible : elle vaudrait toujours
+   la hauteur actuelle de l'iframe, sans jamais refléter le contenu. */
+html.rp-embedded,
+html.rp-embedded body {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}

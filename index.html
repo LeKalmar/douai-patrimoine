@@ -12,7 +12,11 @@
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <script defer src="js/parent-page-height.js"></script>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
 </head>
 <body>
 
@@ -23,13 +27,8 @@
   <!-- ============ HERO ============ -->
   <section class="rp-hero">
     <div class="rp-hero-editorial">
-      <p class="rp-eyebrow">Patrimoine · 54 bibliothèques classées</p>
-      <h1 class="rp-hero-title">Réserve<br>patri<span>moniale</span></h1>
+      <h1 class="rp-hero-title">Réserve<br><span>patrimoniale</span></h1>
       <p class="rp-hero-lead">Manuscrits enluminés, incunables et fonds historiques classés, conservés au premier étage de la bibliothèque Marceline Desbordes-Valmore.</p>
-      <div class="rp-hero-actions">
-        <a href="inventaire.html" class="rp-btn rp-btn--solid">Parcourir l'inventaire</a>
-        <a href="#pratique" class="rp-btn rp-btn--outline">Préparer une visite</a>
-      </div>
       <dl class="rp-hero-stats">
         <div class="rp-stat">
           <dt class="rp-stat-value" id="stat-documents">15 518</dt>
@@ -215,7 +214,17 @@ fetch('data/build-report.json')
       },
       center: [LNG, LAT],
       zoom: 15,
-      attributionControl: false
+      attributionControl: false,
+      /* Publication en iframe (voir js/parent-page-height.js) : la molette
+         doit faire défiler la page hôte, pas zoomer cette petite carte de
+         localisation qu'on ne fait que survoler en descendant. Ctrl (⌘ sur
+         Mac) + molette zoome toujours, et les boutons +/− restent là. */
+      cooperativeGestures: document.documentElement.classList.contains('rp-embedded'),
+      locale: {
+        'CooperativeGesturesHandler.WindowsHelpText': 'Utilisez Ctrl + molette pour zoomer',
+        'CooperativeGesturesHandler.MacHelpText': 'Utilisez ⌘ + molette pour zoomer',
+        'CooperativeGesturesHandler.MobileHelpText': 'Utilisez deux doigts pour déplacer la carte'
+      }
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
