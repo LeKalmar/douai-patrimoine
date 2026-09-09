@@ -5,8 +5,8 @@
  * modifiée est détectable en moins d'une minute avec la cote à jour.
  *
  * POST /api/syracuse-tick, non authentifié, déclenché en tâche de fond
- * par js/syracuse-sync-trigger.js à chaque chargement de recolement.html
- * ou magasins.html — voir CLAUDE.md, section « Synchronisation
+ * par js/syracuse-sync-trigger.js à chaque chargement de recolement.html,
+ * magasins.html ou reserve.html — voir CLAUDE.md, section « Synchronisation
  * incrémentale Syracuse ». Contrairement aux six autres endpoints du
  * projet, il n'expose aucune donnée fournie par l'appelant : un appel
  * ne fait qu'avancer (ou pas) un job serveur déjà entièrement défini

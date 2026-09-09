@@ -13,8 +13,13 @@
   <link rel="stylesheet" href="style.css">
   <script src="js/reserve-shared.js"></script>
   <!-- Surcouche de fraîcheur Syracuse (voir js/syracuse-sync-shared.js et
-       CLAUDE.md, section « Synchronisation incrémentale Syracuse »). -->
+       CLAUDE.md, section « Synchronisation incrémentale Syracuse »). Outil
+       interne au même niveau de confiance que recolement.html/magasins.html
+       (protégé par le même gate sessionStorage) : déclenche aussi une
+       tranche en tâche de fond, pour que le plan progresse tout seul même
+       si personne n'a ouvert ces deux autres pages entretemps. -->
   <script src="js/syracuse-sync-shared.js"></script>
+  <script src="js/syracuse-sync-trigger.js" defer></script>
   <style>
     :root {
       --plan-free:#c8e6c9; --plan-free-brd:#388e3c;

@@ -906,14 +906,23 @@ sont justes, avant d'y raccrocher une première fusion dans l'affichage
 
 - **`js/syracuse-sync-trigger.js`** — le déclenchement : un unique appel
   `fetch('/api/syracuse-tick', {method:'POST', keepalive:true})` en
-  fire-and-forget, résultat ignoré. Fichier volontairement séparé et
-  minimal, inclus via `<script defer>` sur `recolement.html` et
-  `magasins.html` (à côté de `js/parent-page-height.js`) — aucune ligne du
-  script principal de ces deux pages n'est touchée. Raison de cette
+  fire-and-forget, résultat ignoré pour le fonctionnement de la page (juste
+  tracé en console, voir plus bas). Fichier volontairement séparé et
+  minimal, inclus via `<script defer>` sur `recolement.html`, `magasins.html`
+  et `reserve.html` (à côté de `js/parent-page-height.js`) — aucune ligne du
+  script principal de ces trois pages n'est touchée. Raison de cette
   précaution : `recolement.html` a déjà eu deux pannes de production par
   *temporal dead zone* dans son script principal (voir « Pièges connus »
   plus bas) ; ce nouveau code ne doit avoir strictement aucune chance
-  d'interagir avec cet ordre d'initialisation.
+  d'interagir avec cet ordre d'initialisation. `reserve.html` a reçu le
+  déclencheur après coup (2026-09-09, diagnostiqué en conditions réelles :
+  la page ne faisait que lire la surcouche sans jamais la faire avancer,
+  donc rien ne progressait tant que personne n'avait ouvert les deux autres
+  pages) — les trois pages sont des outils internes au même niveau de
+  confiance (même gate `sessionStorage`), contrairement à `inventaire.html`
+  qui reste volontairement lecture seule : ajouter le déclenchement sur une
+  page publique changerait le profil d'exposition, décision non prise sans
+  en reparler avec l'équipe.
 
 Le bloc `notices` de l'état est rempli à chaque tranche (permet de détecter
 qu'un code-barre a disparu des exemplaires d'une notice) mais rien ne
@@ -924,6 +933,17 @@ l'exploite encore.
 `js/exemplaires-manuels-shared.js` — `fetch('/api/syracuse-sync')`, renvoie
 `data.records` (`{}` si l'API est indisponible ou si rien n'a encore été
 synchronisé, jamais d'exception). Deux pages la consomment à ce stade :
+
+Traçabilité volontaire dans la console navigateur (F12), pour vérifier sans
+requêter l'API à la main : `js/syracuse-sync-trigger.js` logue la réponse de
+chaque tick (`[syracuse-sync] tick : {...}` — `skipped`/`ok`), et
+`fetchSyracuseSyncOverlay()` logue la taille de la surcouche chargée
+(`[syracuse-sync] surcouche chargée : N code(s)-barres, lastSync = …`) ;
+`js/inventaire-page.js` logue en plus chaque correction effectivement
+appliquée (`[syracuse-sync] correction appliquée sur <code-barre>`). Sans
+effet sur le fonctionnement des pages (juste `console.log`), volontairement
+peu bavard — seulement ce qui est utile pour diagnostiquer « pourquoi je ne
+vois pas mon changement » sans redemander une vérification manuelle.
 
 - **`inventaire.html`** (via `js/inventaire-page.js`, fonction `load()`) :
   une troisième promesse rejoint le `Promise.all` existant (à côté de
@@ -940,7 +960,11 @@ synchronisé, jamais d'exception). Deux pages la consomment à ce stade :
 - **`reserve.html`** : `SYRACUSE_OVERLAY` (variable de module), rafraîchie
   par `loadSyracuseOverlay()` au chargement puis toutes les 5 min (inutile
   plus souvent — la synchro elle-même ne peut pas avancer plus vite qu'une
-  tranche par tranche de 5 min, voir plus haut). `noticeRows()` (fenêtre
+  tranche par tranche de 5 min, voir plus haut). Cette page déclenche aussi
+  la synchro elle-même (voir `js/syracuse-sync-trigger.js` plus haut) — sans
+  ça, une notice ne progresserait jamais tant que personne n'a ouvert
+  `recolement.html`/`magasins.html` entretemps, ce qui s'est produit en
+  conditions réelles avant ce correctif. `noticeRows()` (fenêtre
   modale au clic sur une étagère) affiche, pour chaque notice dont le
   code-barre a une entrée dans la surcouche, un badge bleu `.notice-live`
   (« 🔄 Section · Site ») à côté du `.notice-fonds` figé au moment du scan
