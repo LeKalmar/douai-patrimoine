@@ -818,6 +818,25 @@ sont justes, avant d'y raccrocher une première fusion dans l'affichage
     `timestamp` sans changer le contenu (mesuré dans `API-SYRACUSE.MD`,
     +16 222 notices en une journée sur un pic) — l'état ne grossit que sur
     un vrai changement de cote/section/site/statut.
+  - **Tri `timestamp` décroissant** (`SortField:'timestamp', SortOrder:1`
+    dans `search()` — accepté bien qu'absent de `d.Sorts`, §19) : sans ce
+    tri, une modification toute fraîche se retrouve n'importe où dans une
+    fenêtre en retard de plusieurs jours (potentiellement des dizaines de
+    milliers d'entrées, voir l'amorçage ci-dessous) — des milliers de
+    tranches avant d'être atteinte au rythme d'une tous les 5 min. Avec le
+    tri, elle apparaît près du sommet dès la première tranche de cette
+    fenêtre (`windowEnd` fixe). Diagnostiqué le 2026-09-09 : une cote
+    modifiée à 09:39 n'apparaissait toujours pas sur le site après
+    rechargement — cause combinée de l'amorçage jamais déclenché (aucun
+    tick n'avait encore tourné en production, voir ci-dessous) et de
+    l'ordre non trié sur un retard initial de ~32 000 notices. Vérifié en
+    direct que le tri fonctionne (`Query.SortField`/`SortOrder` échoués
+    dans la réponse) mais que des réindexations en masse concurrentes
+    peuvent placer plus de 100 notices « plus récentes » qu'une
+    modification faite 15 min plus tôt (elles aussi timestampées
+    « maintenant » sans changement réel) — retarde de quelques tranches,
+    jamais indéfiniment (contrairement à un ordre arbitraire sur 32 000
+    entrées).
   - **Amorçage sur la date du dernier rebuild XML, pas sur « maintenant »**
     (`resolveBootstrapLastSync()`) : au tout premier passage (`lastSync`
     jamais posé), la tranche ne fait aucun appel Syracuse — elle lit

@@ -91,7 +91,21 @@ async function postJson(url, body) {
    contrairement à une recherche utilisateur, la nôtre est un Solr
    canonique entièrement re-dérivable de (fenêtre, page). Le doc note que
    « reconstruire fonctionne aussi », au prix du QueryGuid perdu, sans
-   conséquence pour un usage interne. */
+   conséquence pour un usage interne.
+
+   Tri `timestamp` décroissant (`SortOrder:1`, absent de `d.Sorts` mais
+   accepté — §19) : dans une fenêtre en retard de plusieurs jours (des
+   dizaines de milliers de notices, voir le premier amorçage), un ordre non
+   trié laisserait une modification toute récente n'importe où dans la
+   file — potentiellement des milliers de tranches avant d'être atteinte.
+   Trié par ordre décroissant, elle apparaît près du sommet dès la première
+   tranche de CETTE fenêtre (`windowEnd` fixe, voir runSlice) : les
+   réindexations en masse concurrentes peuvent en retarder quelques-unes
+   (elles aussi timestampées « maintenant » sans changement réel de
+   contenu — vérifié en conditions réelles le 2026-09-09 : plus de 100
+   notices avaient un timestamp plus récent qu'une modification faite
+   15 min plus tôt), mais jamais indéfiniment, contrairement à un ordre
+   arbitraire sur 32 000 entrées. */
 export async function search(queryString, { page = 0, resultSize = RESULT_SIZE } = {}) {
   return postJson(SEARCH_URL, {
     query: {
@@ -103,6 +117,8 @@ export async function search(queryString, { page = 0, resultSize = RESULT_SIZE }
       InitialSearch: true,
       SearchContext: 0,
       ResultSize: resultSize,
+      SortField: 'timestamp',
+      SortOrder: 1,
     },
   });
 }
