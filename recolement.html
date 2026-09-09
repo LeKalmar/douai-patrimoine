@@ -15,6 +15,7 @@
 <script src="js/reliures-manuelles-shared.js"></script>
 <script src="js/columnar.js"></script>
 <script src="js/catalog-cache.js"></script>
+<script src="js/syracuse-sync-shared.js"></script>
 <style>
   :root{
     --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
@@ -228,8 +229,11 @@
        rendu. Voir js/parent-page-height.js. -->
   <script src="js/parent-page-height.js"></script>
   <!-- Synchronisation incrémentale Syracuse (fraîcheur des cotes/statuts
-       entre deux exports) : déclenchement en tâche de fond, sans effet sur
-       l'affichage de cette page. Voir js/syracuse-sync-trigger.js. -->
+       entre deux exports) : déclenchement en tâche de fond. La surcouche
+       elle-même (js/syracuse-sync-shared.js, chargée plus haut) est
+       consommée par loadSyracuseOverlay() dans le script principal — voir
+       "CATALOGUE(S)" — pour corriger cote/titre/auteur affichés dans les
+       Statistiques avancées sans attendre le prochain export XML. -->
   <script src="js/syracuse-sync-trigger.js" defer></script>
 </head>
 <body>
@@ -880,6 +884,16 @@ setInterval(flushPendingSync, 20000);
 setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
 
+// Surcouche Syracuse (voir loadSyracuseOverlay() plus bas, section
+// CATALOGUE(S)) : même cadence que reserve.html (5 min — la synchro
+// elle-même n'avance de toute façon pas plus vite qu'une tranche par
+// tranche de ~1 min, voir CLAUDE.md), plus un rafraîchissement immédiat au
+// retour sur l'onglet. Le premier appel a lieu plus bas, une fois
+// loadSyracuseOverlay() déclarée (hissée de toute façon, mais gardé au même
+// endroit que sa déclaration pour la lisibilité).
+setInterval(()=>{ if(!document.hidden) loadSyracuseOverlay(); }, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadSyracuseOverlay(); });
+
 /* ════════════ CATALOGUE(S) ════════════
    Deux catalogues indépendants de reconnaissance de code-barre, un par
    catalogGroup (voir js/reserve-shared.js) : 'reserve' pour la réserve
@@ -993,6 +1007,108 @@ let catalogByGroup = { reserve:null, magasin:null };
 let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
 let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas encore chargé" (—) de "échec" (indisponible)
 
+/* Surcouche de synchronisation incrémentale Syracuse (voir
+   js/syracuse-sync-shared.js, api/syracuse-tick.mjs et CLAUDE.md, section
+   « Synchronisation incrémentale Syracuse ») : { barcode: {cote, titre,
+   auteur, dt, section, site, statut, rscId, ts} } pour chaque code-barre
+   modifié dans Syracuse depuis le dernier export XML. Contrairement à
+   inventaire.html/reserve.html (simple badge ou correction d'affichage),
+   ici la correction est appliquée DIRECTEMENT sur les entrées de
+   catalogByGroup (cote/titre/auteur) : les tableaux des "Statistiques
+   avancées" — notamment "Jamais scannés" et "Documents probablement
+   perdus" — lisent ces champs en direct sur le catalogue plutôt que sur un
+   instantané figé, donc la correction s'y reflète sans attendre un nouveau
+   `npm run build`/`build:magasins`. Déclarée ici (tôt, comme
+   catalogByGroup) plutôt que plus bas avec le reste de la synchro : voir la
+   note sur la temporal dead zone plus haut dans cette section — même risque
+   si une fonction appelée pendant l'init synchrone venait à la lire. */
+let SYRACUSE_OVERLAY = {};
+
+/* Corrige en place cote/titre/auteur des entrées de `cat` déjà connues de
+   la surcouche — jamais le contraire (une entrée absente de la surcouche,
+   ou un champ vide dans la surcouche, garde sa valeur issue de l'export
+   XML). N'appelle jamais fetch : suppose SYRACUSE_OVERLAY déjà à jour. */
+// `snapshotOut`, si fourni, reçoit { [barcode]: {cote,titre,auteur} } — les
+// valeurs D'AVANT correction pour chaque entrée effectivement touchée. Sert
+// uniquement au chemin réseau froid de loadMagasinCatalog() : le cache
+// IndexedDB doit rester une image fidèle de data/magasins.json, jamais de la
+// version corrigée en direct (voir plus bas, "4. Remplissage du cache").
+function applySyracuseOverlayToCatalog(cat, snapshotOut){
+  if(!cat) return;
+  for(const bc in SYRACUSE_OVERLAY){
+    const entry = cat[bc];
+    const fresh = SYRACUSE_OVERLAY[bc];
+    if(!entry || !fresh) continue;
+    if(!fresh.cote && !fresh.titre && !fresh.auteur) continue;
+    if(snapshotOut && !(bc in snapshotOut)){
+      snapshotOut[bc] = { cote:entry.cote, titre:entry.titre, auteur:entry.auteur };
+    }
+    if(fresh.cote) entry.cote = fresh.cote;
+    if(fresh.titre) entry.titre = fresh.titre;
+    if(fresh.auteur) entry.auteur = fresh.auteur;
+  }
+}
+
+/* Recharge la surcouche puis la réapplique à tout catalogue déjà chargé
+   (reserve et/ou magasin — peu importe lequel des deux est prêt à cet
+   instant, l'autre sera couvert à son propre chargement ou au prochain
+   passage). L'index cote→code-barre est reconstruit ensuite (une cote
+   corrigée doit rester trouvable via "Livres sans code-barre") ; l'index
+   par run de chiffres, lui, ne dépend pas du texte de la cote et n'a donc
+   pas besoin de l'être. Appelée une première fois au chargement puis
+   toutes les 5 min (comme reserve.html — la synchro elle-même n'avance de
+   toute façon pas plus vite qu'une tranche par tranche de ~1 min, voir
+   CLAUDE.md) et à chaque retour d'onglet. Échoue silencieusement si l'API
+   est indisponible (fetchSyracuseSyncOverlay() ne lève jamais). */
+function loadSyracuseOverlay(){
+  if(typeof fetchSyracuseSyncOverlay !== 'function') return;
+  fetchSyracuseSyncOverlay().then(data=>{
+    SYRACUSE_OVERLAY = data || {};
+    ['reserve','magasin'].forEach(group=>{
+      const cat = catalogByGroup[group];
+      if(!cat) return;
+      applySyracuseOverlayToCatalog(cat);
+      catalogCoteIndexByGroup[group] = buildCoteIndex(cat);
+    });
+    updateStats(); // rafraîchit aussi le panneau ouvert, voir refreshAdvList() appelé depuis updateAdvListsCount()
+  });
+}
+// Premier appel : en parallèle du chargement des catalogues plus bas (peu
+// importe lequel des deux finit en premier, voir applySyracuseOverlayToCatalog()
+// appelée à l'installation de chacun) — pas besoin d'attendre 5 min pour une
+// première correction. L'intervalle/visibilitychange sont posés plus haut,
+// avant la déclaration de cette fonction (hissée) : gardés groupés avec le
+// reste de la synchro Syracuse côté "SCAN"/sync, voir plus haut.
+loadSyracuseOverlay();
+
+/* Badge affiché dans une cellule "Syracuse" des tableaux de "Statistiques
+   avancées" (voir ADV_CATS) quand ce code-barre a une correction plus
+   récente que le dernier export XML. Sur demande explicite (2026-09-09) :
+   la ligne reste affichée EN PLUS de ce badge plutôt que d'être retirée de
+   la liste — corriger cote/titre/auteur ne "règle" pas le problème que la
+   ligne signale (code-barre endommagé, jamais scanné, anomalie de
+   classement...), donc l'exemplaire doit rester visible tant qu'il n'a pas
+   été traité physiquement. */
+function syracuseCorrectionCell(barcode){
+  const fresh = barcode ? SYRACUSE_OVERLAY[barcode] : null;
+  if(!fresh) return '—';
+  const d = fresh.ts ? new Date(fresh.ts) : null;
+  const dateStr = d && !isNaN(d) ? d.toLocaleDateString('fr-FR') : '';
+  return `<span style="color:#1565c0" title="Cote/titre/auteur relevés par la synchronisation incrémentale Syracuse${dateStr ? ', le '+dateStr : ''} — plus récents que le dernier export XML complet">🔄 corrigé${dateStr?' le '+esc(dateStr):''}</span>`;
+}
+// Utilisé par les boutons d'export (voir "Exclure les codes-barres déjà
+// corrigés" dans advDetailsTemplate()) pour ne garder que les lignes dont le
+// code-barre n'a encore aucune correction Syracuse connue.
+function syracuseNotCorrectedFilter(r){ return !(r.barcode && SYRACUSE_OVERLAY[r.barcode]); }
+// Combine plusieurs filtres d'export (ex. tranche de travées + non corrigés)
+// en un seul, en ignorant les filtres absents (null/undefined) — évite de
+// dupliquer exportAdvBarcodes() pour chaque combinaison possible.
+function combineExportFilters(){
+  const fns = Array.prototype.filter.call(arguments, Boolean);
+  if(!fns.length) return null;
+  return r => fns.every(fn=>fn(r));
+}
+
 /* Il n'y a plus qu'UN catalogue magasins (2026-09-02). Il y en avait deux,
    construits depuis le même data/magasins.json : catalogByGroup.magasin
    filtré aux exemplaires _isMagasin (statistiques de progression) et
@@ -1083,6 +1199,11 @@ Promise.all([
   const items = data.concat(manuels);
   const built = buildCatalogFromItems(items);
   applyManualReliureGroups(built.catalog, reliuresManuelles);
+  // Corrige cote/titre/auteur avec ce que loadSyracuseOverlay() a déjà pu
+  // charger (souvent le cas : la surcouche, un petit JSON, résout en
+  // général avant data/inventaire.json) — sinon la correction arrivera au
+  // premier passage de loadSyracuseOverlay(), voir plus haut.
+  applySyracuseOverlayToCatalog(built.catalog);
   catalogByGroup.reserve = built.catalog;
   catalogNoticeCountByGroup.reserve = built.noticeCount;
   catalogCoteIndexByGroup.reserve = buildCoteIndex(built.catalog);
@@ -1120,6 +1241,11 @@ Promise.all([
 const MAGASIN_CACHE_NAME = 'magasins';
 
 function installMagasinCatalog(catalogObj, noticeCount){
+  // N'applique PAS la surcouche Syracuse ici (voir loadMagasinCatalog(), qui
+  // s'en charge à chaque site d'appel) : sur le chemin réseau froid,
+  // catalogObj EST l'objet réencodé plus bas pour le cache IndexedDB — le
+  // muter ici le ferait fuiter dans ce cache, qui doit rester une image
+  // fidèle de data/magasins.json (voir "4. Remplissage du cache").
   catalogByGroup.magasin = catalogObj;
   catalogNoticeCountByGroup.magasin = noticeCount;
   catalogCoteIndexByGroup.magasin = buildCoteIndex(catalogObj);
@@ -1152,6 +1278,10 @@ async function loadMagasinCatalog(){
           const e = catalogObj[bc];
           if(e.isMagasin) notices.add(e.noticeId);
         }
+        // Sans risque pour le cache ici (contrairement au chemin froid plus
+        // bas) : catalogObj vient d'un decode() tout juste reconstruit à
+        // partir du payload lu, jamais réencodé/réécrit dans ce cache.
+        applySyracuseOverlayToCatalog(catalogObj);
         installMagasinCatalog(catalogObj, notices.size);
         return;
       }catch(e){
@@ -1176,6 +1306,16 @@ async function loadMagasinCatalog(){
     return r.json();
   });
   const built = buildCatalogFromItems(data, undefined, { scoped:true });
+  // Capture les cote/titre/auteur D'AVANT correction pour les (rares)
+  // entrées touchées par la surcouche Syracuse — proportionnel à sa taille,
+  // pas à celle du catalogue (~200 000 entrées) — avant de les corriger sur
+  // built.catalog, l'objet réellement affiché (catalogByGroup.magasin).
+  // Sert à reconstituer une image pristine pour le cache, voir "4." plus
+  // bas : built.catalog est le MÊME objet que celui réencodé pour le cache
+  // IndexedDB, donc une correction appliquée ici s'y retrouverait sinon
+  // figée jusqu'au prochain npm run build:magasins.
+  const originalOverlaidFields = {};
+  applySyracuseOverlayToCatalog(built.catalog, originalOverlaidFields);
   installMagasinCatalog(built.catalog, built.noticeCount);
 
   // 4. Remplissage du cache, une fois la page déjà utilisable. Encoder puis
@@ -1191,7 +1331,23 @@ async function loadMagasinCatalog(){
       ? cb => window.requestIdleCallback(cb, { timeout:5000 })
       : cb => setTimeout(cb, 2000);
     later(()=>{
-      try{ cache.write(MAGASIN_CACHE_NAME, version, cache.encode(built.catalog)); }
+      try{
+        let toEncode = built.catalog;
+        const touched = Object.keys(originalOverlaidFields);
+        if(touched.length){
+          // Copie superficielle (juste des pointeurs, pas un clone profond
+          // — coût proportionnel au catalogue entier mais fait ici, en
+          // temps d'inactivité, jamais sur le chemin d'affichage) où les
+          // quelques entrées touchées par la surcouche retrouvent leurs
+          // cote/titre/auteur d'origine, SANS toucher à built.catalog —
+          // même objet que catalogByGroup.magasin, activement affiché.
+          toEncode = Object.assign({}, built.catalog);
+          touched.forEach(bc=>{
+            if(toEncode[bc]) toEncode[bc] = Object.assign({}, toEncode[bc], originalOverlaidFields[bc]);
+          });
+        }
+        cache.write(MAGASIN_CACHE_NAME, version, cache.encode(toEncode));
+      }
       catch(e){ console.warn('[catalogue magasins] mise en cache impossible :', e && e.message); }
     });
   }
@@ -1402,12 +1558,13 @@ const ADV_CATS = {
     title: 'Codes-barres endommagés',
     desc: 'Documents dont le code-barre a été saisi à la main (illisible au scanner)',
     placeholder: 'Filtrer (cote, titre, code-barre, piège)…',
-    headers: ['Cote','Titre','Emplacement','Code-barre','Piège'],
-    colspan: 5,
+    headers: ['Cote','Titre','Emplacement','Code-barre','Piège','Syracuse'],
+    colspan: 6,
     emptyMsg: 'Aucun code-barre endommagé pour l\'instant.',
     filterFields: ['cote','titre','barcode','piege'],
     filePrefix: 'codes-barres-endommages',
     needsCatalog: false,
+    showCorrectionFilter: true,
     listFn: damagedList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
@@ -1415,35 +1572,39 @@ const ADV_CATS = {
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
   },
   manualcote: {
     title: 'Scannés, non catalogués, cote saisie à la main',
     desc: 'Code-barre absent du catalogue au moment du scan : seule la cote a été renseignée à la main, sans titre ni auteur',
     placeholder: 'Filtrer (cote, code-barre)…',
-    headers: ['Cote','Emplacement','Code-barre'],
-    colspan: 3,
+    headers: ['Cote','Emplacement','Code-barre','Syracuse'],
+    colspan: 4,
     emptyMsg: 'Aucun code-barre dans ce cas pour l\'instant.',
     filterFields: ['cote','barcode'],
     filePrefix: 'codes-barres-non-catalogues',
     needsCatalog: true,
+    showCorrectionFilter: true,
     listFn: manualCoteList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
   },
   notscanned: {
     title: 'Jamais scannés — dans le catalogue mais pas encore récolés',
     desc: 'Codes-barres du catalogue absents des scans : potentiellement perdus, ou récolement pas encore effectué',
     placeholder: 'Filtrer (cote, titre, auteur, code-barre, piège)…',
-    headers: ['Cote','Titre','Auteur','Code-barre','Piège'],
-    colspan: 5,
+    headers: ['Cote','Titre','Auteur','Code-barre','Piège','Syracuse'],
+    colspan: 6,
     emptyMsg: 'Tout le catalogue a été scanné au moins une fois.',
     filterFields: ['cote','titre','auteur','barcode','piege'],
     filePrefix: 'codes-barres-jamais-scannes',
     needsCatalog: true,
+    showCorrectionFilter: true,
     listFn: notScannedList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
@@ -1451,18 +1612,20 @@ const ADV_CATS = {
       <td>${esc(r.auteur)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
   },
   perdus: {
     title: 'Documents probablement perdus (dans la plage déjà parcourue)',
     desc: 'Uniquement pour les magasins 2e/5e étage (cotes numériques séquentielles) : jamais scannés, mais leur cote tombe entre la première et la dernière cote déjà scannée dans ce groupe — auraient donc dû être croisés en parcourant les rayons dans l\'ordre des cotes',
     placeholder: 'Filtrer (cote, titre, auteur, code-barre, piège)…',
-    headers: ['Cote','Titre','Auteur','Code-barre','Piège'],
-    colspan: 5,
+    headers: ['Cote','Titre','Auteur','Code-barre','Piège','Syracuse'],
+    colspan: 6,
     emptyMsg: 'Aucun document probablement perdu (ou pas encore assez de cotes scannées dans ce groupe pour définir une plage).',
     filterFields: ['cote','titre','auteur','barcode','piege'],
     filePrefix: 'documents-probablement-perdus',
     needsCatalog: true,
+    showCorrectionFilter: true,
     listFn: probablyLostList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
@@ -1470,18 +1633,20 @@ const ADV_CATS = {
       <td>${esc(r.auteur)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
   },
   scanned: {
     title: 'Récolés — codes-barres déjà scannés',
     desc: 'Tous les documents déjà récolés dans ce groupe (scan physique, y compris exemplarisation rapide et cascade de reliures) — export utile pour ajout panier SIGB ou recoupement avec une autre liste',
     placeholder: 'Filtrer (cote, titre, auteur, code-barre)…',
-    headers: ['Cote','Titre','Auteur','Emplacement','Code-barre'],
-    colspan: 5,
+    headers: ['Cote','Titre','Auteur','Emplacement','Code-barre','Syracuse'],
+    colspan: 6,
     emptyMsg: 'Aucun document récolé pour l\'instant.',
     filterFields: ['cote','titre','auteur','barcode'],
     filePrefix: 'codes-barres-recoles',
     needsCatalog: false,
+    showCorrectionFilter: true,
     listFn: scannedList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
@@ -1489,6 +1654,7 @@ const ADV_CATS = {
       <td>${esc(r.auteur)}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
   },
   nobarcode: {
@@ -1514,12 +1680,13 @@ const ADV_CATS = {
     title: 'Anomalies de classement (hors magasin selon Syracuse)',
     desc: 'Code-barre scanné dans un magasin mais catalogué dans Syracuse sous une autre section que Magasin/Magasin Jeunesse (colonne "Section réelle") — à vérifier : mauvais classement côté catalogue, ou document à ranger ailleurs.',
     placeholder: 'Filtrer (cote, titre, section, code-barre, piège)…',
-    headers: ['Cote','Titre','Section réelle','Emplacement','Code-barre','Piège'],
-    colspan: 6,
+    headers: ['Cote','Titre','Section réelle','Emplacement','Code-barre','Piège','Syracuse'],
+    colspan: 7,
     emptyMsg: 'Aucune anomalie de classement détectée pour l\'instant.',
     filterFields: ['cote','titre','sectionReelle','barcode','piege'],
     filePrefix: 'anomalies-classement-magasin',
     needsCatalog: false,
+    showCorrectionFilter: true,
     listFn: horsSectionList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
@@ -1528,6 +1695,7 @@ const ADV_CATS = {
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
   },
 };
@@ -3036,6 +3204,10 @@ function advDetailsTemplate(id, spec, opts){
           <span class="log-title">${esc(spec.desc)}</span>
           <div class="log-header-actions">
             <input type="text" class="log-search" id="${id}-search" placeholder="${esc(spec.placeholder)}">
+            ${spec.showCorrectionFilter ? `<label class="adv-corr-filter" style="font-size:.75rem;display:inline-flex;align-items:center;gap:.3em;white-space:nowrap">
+              <input type="checkbox" id="${id}-export-uncorrected">
+              Exclure les corrigés (Syracuse)
+            </label>` : ''}
             <button type="button" class="export-btn" id="${id}-export">⬇ Exporter (.txt)</button>
             ${showAllExport ? `<button type="button" class="export-btn" id="${id}-export-all" title="Réunit les codes-barres de cette catégorie pour les 3 magasins (2e/5e/6e), sans tenir compte de la recherche en cours">⬇ Exporter tous les magasins</button>` : ''}
             ${rangeExports.map(rg=>`<button type="button" class="export-btn" id="${id}-export-${rg.key}" title="N'exporte que les codes-barres de ${esc(rg.label)}, en respectant la recherche en cours">⬇ ${esc(rg.label)}</button>`).join('')}
@@ -3218,13 +3390,22 @@ function exportAdvBarcodes(rows, filterFields, filter, filenamePrefix, field, ex
   downloadTxt(filtered.map(r=>r[field||'barcode']).join('\n'),
     `${filenamePrefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
 }
+// Coché sur la case "Exclure les corrigés (Syracuse)" d'un panneau donné —
+// voir advDetailsTemplate(). Absent (spec.showCorrectionFilter falsy, ex.
+// "Mauvais numéro / code-barre absent") : toujours null, aucun filtre.
+function uncorrectedOnlyFilter(id, spec){
+  if(!spec.showCorrectionFilter) return null;
+  const cb = document.getElementById(id+'-export-uncorrected');
+  return (cb && cb.checked) ? syracuseNotCorrectedFilter : null;
+}
 ADV_GROUPS.forEach(g=>{
   Object.keys(ADV_CATS).forEach(catKey=>{
     const id = `${catKey}-${g.id}`;
     const spec = ADV_CATS[catKey];
     document.getElementById(id+'-export').addEventListener('click', ()=>{
+      const onlyNew = uncorrectedOnlyFilter(id, spec);
       exportAdvBarcodes(spec.listFn(g.id), spec.filterFields, document.getElementById(id+'-search').value,
-        `${spec.filePrefix}-${g.id}`, spec.exportField);
+        `${spec.filePrefix}-${g.id}${onlyNew?'-non-corriges':''}`, spec.exportField, onlyNew);
     });
     // Bouton "Exporter tous les magasins" (2e+5e+6e réunis, voir
     // advDetailsTemplate) — présent uniquement dans les 3 groupes magasin,
@@ -3234,8 +3415,9 @@ ADV_GROUPS.forEach(g=>{
     if(g.catalogGroup==='magasin'){
       const allBtn = document.getElementById(id+'-export-all');
       if(allBtn) allBtn.addEventListener('click', ()=>{
+        const onlyNew = uncorrectedOnlyFilter(id, spec);
         const allRows = MAGASIN_ADV_GROUPS.flatMap(mg=>spec.listFn(mg.id));
-        exportAdvBarcodes(allRows, spec.filterFields, '', `${spec.filePrefix}-magasins-tous-etages`, spec.exportField);
+        exportAdvBarcodes(allRows, spec.filterFields, '', `${spec.filePrefix}-magasins-tous-etages${onlyNew?'-non-corriges':''}`, spec.exportField, onlyNew);
       });
     }
     // Boutons par tranche de travées (voir MAGASIN5_TRAVEE_RANGES) — pour
@@ -3248,8 +3430,10 @@ ADV_GROUPS.forEach(g=>{
         const rangeBtn = document.getElementById(id+'-export-'+rg.key);
         if(!rangeBtn) return;
         rangeBtn.addEventListener('click', ()=>{
+          const onlyNew = uncorrectedOnlyFilter(id, spec);
           exportAdvBarcodes(spec.listFn(g.id), spec.filterFields, document.getElementById(id+'-search').value,
-            `${spec.filePrefix}-${g.id}-${rg.key}`, spec.exportField, r=>rg.test(r.travee));
+            `${spec.filePrefix}-${g.id}-${rg.key}${onlyNew?'-non-corriges':''}`, spec.exportField,
+            combineExportFilters(r=>rg.test(r.travee), onlyNew));
         });
       });
     }
