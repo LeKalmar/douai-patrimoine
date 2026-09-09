@@ -111,12 +111,35 @@ export async function getHoldings(rscId) {
   return postJson(HOLDINGS_URL, { Record: { RscId: String(rscId), Docbase: 'SYRACUSE' } });
 }
 
+/* Point de départ du tout premier passage (voir runSlice) : le
+   `generatedAt` du dernier rebuild de data/magasins.json, pas "maintenant"
+   — pour que la fraîcheur apportée par l'API prenne le relais exactement
+   là où le socle XML s'arrête, sans laisser un trou (voir CLAUDE.md,
+   section « Synchronisation incrémentale Syracuse »). Lu dynamiquement sur
+   le déploiement lui-même (fichier statique, servi par Vercel) plutôt que
+   codé en dur, pour rester correct après un futur rebuild + {type:'reset'}
+   sans avoir à retoucher ce fichier. `origin` vient des en-têtes de la
+   requête entrante (host/proto) — pas de domaine supposé fixe. En cas
+   d'échec (réseau, champ absent) : repli sur `now`, jamais d'erreur fatale
+   pour un simple amorçage. */
+async function resolveBootstrapLastSync(origin, nowIso) {
+  try {
+    const res = await fetch(`${origin}/data/magasins-build-report.json`);
+    if (!res.ok) return nowIso;
+    const report = await res.json();
+    return (report && report.generatedAt) || nowIso;
+  } catch {
+    return nowIso;
+  }
+}
+
 function recordEquals(a, b) {
   if (!a) return false;
   return (
     a.cote === b.cote &&
     a.titre === b.titre &&
     a.auteur === b.auteur &&
+    a.dt === b.dt &&
     a.section === b.section &&
     a.site === b.site &&
     a.statut === b.statut &&
@@ -181,11 +204,29 @@ async function checkTimestampFieldAlive() {
    ou par le rebuild mensuel complet — voir CLAUDE.md). Pas corrigé pour
    ne pas complexifier une phase pensée pour être observée avant d'être
    affichée. */
-async function runSlice(state) {
+async function runSlice(state, origin) {
   const nowIso = new Date().toISOString();
   const cursor = state.cursor;
+
+  /* Tout premier passage (lastSync jamais posé) : on amorce sur la date du
+     dernier rebuild XML (`data/magasins-build-report.json`), pas sur
+     "maintenant" — pour couvrir sans trou tout ce qui a changé depuis le
+     dernier export bib.xml. Choix explicite de l'utilisateur (2026-09-09) :
+     l'écart peut représenter plusieurs dizaines de milliers de notices
+     (§19-20 : ~32 000 sur une semaine de retard), donc plusieurs jours à
+     réel régime de tick avant résorption complète du retard — accepté,
+     puisque le débit par tranche reste identique quel que soit le volume
+     restant (le plancher de 5 min protège Syracuse dans tous les cas, seul
+     le temps total de rattrapage varie). Aucun appel Syracuse à ce stade,
+     juste la lecture (via HTTP, sur notre propre déploiement) de ce
+     fichier statique. */
+  if (!state.lastSync && !cursor) {
+    const bootstrapFrom = await resolveBootstrapLastSync(origin, nowIso);
+    return { recordsPatch: {}, noticesPatch: {}, newLastSync: bootstrapFrom, newCursor: null, processed: 0, remaining: 0 };
+  }
+
   const windowEnd = cursor ? cursor.windowEnd : nowIso;
-  const lastSync = state.lastSync || '1970-01-01T00:00:00Z';
+  const lastSync = state.lastSync;
   const page = cursor ? cursor.page : 0;
   const offsetInPage = cursor ? cursor.offsetInPage : 0;
 
@@ -227,12 +268,13 @@ async function runSlice(state) {
     for (const h of holdings) {
       if (!h.Barcode) continue;
       barcodes.push(h.Barcode);
-      // titre/auteur ne sont PAS dans GetHoldings (§16) : ils viennent de
-      // la réponse Search déjà en main (§3), pas d'appel supplémentaire.
+      // titre/auteur/dt ne sont PAS dans GetHoldings (§16) : ils viennent
+      // de la réponse Search déjà en main (§3), pas d'appel supplémentaire.
       const candidate = {
         cote: h.Cote || null,
         titre: resource.Ttl || null,
         auteur: resource.Crtr || null,
+        dt: resource.Dt || null,
         section: h.Section || null,
         site: h.Site || null,
         statut: h.Statut || null,
@@ -306,6 +348,13 @@ export default async function handler(req, res) {
   }
   res.setHeader('Cache-Control', 'no-store');
 
+  // Pour resolveBootstrapLastSync() : notre propre origine, dérivée des
+  // en-têtes de la requête (Vercel les pose systématiquement) plutôt que
+  // d'un domaine supposé fixe — fonctionne aussi bien en preview qu'en prod.
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const origin = `${proto}://${host}`;
+
   const now = Date.now();
   let claimed;
   try {
@@ -320,7 +369,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const outcome = await runSlice(claimed);
+    const outcome = await runSlice(claimed, origin);
     await r2CasUpdate(KEY, state => commitSlice(state, outcome), emptyState);
     res.status(200).json({ ok: true, processed: outcome.processed, remaining: outcome.remaining });
   } catch (err) {

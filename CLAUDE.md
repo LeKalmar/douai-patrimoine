@@ -767,7 +767,7 @@ décaler ces plages. Le panneau de stats affiche le compte par étage
 (calculé sur `ROWS`, indépendamment du rapport de build) et un menu
 déroulant permet de filtrer le tableau (et donc l'export .txt) par étage.
 
-## Synchronisation incrémentale Syracuse (2026-09-09, phases 1-3)
+## Synchronisation incrémentale Syracuse (2026-09-09)
 
 `data/magasins.json` ne se met à jour qu'au rythme d'un export `bib.xml`
 (mensuel dans les faits). `API-SYRACUSE.MD` (non commité — document de
@@ -781,11 +781,11 @@ validation en conditions réelles (2026-09-09) a confirmé le meilleur cas :
 une cote modifiée dans Syracuse est détectable en moins d'une minute, avec
 la valeur à jour.
 
-Ce qui existe aujourd'hui est volontairement borné aux trois premières
-phases du plan de synchronisation, plus le déclenchement — **pas encore la
-fusion dans l'affichage** : les données s'accumulent dans R2, invisibles,
-le temps d'observer en production que le rythme d'appel reste sage et que
-les données collectées sont justes.
+Le moteur de synchronisation (déclenchement compris) a d'abord été construit
+seul, borné aux trois premières phases du plan — le temps d'observer en
+production que le rythme d'appel reste sage et que les données collectées
+sont justes, avant d'y raccrocher une première fusion dans l'affichage
+(voir plus bas).
 
 - **`api/syracuse-tick.mjs`** — le moteur de delta. `POST
   /api/syracuse-tick`, non authentifié (il n'écrit aucune donnée fournie
@@ -818,17 +818,42 @@ les données collectées sont justes.
     `timestamp` sans changer le contenu (mesuré dans `API-SYRACUSE.MD`,
     +16 222 notices en une journée sur un pic) — l'état ne grossit que sur
     un vrai changement de cote/section/site/statut.
+  - **Amorçage sur la date du dernier rebuild XML, pas sur « maintenant »**
+    (`resolveBootstrapLastSync()`) : au tout premier passage (`lastSync`
+    jamais posé), la tranche ne fait aucun appel Syracuse — elle lit
+    `data/magasins-build-report.json` sur le déploiement lui-même
+    (`origin` dérivé des en-têtes `host`/`x-forwarded-proto` de la requête
+    entrante, pas un domaine supposé fixe) et prend son `generatedAt` comme
+    point de départ, avec repli sur `now` si cette lecture échoue. Bug
+    corrigé le jour même de la première implémentation (2026-09-09) :
+    partir de `lastSync = epoch` aurait fait chercher *tout l'historique*
+    depuis toujours ; partir de `now` aurait au contraire laissé un trou
+    permanent entre le dernier export `bib.xml` et le démarrage réel de la
+    synchro. Amorcer sur `generatedAt` ferme ce trou : le socle XML
+    (ponctuel) et la fraîcheur API (continue) se raccordent exactement,
+    sans intervalle non couvert. Conséquence acceptée sur ce premier
+    démarrage : l'écart avec le dernier rebuild peut représenter des
+    dizaines de milliers de notices (§19-20, ~32 000 sur une semaine de
+    retard mesurées) — donc plusieurs jours à rythme réel de tick avant
+    résorption complète. Sans risque de surcharge pour autant : le débit
+    par tranche (plancher de 5 min, ≤10 `GetHoldings`) est identique quel
+    que soit le volume restant, seul le temps total de rattrapage varie.
+    Après un futur rebuild, `{type:'reset'}` (voir `api/syracuse-sync.mjs`)
+    remet `lastSync` à zéro, et le prochain amorçage se recale
+    automatiquement sur le nouveau `generatedAt` — rien à retoucher dans ce
+    fichier à chaque rebuild.
   - **Fenêtre glissante avec curseur** (`cursor: {windowEnd, page,
-    offsetInPage}`) : la fenêtre `[lastSync, windowEnd]` reste fixe tant
-    qu'il reste des pages à traiter, `lastSync` n'avance que quand elle est
-    intégralement épuisée — une notice n'est donc ni sautée ni retraitée
-    indéfiniment sur un pic. Limite connue et documentée dans le fichier :
-    la requête est reconstruite à chaque tranche plutôt que de réinjecter
-    le `Query` normalisé du serveur, donc rien ne garantit l'ordre exact
-    des résultats d'une page déjà partiellement consommée si l'index bouge
-    entre deux tranches — risque étroit (une page ne s'étale que sur ~2-3
-    tranches) et auto-cicatrisant (rattrapé à la prochaine modification de
-    la notice concernée, ou par le rebuild mensuel complet).
+    offsetInPage}`) : une fois `lastSync` posé, la fenêtre `[lastSync,
+    windowEnd]` reste fixe tant qu'il reste des pages à traiter, `lastSync`
+    n'avance que quand elle est intégralement épuisée — une notice n'est
+    donc ni sautée ni retraitée indéfiniment sur un pic. Limite connue et
+    documentée dans le fichier : la requête est reconstruite à chaque
+    tranche plutôt que de réinjecter le `Query` normalisé du serveur, donc
+    rien ne garantit l'ordre exact des résultats d'une page déjà
+    partiellement consommée si l'index bouge entre deux tranches — risque
+    étroit (une page ne s'étale que sur ~2-3 tranches) et auto-cicatrisant
+    (rattrapé à la prochaine modification de la notice concernée, ou par
+    le rebuild mensuel complet).
   - **Interrupteur automatique** : 3 tranches en échec d'affilée →
     `enabled:false` dans l'état. Seul un `POST` authentifié vers
     `/api/syracuse-sync` (`{type:'setEnabled', enabled:true}`) peut le
@@ -839,9 +864,11 @@ les données collectées sont justes.
     `timestamp:[* TO *]` confirme — si elle aussi renvoie 0, coupure
     automatique (le champ a probablement disparu d'une mise à jour
     Syracuse). Ne coûte rien tant que le flux est normal.
-  - Titre/auteur ne viennent **pas** de `GetHoldings` (qui ne les expose
-    pas) mais de la réponse `Search` déjà en main pour la même notice — pas
-    d'appel supplémentaire.
+  - Titre/auteur/date (`dt`, depuis `Resource.Dt`) ne viennent **pas** de
+    `GetHoldings` (qui ne les expose pas, §16) mais de la réponse `Search`
+    déjà en main pour la même notice — pas d'appel supplémentaire. `dt`
+    sert notamment à corriger les dates de publication cassées côté
+    catalogue affiché (voir la fusion côté client à venir).
 
 - **`api/syracuse-sync.mjs`** — accès à l'état stocké, sur le patron
   `createPatchEndpoint()` des sept autres endpoints « proxy classique »
@@ -871,10 +898,46 @@ les données collectées sont justes.
 
 Le bloc `notices` de l'état est rempli à chaque tranche (permet de détecter
 qu'un code-barre a disparu des exemplaires d'une notice) mais rien ne
-l'exploite encore. Aucune page ne lit `syracuse-sync.json` pour
-l'affichage : la fusion côté client (sur le modèle de
-`js/exemplaires-manuels-shared.js`) est la prochaine étape, une fois le
-pipeline observé en production.
+l'exploite encore.
+
+**Fusion côté client (2026-09-09)** : `js/syracuse-sync-shared.js`
+(`fetchSyracuseSyncOverlay()`) expose la surcouche au même patron que
+`js/exemplaires-manuels-shared.js` — `fetch('/api/syracuse-sync')`, renvoie
+`data.records` (`{}` si l'API est indisponible ou si rien n'a encore été
+synchronisé, jamais d'exception). Deux pages la consomment à ce stade :
+
+- **`inventaire.html`** (via `js/inventaire-page.js`, fonction `load()`) :
+  une troisième promesse rejoint le `Promise.all` existant (à côté de
+  `data/inventaire.json` et `fetchExemplairesManuelsAsCatalogRows()`). Pour
+  chaque exemplaire dont le code-barre (`995$f`/`915$b`) a une entrée dans
+  la surcouche, `cote`/`titre`/`auteur`/`dt` remplacent `930$g`/`200$a`/
+  `700$a`/`210$d` **avant** que `_year`/`_hay` ne soient dérivés (mêmes
+  lignes que le calcul existant) — la correction alimente donc aussi bien
+  l'affichage (liste de résultats `js/inventaire-page.js`, fiche détaillée
+  `buildExpandedContent()` dans `js/inventaire.js` — un seul point de
+  fusion sert les deux, `rec` étant le même objet partagé) que le tri et le
+  filtre par date. Corrige notamment les dates de publication cassées
+  signalées par l'équipe, sans attendre le prochain export XML.
+- **`reserve.html`** : `SYRACUSE_OVERLAY` (variable de module), rafraîchie
+  par `loadSyracuseOverlay()` au chargement puis toutes les 5 min (inutile
+  plus souvent — la synchro elle-même ne peut pas avancer plus vite qu'une
+  tranche par tranche de 5 min, voir plus haut). `noticeRows()` (fenêtre
+  modale au clic sur une étagère) affiche, pour chaque notice dont le
+  code-barre a une entrée dans la surcouche, un badge bleu `.notice-live`
+  (« 🔄 Section · Site ») à côté du `.notice-fonds` figé au moment du scan
+  — sans jamais reconstruire ce dernier : `reserve.html` n'a aucun accès à
+  `data/magasins.json` (son plan vient entièrement de `/api/recolement`,
+  voir plus haut), donc pas moyen d'y recalculer un `_fondsLabel` propre ;
+  la surcouche est affichée telle quelle, distinguée visuellement plutôt
+  que fusionnée dans le libellé existant. Absent pour l'immense majorité
+  des notices (celles non retouchées depuis le dernier rebuild) — le badge
+  n'apparaît que sur ce qui a effectivement changé.
+
+`analyse-cotes.html` et les autres pages qui chargent `data/inventaire.json`
+indépendamment (`exemplarisation.html`, `reliures.html`,
+`livres-spolies.html`, `transfert-magasins.html`, `recolement.html`) n'ont
+pas cette fusion — à dupliquer au même patron si un besoin similaire s'y
+fait sentir.
 
 ## Exemplarisation rapide (catalogage minimal)
 

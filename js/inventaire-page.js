@@ -131,12 +131,32 @@
          catalogue amputé des créations récentes qu'une page vide. */
       typeof fetchExemplairesManuelsAsCatalogRows === 'function'
         ? fetchExemplairesManuelsAsCatalogRows().catch(function () { return []; })
-        : Promise.resolve([])
+        : Promise.resolve([]),
+      /* Surcouche Syracuse (synchronisation incrémentale, voir
+         js/syracuse-sync-shared.js) : corrige cote/titre/auteur/date sur les
+         exemplaires touchés depuis le dernier rebuild XML — { } si l'API est
+         indisponible ou si rien n'a encore été synchronisé. */
+      typeof fetchSyracuseSyncOverlay === 'function'
+        ? fetchSyracuseSyncOverlay()
+        : Promise.resolve({})
     ])
       .then(function (res) {
         records = res[0].concat(res[1]);
+        var overlay = res[2] || {};
         records.forEach(function (r, i) {
           r._id = i;
+          var barcode = (r['995$f'] || r['915$b'] || '').trim();
+          var fresh = barcode ? overlay[barcode] : null;
+          if (fresh) {
+            // Appliqué AVANT _year/_hay pour que la correction alimente
+            // aussi le tri/la recherche/le filtre par date, pas seulement
+            // l'affichage — mêmes champs que ce que rend buildRow()/
+            // buildExpandedContent() (210$d, 200$a, 700$a, 930$g).
+            if (fresh.dt) r['210$d'] = fresh.dt;
+            if (fresh.titre) r['200$a'] = fresh.titre;
+            if (fresh.auteur) r['700$a'] = fresh.auteur;
+            if (fresh.cote) r['930$g'] = fresh.cote;
+          }
           r._fonds = getFondsFromCote(r);
           r._type = normType(r['200$b']);
           r._lieu = normLieu(r['210$a']);
