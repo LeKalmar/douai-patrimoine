@@ -11,6 +11,10 @@
 function fetchSyracuseSyncOverlay() {
   return fetch('/api/syracuse-sync')
     .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (data) { return (data && data.records) || {}; })
+    .then(function (data) {
+      var records = (data && data.records) || {};
+      console.log('[syracuse-sync] surcouche chargée :', Object.keys(records).length, 'code(s)-barres, lastSync =', data && data.lastSync);
+      return records;
+    })
     .catch(function () { return {}; });
 }

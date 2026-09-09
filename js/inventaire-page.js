@@ -152,6 +152,7 @@
             // aussi le tri/la recherche/le filtre par date, pas seulement
             // l'affichage — mêmes champs que ce que rend buildRow()/
             // buildExpandedContent() (210$d, 200$a, 700$a, 930$g).
+            console.log('[syracuse-sync] correction appliquée sur', barcode, '—', fresh);
             if (fresh.dt) r['210$d'] = fresh.dt;
             if (fresh.titre) r['200$a'] = fresh.titre;
             if (fresh.auteur) r['700$a'] = fresh.auteur;
