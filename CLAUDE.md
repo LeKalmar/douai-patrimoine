@@ -253,6 +253,16 @@ Quatre choses à savoir avant de toucher à une page :
   document coïncident. `window.rpEmbed` (`isEmbedded`, `refresh()`) est la
   petite API exposée par le script pour ces cas.
 
+**Tout ce qui est habillage AUTOUR de l'iframe se règle côté portail, jamais
+ici.** La bande blanche au-dessus de l'iframe vient du `padding-top: 15px` de
+`#portal .panel-body`, un sélecteur du site hôte : une règle CSS écrite dans
+`css/main.css` ou `style.css` ne peut pas l'atteindre (une feuille de styles ne
+traverse pas la frontière d'un document — essayé le 2026-09-08, `!important`
+compris, sans effet ; commentaire laissé en place dans `css/main.css` pour ne
+pas la recréer). Le correctif se pose dans le back-office du portail, au même
+endroit que l'écouteur `iframeHeight` :
+`#portal .panel-body { padding-top: 0 !important; }`.
+
 Les deux cartes MapLibre (`js/main.js` pour l'exposition, la carte « Nous
 trouver » d'`index.html`) passent en **gestes coopératifs**
 (`cooperativeGestures`) quand `rp-embedded` est présent : sans ça, la molette
@@ -757,6 +767,115 @@ décaler ces plages. Le panneau de stats affiche le compte par étage
 (calculé sur `ROWS`, indépendamment du rapport de build) et un menu
 déroulant permet de filtrer le tableau (et donc l'export .txt) par étage.
 
+## Synchronisation incrémentale Syracuse (2026-09-09, phases 1-3)
+
+`data/magasins.json` ne se met à jour qu'au rythme d'un export `bib.xml`
+(mensuel dans les faits). `API-SYRACUSE.MD` (non commité — document de
+travail sur l'API interne, non documentée, du portail public
+`bm-douai.fr`) a établi qu'un champ Solr interne, `timestamp`, permet de
+repérer les notices modifiées récemment, et que
+`ILSClient.svc/GetHoldings` expose le détail par exemplaire (cote,
+code-barre, section, statut) — voir ce document pour l'exploration complète
+(endpoints, formats de requête, mesures de coût). Un protocole de
+validation en conditions réelles (2026-09-09) a confirmé le meilleur cas :
+une cote modifiée dans Syracuse est détectable en moins d'une minute, avec
+la valeur à jour.
+
+Ce qui existe aujourd'hui est volontairement borné aux trois premières
+phases du plan de synchronisation, plus le déclenchement — **pas encore la
+fusion dans l'affichage** : les données s'accumulent dans R2, invisibles,
+le temps d'observer en production que le rythme d'appel reste sage et que
+les données collectées sont justes.
+
+- **`api/syracuse-tick.mjs`** — le moteur de delta. `POST
+  /api/syracuse-tick`, non authentifié (il n'écrit aucune donnée fournie
+  par l'appelant, il ne fait qu'avancer un job déjà entièrement défini côté
+  serveur), déclenché en tâche de fond par `js/syracuse-sync-trigger.js`.
+  Volontairement **pas** un proxy générique vers `Search.svc/Search` ou
+  `GetHoldings` : les exposer en passthrough public serait le vrai risque
+  de surcharge, pire que ce que la synchro cherche à éviter — n'importe qui
+  pourrait relayer des requêtes illimitées vers Syracuse à travers notre
+  propre domaine, sans la friction d'un navigateur. `search()`/
+  `getHoldings()` restent des fonctions internes (exportées uniquement pour
+  être testables isolément, jamais routées).
+
+  Garde-fous, tous vérifiés **avant** le moindre appel réseau vers
+  Syracuse, aucun reporté à une phase ultérieure :
+  - **Plancher de 5 min + verrou anti-concurrence** (`claimSlot()`) : posés
+    via une écriture `r2CasUpdate` sur `syracuse-sync.json` — le CAS
+    garantit qu'un seul appel concurrent « prend la main », un second appel
+    presque simultané relit l'état que le premier vient de poser et se
+    déclare `too-soon`/`in-progress` à son tour, sans structure de verrou
+    séparée. Un verrou resté posé plus de 2 min est considéré issu d'une
+    invocation plantée et peut être repris, plancher ignoré.
+  - **Jamais de `Promise.all` entre appels Syracuse** : boucle `for`
+    séquentielle, 300 ms d'attente entre deux appels quels qu'ils soient
+    (recherche comprise), au plus 10 `GetHoldings` par tranche
+    (`MAX_HOLDINGS_PER_TICK`) — budget mesuré ~6,5 s, confortable sous la
+    limite par défaut d'une fonction Vercel (aucun `maxDuration`
+    n'est configuré dans `vercel.json`).
+  - **Comparaison avant écriture** : une réindexation en masse bouge
+    `timestamp` sans changer le contenu (mesuré dans `API-SYRACUSE.MD`,
+    +16 222 notices en une journée sur un pic) — l'état ne grossit que sur
+    un vrai changement de cote/section/site/statut.
+  - **Fenêtre glissante avec curseur** (`cursor: {windowEnd, page,
+    offsetInPage}`) : la fenêtre `[lastSync, windowEnd]` reste fixe tant
+    qu'il reste des pages à traiter, `lastSync` n'avance que quand elle est
+    intégralement épuisée — une notice n'est donc ni sautée ni retraitée
+    indéfiniment sur un pic. Limite connue et documentée dans le fichier :
+    la requête est reconstruite à chaque tranche plutôt que de réinjecter
+    le `Query` normalisé du serveur, donc rien ne garantit l'ordre exact
+    des résultats d'une page déjà partiellement consommée si l'index bouge
+    entre deux tranches — risque étroit (une page ne s'étale que sur ~2-3
+    tranches) et auto-cicatrisant (rattrapé à la prochaine modification de
+    la notice concernée, ou par le rebuild mensuel complet).
+  - **Interrupteur automatique** : 3 tranches en échec d'affilée →
+    `enabled:false` dans l'état. Seul un `POST` authentifié vers
+    `/api/syracuse-sync` (`{type:'setEnabled', enabled:true}`) peut le
+    relever — décision humaine requise, pas de redémarrage automatique.
+  - **Détection de la disparition du champ `timestamp`** : si aucune
+    notice n'est détectée depuis plus de 12 h alors que la baseline mesurée
+    est de ~200 à 800/jour, une requête de contrôle ponctuelle
+    `timestamp:[* TO *]` confirme — si elle aussi renvoie 0, coupure
+    automatique (le champ a probablement disparu d'une mise à jour
+    Syracuse). Ne coûte rien tant que le flux est normal.
+  - Titre/auteur ne viennent **pas** de `GetHoldings` (qui ne les expose
+    pas) mais de la réponse `Search` déjà en main pour la même notice — pas
+    d'appel supplémentaire.
+
+- **`api/syracuse-sync.mjs`** — accès à l'état stocké, sur le patron
+  `createPatchEndpoint()` des sept autres endpoints « proxy classique »
+  (voir « Stockage partagé » plus bas) : `GET` public avec ETag/304,
+  `POST` authentifié pour les deux seules actions humaines nécessaires à
+  ce stade — `{type:'setEnabled', enabled}` (couper/relever la synchro à
+  la main) et `{type:'reset'}` (repartir de zéro après un rebuild mensuel
+  complet de `data/magasins.json`, les deltas accumulés devenant obsolètes
+  face au nouvel export). La forme de l'état (`lastSync`, `cursor`,
+  `records: {barcode: {...}}`, `notices: {rscId: {barcodes, ts}}`,
+  `enabled`, `syncInProgress`, `lastSyncAttempt`, `consecutiveErrors`,
+  `lastError`) est centralisée dans `lib/syracuse-sync-state.mjs`
+  (`SYRACUSE_SYNC_KEY`, `emptySyracuseSyncState()`) — un seul point de
+  vérité partagé entre les deux fichiers `api/syracuse-*.mjs`, pour qu'ils
+  ne divergent jamais sur le schéma.
+
+- **`js/syracuse-sync-trigger.js`** — le déclenchement : un unique appel
+  `fetch('/api/syracuse-tick', {method:'POST', keepalive:true})` en
+  fire-and-forget, résultat ignoré. Fichier volontairement séparé et
+  minimal, inclus via `<script defer>` sur `recolement.html` et
+  `magasins.html` (à côté de `js/parent-page-height.js`) — aucune ligne du
+  script principal de ces deux pages n'est touchée. Raison de cette
+  précaution : `recolement.html` a déjà eu deux pannes de production par
+  *temporal dead zone* dans son script principal (voir « Pièges connus »
+  plus bas) ; ce nouveau code ne doit avoir strictement aucune chance
+  d'interagir avec cet ordre d'initialisation.
+
+Le bloc `notices` de l'état est rempli à chaque tranche (permet de détecter
+qu'un code-barre a disparu des exemplaires d'une notice) mais rien ne
+l'exploite encore. Aucune page ne lit `syracuse-sync.json` pour
+l'affichage : la fusion côté client (sur le modèle de
+`js/exemplaires-manuels-shared.js`) est la prochaine étape, une fois le
+pipeline observé en production.
+
 ## Exemplarisation rapide (catalogage minimal)
 
 `exemplarisation.html` (2026-08-12) permet de créer un exemplaire (titre,
@@ -1121,26 +1240,37 @@ pour plusieurs choses indépendantes :
   — voir « Exemplarisation rapide » plus haut. Contrairement aux deux
   catégories ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
   dans le site ne relit ces images pour l'instant.
+- **`syracuse-sync.json`** : surcouche de synchronisation incrémentale avec
+  le portail public Syracuse (`bm-douai.fr`), alimentée par
+  `api/syracuse-tick.mjs` — voir « Synchronisation incrémentale Syracuse »
+  plus bas pour le détail. Cinquième usage indépendant du bucket R2, en
+  plus de `xml/`, de la famille `recolement.json`/…/`desherbage-traitements.json`,
+  de `recolement-backups/` et de `vignette/`.
 
-Sept fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
+Neuf fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
 `api/exemplaires-manuels.mjs`, `api/reliures-manuelles.mjs`,
-`api/vignette.mjs`, `api/transferts.mjs`, `api/desherbage.mjs`) servent de proxy vers R2 :
-`GET` (sauf `api/vignette.mjs`, POST uniquement) renvoie l'état courant
-(public, même niveau
-d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit un
-« patch » unitaire (ex. `{type:'scan', record}` ou `{id, field, value}`) et
-le fusionne côté serveur via lecture+ETag+réécriture conditionnelle
+`api/vignette.mjs`, `api/transferts.mjs`, `api/desherbage.mjs`,
+`api/syracuse-sync.mjs`, `api/syracuse-tick.mjs`) touchent à R2. Les huit
+premières servent de proxy classique vers un état stocké : `GET` (sauf
+`api/vignette.mjs`, POST uniquement) renvoie l'état courant (public, même
+niveau d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit
+un « patch » unitaire (ex. `{type:'scan', record}` ou `{id, field, value}`)
+et le fusionne côté serveur via lecture+ETag+réécriture conditionnelle
 (`r2CasUpdate` dans `lib/r2.mjs`, compare-and-swap avec retry) — jamais un
 écrasement complet du fichier, pour qu'un scan pris par un collègue au même
-instant ne soit pas perdu.
+instant ne soit pas perdu. `api/syracuse-tick.mjs` est d'une autre nature :
+un déclencheur de job (`POST` non authentifié, aucune donnée fournie par
+l'appelant) plutôt qu'un proxy d'état — voir plus bas.
 
-Depuis 2026-09-02, les six endpoints « état partagé » (tous sauf
+Depuis 2026-09-02, sept des huit endpoints « proxy classique » (tous sauf
 `api/vignette.mjs`) partagent une seule implémentation,
 `createPatchEndpoint()` dans `lib/patch-endpoint.mjs` — ils étaient
 auparavant copiés ligne pour ligne, ne différant que par leur clé R2, leur
 état vide et leur `applyPatch()` (`api/reliures-manuelles.mjs` passe en plus
-un `normalizeState` pour son ancien format à plat). Un correctif profite donc
-aux six d'un coup. C'est notamment ce qui a permis d'ajouter partout un
+un `normalizeState` pour son ancien format à plat ; `api/syracuse-sync.mjs`,
+ajouté début 2026-09-09, en hérite directement sans particularité). Un
+correctif profite donc à tous d'un coup. C'est notamment ce qui a permis
+d'ajouter partout un
 **ETag** : l'ETag de l'objet R2 (déjà renvoyé par `r2Get`) est propagé en
 en-tête, et un `If-None-Match` correspondant donne un **304 sans corps**. Le
 `Cache-Control` est `public, max-age=0, must-revalidate, s-maxage=20,

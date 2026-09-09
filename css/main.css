@@ -769,9 +769,12 @@ body {
     outline-offset: 2px;
     filter: brightness(1.3) drop-shadow(0 0 6px rgba(255,255,255,0.8));
 }
-#portal .panel-body {
-  padding-top: 0 !important;
-}
+/* Pas de règle `#portal .panel-body` ici : `#portal` appartient au site hôte,
+   pas à cette page. Une feuille de styles ne traverse pas la frontière d'une
+   iframe — une telle règle placée ici resterait sans effet (essayé le
+   2026-09-08, `!important` compris). Le retrait du `padding-top: 15px`
+   au-dessus de l'iframe se fait côté portail, au même endroit que l'écouteur
+   `iframeHeight` (voir « Publication en iframe » dans CLAUDE.md). */
 
 /* ========================================================
    PUBLICATION EN IFRAME
