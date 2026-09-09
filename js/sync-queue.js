@@ -36,7 +36,7 @@
      un environnement fourni de l'extérieur. */
 
   function authHeaders() {
-    const token = global.sessionStorage.getItem('rp_admin_token');
+    const token = global.localStorage.getItem('rp_admin_token');
     const h = { 'Content-Type': 'application/json' };
     if (token) h['Authorization'] = 'Basic ' + token;
     return h;

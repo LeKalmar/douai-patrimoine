@@ -990,7 +990,7 @@ retard au lieu de ne progresser qu'au prochain rechargement manuel.
   la page ne faisait que lire la surcouche sans jamais la faire avancer,
   donc rien ne progressait tant que personne n'avait ouvert les deux autres
   pages) — les trois pages sont des outils internes au même niveau de
-  confiance (même gate `sessionStorage`), contrairement à `inventaire.html`
+  confiance (même gate `localStorage`), contrairement à `inventaire.html`
   qui reste volontairement lecture seule : ajouter le déclenchement sur une
   page publique changerait le profil d'exposition, décision non prise sans
   en reparler avec l'équipe.
@@ -1859,10 +1859,25 @@ L'« espace professionnel » n'a **toujours pas de vraie protection serveur
 au niveau des pages** — les pages elles-mêmes restent 100 % statiques :
 
 - Le contrôle d'accès des pages protégées n'est qu'un test
-  `sessionStorage.getItem('rp_admin_auth') === '1'` — contournable
-  trivialement dans la console du navigateur (`sessionStorage.setItem(...)`),
+  `localStorage.getItem('rp_admin_auth') === '1'` — contournable
+  trivialement dans la console du navigateur (`localStorage.setItem(...)`),
   **sans même connaître le mot de passe**. Une personne qui contourne ce
   gate peut donc voir l'UI de `recolement.html`, `reserve.html`, etc.
+
+Depuis 2026-09-09, ce gate est posé sur `localStorage` plutôt que
+`sessionStorage` (`rp_admin_auth` et `rp_admin_token`, le second portant le
+`btoa(user:pass)` utilisé pour l'en-tête `Authorization: Basic` des `POST`
+authentifiés). Raison : `sessionStorage` n'est copié vers un nouvel onglet
+que quand le navigateur le crée lui-même en suivant un lien depuis un onglet
+déjà connecté — un onglet ouvert indépendamment (URL tapée, onglet dupliqué,
+raccourci) démarre avec un `sessionStorage` vide et renvoyait donc vers
+`index.html` malgré une connexion déjà active ailleurs. `localStorage` est
+partagé par tous les onglets/fenêtres de la même origine et survit à la
+fermeture du navigateur — accepté sans réserve puisque ce gate n'a jamais
+été une vraie protection (voir plus bas) : le seul changement réel est que
+la « déconnexion » (bouton dédié, qui fait toujours `removeItem` sur les
+deux clés) redevient le seul moyen d'en sortir, au lieu de la fermeture du
+navigateur.
 
 Depuis 2026-07-24, ce qui a changé : les identifiants (`ADMIN_USER` /
 `ADMIN_PASS`) **ne sont plus en clair dans le JavaScript** — le formulaire
@@ -1870,7 +1885,7 @@ de connexion de `index.html` les envoie à `/api/login`, qui les compare
 côté serveur aux variables d'environnement Vercel (`lib/auth.mjs`,
 `credentialsMatch()`). Un « voir le code source » ne révèle donc plus le
 mot de passe. Ça ne protège pas davantage l'accès aux *pages* (le gate
-`sessionStorage` reste un simple indicateur, toujours contournable comme
+`localStorage` reste un simple indicateur, toujours contournable comme
 ci-dessus) — seulement le **coût de découverte du mot de passe**, et par
 ricochet l'écriture dans l'état partagé R2 : un `POST` vers
 `/api/recolement` ou `/api/spolies` exige un en-tête `Authorization: Basic`
@@ -1888,7 +1903,7 @@ nofollow">` sur toutes les pages de l'espace pro pour éviter leur
 indexation.
 
 Ce qui n'a **pas** été corrigé, car c'est une décision produit et non un
-simple nettoyage : le gate des *pages* reste côté client (sessionStorage),
+simple nettoyage : le gate des *pages* reste côté client (localStorage),
 donc ce n'est qu'une barrière anti-curieux pour la navigation, pas une
 vraie protection d'accès — même si l'écriture des données partagées est,
 elle, réellement protégée depuis l'ajout de `/api/login`. Pour aller plus

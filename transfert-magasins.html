@@ -237,13 +237,13 @@
 
 <script>
 (function() {
-  if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+  if (localStorage.getItem('rp_admin_auth') !== '1') {
     window.location.href = 'index.html';
   }
 })();
 document.getElementById('logout-btn').addEventListener('click', function() {
-  sessionStorage.removeItem('rp_admin_auth');
-  sessionStorage.removeItem('rp_admin_token');
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
   window.location.href = 'index.html';
 });
 

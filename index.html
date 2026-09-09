@@ -335,8 +335,8 @@ document.addEventListener('DOMContentLoaded', function() {
       .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
       .then(function(result) {
         if (result.ok && result.data.ok) {
-          sessionStorage.setItem('rp_admin_auth', '1');
-          sessionStorage.setItem('rp_admin_token', btoa(user + ':' + pass));
+          localStorage.setItem('rp_admin_auth', '1');
+          localStorage.setItem('rp_admin_token', btoa(user + ':' + pass));
           window.location.href = 'admin.html';
         } else {
           errorMsg.textContent = (result.data && result.data.error === 'ADMIN_USER / ADMIN_PASS non configurés côté serveur (variables Vercel).')

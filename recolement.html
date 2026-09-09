@@ -435,13 +435,13 @@
 <script>
 (async function(){
 /* ════════════ AUTH ════════════ */
-if (sessionStorage.getItem('rp_admin_auth') !== '1') {
+if (localStorage.getItem('rp_admin_auth') !== '1') {
   window.location.href = 'index.html';
   return;
 }
 document.getElementById('logout-btn').addEventListener('click', function(){
-  sessionStorage.removeItem('rp_admin_auth');
-  sessionStorage.removeItem('rp_admin_token');
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
   window.location.href = 'index.html';
 });
 
@@ -784,7 +784,7 @@ await initStorage();
    R2 non configuré), le patch reste dans une file locale et sera retenté —
    rien n'est jamais perdu, seulement pas encore visible par les autres. */
 function authHeaders(){
-  const token = sessionStorage.getItem('rp_admin_token');
+  const token = localStorage.getItem('rp_admin_token');
   const h = { 'Content-Type': 'application/json' };
   if(token) h['Authorization'] = 'Basic ' + token;
   return h;
