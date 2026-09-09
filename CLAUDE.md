@@ -1060,14 +1060,33 @@ tableaux des « Statistiques avancées » qui lisent le catalogue en direct
 (« Jamais scannés », « Documents probablement perdus ») reflètent donc la
 correction sans attendre un nouveau `npm run build`/`build:magasins`. Sur
 demande explicite, la ligne concernée n'est jamais retirée de ces
-tableaux : chaque catégorie (sauf « Mauvais numéro / code-barre absent »,
-qui exporte des cotes et non des codes-barres) gagne une colonne
-« Syracuse » — badge « 🔄 corrigé le JJ/MM/AAAA » (date = `ts` de la
-surcouche) si ce code-barre a une correction, `—` sinon — et une case à
-cocher « Exclure les corrigés (Syracuse) » à côté de son bouton d'export
-.txt, qui s'applique aussi aux boutons « tous les magasins »/tranche de
-travées de la même catégorie (`syracuseNotCorrectedFilter()`,
-`combineExportFilters()`). `loadSyracuseOverlay()` (appelée au chargement,
+tableaux : chaque catégorie gagne une colonne dédiée à la fraîcheur
+Syracuse, à l'exception de « Mauvais numéro / code-barre absent » (exporte
+des cotes, pas des codes-barres) — mais son contenu diffère pour
+« Récolés » (`ADV_CATS.scanned`), seule catégorie sans notion d'anomalie à
+traiter (le document est déjà localisé physiquement, une correction de
+cote/titre/auteur n'y change rien) :
+
+- Les cinq autres catégories affichent une colonne « Syracuse » — badge
+  « 🔄 corrigé le JJ/MM/AAAA » (`syracuseCorrectionCell()`, date = `ts` de
+  la surcouche) si ce code-barre a une correction, `—` sinon — avec une
+  case à cocher « Exclure les corrigés (Syracuse) » à côté du bouton
+  d'export .txt, qui s'applique aussi aux boutons « tous les magasins »/
+  tranche de travées de la même catégorie (`syracuseNotCorrectedFilter()`,
+  `combineExportFilters()`, activés par `spec.showCorrectionFilter` dans
+  `ADV_CATS`).
+- « Récolés » affiche à la place (2026-09-09, demande explicite) une
+  colonne « Prêt » — badge « 📕 en prêt » (`syracuseLoanBadge()`) si le
+  champ `statut` de la surcouche contient "prêt" (insensible à la casse,
+  couvre "En prêt", "En prêt, en magasin"… — Syracuse combine parfois
+  plusieurs informations dans ce champ, formulation exacte non documentée
+  côté ILS), `—` sinon. Pas de case "Exclure les corrigés" pour cette
+  catégorie (`showCorrectionFilter` absent de son entrée `ADV_CATS`) :
+  savoir qu'un exemplaire vient d'être scanné en rayon alors qu'il est
+  enregistré "en prêt" est l'info utile ici, pas la fraîcheur
+  cote/titre/auteur.
+
+`loadSyracuseOverlay()` (appelée au chargement,
 toutes les 5 min et au retour d'onglet, même cadence que `reserve.html`)
 réapplique la correction et reconstruit l'index cote→code-barre
 (`catalogCoteIndexByGroup`) de chaque catalogue déjà chargé — peu importe

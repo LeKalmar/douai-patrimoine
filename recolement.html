@@ -1096,6 +1096,23 @@ function syracuseCorrectionCell(barcode){
   const dateStr = d && !isNaN(d) ? d.toLocaleDateString('fr-FR') : '';
   return `<span style="color:#1565c0" title="Cote/titre/auteur relevés par la synchronisation incrémentale Syracuse${dateStr ? ', le '+dateStr : ''} — plus récents que le dernier export XML complet">🔄 corrigé${dateStr?' le '+esc(dateStr):''}</span>`;
 }
+// Utilisé uniquement par "Récolés" (ADV_CATS.scanned), à la place du badge
+// "corrigé" ci-dessus : cette section liste des documents déjà localisés
+// physiquement, une correction de cote/titre/auteur n'y est pas une anomalie
+// à traiter (demande explicite, 2026-09-09). En revanche, savoir qu'un
+// exemplaire qu'on vient de scanner en rayon est enregistré "en prêt" côté
+// Syracuse EST une info utile (livre non rendu, ou statut pas à jour) — lu
+// sur le champ `statut` de la surcouche (h.Statut, voir api/syracuse-tick.mjs),
+// jamais exposé ailleurs dans cette page. Détection par sous-chaîne
+// insensible à la casse plutôt qu'une liste de valeurs exactes : Syracuse
+// combine parfois plusieurs informations dans ce champ (ex. "En prêt, en
+// magasin"), et la formulation exacte n'est pas documentée côté ILS.
+function syracuseLoanBadge(barcode){
+  const fresh = barcode ? SYRACUSE_OVERLAY[barcode] : null;
+  const statut = fresh && fresh.statut;
+  if(!statut || !/pr[eê]t/i.test(statut)) return '—';
+  return `<span style="color:#c62828" title="${esc(statut)} — relevé par la synchronisation incrémentale Syracuse">📕 en prêt</span>`;
+}
 // Utilisé par les boutons d'export (voir "Exclure les codes-barres déjà
 // corrigés" dans advDetailsTemplate()) pour ne garder que les lignes dont le
 // code-barre n'a encore aucune correction Syracuse connue.
@@ -1640,13 +1657,12 @@ const ADV_CATS = {
     title: 'Récolés — codes-barres déjà scannés',
     desc: 'Tous les documents déjà récolés dans ce groupe (scan physique, y compris exemplarisation rapide et cascade de reliures) — export utile pour ajout panier SIGB ou recoupement avec une autre liste',
     placeholder: 'Filtrer (cote, titre, auteur, code-barre)…',
-    headers: ['Cote','Titre','Auteur','Emplacement','Code-barre','Syracuse'],
+    headers: ['Cote','Titre','Auteur','Emplacement','Code-barre','Prêt'],
     colspan: 6,
     emptyMsg: 'Aucun document récolé pour l\'instant.',
     filterFields: ['cote','titre','auteur','barcode'],
     filePrefix: 'codes-barres-recoles',
     needsCatalog: false,
-    showCorrectionFilter: true,
     listFn: scannedList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
@@ -1654,7 +1670,7 @@ const ADV_CATS = {
       <td>${esc(r.auteur)}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
-      <td>${syracuseCorrectionCell(r.barcode)}</td>
+      <td>${syracuseLoanBadge(r.barcode)}</td>
     </tr>`,
   },
   nobarcode: {
