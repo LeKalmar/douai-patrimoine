@@ -17,6 +17,7 @@
     "upload:desherbage": "node scripts/upload-desherbage-to-r2.mjs",
     "upload:bib": "node scripts/upload-bib-to-r2.mjs",
     "test:r2": "node scripts/test-r2.mjs",
+    "sync:syracuse": "node scripts/run-syracuse-sync.mjs",
     "backfill:reliure": "node scripts/backfill-reliure.mjs"
   }
 }
