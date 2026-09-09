@@ -87,6 +87,31 @@ const CALL_SPACING_MS = 300; // ⚠️ ne pas réduire — c'est la seule protec
 const MAX_CONSECUTIVE_ERRORS = 3;
 const SANITY_CHECK_QUIET_MS = 12 * 60 * 60 * 1000;
 
+/* Périmètre volontairement restreint à ces deux sites physiques (demande
+   explicite, 2026-09-09) — ce sont les seuls que couvrent
+   recolement.html/reserve.html/magasins.html. `LocationSite_exact` (facette
+   Search, §5/§7 d'API-SYRACUSE.MD) est le même axe que `h.Site`/`h.SiteCode`
+   de GetHoldings et que `Bibliothèque (Libellé)` de bib.xml (voir §16-17,
+   déjà utilisé ainsi par build-magasins.mjs : `bibliotheque.startsWith
+   ('Douai')`). Ici volontairement PAS ce filtre large "tout Douai" (qui
+   inclurait aussi "Douai La Micheline", une bibliothèque du réseau hors
+   périmètre de cet outil) : compromis accepté en connaissance de cause — un
+   exemplaire mal rattaché à un AUTRE site Syracuse ne fera plus remonter de
+   correction fraîche via cette surcouche. Sans conséquence sur la
+   détection d'anomalies de classement elle-même (ADV_CATS.horssection dans
+   recolement.html) : elle vient du rebuild XML complet mensuel, pas de
+   cette synchro incrémentale — seule la fraîcheur cote/titre/auteur d'un
+   tel exemplaire serait perdue, pas le signal d'anomalie.
+   Effet de bord accepté sur le coupe-circuit du §22 (SANITY_CHECK_QUIET_MS) :
+   un périmètre plus étroit peut rester silencieux plus de 12 h en usage
+   normal (week-end...), ce qui déclenchera plus souvent la requête de
+   contrôle `checkTimestampFieldAlive()` — sans risque, puisque cette
+   requête reste volontairement non filtrée (voir son appel plus bas) et ne
+   coupe la synchro que si le champ `timestamp` a réellement disparu de tout
+   le portail, jamais sur la seule base d'un silence de CE périmètre. */
+const TARGET_SITES = ['Douai Marceline Desbordes-Valmore', 'Douai Réserve Patrimoniale'];
+const SITE_FILTER = TARGET_SITES.map(s => `LocationSite_exact:"${s}"`).join(' OR ');
+
 class SkipTick extends Error {
   constructor(reason, extra) {
     super(reason);
@@ -273,7 +298,10 @@ async function runSlice(state, origin) {
     }
   }
 
-  const queryString = `timestamp:[${lastSync} TO ${windowEnd}]`;
+  // TARGET_SITES/SITE_FILTER : voir le commentaire à leur déclaration
+  // plus haut (compromis accepté, hors périmètre de checkTimestampFieldAlive
+  // qui reste volontairement non filtré).
+  const queryString = `timestamp:[${lastSync} TO ${windowEnd}] AND (${SITE_FILTER})`;
   await sleep(CALL_SPACING_MS);
   const searchResult = await search(queryString, { page, resultSize: RESULT_SIZE });
   if (!searchResult.success) {

@@ -818,6 +818,35 @@ sont justes, avant d'y raccrocher une première fusion dans l'affichage
     `timestamp` sans changer le contenu (mesuré dans `API-SYRACUSE.MD`,
     +16 222 notices en une journée sur un pic) — l'état ne grossit que sur
     un vrai changement de cote/section/site/statut.
+  - **Filtre de site** (`TARGET_SITES`/`SITE_FILTER`, 2026-09-09, demande
+    explicite) : la requête `search()` du delta ajoute
+    `AND (LocationSite_exact:"Douai Marceline Desbordes-Valmore" OR
+    LocationSite_exact:"Douai Réserve Patrimoniale")` — les deux seuls sites
+    physiques que couvrent `recolement.html`/`reserve.html`/`magasins.html`.
+    Ce champ Search (facette §5/§7 d'`API-SYRACUSE.MD`) est le même axe que
+    `h.Site`/`h.SiteCode` de `GetHoldings` et que `Bibliothèque (Libellé)`
+    de `bib.xml` (§16-17) — déjà filtré ainsi, mais plus largement
+    (`bibliotheque.startsWith('Douai')`, donc « Douai La Micheline » y
+    compris), dans `build-magasins.mjs`. Ici volontairement plus étroit que
+    « tout Douai » : compromis accepté en connaissance de cause — un
+    exemplaire mal rattaché à un AUTRE site Syracuse ne fera plus remonter
+    de correction fraîche via cette surcouche. **Sans conséquence sur la
+    détection d'anomalies de classement elle-même** (`ADV_CATS.horssection`
+    dans `recolement.html`) : elle vient du rebuild XML complet mensuel, pas
+    de cette synchro incrémentale — seule la fraîcheur cote/titre/auteur
+    d'un tel exemplaire serait perdue, jamais le signal d'anomalie. Un
+    filtre par site n'ajoute ni appel ni latence (une clause en plus dans le
+    même `QueryString`, toujours un seul `search()`) ; il en économise
+    plutôt — le portail Syracuse dessert plus que le réseau de Douai (voir
+    « Médiathèque départementale », déjà exclue ailleurs), et une partie des
+    notices détectées avant ce filtre déclenchait un `GetHoldings` que la
+    page ignorait de toute façon ensuite (code-barre absent du catalogue).
+    Effet de bord accepté sur le coupe-circuit ci-dessous
+    (`SANITY_CHECK_QUIET_MS`) : un périmètre plus étroit peut rester
+    silencieux plus de 12 h en usage normal (week-end...), ce qui déclenche
+    plus souvent la requête de contrôle — sans risque, puisqu'elle reste
+    volontairement non filtrée et ne coupe la synchro que si le champ
+    `timestamp` a réellement disparu de tout le portail.
   - **Tri `timestamp` décroissant** (`SortField:'timestamp', SortOrder:1`
     dans `search()` — accepté bien qu'absent de `d.Sorts`, §19) : sans ce
     tri, une modification toute fraîche se retrouve n'importe où dans une
