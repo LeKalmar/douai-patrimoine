@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Livres spoliés — Réserve patrimoniale</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="js/columnar.js"></script>
+  <script src="js/sync-queue.js"></script>
+  <style>
+    :root {
+      --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+    }
+    body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--papier);margin:0;line-height:normal}
+    .page-hero{background:var(--bleu);color:#fff;padding:2.5rem 1.5rem 2rem}
+    .page-hero .container{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.75rem;letter-spacing:.04em}
+    .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:400;margin:0 0 .5rem;line-height:1.15}
+    .page-lead{font-size:.9rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
+    .hero-actions a, .hero-actions button {
+      font-family:inherit;font-size:.82rem;color:rgba(255,255,255,0.8);
+      background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
+      padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;
+      transition:all .15s;
+    }
+    .hero-actions a:hover, .hero-actions button:hover { background:rgba(255,255,255,0.2); color:#fff; }
+    .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+    .sync-status.pending{color:#ffcc80}
+    .container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
+    .loader{background:var(--papier-ombre);border:1px dashed var(--trait-fort);border-radius:var(--radius-md);padding:1.5rem;text-align:center;margin:2rem auto;max-width:1200px}
+    .loader p{font-size:.85rem;color:var(--text-light);margin:0 0 .5rem}
+    .spinner-row{display:flex;align-items:center;justify-content:center;gap:.4rem;font-size:.8rem;color:var(--text-light)}
+    .sp{width:7px;height:7px;border-radius:50%;background:var(--trait-fort);animation:sp 1.2s infinite}
+    .sp:nth-child(2){animation-delay:.2s}.sp:nth-child(3){animation-delay:.4s}
+    @keyframes sp{0%,80%,100%{opacity:.2}40%{opacity:1}}
+    footer{background:var(--encre);color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:3rem;font-size:.8rem;text-align:center}
+    footer a{color: var(--carmin);text-decoration:none}
+
+    .ls-section{padding:2rem 0 3rem}
+    .section-heading{font-family:'Moret','DM Serif Display',serif;font-size:1.4rem;font-weight:400;margin:0 0 .35rem;color:var(--encre)}
+    .section-subhead{font-size:.875rem;color:var(--text-light);margin:0 0 1.25rem}
+
+    /* Stats */
+    .ls-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:1.75rem}
+    .cstat{background:#fff;border:1px solid #E3DED4;border-radius:8px;padding:.75rem .9rem}
+    .cstat-lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);margin-bottom:.25rem}
+    .cstat-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1;color:var(--bleu)}
+    .cstat-val.warn{color:#c9a227}
+    .cstat-val.ok{color:#2e7d32}
+    .cstat-val.bad{color:#c62828}
+
+    /* Camembert de répartition */
+    .ls-piechart-wrap{display:flex;align-items:center;gap:1.75rem;flex-wrap:wrap;background:#fff;border:1px solid #E3DED4;border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.75rem;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .ls-piechart{position:relative;width:150px;height:150px;border-radius:50%;flex-shrink:0;transition:background .2s}
+    .ls-piechart-hole{position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:0 0 0 1px #F0ECE3 inset}
+    .ls-piechart-hole .n{font-family:'Moret','DM Serif Display',serif;font-size:1.4rem;color:var(--bleu);line-height:1}
+    .ls-piechart-hole .l{font-size:.58rem;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem}
+    .ls-piechart-legend{display:grid;gap:.45rem;flex:1;min-width:220px}
+    .ls-legend-item{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--text)}
+    .ls-legend-swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+    .ls-legend-label{flex:1}
+    .ls-legend-count{font-weight:600;color:var(--text)}
+    .ls-legend-pct{color:var(--text-light);font-size:.72rem;width:3.4em;text-align:right}
+
+    /* Recherche catalogue */
+    .catalog-search-wrap{background:#fff;border:1px solid #E3DED4;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.75rem;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .catalog-search-label{font-size:.75rem;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem}
+    .catalog-search-bar{display:flex;align-items:center;gap:.5rem;background:#fff;border:1px solid var(--trait-fort);border-radius:8px;padding:.6rem .9rem}
+    .catalog-search-bar svg{flex-shrink:0}
+    .catalog-search-bar input{flex:1;border:none;outline:none;background:transparent;font-size:.95rem;font-family:inherit;color:var(--text)}
+    .catalog-search-hint{font-size:.72rem;color:var(--text-light);margin-top:.5rem}
+    .catalog-results{margin-top:1rem;display:grid;gap:.5rem;max-height:360px;overflow-y:auto}
+    .catalog-result{display:flex;align-items:center;gap:.75rem;padding:.55rem .75rem;border:1px solid var(--trait);border-radius:8px;background:var(--papier-ombre)}
+    .catalog-result .cr-type{flex-shrink:0;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;font-weight:700;color:#fff;background:var(--bleu);border-radius:10px;padding:2px 8px;white-space:nowrap}
+    .catalog-result .cr-main{flex:1;min-width:0}
+    .catalog-result .cr-titre{font-size:.85rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .catalog-result .cr-meta{font-size:.72rem;color:var(--text-light);margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .catalog-result .cr-source{flex-shrink:0;font-size:.68rem;color:var(--text-light);white-space:nowrap}
+    .catalog-result .cr-cote{flex-shrink:0;font-family:monospace;font-size:.78rem;font-weight:700;color:var(--bleu);background:var(--accent-light);padding:2px 8px;border-radius:5px}
+    .catalog-empty{padding:.75rem;text-align:center;color:var(--text-light);font-size:.8rem;font-style:italic}
+    .catalog-more{padding:.4rem;text-align:center;font-size:.7rem;color:var(--text-light);font-style:italic}
+
+    /* Table livres spoliés */
+    .ls-wrap{background:#fff;border:1px solid #E3DED4;border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
+    .ls-header{display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;background:var(--papier-ombre);border-bottom:1px solid var(--trait);flex-wrap:wrap;gap:.5rem}
+    .ls-header-title{font-size:.75rem;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.05em}
+    .ls-header-actions{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+    .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid var(--trait-fort);border-radius:6px;background:#fff;cursor:pointer;color:var(--text);transition:all .15s;display:flex;align-items:center;gap:.3rem}
+    .export-btn:hover{background:var(--papier-ombre);border-color:#B0A99A}
+    .export-btn.primary{background:var(--encre);border-color:var(--encre);color:#fff}
+    .export-btn.primary:hover{background:var(--bleu);border-color:var(--bleu)}
+    .export-btn.danger{color:#c62828;border-color:#f0c0c0}
+    .export-btn.danger:hover{background:#fff5f5;border-color:#e57373}
+    .export-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
+    .ls-filter-info{font-size:.72rem;color:#666;font-style:italic;padding:.3rem .75rem;background:#fffde7;border-bottom:1px solid #fff9c4;display:none}
+    .ls-filter-info.visible{display:block}
+    .ls-table-scroll{overflow-x:auto}
+    .ls-table{width:100%;border-collapse:collapse;font-size:.78rem;min-width:1600px}
+    .ls-table th{position:sticky;top:0;background:#fff;padding:.45rem .65rem;text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-light);border-bottom:1px solid var(--trait);font-weight:600;white-space:nowrap}
+    .ls-table td{padding:.4rem .65rem;border-bottom:1px solid #F0ECE3;vertical-align:middle}
+    .ls-table tr:last-child td{border-bottom:none}
+    .ls-table tr:hover td{background:var(--papier-ombre)}
+    .ls-table tr.is-found td{background:#f3fbf3}
+    .ls-table tr.is-found:hover td{background:#eaf7ea}
+    .ls-table tr.is-notfound td{background:#fdf2f2}
+    .ls-table tr.is-notfound:hover td{background:#fbe4e4}
+    .ls-table tr.is-cote td{background:#fffbe6}
+    .ls-table tr.is-cote:hover td{background:#fff6cc}
+    .ls-table th[data-sort]{cursor:pointer;user-select:none}
+    .ls-table th[data-sort]:hover{color:var(--text)}
+    .ls-table th.sorted{color:var(--bleu)}
+    .sort-arrow{font-size:.6rem;margin-left:.15rem}
+    .ls-titre{font-weight:600;color:var(--text);max-width:260px}
+    .ls-auteur{color:var(--text);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ls-pub{color:var(--text-light);font-size:.72rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ls-caisse{font-family:monospace;color:var(--text-light)}
+    .ls-type{font-size:.68rem;color:var(--bleu);text-transform:uppercase;letter-spacing:.03em}
+    .ls-input{font-family:monospace;font-size:.75rem;border:1px solid var(--trait-fort);border-radius:5px;padding:.25rem .4rem;width:100%;box-sizing:border-box;color:var(--text)}
+    .ls-input:focus{outline:none;border-color:var(--bleu);background:var(--papier-ombre)}
+    .ls-input.possesseur{font-family:'DM Sans',sans-serif}
+    .col-cote{min-width:110px}
+    .col-possesseur{min-width:160px}
+    .col-origine{min-width:150px}
+    .col-date{min-width:120px}
+    .ls-checkbox-cell{text-align:center}
+    .ls-empty{padding:1.5rem;text-align:center;color:var(--text-light);font-size:.85rem;font-style:italic}
+
+    /* Tri-state (rien / oui / non) pour Retrouvé et Ex-libris */
+    .tristate{display:inline-flex;border:1px solid var(--trait-fort);border-radius:6px;overflow:hidden}
+    .tristate button{font-family:inherit;font-size:.72rem;border:none;background:#fff;padding:.22rem .5rem;cursor:pointer;color:#aaa;line-height:1;border-right:1px solid #eee}
+    .tristate button:last-child{border-right:none}
+    .tristate button:hover:not(.active){background:var(--papier-ombre);color:var(--text)}
+    .tristate button.active[data-value=""]{background:#e0e0e0;color:var(--text)}
+    .tristate button.active[data-value="1"]{background:#2e7d32;color:#fff}
+    .tristate button.active[data-value="0"]{background:#c62828;color:#fff}
+    .ls-possesseur-hidden{color:#ccc;font-size:.78rem;font-style:italic}
+
+    /* Pagination (repris d'analyse-cotes.html) */
+    .ls-pagination{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-top:1px solid var(--trait);background:var(--papier-ombre);flex-wrap:wrap;gap:.5rem}
+    .pag-info{font-size:.72rem;color:var(--text-light)}
+    .pag-controls{display:flex;align-items:center;gap:.25rem}
+    .pag-btn{font-family:inherit;font-size:.72rem;padding:.2rem .55rem;border:1px solid var(--trait-fort);border-radius:5px;background:#fff;cursor:pointer;color:var(--text);transition:all .12s;min-width:28px;text-align:center;line-height:1.4}
+    .pag-btn:hover:not(:disabled){background:var(--papier-ombre);border-color:#B0A99A}
+    .pag-btn:disabled{opacity:.35;cursor:default}
+    .pag-btn.active{background:var(--encre);color:#fff;border-color:var(--encre);font-weight:600}
+    .pag-ellipsis{font-size:.72rem;color:var(--text-light);padding:0 .15rem}
+    .pag-perpage{font-family:inherit;font-size:.72rem;border:1px solid var(--trait-fort);border-radius:5px;padding:.2rem .4rem;background:#fff;color:var(--text);cursor:pointer}
+
+    .ls-note{font-size:.78rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
+    .ls-note strong{color:#665c00}
+  </style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
+      <h1 class="page-title">Livres <em>spoliés</em></h1>
+      <p class="page-lead">Recherche croisée entre la liste des ouvrages spoliés à retrouver et le catalogue numérisé, avec suivi du récolement (retrouvé, ex-libris, ancien possesseur).</p>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
+      <a href="admin.html">← Espace professionnel</a>
+    </div>
+  </div>
+</section>
+
+<div class="loader" id="loader">
+  <p>Chargement de la liste des livres spoliés et du catalogue…</p>
+  <div class="spinner-row"><div class="sp"></div><div class="sp"></div><div class="sp"></div><span>Chargement en cours</span></div>
+</div>
+
+<section class="ls-section" id="ls-main" style="display:none">
+  <div class="container">
+
+    <p class="ls-note">
+      <strong>Comment ça marche :</strong> tapez un titre, un auteur ou une cote dans la barre de recherche pour
+      vérifier si un ouvrage figure déjà dans le catalogue numérisé (partiellement affiché ci-dessous) — la même
+      recherche filtre aussi le tableau des livres spoliés. Tout n'étant pas catalogué, pensez aussi aux fiches
+      papier. Cochez <strong>Retrouvé</strong> une fois l'ouvrage localisé, <strong>Ex-libris</strong> s'il porte une
+      marque de provenance, et notez le nom de l'ancien possesseur dès qu'il est identifié. Les modifications sont
+      enregistrées dans ce navigateur et synchronisées automatiquement avec le reste de l'équipe (voir l'indicateur
+      en haut de page). « Exporter le JSON » reste utile pour figer une version datée dans
+      <code>data/livres-spolies.json</code>.
+    </p>
+
+    <div class="ls-stats" id="ls-stats"></div>
+
+    <div class="ls-piechart-wrap">
+      <div class="ls-piechart" id="ls-piechart">
+        <div class="ls-piechart-hole">
+          <div class="n" id="ls-piechart-total">0</div>
+          <div class="l">livres</div>
+        </div>
+      </div>
+      <div class="ls-piechart-legend" id="ls-piechart-legend"></div>
+    </div>
+
+    <div class="catalog-search-wrap">
+      <div class="catalog-search-label">Rechercher dans le catalogue &amp; filtrer la liste</div>
+      <div class="catalog-search-bar">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#999" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l2.5 2.5"/></svg>
+        <input type="text" id="search-input" placeholder="Titre, auteur ou cote…" autocomplete="off">
+      </div>
+      <p class="catalog-search-hint">La recherche porte sur le titre, l'auteur et la cote, à la fois dans le catalogue (réserve et magasins 2e/5e étage) et dans la liste des livres spoliés ci-dessous.</p>
+      <div class="catalog-results" id="catalog-results"></div>
+    </div>
+
+    <div class="ls-wrap">
+      <div class="ls-header">
+        <span class="ls-header-title" id="ls-header-title">Liste des livres spoliés</span>
+        <div class="ls-header-actions">
+          <button class="export-btn danger" id="btn-reset" title="Effacer les modifications enregistrées dans ce navigateur">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M6 4V2.5A.5.5 0 0 1 6.5 2h3a.5.5 0 0 1 .5.5V4M12.5 4l-.6 9a1 1 0 0 1-1 .9H5.1a1 1 0 0 1-1-.9L3.5 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Réinitialiser
+          </button>
+          <button class="export-btn primary" id="btn-export">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v9M4 6l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Exporter le JSON
+          </button>
+        </div>
+      </div>
+      <div class="ls-filter-info" id="ls-filter-info"></div>
+      <div class="ls-table-scroll">
+        <table class="ls-table">
+          <thead>
+            <tr>
+              <th data-sort="caisse">Caisse</th>
+              <th data-sort="type">Type</th>
+              <th data-sort="auteur">Auteur</th>
+              <th data-sort="titre">Titre</th>
+              <th data-sort="pub">Publication</th>
+              <th class="col-origine" data-sort="origine">Origine</th>
+              <th class="col-date" data-sort="dateEntree">Date d'entrée</th>
+              <th class="col-cote" data-sort="coteBM">Cote BM</th>
+              <th data-sort="trouve">Retrouvé</th>
+              <th data-sort="exLibris">Ex-libris</th>
+              <th class="col-possesseur" data-sort="possesseur">Ancien possesseur</th>
+              <th class="col-date" data-sort="dateSortie">Date de sortie</th>
+            </tr>
+          </thead>
+          <tbody id="ls-tbody"></tbody>
+        </table>
+      </div>
+      <div class="ls-pagination" id="ls-pag"></div>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (localStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function norm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function debounce(fn, ms){
+  let t;
+  return function(...args){ clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
+}
+
+/* ════════════════════════════════════════════════════════════
+   LIVRES SPOLIÉS — état & persistance locale
+   ════════════════════════════════════════════════════════════
+   Les données de base viennent de data/livres-spolies.json
+   (converti depuis data/livres-spolies.ods). Les cases cochées
+   et champs remplis par l'équipe sont surchargés par-dessus via
+   localStorage, puis peuvent être exportés en JSON pour être
+   déposés définitivement dans data/livres-spolies.json.
+   ════════════════════════════════════════════════════════════ */
+
+const LS_KEY = 'rp_livres_spolies_overrides';
+const TYPE_LABELS = {
+  'MANU': 'Manuscrit', 'IMP': 'Texte imprimé', 'ICO': 'Iconographie',
+  'Photographie': 'Photographie', 'NUMI': 'Numismatique', 'LIVA': "Livre d'artiste",
+  'Document Cartographique': 'Carte',
+};
+
+let BASE = [];       // data brute de data/livres-spolies.json
+let OVERRIDES = {};  // { [id]: { trouve, exLibris, possesseur, coteBM } }
+let ROWS = [];        // BASE fusionné avec OVERRIDES
+let FILTERED = [];
+let CATALOG = [];      // data/inventaire.json, indexé pour la recherche
+
+const STATE = { page: 1, perPage: 50, sortKey: null, sortDir: 'asc' };
+
+// La donnée de base ne connaît que true/false (false utilisé comme valeur
+// par défaut pour ~500 des 506 lignes). Pour le tri-état rien/oui/non, on
+// interprète true comme "oui" et tout le reste comme "rien" (non renseigné)
+// — "non" ne peut désormais provenir que d'un choix explicite (OVERRIDES).
+function normalizeTriState(v){ return v === true ? true : null; }
+
+function loadOverrides(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveOverrides(){
+  localStorage.setItem(LS_KEY, JSON.stringify(OVERRIDES));
+}
+
+/* ════ Synchronisation partagée (R2 via /api/spolies) ════
+   Même principe que recolement.html : le localStorage reste la source de
+   vérité locale, chaque changement de champ est en plus envoyé en
+   arrière-plan vers /api/spolies (fusion côté serveur par compare-and-swap).
+   En cas d'échec (hors ligne, R2 non configuré), le patch reste dans une
+   file locale et sera retenté — rien n'est jamais perdu. */
+const LS_PENDING = 'rp_livres_spolies_pending_sync';
+/* File de synchronisation : implémentation commune aux cinq pages qui
+   écrivent dans un état partagé R2 — voir js/sync-queue.js (localStorage
+   comme source de vérité locale, rejeu à la reconnexion, indicateur
+   #sync-status). Ce bloc était auparavant recopié à l'identique dans chacune.
+   Un patch de livres-spolies est envoyé tel quel ({id, field, value}). */
+const syncQueue = createSyncQueue({
+  storageKey: LS_PENDING,
+  endpoint: '/api/spolies',
+});
+const authHeaders = syncAuthHeaders;
+function queuePatch(item){ syncQueue.queue(item); }
+function flushPendingSync(){ return syncQueue.flush(); }
+function updateSyncIndicator(){ syncQueue.updateIndicator(); }
+
+// Fusionne l'état partagé reçu du serveur, sans écraser un champ pour
+// lequel on a un patch local pas encore confirmé (évite qu'une saisie en
+// cours ne soit effacée par un rafraîchissement périodique).
+function mergeIncomingOverrides(serverOverrides){
+  Object.keys(serverOverrides || {}).forEach(id => {
+    const incoming = serverOverrides[id] || {};
+    const localForId = OVERRIDES[id] || {};
+    const pendingFieldsForId = new Set(syncQueue.items.filter(p => String(p.id) === id).map(p => p.field));
+    const merged = { ...localForId };
+    Object.keys(incoming).forEach(field => {
+      if(!pendingFieldsForId.has(field)) merged[field] = incoming[field];
+    });
+    OVERRIDES[id] = merged;
+  });
+  saveOverrides();
+  mergeRows();
+  renderStats();
+  // resetPage=false : ce rafraîchissement périodique en arrière-plan ne doit
+  // pas renvoyer l'utilisateur·rice à la page 1 en pleine consultation.
+  applyFilter(document.getElementById('search-input').value.trim(), false);
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/spolies');
+    if(!res.ok) return;
+    const data = await res.json();
+    mergeIncomingOverrides(data);
+  }catch(e){ /* hors ligne ou API non disponible : on reste sur le cache local */ }
+}
+
+// Lecture seule (GET) : espacée à 45s et suspendue pendant que l'onglet est en
+// arrière-plan, pour ne pas cumuler des requêtes R2 inutiles sur des postes
+// laissés ouverts toute la journée — avec un rafraîchissement immédiat au
+// retour sur l'onglet pour ne pas perdre en fraîcheur perçue.
+setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
+
+function mergeRows(){
+  ROWS = BASE.map(r => {
+    const o = OVERRIDES[r.id] || {};
+    return {
+      ...r,
+      trouve: o.trouve != null ? o.trouve : r.trouve,
+      exLibris: o.exLibris != null ? o.exLibris : r.exLibris,
+      possesseur: o.possesseur != null ? o.possesseur : r.possesseur,
+      coteBM: o.coteBM != null ? o.coteBM : r.coteBM,
+      origine: o.origine != null ? o.origine : (r.origine || ''),
+      dateEntree: o.dateEntree != null ? o.dateEntree : (r.dateEntree || ''),
+      dateSortie: o.dateSortie != null ? o.dateSortie : (r.dateSortie || ''),
+      _search: norm([r.auteur, r.titre, r.coteBM, r.type, r.lieu, r.editeur, r.origine, r.dateEntree].join(' ')),
+    };
+  });
+}
+
+function setOverride(id, field, value){
+  if(!OVERRIDES[id]) OVERRIDES[id] = {};
+  OVERRIDES[id][field] = value;
+  saveOverrides();
+  const row = ROWS.find(r => r.id === id);
+  if(row) row[field] = value;
+  renderStats();
+  queuePatch({id, field, value});
+}
+
+/* ════ Stats ════ */
+function renderStats(){
+  const total = ROWS.length;
+  const trouve = ROWS.filter(r => r.trouve).length;
+  const nonTrouve = ROWS.filter(r => r.trouve === false).length;
+  const coteRenseignee = ROWS.filter(r => r.coteBM && r.coteBM.trim()).length;
+  const exlibris = ROWS.filter(r => r.exLibris).length;
+  const possesseurConnu = ROWS.filter(r => r.possesseur && r.possesseur.trim()).length;
+  document.getElementById('ls-stats').innerHTML = `
+    <div class="cstat"><div class="cstat-lbl">Ouvrages listés</div><div class="cstat-val">${total.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Retrouvés</div><div class="cstat-val ok">${trouve.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Non retrouvés</div><div class="cstat-val bad">${nonTrouve.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Restants</div><div class="cstat-val warn">${(total-trouve).toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Cote renseignée</div><div class="cstat-val warn">${coteRenseignee.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Avec ex-libris</div><div class="cstat-val">${exlibris.toLocaleString('fr-FR')}</div></div>
+    <div class="cstat"><div class="cstat-lbl">Possesseur identifié</div><div class="cstat-val">${possesseurConnu.toLocaleString('fr-FR')}</div></div>
+  `;
+  renderPieChart();
+}
+
+/* ════ Camembert de répartition ════
+   Catégories mutuellement exclusives (même ordre de priorité que
+   rowStateClass, avec les retrouvés subdivisés par ex-libris) pour que les
+   parts totalisent 100% : non retrouvé > retrouvé (± ex-libris) > cote
+   renseignée > non traité. */
+const PIE_CATEGORIES = [
+  { key: 'notfound', label: 'Non retrouvés',            color: '#c62828' },
+  { key: 'cote',      label: 'Cote renseignée',          color: '#c9a227' },
+  { key: 'found',     label: 'Retrouvés',                color: '#2e7d32' },
+  { key: 'foundEx',   label: 'Retrouvés avec ex-libris', color: '#2A3CD4' },
+  { key: 'untreated', label: 'Non traités',              color: '#bbbbbb' },
+];
+
+function pieCategoryOf(r){
+  if(r.trouve === false) return 'notfound';
+  if(r.trouve === true) return r.exLibris === true ? 'foundEx' : 'found';
+  if(r.coteBM && r.coteBM.trim()) return 'cote';
+  return 'untreated';
+}
+
+function renderPieChart(){
+  const total = ROWS.length;
+  const counts = {};
+  PIE_CATEGORIES.forEach(c => counts[c.key] = 0);
+  ROWS.forEach(r => counts[pieCategoryOf(r)]++);
+
+  let acc = 0;
+  const stops = PIE_CATEGORIES.map(c => {
+    const pct = total ? (counts[c.key] / total) * 100 : 0;
+    const from = acc;
+    acc += pct;
+    return `${c.color} ${from}% ${acc}%`;
+  });
+  document.getElementById('ls-piechart').style.background =
+    total ? `conic-gradient(${stops.join(', ')})` : '#eee';
+  document.getElementById('ls-piechart-total').textContent = total.toLocaleString('fr-FR');
+
+  document.getElementById('ls-piechart-legend').innerHTML = PIE_CATEGORIES.map(c => {
+    const n = counts[c.key];
+    const pct = total ? (n / total * 100) : 0;
+    return `<div class="ls-legend-item">
+      <span class="ls-legend-swatch" style="background:${c.color}"></span>
+      <span class="ls-legend-label">${esc(c.label)}</span>
+      <span class="ls-legend-count">${n.toLocaleString('fr-FR')}</span>
+      <span class="ls-legend-pct">${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+}
+
+/* ════ Recherche catalogue (data/inventaire.json + data/magasins.json) ════ */
+// forEachRow : accepte un tableau plat (inventaire) comme un conteneur
+// colonnaire (magasins, voir js/columnar.js) — et ne garde en mémoire que
+// l'index de recherche, pas les lignes brutes.
+function indexCatalogRows(rows, source){
+  const out = [];
+  columnar.forEachRow(rows, r => {
+    const titre = r['200$a'] || '';
+    const auteur = [r['700$a'], r['700$b']].filter(Boolean).join(' ');
+    const cote = r['930$g'] || '';
+    const annee = r['210$d'] || '';
+    const type = r['200$b'] || '';
+    out.push({
+      titre, auteur, cote, annee, type, source,
+      _search: norm([titre, auteur, cote].join(' ')),
+    });
+  });
+  return out;
+}
+
+function buildCatalogIndex(inventaire, magasins){
+  CATALOG = [
+    ...indexCatalogRows(inventaire, 'Réserve'),
+    ...indexCatalogRows(magasins, 'Magasins 2e/5e'),
+  ];
+}
+
+function renderCatalogResults(query){
+  const box = document.getElementById('catalog-results');
+  if(!query){
+    box.innerHTML = '';
+    return;
+  }
+  const q = norm(query);
+  const matches = CATALOG.filter(r => r._search.includes(q));
+  if(!matches.length){
+    box.innerHTML = `<div class="catalog-empty">Aucun résultat dans le catalogue pour « ${esc(query)} ».</div>`;
+    return;
+  }
+  const shown = matches.slice(0, 25);
+  box.innerHTML = shown.map(r => `
+    <div class="catalog-result">
+      <span class="cr-type">${esc(TYPE_LABELS[r.type] || r.type || '—')}</span>
+      <div class="cr-main">
+        <div class="cr-titre">${esc(r.titre || '(sans titre)')}</div>
+        <div class="cr-meta">${esc(r.auteur || 'Auteur inconnu')}${r.annee ? ' · ' + esc(r.annee) : ''}</div>
+      </div>
+      <span class="cr-source">${esc(r.source)}</span>
+      <span class="cr-cote">${esc(r.cote || '—')}</span>
+    </div>
+  `).join('') + (matches.length > shown.length
+    ? `<div class="catalog-more">+ ${matches.length - shown.length} autre${matches.length - shown.length > 1 ? 's' : ''} résultat${matches.length - shown.length > 1 ? 's' : ''} dans le catalogue…</div>`
+    : '');
+}
+
+/* ════ Tri des colonnes (alphabétique / numérique / booléen) ════ */
+const SORT_COLUMNS = {
+  caisse:     { type: 'numeric', get: r => r.caisse },
+  type:       { type: 'text',    get: r => TYPE_LABELS[r.type] || r.type || '' },
+  auteur:     { type: 'text',    get: r => r.auteur || '' },
+  titre:      { type: 'text',    get: r => r.titre || '' },
+  pub:        { type: 'text',    get: r => formatPub(r) },
+  origine:    { type: 'text',    get: r => r.origine || '' },
+  dateEntree: { type: 'text',    get: r => r.dateEntree || '' },
+  coteBM:     { type: 'text',    get: r => r.coteBM || '' },
+  dateSortie: { type: 'text',    get: r => r.dateSortie || '' },
+  // Ordre booléen : non (0) < rien (1) < oui (2)
+  trouve:     { type: 'boolean', get: r => r.trouve === true ? 2 : (r.trouve === false ? 0 : 1) },
+  exLibris:   { type: 'boolean', get: r => r.exLibris === true ? 2 : (r.exLibris === false ? 0 : 1) },
+  possesseur: { type: 'text',    get: r => r.possesseur || '' },
+};
+
+function compareValues(a, b, type){
+  if(type === 'numeric'){
+    const na = parseFloat(String(a).replace(',', '.'));
+    const nb = parseFloat(String(b).replace(',', '.'));
+    const va = isNaN(na) ? -Infinity : na;
+    const vb = isNaN(nb) ? -Infinity : nb;
+    return va - vb;
+  }
+  if(type === 'boolean') return a - b;
+  return norm(a).localeCompare(norm(b), 'fr');
+}
+
+function applySort(rows){
+  if(!STATE.sortKey) return rows;
+  const col = SORT_COLUMNS[STATE.sortKey];
+  if(!col) return rows;
+  const dir = STATE.sortDir === 'asc' ? 1 : -1;
+  return [...rows].sort((ra, rb) => dir * compareValues(col.get(ra), col.get(rb), col.type));
+}
+
+function updateSortHeaders(){
+  document.querySelectorAll('.ls-table th[data-sort]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if(arrow) arrow.remove();
+    const isSorted = th.dataset.sort === STATE.sortKey;
+    th.classList.toggle('sorted', isSorted);
+    if(isSorted){
+      const span = document.createElement('span');
+      span.className = 'sort-arrow';
+      span.textContent = STATE.sortDir === 'asc' ? '▲' : '▼';
+      th.appendChild(span);
+    }
+  });
+}
+
+document.querySelectorAll('.ls-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', function(){
+    const key = th.dataset.sort;
+    if(STATE.sortKey === key){
+      STATE.sortDir = STATE.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      STATE.sortKey = key;
+      STATE.sortDir = 'asc';
+    }
+    updateSortHeaders();
+    applyFilter(document.getElementById('search-input').value.trim());
+  });
+});
+
+/* ════ Filtre + rendu du tableau des livres spoliés ════ */
+function applyFilter(query, resetPage = true){
+  const q = norm(query);
+  FILTERED = applySort(q ? ROWS.filter(r => r._search.includes(q)) : ROWS);
+  if(resetPage) STATE.page = 1;
+
+  const finfo = document.getElementById('ls-filter-info');
+  if(q){
+    finfo.textContent = `Filtre actif « ${query} » — ${FILTERED.length} résultat${FILTERED.length !== 1 ? 's' : ''} sur ${ROWS.length}`;
+    finfo.classList.add('visible');
+  } else {
+    finfo.textContent = '';
+    finfo.classList.remove('visible');
+  }
+  document.getElementById('ls-header-title').textContent =
+    `Liste des livres spoliés (${FILTERED.length.toLocaleString('fr-FR')})`;
+
+  renderTablePage();
+}
+
+function formatPub(r){
+  return [r.lieu, r.editeur, r.date].filter(Boolean).join(', ');
+}
+
+/* ════ Tri-état (rien / oui / non) — Retrouvé & Ex-libris ════ */
+function tristateHTML(field, value, labels){
+  const state = value === true ? '1' : (value === false ? '0' : '');
+  return `<div class="tristate" data-field="${field}">
+    <button type="button" data-value="" class="${state === '' ? 'active' : ''}" title="${esc(labels[0])}">—</button>
+    <button type="button" data-value="1" class="${state === '1' ? 'active' : ''}" title="${esc(labels[1])}">✓</button>
+    <button type="button" data-value="0" class="${state === '0' ? 'active' : ''}" title="${esc(labels[2])}">✕</button>
+  </div>`;
+}
+
+// La barre de saisie de l'ancien possesseur n'a de sens que si l'ex-libris
+// est explicitement coché "oui" — masquée pour "rien"/"non".
+function possesseurCellHTML(r){
+  if(r.exLibris === true){
+    return `<input type="text" class="ls-input possesseur" data-field="possesseur" placeholder="Nom de l'ancien possesseur" value="${esc(r.possesseur)}">`;
+  }
+  return `<span class="ls-possesseur-hidden">—</span>`;
+}
+
+// La date de sortie (perdu/détruit) n'a de sens que si le livre est
+// explicitement marqué "non retrouvé" — masquée sinon, même logique que le
+// champ ancien possesseur vis-à-vis de l'ex-libris.
+function dateSortieCellHTML(r){
+  if(r.trouve === false){
+    return `<input type="text" class="ls-input" data-field="dateSortie" placeholder="ex. déclaré perdu en 2020" value="${esc(r.dateSortie)}">`;
+  }
+  return `<span class="ls-possesseur-hidden">—</span>`;
+}
+
+// Priorité d'affichage : non retrouvé (rouge) > retrouvé (vert) > cote BM
+// renseignée (jaune) > rien.
+function rowStateClass(r){
+  if(r.trouve === false) return 'is-notfound';
+  if(r.trouve === true) return 'is-found';
+  if(r.coteBM && r.coteBM.trim()) return 'is-cote';
+  return '';
+}
+
+function updateRowStateClasses(tr, row){
+  tr.classList.remove('is-found', 'is-notfound', 'is-cote');
+  const cls = rowStateClass(row);
+  if(cls) tr.classList.add(cls);
+}
+
+function refreshPossesseurCell(tr, row){
+  const td = tr.querySelector('.col-possesseur');
+  if(td) td.innerHTML = possesseurCellHTML(row);
+}
+
+function refreshDateSortieCell(tr, row){
+  const td = tr.querySelector('.col-date-sortie');
+  if(td) td.innerHTML = dateSortieCellHTML(row);
+}
+
+function renderTablePage(){
+  const total = FILTERED.length;
+  const pages = Math.max(1, Math.ceil(total / STATE.perPage));
+  STATE.page = Math.min(STATE.page, pages);
+  const start = (STATE.page - 1) * STATE.perPage;
+  const slice = FILTERED.slice(start, start + STATE.perPage);
+
+  const tbody = document.getElementById('ls-tbody');
+  if(!slice.length){
+    tbody.innerHTML = `<tr><td colspan="12"><div class="ls-empty">Aucun résultat.</div></td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => `
+      <tr class="${rowStateClass(r)}" data-id="${r.id}">
+        <td class="ls-caisse">${esc(r.caisse)}</td>
+        <td class="ls-type">${esc(TYPE_LABELS[r.type] || r.type)}</td>
+        <td class="ls-auteur" title="${esc(r.auteur)}">${esc(r.auteur || '—')}</td>
+        <td class="ls-titre">${esc(r.titre)}</td>
+        <td class="ls-pub" title="${esc(formatPub(r))}">${esc(formatPub(r)) || '—'}${r.volumes ? ' · vol. ' + esc(r.volumes) : ''}</td>
+        <td class="col-origine"><input type="text" class="ls-input" data-field="origine" placeholder="ex. Don, saisie, réquisition…" value="${esc(r.origine)}"></td>
+        <td class="col-date"><input type="text" class="ls-input" data-field="dateEntree" placeholder="ex. 1946" value="${esc(r.dateEntree)}"></td>
+        <td class="col-cote"><input type="text" class="ls-input" data-field="coteBM" placeholder="ex. D12345" value="${esc(r.coteBM)}"></td>
+        <td class="ls-checkbox-cell">${tristateHTML('trouve', r.trouve, ['Non renseigné', 'Retrouvé', 'Non retrouvé'])}</td>
+        <td class="ls-checkbox-cell">${tristateHTML('exLibris', r.exLibris, ['Non renseigné', 'Avec ex-libris', 'Sans ex-libris'])}</td>
+        <td class="col-possesseur">${possesseurCellHTML(r)}</td>
+        <td class="col-date col-date-sortie">${dateSortieCellHTML(r)}</td>
+      </tr>
+    `).join('');
+  }
+
+  renderPagination(total, pages);
+}
+
+function renderPagination(total, pages){
+  const pagEl = document.getElementById('ls-pag');
+  const start = (STATE.page - 1) * STATE.perPage;
+  const from = total === 0 ? 0 : start + 1;
+  const to = Math.min(start + STATE.perPage, total);
+  const infoTxt = total === 0 ? 'Aucun résultat' : `${from}–${to} sur ${total.toLocaleString('fr-FR')}`;
+
+  const curPage = STATE.page;
+  const btnPrev  = `<button class="pag-btn" onclick="gotoPage(${curPage-1})" ${curPage<=1?'disabled':''}>‹</button>`;
+  const btnFirst = `<button class="pag-btn" onclick="gotoPage(1)" ${curPage<=1?'disabled':''}>«</button>`;
+  const btnNext  = `<button class="pag-btn" onclick="gotoPage(${curPage+1})" ${curPage>=pages?'disabled':''}>›</button>`;
+  const btnLast  = `<button class="pag-btn" onclick="gotoPage(${pages})" ${curPage>=pages?'disabled':''}>»</button>`;
+
+  let pageButtons = '';
+  if(pages <= 7){
+    for(let p = 1; p <= pages; p++){
+      pageButtons += `<button class="pag-btn${p===curPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+    }
+  } else {
+    const show = new Set([1, pages, curPage, curPage-1, curPage+1].filter(p=>p>=1&&p<=pages));
+    const sorted = [...show].sort((a,b)=>a-b);
+    let prev = 0;
+    sorted.forEach(p => {
+      if(p - prev > 1) pageButtons += `<span class="pag-ellipsis">…</span>`;
+      pageButtons += `<button class="pag-btn${p===curPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+      prev = p;
+    });
+  }
+
+  const perPageSel = `<select class="pag-perpage" onchange="changePerPage(this.value)" title="Lignes par page">
+    ${[25,50,100,200].map(n=>`<option value="${n}"${n===STATE.perPage?' selected':''}>${n} / page</option>`).join('')}
+  </select>`;
+
+  pagEl.innerHTML = total === 0 ? '' : `
+    <span class="pag-info">${infoTxt}</span>
+    <div class="pag-controls">
+      ${perPageSel}
+      ${btnFirst}${btnPrev}
+      ${pageButtons}
+      ${btnNext}${btnLast}
+    </div>`;
+}
+
+window.gotoPage = function(page){
+  const pages = Math.max(1, Math.ceil(FILTERED.length / STATE.perPage));
+  STATE.page = Math.max(1, Math.min(page, pages));
+  renderTablePage();
+};
+
+window.changePerPage = function(val){
+  STATE.perPage = parseInt(val, 10);
+  STATE.page = 1;
+  renderTablePage();
+};
+
+/* ════ Édition des cellules (délégation d'évènements) ════ */
+// Champs texte (cote BM, ancien possesseur)
+document.getElementById('ls-tbody').addEventListener('change', function(e){
+  const target = e.target;
+  const field = target.dataset.field;
+  if(!field) return;
+  const tr = target.closest('tr');
+  const id = parseInt(tr.dataset.id, 10);
+  const value = target.value;
+  setOverride(id, field, value);
+  const row = ROWS.find(r => r.id === id);
+  if(field === 'coteBM') updateRowStateClasses(tr, row);
+});
+
+// Tri-état (rien / oui / non) — Retrouvé & Ex-libris
+document.getElementById('ls-tbody').addEventListener('click', function(e){
+  const btn = e.target.closest('.tristate button');
+  if(!btn) return;
+  const wrap = btn.closest('.tristate');
+  const field = wrap.dataset.field;
+  const tr = btn.closest('tr');
+  const id = parseInt(tr.dataset.id, 10);
+  const raw = btn.dataset.value;
+  const value = raw === '' ? null : raw === '1';
+  wrap.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+  setOverride(id, field, value);
+  const row = ROWS.find(r => r.id === id);
+  updateRowStateClasses(tr, row);
+  if(field === 'exLibris') refreshPossesseurCell(tr, row);
+  if(field === 'trouve') refreshDateSortieCell(tr, row);
+});
+
+/* ════ Export / réinitialisation ════ */
+document.getElementById('btn-export').addEventListener('click', function(){
+  const out = ROWS.map(({ _search, ...r }) => r);
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'livres-spolies.json';
+  a.click();
+});
+
+document.getElementById('btn-reset').addEventListener('click', function(){
+  if(!confirm("Effacer toutes les modifications enregistrées dans ce navigateur (retrouvé, ex-libris, cote BM, possesseur) ? Cette action ne peut pas être annulée. Pensez à exporter le JSON avant si besoin. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
+  localStorage.removeItem(LS_KEY);
+  OVERRIDES = {};
+  syncQueue.clear();
+  mergeRows();
+  applyFilter(document.getElementById('search-input').value.trim());
+  renderStats();
+});
+
+/* ════ Barre de recherche unique (catalogue + filtre tableau) ════ */
+const onSearch = debounce(function(value){
+  renderCatalogResults(value.trim());
+  applyFilter(value.trim());
+}, 150);
+document.getElementById('search-input').addEventListener('input', function(){
+  onSearch(this.value);
+});
+
+/* ════ Démarrage ════ */
+Promise.all([
+  fetch('data/livres-spolies.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (livres-spolies.json)'); return r.json(); }),
+  fetch('data/inventaire.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (inventaire.json)'); return r.json(); }),
+  fetch('data/magasins.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' (magasins.json)'); return r.json(); }),
+]).then(([spolies, inventaire, magasins]) => {
+  BASE = spolies.map(r => ({
+    ...r,
+    trouve: normalizeTriState(r.trouve),
+    exLibris: normalizeTriState(r.exLibris),
+  }));
+  OVERRIDES = loadOverrides();
+  mergeRows();
+  buildCatalogIndex(inventaire, magasins);
+
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('ls-main').style.display = '';
+
+  renderStats();
+  updateSortHeaders();
+  applyFilter('');
+
+  updateSyncIndicator();
+  syncFromServer();
+  flushPendingSync();
+}).catch(err => {
+  document.getElementById('loader').innerHTML =
+    `<p style="color:#c62828">Erreur de chargement : ${err.message}</p>`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Plan des magasins — Bibliothèques de Douai</title>
+  <meta name="description" content="Plan interactif des espaces de stockage (réserve patrimoniale, Réserve Douaisienne, magasins d'étage). Visualisation des travées, colonnes, armoires et de leur taux d'occupation d'après le récolement.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="js/reserve-shared.js"></script>
+  <!-- Surcouche de fraîcheur Syracuse (voir js/syracuse-sync-shared.js et
+       CLAUDE.md, section « Synchronisation incrémentale Syracuse »). Outil
+       interne au même niveau de confiance que recolement.html/magasins.html
+       (protégé par le même gate localStorage) : déclenche aussi une
+       tranche en tâche de fond, pour que le plan progresse tout seul même
+       si personne n'a ouvert ces deux autres pages entretemps. -->
+  <script src="js/syracuse-sync-shared.js"></script>
+  <script src="js/syracuse-sync-trigger.js" defer></script>
+  <style>
+    :root {
+      --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
+      --plan-cat: #1A1E99; --plan-manuel: #F9A825; --plan-noncat: #c62828; --plan-nonrange: #8E24AA;
+      --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
+      --red: #E8445A; --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+    }
+    body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+    .page-hero{background:#12157A;color:#fff;padding:3rem 1.5rem 2.5rem}
+    .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+    .hero-actions a,.hero-actions button{
+      font-family:inherit;font-size:.8rem;padding:.4rem .9rem;border:1px solid rgba(255,255,255,0.3);
+      border-radius:6px;background:transparent;color:rgba(255,255,255,0.85);text-decoration:none;cursor:pointer;transition:background .15s,color .15s
+    }
+    .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+    .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.75rem;letter-spacing:.04em}
+    .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(2rem,5vw,3.2rem);font-weight:400;margin:0 0 .5rem;line-height:1.15}
+    .page-title em{font-style:italic;color: var(--warm)}
+    .page-lead{font-size:1rem;color:rgba(255,255,255,0.7);margin:0;max-width:560px;line-height:1.6}
+    #main{padding-bottom:0}
+    .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+    .section{padding:2rem 0}
+    .csv-loader{background: #F5F5FF;border:1px dashed #ccc;border-radius:var(--radius-md);padding:1.5rem;text-align:center;margin-bottom:1.5rem}
+    .csv-loader p{font-size:.85rem;color:#666;margin:0 0 .5rem}
+    .spinner-row{display:flex;align-items:center;justify-content:center;gap:.4rem;font-size:.8rem;color:#999}
+    .sp{width:7px;height:7px;border-radius:50%;background:#ccc;animation:sp 1.2s infinite}
+    .sp:nth-child(2){animation-delay:.2s}.sp:nth-child(3){animation-delay:.4s}
+    @keyframes sp{0%,80%,100%{opacity:.2}40%{opacity:1}}
+    .plan-toolbar{background:#f5f5f5;border-bottom:1px solid #e0e0e0;padding:.75rem 0}
+    .plan-toolbar .container{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+    .toolbar-search{display:flex;align-items:center;gap:.4rem;background:#fff;border:1px solid #ccc;border-radius:var(--radius-md);padding:.3rem .75rem;flex:1;min-width:200px}
+    .toolbar-search svg{width:16px;height:16px;flex-shrink:0;stroke:#999}
+    .toolbar-search input{border:none;outline:none;font-size:.875rem;background:transparent;color:#1a1a1a;width:100%;font-family:inherit}
+    .toolbar-btn{font-family:inherit;font-size:.8rem;padding:.35rem .9rem;border:1px solid #ccc;border-radius:var(--radius-md);background:#fff;cursor:pointer;color:#333;transition:background .15s}
+    .toolbar-btn:hover{background:#eee}.toolbar-btn.active{background:#12157A;color:#fff;border-color:#1a1a1a}
+    .toolbar-sep{width:1px;height:20px;background:#ddd;flex-shrink:0}
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;padding:1.25rem 0}
+    .stat-card{background: #F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+    .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+    .stat-card-val{font-family:'Moret','DM Serif Display',serif;font-size:1.75rem;line-height:1}
+    .stat-card-val.green{color:#2e7d32}.stat-card-val.red{color:#c62828}
+    .stat-card-val.cat{color:var(--plan-cat)}.stat-card-val.manuel{color:var(--plan-manuel)}.stat-card-val.noncat{color:var(--plan-noncat)}
+    .stat-card-val.nonrange{color:var(--plan-nonrange)}
+    .legend-row{display:flex;flex-wrap:wrap;gap:.75rem;font-size:.75rem;color:#555;margin-bottom:1rem;align-items:center}
+    .leg{display:flex;align-items:center;gap:.35rem}
+    .leg-dot{width:13px;height:13px;border-radius:3px;flex-shrink:0}
+    .search-results{background:#fff;border:1px solid #ddd;border-radius:var(--radius-md);max-height:220px;overflow-y:auto;font-size:.8rem;display:none;margin-bottom:.75rem;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+    .sr-item{padding:.45rem .9rem;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .1s}
+    .sr-item:last-child{border-bottom:none}.sr-item:hover{background:#f5f5f5}
+    .sr-item strong{color:#1a1a1a}.sr-item em{font-style:normal;color:#888;font-size:.72rem}
+    .room-group{margin-bottom:2.5rem}
+    .room-group-title{font-family:'Moret','DM Serif Display',serif;font-style:italic;font-size:1.6rem;font-weight:400;margin:0 0 1.1rem;color:#12157A;display:flex;align-items:center;gap:.75rem}
+    .room-group-title::after{content:'';flex:1;height:2px;background:linear-gradient(to right,#12157A,transparent)}
+    .room-section{margin-bottom:2rem}
+    .room-section-title{font-family:'Moret','DM Serif Display',serif;font-size:1.15rem;font-weight:400;margin:0 0 .75rem;color:#333;display:flex;align-items:center;gap:.6rem}
+    .room-section-title::after{content:'';flex:1;height:1px;background:#e0e0e0}
+    details.room-section > summary.room-section-title{cursor:pointer;list-style:none}
+    details.room-section > summary.room-section-title::-webkit-details-marker{display:none}
+    details.room-section > summary.room-section-title::before{content:'▸ ';color:#999}
+    details.room-section[open] > summary.room-section-title::before{content:'▾ '}
+    .room-plan{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem 1rem;overflow-x:auto}
+    .room-placeholder{color:#999;font-style:italic;font-size:.875rem;text-align:center;padding:1rem 0;margin:0}
+    .room-inner{display:flex;flex-wrap:nowrap;gap:.9rem;align-items:flex-end;min-width:max-content}
+    .travee-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+    .travee-wrap:hover .tv-box{border-color:#555;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+    .travee-wrap.sel .tv-box{border:2px solid var(--red)!important}
+    .tv-box{border:1px solid #ccc;border-radius:var(--radius-sm);padding:3px;background:#fff;display:flex;flex-direction:row;gap:3px;transition:border-color .15s,box-shadow .15s}
+    .tv-col{display:flex;flex-direction:column;gap:1.5px;align-items:center}
+    .tv-slot{border-radius:1px;transition:transform .1s,outline-color .1s}
+    .tv-slot:hover{outline:2px solid #1a1a1a;outline-offset:-1px;position:relative;z-index:2;transform:scale(1.1)}
+    .tv-label{font-size:11px;font-weight:600;color:#555;text-align:center;white-space:nowrap;line-height:1.3}
+    .tv-sublabel{font-size:9.5px;color:#888;text-align:center;white-space:nowrap;line-height:1.3}
+    .tv-col-lbl{font-size:8px;color:#aaa;text-align:center;white-space:nowrap;line-height:1;margin-top:3px}
+    .vsep{width:1px;background:#ddd;min-height:60px;margin:0 .4rem;align-self:center;flex-shrink:0}
+    .detail-panel-title{font-family:'Moret','DM Serif Display',serif;font-size:1.1rem;font-weight:400;margin:0 0 .75rem;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}
+    .notices-section{margin-top:.75rem}
+    .notices-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem}
+    .notices-title{font-size:.75rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+    .notices-sort{font-size:.7rem;color:#999;display:flex;align-items:center;gap:.3rem}
+    .notices-sort select{font-size:.7rem;border:1px solid #ddd;border-radius:4px;padding:1px 4px;background:#fff;font-family:inherit;color:#555}
+    .notices-export-btn{font-family:inherit;font-size:.68rem;padding:.2rem .55rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s;white-space:nowrap}
+    .notices-export-btn:hover{background:#f5f5f5;border-color:#999}
+    .notices-list{border:1px solid #ebebeb;border-radius:var(--radius-md);overflow:hidden;max-height:280px;overflow-y:auto}
+    .notice-row{display:flex;align-items:flex-start;gap:.6rem;padding:.45rem .75rem;border-bottom:1px solid #f5f5f5;font-size:.78rem;transition:background .1s}
+    .notice-row:last-child{border-bottom:none}.notice-row:hover{background:#fafafa}
+    .notice-row.hl{background:#fff9c4}.notice-row.hl:hover{background:#fff59d}
+    .notice-cote{font-size:.68rem;color:#12157A;font-weight:700;white-space:nowrap;min-width:85px;flex-shrink:0;padding-top:2px;font-family:monospace}
+    .notice-titre{flex:1;color:#1a1a1a;line-height:1.35}
+    .notice-auteur{font-size:.7rem;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
+    .notice-fonds{font-size:.62rem;padding:1px 5px;border-radius:3px;background:#f0f0f0;color:#666;white-space:nowrap;align-self:flex-start;margin-top:2px;flex-shrink:0}
+    .notice-barcode{font-size:.66rem;color:#999;white-space:nowrap;flex-shrink:0;padding-top:2px;font-family:monospace}
+    .notice-live{font-size:.62rem;padding:1px 5px;border-radius:3px;background:#e3f2fd;color:#1565c0;white-space:nowrap;align-self:flex-start;margin-top:2px;flex-shrink:0}
+    .notice-more{font-size:.75rem;color:rgba(255,255,255,0.5);text-align:center;padding:.5rem;font-style:italic}
+    .placeholder-msg{font-size:.875rem;color:rgba(255,255,255,0.5);padding:.5rem 0;font-style:italic}
+    .shelf-hover{position:fixed;z-index:80;background:#fff;border:1px solid #ddd;border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.6rem .75rem;font-size:.72rem;width:280px;pointer-events:none}
+    .notices-modal{position:fixed;inset:0;background:rgba(26,26,46,0.55);display:flex;align-items:center;justify-content:center;padding:1.5rem;z-index:1000}
+    .notices-modal[hidden]{display:none}
+    .notices-modal-box{background:#fff;border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:640px;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25);position:relative}
+    .notices-modal-close{position:absolute;top:.75rem;right:.75rem;width:28px;height:28px;border:none;background:#f0f0f0;border-radius:50%;cursor:pointer;font-size:.9rem;color:#555;line-height:1}
+    .notices-modal-close:hover{background:#e0e0e0}
+    .notices-modal .notices-list{max-height:55vh}
+    /* Publication en iframe (voir js/parent-page-height.js) : une surcouche
+       `position:fixed` se placerait par rapport à l'iframe ENTIÈRE, haute
+       comme le document et non comme l'écran — donc hors de vue. Rendue
+       absolue, elle se cale sur le document, et openNoticesModal() amène la
+       page hôte sur la boîte de dialogue. Les hauteurs en vh vaudraient de
+       même une fraction de la hauteur du document : en pixels ici. */
+    html.rp-embedded .notices-modal{position:absolute}
+    html.rp-embedded .notices-modal-box{max-height:520px}
+    html.rp-embedded .notices-modal .notices-list{max-height:340px}
+    .sh-title{font-size:.74rem;font-weight:700;color:#1a1a1a;margin-bottom:.4rem;padding-bottom:.35rem;border-bottom:1px solid #f0f0f0}
+    .sh-row{display:flex;align-items:flex-start;gap:.4rem;padding:.2rem 0}
+    .sh-cote{font-family:monospace;font-size:.66rem;color:#12157A;font-weight:700;white-space:nowrap;flex-shrink:0;padding-top:1px}
+    .sh-titre{flex:1;color:#333;line-height:1.3}
+    .sh-empty{color:#888;font-style:italic}
+    .sh-more{font-size:.68rem;color:#999;font-style:italic;margin-top:.2rem;text-align:center}
+    footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:3rem;font-size:.8rem;text-align:center}
+    footer a{color: var(--warm);text-decoration:none}
+    @media(max-width:600px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+  </style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Patrimoine · Magasins</nav>
+      <h1 class="page-title">Plan des <em>Magasins</em></h1>
+      <p class="page-lead">Visualisation topographique des espaces de stockage d'après le récolement.</p>
+    </div>
+    <div class="hero-actions">
+      <a href="recolement.html">Récolement</a>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<div class="plan-toolbar">
+  <div class="container">
+    <div class="toolbar-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="sq" placeholder="Cote, titre, auteur, code-barre, travée…" autocomplete="off">
+    </div>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn active" id="btn-all"  onclick="setFilter('all')">Tout</button>
+    <button class="toolbar-btn"        id="btn-occ"  onclick="setFilter('occ')">Occupés</button>
+    <button class="toolbar-btn"        id="btn-free" onclick="setFilter('free')">Libres</button>
+  </div>
+</div>
+
+<main id="main" tabindex="-1">
+  <div class="section">
+    <div class="container">
+
+      <div class="csv-loader" id="csv-loader">
+        <p>Chargement du récolement…</p>
+        <div class="spinner-row"><div class="sp"></div><div class="sp"></div><div class="sp"></div><span>Analyse en cours</span></div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-card-label">Notices localisées</div><div class="stat-card-val" id="sn">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Emplacements totaux</div><div class="stat-card-val" id="st">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Catalogués</div><div class="stat-card-val cat" id="so">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Non catalogués (estimé)</div><div class="stat-card-val noncat" id="so-noncat">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Vides confirmés</div><div class="stat-card-val green" id="sv">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Non rangés</div><div class="stat-card-val nonrange" id="so-nonrange">—</div></div>
+        <div class="stat-card"><div class="stat-card-label">Taux de remplissage</div><div class="stat-card-val" id="sr">—</div></div>
+      </div>
+
+      <div class="legend-row">
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-cat)"></div><span>Catalogué</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-manuel)"></div><span>Exemplarisé rapide</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-noncat)"></div><span>Non catalogué (estimé)</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></div><span>Vide (confirmé)</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-nonrange)"></div><span>Non rangé</span></div>
+        <div class="leg"><div class="leg-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></div><span>Non inventorié</span></div>
+        <div class="leg" style="color:#aaa;font-style:italic;margin-left:auto">Survolez une étagère pour son détail, cliquez sur une travée pour l'ouvrir</div>
+      </div>
+
+      <div class="search-results" id="sres"></div>
+
+      <div class="room-group">
+        <h2 class="room-group-title">Magasin — 6e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-magasin6"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="room-group">
+        <h2 class="room-group-title">Magasin — 5e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-magasin5"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="room-group">
+        <h2 class="room-group-title">Périodiques — 3e / 4e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <p class="room-placeholder">Non couvert par cet outil de récolement.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="room-group">
+        <h2 class="room-group-title">Magasin — 2e étage</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-magasin2"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="room-group">
+        <h2 class="room-group-title">Réserve — 1er étage</h2>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Réserve patrimoniale</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees"></div>
+          </div>
+        </div>
+
+        <details class="room-section">
+          <summary class="room-section-title">Armoires (bois)</summary>
+          <div class="room-plan">
+            <div class="room-inner" id="room-armoires"></div>
+          </div>
+        </details>
+
+        <details class="room-section">
+          <summary class="room-section-title">Armoires à tiroirs</summary>
+          <div class="room-plan">
+            <div class="room-inner" id="room-tiroirs"></div>
+          </div>
+        </details>
+
+        <div class="room-section">
+          <h3 class="room-section-title">Réserve Douaisienne</h3>
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-douaisienne"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div id="shelf-hover" class="shelf-hover" style="display:none" aria-hidden="true"></div>
+
+<div id="notices-modal" class="notices-modal" hidden>
+  <div class="notices-modal-box" role="dialog" aria-modal="true" aria-labelledby="notices-modal-title">
+    <button type="button" class="notices-modal-close" id="notices-modal-close" aria-label="Fermer">✕</button>
+    <div id="notices-modal-content"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="index.html">← Retour</a></p>
+  </div>
+</footer>
+
+<script>
+/* ════════════ AUTH ════════════ */
+(function() {
+  if (localStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+document.getElementById('logout-btn').addEventListener('click', function(){
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+/* TRAVEES, GROUPES, EMPLACEMENTS_ARMOIRE, EMPLACEMENTS_TIROIR, LOCATIONS_ALL,
+   parseCote/compareCotes sont définis dans js/reserve-shared.js (partagé avec
+   recolement.html). Armoires et tiroirs sont traités comme des pseudo-travées
+   (colonne = meuble, étage = tiroir/niveau) et passent par la même mécanique
+   (CNT/DET/colsOf/maxEtageOf) que les travées classiques. */
+
+/* ════════════ ÉTAT ════════════ */
+let CNT={}, CNT_MANUEL={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={}, LASTSHELF={};
+let selId=null, filter='all', csvLoaded=false;
+let hlBarcode=null;
+
+/* Hauteur de référence (en "nombre d'étages") partagée par toutes les
+   travées dans le plan miniature — DEFAULT_MAX_ETAGE (js/reserve-shared.js),
+   la valeur par défaut désormais commune à toutes les travées tant qu'aucune
+   dernière étagère n'y est marquée. Voir makeTraveeEl(). */
+const TRAVEE_REF_MAXET=DEFAULT_MAX_ETAGE;
+
+function travTitle(tid){
+  if(tid==='ARMOIRE') return 'Armoires (bois)';
+  if(tid==='TIROIR') return 'Armoires à tiroirs';
+  return 'Travée '+tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'').replace(/^M6-/,'');
+}
+function etageWordFor(tid){
+  if(tid==='ARMOIRE') return 'niveau';
+  if(tid==='TIROIR') return 'tiroir';
+  return 'étage';
+}
+
+/* ════════════ CHARGEMENT DU RÉCOLEMENT ════════════
+   data/recolement.json regroupe scans, non-catalogués, étagères vides,
+   emplacements non rangés et dernières étagères de colonne marquées :
+   { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
+   lastShelves:[...] }.
+   Les anciens exports (simple tableau de scans, ou sans lastShelves) restent
+   lisibles. */
+function applyRecolementData(data){
+  const rows = Array.isArray(data) ? data : (data.scans||[]);
+  const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+  const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
+  const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
+  const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
+  parseVide(videRows);
+  parseNonCat(nonCatRows);
+  parseNonRange(nonRangeRows);
+  parseLastShelf(lastShelfRows);
+  parseRecolement(rows);
+}
+
+/* Priorité à /api/recolement (état partagé R2, à jour en direct pour tous
+   les collègues) ; repli sur data/recolement.json (snapshot committé) si
+   l'API échoue — R2 non configuré, page servie hors Vercel, etc. */
+function loadRecolement(){
+  fetch('/api/recolement')
+    .then(r=>{ if(!r.ok) throw new Error('api-unavailable'); return r.json(); })
+    .then(applyRecolementData)
+    .catch(()=>{
+      fetch('data/recolement.json')
+        .then(r=>{ if(!r.ok) throw new Error('missing'); return r.json(); })
+        .then(applyRecolementData)
+        .catch(()=>{
+          csvLoaded=true;
+          document.getElementById('csv-loader').innerHTML=
+            '<p>Aucun récolement disponible pour le moment. Utilisez l\'outil <a href="recolement.html">Récolement</a> depuis l\'espace professionnel pour commencer à localiser les collections.</p>';
+          document.getElementById('sn').textContent='0';
+          buildPlan();
+        });
+    });
+}
+
+function parseVide(rows){
+  VIDE={};
+  (rows||[]).forEach(row=>{
+    const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
+    if(!t||!etage) return;
+    VIDE[`${t}|${col}|${etage}`]=true;
+  });
+}
+
+function parseNonCat(rows){
+  NONCAT={};
+  (rows||[]).forEach(row=>{
+    const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
+    const count=parseInt(row.count,10)||0;
+    if(!t||!etage||count<=0) return;
+    NONCAT[`${t}|${col}|${etage}`]=count;
+  });
+}
+
+function parseNonRange(rows){
+  NONRANGE={};
+  (rows||[]).forEach(row=>{
+    const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
+    if(!t||!etage) return;
+    NONRANGE[`${t}|${col}|${etage}`]=true;
+  });
+}
+
+/* Marque, par colonne (pas par étage), le dernier étage réel — clé sans
+   étage puisque c'est une propriété de la colonne entière. Consommé par
+   maxEtageOf() pour arrêter d'afficher des placeholders "non inventorié"
+   au-delà de cet étage. */
+function parseLastShelf(rows){
+  LASTSHELF={};
+  (rows||[]).forEach(row=>{
+    const t=(row.travee||'').trim(), col=(row.colonne||'').trim(), etage=(row.etage||'').trim();
+    if(!t||!col||!etage) return;
+    LASTSHELF[`${t}|${col}`]=etage;
+  });
+}
+
+// Travées de magasin d'étage (préfixe M2-/M5-/M6-) — voir isMagasinTravee()
+// juste en dessous pour pourquoi leur dédoublonnage diffère de la réserve.
+function isMagasinTravee(t){
+  return t.startsWith('M2-') || t.startsWith('M5-') || t.startsWith('M6-');
+}
+
+function parseRecolement(rows){
+  CNT={}; CNT_MANUEL={}; DET={};
+  rows.forEach(row=>{
+    const t     =(row.travee  ||'').trim();
+    const col   =(row.colonne ||'').trim();
+    const etage =(row.etage   ||'').trim();
+    const cote  =(row.cote    ||'').trim();
+    const titre =(row.titre   ||'').trim().slice(0,80);
+    const auteur=(row.auteur  ||'').trim().slice(0,40);
+    const fonds =(row.fonds   ||'').trim();
+    const etat  =(row.etat    ||'').trim().slice(0,30);
+    const manuel=!!row.manuel;
+    const barcode=(row.barcode||'').trim();
+    const ts=Number(row.ts)||0;
+    if(!t || !etage) return;
+    const n={c:cote,t:titre,a:auteur,f:fonds,e:etat,m:manuel,b:barcode,ts};
+    const key = `${t}|${col}|${etage}`;
+    if (!DET[key]) DET[key] = [];
+
+    // Dédoublonnage par cote réservé à la réserve (patrimoniale/Douaisienne/
+    // armoires/tiroirs) : là, une cote identifie une notice unique, donc
+    // deux exemplaires qui la partagent sont deux copies de LA MÊME notice,
+    // à ne compter qu'une fois. Dans les magasins d'étage en revanche, la
+    // cote du 6e étage est littéraire (ex. "R BEN" = Roman, auteur en
+    // "BEN…") : c'est une catégorie de rayon, pas un identifiant de livre —
+    // des dizaines de titres différents y partagent légitimement la même
+    // cote. Y dédoublonner par cote sous-comptait donc gravement le nombre
+    // de livres réellement récolés (ex. 32 romans "R BEN" comptés comme 1
+    // seul). Le code-barre, lui, est toujours unique par exemplaire (chaque
+    // entrée de `rows` vient d'un état déjà keyé par code-barre côté
+    // serveur) : pour un magasin, chaque scan compte donc individuellement,
+    // sans déduplication supplémentaire.
+    const coteDejaVue = !isMagasinTravee(t) && cote && DET[key].some(x => x.c === cote);
+    if (!coteDejaVue) {
+      if (manuel) CNT_MANUEL[key] = (CNT_MANUEL[key] || 0) + 1;
+      else CNT[key] = (CNT[key] || 0) + 1;
+      DET[key].push(n);
+    }
+  });
+  csvLoaded=true;
+  document.getElementById('csv-loader').style.display='none';
+  const total=Object.values(CNT).reduce((s,v)=>s+v,0) + Object.values(CNT_MANUEL).reduce((s,v)=>s+v,0);
+  document.getElementById('sn').textContent=total.toLocaleString('fr-FR');
+  // refreshPlan() plutôt que buildPlan() : au premier appel le plan n'existe
+  // pas encore et il bascule de lui-même sur une construction complète ;
+  // aux sondages suivants (toutes les 45 s) il se contente de repeindre.
+  refreshPlan();
+}
+
+/* ════════════ HELPERS ════════════ */
+function cnt(t,c,e){ return CNT[`${t}|${c}|${e}`]||0; }
+function cntManuel(t,c,e){ return CNT_MANUEL[`${t}|${c}|${e}`]||0; }
+function nc(t,c,e){ return NONCAT[`${t}|${c}|${e}`]||0; }
+/* GEO_COLS ne contient une travée que si au moins une donnée l'a mentionnée
+   (voir rebuildGeometryIndex) — c'est exactement la question que posait
+   l'ancienne version, qui balayait pour cela les six dictionnaires entiers à
+   chaque appel, une fois par travée et par rendu. */
+function hasData(tid){
+  const cols = GEO_COLS[tid];
+  return !!cols && cols.size > 0;
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* Catégorie d'un emplacement : catalogué > exemplarisé rapide (créé via
+   exemplarisation.html, pas une vraie notice Syracuse) > non catalogué
+   (estimé) > non rangé > vide confirmé > non inventorié (priorité dans cet
+   ordre si plusieurs sont vrais à la fois — en pratique "vide" et "non
+   rangé" sont mutuellement exclusifs côté récolement.html). */
+function slotState(t,c,e){
+  if(cnt(t,c,e)>0) return 'cat';
+  if(cntManuel(t,c,e)>0) return 'manuel';
+  if(nc(t,c,e)>0) return 'noncat';
+  if(NONRANGE[`${t}|${c}|${e}`]) return 'nonrange';
+  if(VIDE[`${t}|${c}|${e}`]) return 'vide';
+  return 'unknown';
+}
+function stateColor(state){
+  if(state==='cat') return 'var(--plan-cat)';
+  if(state==='manuel') return 'var(--plan-manuel)';
+  if(state==='noncat') return 'var(--plan-noncat)';
+  if(state==='nonrange') return 'var(--plan-nonrange)';
+  if(state==='vide') return 'var(--plan-free)';
+  return 'var(--plan-unknown)';
+}
+/* Dégradé proportionnel quand plusieurs catégories coexistent sur la même
+   case (ex. un exemplaire catalogué + un exemplarisé rapidement + une
+   estimation de non catalogués sur la même étagère), plutôt que de masquer
+   entièrement les parts minoritaires derrière la couleur prioritaire. */
+function gradientOf(segments){
+  const nonZero = segments.filter(s=>s.count>0);
+  if(!nonZero.length) return null;
+  if(nonZero.length===1) return nonZero[0].color;
+  const total = nonZero.reduce((s,x)=>s+x.count,0);
+  let acc=0; const stops=[];
+  nonZero.forEach(seg=>{
+    const from=Math.round(acc/total*100);
+    acc+=seg.count;
+    const to=Math.round(acc/total*100);
+    stops.push(`${seg.color} ${from}%`, `${seg.color} ${to}%`);
+  });
+  return `linear-gradient(to right, ${stops.join(', ')})`;
+}
+function slotColor(t,c,e,state){
+  if(state==='cat' || state==='manuel'){
+    const g = gradientOf([
+      {color:'var(--plan-cat)', count:cnt(t,c,e)},
+      {color:'var(--plan-manuel)', count:cntManuel(t,c,e)},
+      {color:'var(--plan-noncat)', count:nc(t,c,e)},
+    ]);
+    if(g) return g;
+  }
+  return stateColor(state);
+}
+function stateLabel(state){
+  if(state==='cat') return 'catalogué';
+  if(state==='manuel') return 'exemplarisé rapide (non catalogué)';
+  if(state==='noncat') return 'non catalogué (estimé)';
+  if(state==='nonrange') return 'non rangé';
+  if(state==='vide') return 'vide (confirmé)';
+  return 'non inventorié';
+}
+/* Texte d'infobulle d'une case du plan miniature — affiché au survol pour
+   identifier un emplacement sans avoir à cliquer dessus. */
+function slotTitle(tid,col,e){
+  const state=slotState(tid,col,e);
+  const n=cnt(tid,col,e), mCount=cntManuel(tid,col,e), ncCount=nc(tid,col,e);
+  let detail;
+  if(state==='cat' || state==='manuel'){
+    const parts=[];
+    if(n>0) parts.push(`${n} catalogué(s)`);
+    if(mCount>0) parts.push(`${mCount} exemplarisé(s) rapidement`);
+    if(ncCount>0) parts.push(`${ncCount} non catalogué(s)`);
+    detail = parts.join(' + ');
+  }
+  else if(state==='noncat') detail = `${ncCount} non catalogué(s) estimé(s)`;
+  else detail = stateLabel(state);
+  const spec=isNaN(parseInt(e));
+  const elbl=spec?e:`${etageWordFor(tid)} ${e}`;
+  return `${travTitle(tid)} · col. ${col}, ${elbl} — ${detail}`;
+}
+/* Taux d'occupation d'une travée (catalogué + exemplarisé rapide + non
+   catalogué + non rangé, sur le total d'emplacements) — affiché sous son
+   étiquette pour donner un aperçu sans avoir à cliquer. */
+function traveeOccupancy(tid,cols){
+  let total=0, filled=0;
+  cols.forEach(col=>{
+    const maxE=maxEtageOf(tid,col);
+    for(let e=1;e<=maxE;e++){
+      total++;
+      const state=slotState(tid,col,String(e));
+      if(state==='cat'||state==='manuel'||state==='noncat'||state==='nonrange') filled++;
+    }
+  });
+  return total ? Math.round(filled/total*100) : 0;
+}
+
+/* Colonnes affichées pour une travée : toujours l'ensemble par défaut
+   (A..nbCols), complété par toute colonne présente dans les données
+   (scans, non-catalogués, vide, non rangé) mais absente du défaut. Union et
+   non filtrage : sinon, dès qu'une seule colonne recevait un scan catalogué,
+   les autres colonnes (mêmes déjà connues via non-catalogués/vide/non
+   rangé, ou simplement pas encore visitées) disparaissaient du plan au lieu
+   d'apparaître en placeholder "non inventorié". */
+/* ════════════ INDEX DE GÉOMÉTRIE ════════════
+   colsOf() et maxEtageOf() reparcouraient l'intégralité des dictionnaires de
+   données (CNT, CNT_MANUEL, VIDE, NONCAT, NONRANGE, LASTSHELF) à CHAQUE
+   appel — et makeTraveeEl() appelle maxEtageOf() une fois par colonne, soit
+   ~800 fois par construction du plan. Sur un récolement avancé (plusieurs
+   dizaines de milliers d'entrées), cela faisait des dizaines de millions de
+   `split('|')` par rendu, répétés toutes les 45 s.
+
+   On construit donc l'index une seule fois par rafraîchissement de données :
+   un passage sur les dictionnaires, puis des lectures en O(1).
+
+   CNT_MANUEL est inclus dans ce parcours, contrairement à l'ancien code qui
+   ne regardait que [CNT, VIDE, NONCAT, NONRANGE] : une étagère ne contenant
+   que des exemplaires créés via exemplarisation.html (donc comptés dans
+   CNT_MANUEL et dans aucun autre dictionnaire) n'étendait ni les colonnes ni
+   les étages, et disparaissait donc du plan alors qu'elle porte de vraies
+   données. Même nature d'oubli que le correctif du 2026-08-11 sur
+   colsOf/maxEtageOf (voir CLAUDE.md) — l'union doit porter sur toutes les
+   données réelles. */
+let GEO_COLS = {};     // tid -> Set(colonne) rencontrée dans les données
+let GEO_MAXET = {};    // "tid|colonne" -> plus haut étage rencontré
+let GEO_DEF = {};      // tid -> définition (évite un find() linéaire par appel)
+
+function rebuildGeometryIndex(){
+  GEO_COLS = {}; GEO_MAXET = {}; GEO_DEF = {};
+  LOCATIONS_ALL.forEach(d=>{ GEO_DEF[d.id] = d; });
+  const note = (t,c,e)=>{
+    if(!t) return;
+    (GEO_COLS[t] || (GEO_COLS[t] = new Set())).add(c);
+    const n = parseInt(e, 10);
+    if(!isNaN(n)){
+      const k = `${t}|${c}`;
+      if(!(k in GEO_MAXET) || n > GEO_MAXET[k]) GEO_MAXET[k] = n;
+    }
+  };
+  [CNT, CNT_MANUEL, VIDE, NONCAT, NONRANGE].forEach(dict=>{
+    for(const k in dict){ const [t,c,e] = k.split('|'); note(t,c,e); }
+  });
+  // LASTSHELF est keyé "tid|colonne" (propriété de la colonne, pas d'un
+  // étage précis) : il fait connaître la colonne, mais n'étend pas le nombre
+  // d'étages — c'est maxEtageOf() qui s'en sert comme plancher.
+  for(const k in LASTSHELF){ const [t,c] = k.split('|'); if(t) (GEO_COLS[t] || (GEO_COLS[t] = new Set())).add(c); }
+}
+
+function colsOf(tDef){
+  const from=new Set();
+  for(let i=1;i<=tDef.nbCols;i++) from.add(String.fromCharCode(64+i));
+  const seen = GEO_COLS[tDef.id];
+  if(seen) seen.forEach(c=>from.add(c));
+  return [...from].sort((a,b)=>{
+    const na=parseInt(a),nb=parseInt(b);
+    if(!isNaN(na)&&!isNaN(nb)) return na-nb;
+    return a.localeCompare(b,'fr');
+  });
+}
+
+/* Idem pour le nombre d'étages d'une colonne : au moins la valeur par
+   défaut de la travée (maxEt), étendue si des données réelles vont plus
+   loin — jamais réduite en dessous du défaut sous prétexte que seuls
+   quelques étages ont été scannés. Exception : si la colonne a une
+   "dernière étagère" marquée (LASTSHELF, voir recolement.html), c'est elle
+   qui sert de base au lieu du défaut de la travée — la colonne s'arrête
+   réellement là, donc plus de placeholder au-delà — tout en restant
+   étendue si des données réelles vont malgré tout plus loin. */
+function maxEtageOf(tid,col){
+  const d=GEO_DEF[tid] || LOCATIONS_ALL.find(x=>x.id===tid);
+  const marked=parseInt(LASTSHELF[`${tid}|${col}`],10);
+  let m=!isNaN(marked)?marked:defaultMaxEtageOf(d);
+  const seen=GEO_MAXET[`${tid}|${col}`];
+  if(seen!==undefined && seen>m) m=seen;
+  return m;
+}
+
+/* ════════════ CONSTRUCTION DU PLAN ════════════ */
+
+/* Toutes les travées/meubles dessinés, dans l'ordre des sections — sert à
+   calculer la signature de structure ci-dessous sans dupliquer la liste des
+   groupes qu'assemble buildPlan(). */
+function allDrawnDefs(){
+  return [
+    ...GROUPES.flat().map(tid=>TRAVEES.find(x=>x.id===tid)),
+    ...TRAVEES_DOUAISIENNE,
+    EMPLACEMENTS_ARMOIRE[0], EMPLACEMENTS_TIROIR[0],
+    ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5, ...TRAVEES_MAGASIN6,
+  ].filter(Boolean);
+}
+
+/* Empreinte de la STRUCTURE du plan : quelles colonnes, et combien d'étages
+   chacune. Deux rafraîchissements qui partagent cette empreinte peuvent se
+   contenter de repeindre les cases existantes ; si elle change (un scan sur
+   une colonne encore jamais vue, une étagère au-delà du maximum connu, une
+   « dernière étagère » nouvellement marquée), il faut rebâtir. */
+function planStructureSignature(){
+  return allDrawnDefs().map(tDef=>{
+    const cols=colsOf(tDef);
+    return tDef.id+':'+cols.map(c=>c+'#'+maxEtageOf(tDef.id,c)).join(',');
+  }).join('|');
+}
+
+let planSignature=null;
+
+function buildPlan(){
+  rebuildGeometryIndex();
+  buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs();
+  buildMagasin2(); buildMagasin5(); buildMagasin6();
+  planSignature=planStructureSignature();
+  updateStats();
+}
+
+/* Rafraîchissement d'un plan déjà à l'écran (sondage toutes les 45 s).
+   Reconstruire les ~5 400 cases à chaque cycle coûtait autant de
+   createElement, de chaînes de style en ligne et de calculs d'aria-label,
+   pour un résultat presque toujours identique — et cela réinitialisait au
+   passage le survol et le défilement. On ne repeint donc que ce qui change ;
+   on ne rebâtit que si la structure a bougé. */
+function refreshPlan(){
+  rebuildGeometryIndex();
+  const sig=planStructureSignature();
+  if(sig!==planSignature || !document.querySelector('.travee-wrap')){ buildPlan(); return; }
+  document.querySelectorAll('.tv-slot').forEach(el=>{
+    const {tid,col,etage}=el.dataset;
+    const state=slotState(tid,col,etage);
+    const bg=slotColor(tid,col,etage,state);
+    let op='1';
+    if(filter==='occ'&&!(state==='cat'||state==='noncat'||state==='nonrange')) op='.15';
+    if(filter==='free'&&state!=='vide') op='.15';
+    // Comparaison sur la dernière valeur appliquée plutôt que sur
+    // el.style.background : le navigateur normalise les dégradés qu'on lui
+    // donne, si bien qu'une relecture ne redonne jamais la chaîne écrite et
+    // que le test serait toujours vrai.
+    if(el.__bg!==bg){ el.style.background=bg; el.__bg=bg; }
+    if(el.__op!==op){ el.style.opacity=op; el.__op=op; }
+    const label=slotTitle(tid,col,etage);
+    if(el.__lbl!==label){ el.setAttribute('aria-label',label); el.__lbl=label; }
+  });
+  document.querySelectorAll('.travee-wrap').forEach(wrap=>{
+    const tid=wrap.dataset.tid, tDef=GEO_DEF[tid];
+    if(!tDef) return;
+    const known=hasData(tid);
+    const pct=known?traveeOccupancy(tid,colsOf(tDef)):null;   // calculé une fois, lu deux fois
+    const occ=known?pct+'% occupé':'—';
+    const sub=wrap.querySelector('.tv-sublabel');
+    if(sub && sub.textContent!==occ) sub.textContent=occ;
+    const title=`${travTitle(tid)}${known?` — ${pct}% occupé`:' — non inventoriée'}`;
+    if(wrap.title!==title) wrap.title=title;
+  });
+  updateStats();
+}
+
+function buildTravees(){
+  const room=document.getElementById('room-travees');
+  room.innerHTML='';
+  GROUPES.forEach((grp,gi)=>{
+    if(gi>0){const s=document.createElement('div');s.className='vsep';room.appendChild(s);}
+    grp.forEach(tid=>{
+      const tDef=TRAVEES.find(x=>x.id===tid);
+      room.appendChild(makeTraveeEl(tid,tDef,colsOf(tDef)));
+    });
+  });
+}
+
+function buildTraveesDouaisienne(){
+  const room=document.getElementById('room-travees-douaisienne');
+  room.innerHTML='';
+  TRAVEES_DOUAISIENNE.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
+function buildMagasin2(){
+  const room=document.getElementById('room-travees-magasin2');
+  room.innerHTML='';
+  TRAVEES_MAGASIN2.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
+function buildMagasin5(){
+  const room=document.getElementById('room-travees-magasin5');
+  room.innerHTML='';
+  TRAVEES_MAGASIN5.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
+function buildMagasin6(){
+  const room=document.getElementById('room-travees-magasin6');
+  room.innerHTML='';
+  TRAVEES_MAGASIN6.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
+function buildArmoires(){
+  const room=document.getElementById('room-armoires');
+  room.innerHTML='';
+  const tDef=EMPLACEMENTS_ARMOIRE[0];
+  room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+}
+
+function buildTiroirs(){
+  const room=document.getElementById('room-tiroirs');
+  room.innerHTML='';
+  const tDef=EMPLACEMENTS_TIROIR[0];
+  room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+}
+
+function makeTraveeEl(tid,tDef,cols){
+  const wrap=document.createElement('div');
+  wrap.className='travee-wrap'+(selId===tid?' sel':'');
+  // dataset.tid : permet à refreshPlan() de retrouver chaque travée sans
+  // reconstruire le DOM (voir plus bas).
+  wrap.dataset.tid=tid;
+  wrap.setAttribute('role','button');wrap.setAttribute('tabindex','0');
+  const box=document.createElement('div');box.className='tv-box';
+  const known=hasData(tid);
+  // Hauteur totale de référence pour une colonne : dans la réalité, toutes
+  // les travées (réserve patrimoniale et Douaisienne confondues) font la
+  // même hauteur physique, peu importe leur nombre d'étages déclaré — donc
+  // une seule référence partagée par toutes (TRAVEE_REF_MAXET), pas une par
+  // travée (sinon une travée à 9 étages paraîtrait plus haute qu'une à 6, ce
+  // qui ne correspond pas au terrain). Armoires et tiroirs gardent leur
+  // propre référence (tDef.maxEt) : ce sont des meubles différents, et il
+  // n'y en a qu'un seul de chaque de toute façon (pas de risque
+  // d'incohérence entre plusieurs armoires). Pour une même travée, une
+  // colonne à 3 étages et une à 4 occupent ainsi toujours la même hauteur
+  // totale (étages + interstices), avec des étages proportionnellement plus
+  // grands ou plus petits selon leur nombre — ce qui aligne aussi les
+  // libellés de colonne sur une même ligne de base.
+  const GAP=1.5, BASE_SLOT_H=9;
+  const refMaxEt=(tid==='ARMOIRE'||tid==='TIROIR')?tDef.maxEt:TRAVEE_REF_MAXET;
+  const targetH=refMaxEt*BASE_SLOT_H+(refMaxEt-1)*GAP;
+  cols.forEach(col=>{
+    const maxE=maxEtageOf(tid,col);
+    const cd=document.createElement('div');cd.className='tv-col';
+    const w=tDef.nbCols<=5?11:9;
+    const h=Math.max(4,(targetH-(maxE-1)*GAP)/maxE);
+    for(let e=1;e<=maxE;e++){
+      const state=slotState(tid,col,String(e));
+      const s=document.createElement('div');s.className='tv-slot';
+      const bg=slotColor(tid,col,String(e),state);
+      let op='1';
+      if(filter==='occ'&&!(state==='cat'||state==='noncat'||state==='nonrange')) op='.15';
+      if(filter==='free'&&state!=='vide') op='.15';
+      s.style.cssText=`width:${w}px;height:${h}px;background:${bg};opacity:${op}`;
+      const lbl0=slotTitle(tid,col,String(e));
+      s.setAttribute('aria-label',lbl0);
+      // Valeurs appliquées, relues par refreshPlan() pour ne repeindre que
+      // ce qui a réellement changé.
+      s.__bg=bg; s.__op=op; s.__lbl=lbl0;
+      s.dataset.tid=tid; s.dataset.col=col; s.dataset.etage=String(e);
+      cd.appendChild(s);
+    }
+    const colLbl=document.createElement('div');colLbl.className='tv-col-lbl';colLbl.textContent=col;
+    cd.appendChild(colLbl);
+    box.appendChild(cd);
+  });
+  wrap.appendChild(box);
+  const lbl=document.createElement('div');lbl.className='tv-label';
+  lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'').replace(/^M6-/,'');
+  wrap.appendChild(lbl);
+  if(csvLoaded){
+    const sub=document.createElement('div');sub.className='tv-sublabel';
+    if(known){ sub.textContent=traveeOccupancy(tid,cols)+'% occupé'; }
+    else { sub.textContent='—'; }
+    wrap.appendChild(sub);
+  }
+  wrap.title=`${travTitle(tid)}${known?` — ${traveeOccupancy(tid,cols)}% occupé`:' — non inventoriée'}`;
+  wrap.addEventListener('click',()=>selectTravee(tid,tDef,cols));
+  wrap.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')selectTravee(tid,tDef,cols);});
+  return wrap;
+}
+
+/* ════════════ STATS ════════════ */
+function updateStats(){
+  let total=0,cat=0,manuel=0,noncat=0,vide=0,nonrange=0;
+  LOCATIONS_ALL.forEach(t=>{
+    colsOf(t).forEach(col=>{
+      const maxE=maxEtageOf(t.id,col);
+      for(let e=1;e<=maxE;e++){
+        total++;
+        const state=slotState(t.id,col,String(e));
+        if(state==='cat') cat++;
+        else if(state==='manuel') manuel++;
+        else if(state==='noncat') noncat++;
+        else if(state==='nonrange') nonrange++;
+        else if(state==='vide') vide++;
+      }
+    });
+  });
+  document.getElementById('st').textContent=total.toLocaleString('fr-FR');
+  document.getElementById('so').textContent=cat.toLocaleString('fr-FR');
+  document.getElementById('so-noncat').textContent=noncat.toLocaleString('fr-FR');
+  document.getElementById('sv').textContent=vide.toLocaleString('fr-FR');
+  document.getElementById('so-nonrange').textContent=nonrange.toLocaleString('fr-FR');
+  document.getElementById('sr').textContent=total?Math.round((cat+manuel+noncat)/total*100)+' %':'—';
+}
+
+/* ════════════ DÉTAIL TRAVÉE ════════════ */
+function selectTravee(tid,tDef,cols){
+  selId=tid; buildPlan();
+  // Armoires (bois) et armoires à tiroirs sont repliées par défaut (<details>,
+  // voir CLAUDE.md) : sans ça, un résultat de recherche pointant vers l'une
+  // d'elles ne rendrait jamais visible la travée sélectionnée dans le plan.
+  if(tid==='ARMOIRE'||tid==='TIROIR'){
+    const room=document.getElementById(tid==='ARMOIRE'?'room-armoires':'room-tiroirs');
+    const det=room&&room.closest('details.room-section');
+    if(det) det.open=true;
+  }
+}
+
+/* ════════════ NOTICES D'UN EMPLACEMENT ════════════
+   Affichées dans une modale (plutôt qu'injectées en bas du panneau de
+   détail, qui peut se trouver loin en dessous du plan cliqué) : plus facile
+   à consulter puis refermer sans perdre sa position de scroll dans le plan. */
+function showNotices(tid,col,etage,highlightBarcode){
+  const modal=document.getElementById('notices-modal');
+  const content=document.getElementById('notices-modal-content');
+  if(!modal||!content) return;
+  hlBarcode=highlightBarcode||null;
+  const key=`${tid}|${col}|${etage}`;
+  const notices=DET[key]||[];
+  const ncCount=NONCAT[key]||0;
+  const spec=isNaN(parseInt(etage));
+  const lbl=spec?etage:`${etageWordFor(tid)} ${etage}`;
+  const heading=`${esc(travTitle(tid))} · col. ${esc(col)}, ${esc(lbl)}`;
+  if(!notices.length){
+    let msg;
+    if(ncCount) msg=`${ncCount} livre(s) non catalogué(s) estimé(s) sur cet emplacement (col. ${col}, ${lbl}) — aucune notice cataloguée.`;
+    else if(NONRANGE[key]) msg=`Emplacement marqué non rangé lors du récolement (col. ${col}, ${lbl}) — documents de natures différentes en désordre, non comptés.`;
+    else if(VIDE[key]) msg=`Emplacement confirmé vide lors du récolement (col. ${col}, ${lbl}).`;
+    else msg=`Aucune notice pour col. ${col}, ${lbl}.`;
+    content.innerHTML=`<div class="detail-panel-title" id="notices-modal-title">${heading}</div>
+      <p class="placeholder-msg">${msg}</p>`;
+    openNoticesModal();
+    return;
+  }
+  content.innerHTML=`<div class="detail-panel-title" id="notices-modal-title">${heading}</div>
+    <div class="notices-section">
+      <div class="notices-header">
+        <span class="notices-title">Col. ${col} — ${lbl} (${notices.length})${ncCount?` <span style="color:var(--plan-noncat);font-weight:400;text-transform:none;letter-spacing:0">+ ${ncCount} non catalogué(s)</span>`:''}</span>
+        <div class="notices-sort">
+          <button type="button" class="notices-export-btn" onclick="exportShelfBarcodes('${key}')">⬇ Exporter (.txt)</button>
+          Trier par&nbsp;
+          <select onchange="rerenderEtage('${key}',this.value)">
+            <option value="cote">Cote</option>
+            <option value="titre">Titre</option>
+            <option value="auteur">Auteur</option>
+            <option value="ts">Ordre du récolement</option>
+          </select>
+        </div>
+      </div>
+      <div class="notices-list" id="nl-${key.replace(/\|/g,'_')}">${noticeRows(notices,'cote')}</div>
+    </div>`;
+  openNoticesModal();
+  scrollToHighlight(content);
+}
+function scrollToHighlight(content){
+  if(!hlBarcode) return;
+  const row=content.querySelector('.notice-row.hl');
+  if(row) row.scrollIntoView({block:'center'});
+}
+function openNoticesModal(){
+  const modal=document.getElementById('notices-modal');
+  modal.hidden=false;
+  /* En iframe, la modale est posée dans le document (voir le CSS
+     .rp-embedded plus haut) : on amène la page hôte dessus, sinon elle
+     s'ouvrirait à un endroit de la page que le visiteur ne regarde pas.
+     scrollIntoView traverse la frontière d'iframe. */
+  if(window.rpEmbed && window.rpEmbed.isEmbedded){
+    modal.querySelector('.notices-modal-box')
+         .scrollIntoView({behavior:'smooth', block:'center'});
+  }
+}
+function closeNoticesModal(){
+  document.getElementById('notices-modal').hidden=true;
+}
+document.getElementById('notices-modal-close').addEventListener('click',closeNoticesModal);
+document.getElementById('notices-modal').addEventListener('click',e=>{
+  if(e.target.id==='notices-modal') closeNoticesModal();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && !document.getElementById('notices-modal').hidden) closeNoticesModal();
+});
+function rerenderEtage(key,sort){
+  const el=document.getElementById('nl-'+key.replace(/\|/g,'_'));
+  if(!el) return;
+  el.innerHTML=noticeRows(DET[key]||[],sort);
+  scrollToHighlight(el);
+}
+
+function downloadTxt(text, filename){
+  const blob = new Blob([text], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+}
+// Codes-barres de l'emplacement affiché dans la modale (mêmes notices que
+// noticeRows(), pas seulement les MAX=60 premières lignes visibles à
+// l'écran), un par ligne — pour aller les rajouter en panier dans le SIGB.
+function exportShelfBarcodes(key){
+  const notices=DET[key]||[];
+  if(!notices.length){ alert('Aucun code-barre catalogué sur cet emplacement.'); return; }
+  const [tid,col,etage]=key.split('|');
+  const slug=travTitle(tid).replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase();
+  const d=new Date(), pad=n=>String(n).padStart(2,'0');
+  downloadTxt(notices.map(n=>n.b).filter(Boolean).join('\n'),
+    `codes-barres-${slug}-col${col}-${etage}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+}
+
+/* ════════════ RENDU DES LIGNES DE NOTICES ════════════ */
+function noticeRows(notices,sort){
+  const sorted=[...notices].sort((a,b)=>{
+    if(sort==='cote')   return compareCotes(a.c,b.c);
+    if(sort==='titre')  return (a.t||'').localeCompare(b.t||'','fr');
+    if(sort==='auteur') return (a.a||'').localeCompare(b.a||'','fr');
+    if(sort==='ts')     return (a.ts||0)-(b.ts||0);
+    return 0;
+  });
+  const MAX=60;
+  let visible=sorted.slice(0,MAX);
+  // Si la notice recherchée (venant d'un résultat de recherche, voir hlBarcode)
+  // tombe au-delà des MAX premières lignes affichées, on la fait quand même
+  // apparaître (en dernière position) plutôt que de la laisser hors-écran :
+  // scrollToHighlight() ne trouverait sinon jamais l'élément .hl à cibler.
+  if(hlBarcode && !visible.some(n=>n.b===hlBarcode)){
+    const hit=sorted.find(n=>n.b===hlBarcode);
+    if(hit) visible=[...visible.slice(0,MAX-1),hit];
+  }
+  let html=visible.map(n=>{
+    // Surcouche Syracuse : présente seulement si ce code-barre a été
+    // touché depuis le dernier rebuild XML — la plupart des notices n'ont
+    // donc aucun badge supplémentaire (voir loadSyracuseOverlay()).
+    const fresh=n.b&&SYRACUSE_OVERLAY[n.b];
+    const liveBadge=fresh
+      ? `<span class="notice-live" title="Relevé Syracuse au dernier passage de la synchronisation incrémentale, potentiellement plus récent que le fonds ci-dessus (figé au moment du scan)">🔄 ${esc(fresh.section||'')}${fresh.site?` · ${esc(fresh.site)}`:''}</span>`
+      : '';
+    return `
+    <div class="notice-row${n.b&&n.b===hlBarcode?' hl':''}">
+      <span class="notice-cote">${esc(n.c)}</span>
+      <span class="notice-titre">${n.m?`<span style="color:var(--plan-manuel);font-weight:700" title="Exemplarisé rapidement, pas encore catalogué dans Syracuse">⚡</span> `:''}${esc(n.t)}${n.e?`<br><span style="font-size:.62rem;color:#bbb">${esc(n.e)}</span>`:''}</span>
+      <span class="notice-auteur" title="${esc(n.a)}">${esc(n.a)}</span>
+      <span class="notice-barcode">${esc(n.b)}</span>
+      <span class="notice-fonds">${esc(n.f)}</span>
+      ${liveBadge}
+    </div>`;
+  }).join('');
+  if(sorted.length>MAX) html+=`<div class="notice-more">… et ${sorted.length-MAX} notices supplémentaires</div>`;
+  return html;
+}
+
+/* ════════════ MODALE AU SURVOL D'UNE ÉTAGÈRE ════════════
+   Écoute déléguée sur document (plutôt qu'un listener par case, il y en a
+   des milliers) : fonctionne même après un buildPlan() qui recrée tout le
+   DOM des cases. Réutilise DET (mêmes données que showNotices) pour afficher
+   la liste des livres de l'emplacement survolé, positionnée près du curseur. */
+let hoverSlot=null;
+function shelfHoverContent(tid,col,etage){
+  const key=`${tid}|${col}|${etage}`;
+  const notices=DET[key]||[];
+  const ncCount=NONCAT[key]||0;
+  const spec=isNaN(parseInt(etage));
+  const lbl=spec?etage:`${etageWordFor(tid)} ${etage}`;
+  let html=`<div class="sh-title">${esc(travTitle(tid))} · col. ${esc(col)}, ${esc(lbl)}</div>`;
+  if(!notices.length){
+    let msg;
+    if(ncCount) msg=`${ncCount} livre(s) non catalogué(s) estimé(s) — aucune notice cataloguée.`;
+    else if(NONRANGE[key]) msg='Marqué non rangé lors du récolement — documents en désordre, non comptés.';
+    else if(VIDE[key]) msg='Confirmé vide lors du récolement.';
+    else msg='Aucune donnée pour cet emplacement.';
+    return html+`<div class="sh-empty">${msg}</div>`;
+  }
+  const MAX=5;
+  const sorted=[...notices].sort((a,b)=>compareCotes(a.c,b.c));
+  html+=sorted.slice(0,MAX).map(n=>`<div class="sh-row"><span class="sh-cote">${esc(n.c)}</span><span class="sh-titre">${n.m?`<span style="color:var(--plan-manuel);font-weight:700">⚡</span> `:''}${esc(n.t)}</span></div>`).join('');
+  if(sorted.length>MAX) html+=`<div class="sh-more">… et ${sorted.length-MAX} de plus</div>`;
+  if(ncCount) html+=`<div class="sh-more">+ ${ncCount} non catalogué(s) estimé(s)</div>`;
+  return html;
+}
+function positionShelfHover(e){
+  const el=document.getElementById('shelf-hover');
+  const pad=16;
+  let x=e.clientX+pad, y=e.clientY+pad;
+  const rect=el.getBoundingClientRect();
+  if(x+rect.width>window.innerWidth-8) x=e.clientX-rect.width-pad;
+  if(y+rect.height>window.innerHeight-8) y=e.clientY-rect.height-pad;
+  el.style.left=Math.max(8,x)+'px';
+  el.style.top=Math.max(8,y)+'px';
+}
+document.addEventListener('mouseover',e=>{
+  const s=e.target.closest('.tv-slot');
+  if(!s) return;
+  if(s!==hoverSlot){
+    hoverSlot=s;
+    const el=document.getElementById('shelf-hover');
+    el.innerHTML=shelfHoverContent(s.dataset.tid,s.dataset.col,s.dataset.etage);
+    el.style.display='block';
+  }
+  positionShelfHover(e);
+});
+document.addEventListener('mousemove',e=>{
+  if(hoverSlot && e.target.closest('.tv-slot')===hoverSlot) positionShelfHover(e);
+});
+document.addEventListener('mouseout',e=>{
+  if(e.target.closest('.tv-slot')===hoverSlot){
+    document.getElementById('shelf-hover').style.display='none';
+    hoverSlot=null;
+  }
+});
+/* Cliquer directement sur une case du plan (l'étagère déjà prévisualisée au
+   survol) ouvre sa modale sans passer par la sélection de toute la travée —
+   capturé en phase de capture + stopPropagation pour empêcher le click du
+   wrap parent (qui appelle selectTravee) de se déclencher en plus. */
+document.addEventListener('click',e=>{
+  const s=e.target.closest('.tv-slot');
+  if(!s) return;
+  e.stopPropagation();
+  showNotices(s.dataset.tid,s.dataset.col,s.dataset.etage);
+},true);
+
+/* ════════════ FILTRE ════════════ */
+function setFilter(f){
+  filter=f;
+  document.querySelectorAll('.toolbar-btn[id^="btn-"]').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('btn-'+f);if(btn) btn.classList.add('active');
+  buildPlan();
+}
+
+/* ════════════ RECHERCHE ════════════ */
+document.getElementById('sq').addEventListener('input',function(){
+  const q=this.value.trim().toLowerCase();
+  const box=document.getElementById('sres');
+  if(q.length<2){box.style.display='none';return;}
+  const hits=[];
+
+  LOCATIONS_ALL.forEach(t=>{
+    if(!t.id.toLowerCase().includes(q) && !(t.label||'').toLowerCase().includes(q)) return;
+    const douaisienne=t.id.startsWith('RD-');
+    const magasin2=t.id.startsWith('M2-');
+    const magasin5=t.id.startsWith('M5-');
+    const magasin6=t.id.startsWith('M6-');
+    const suffix=douaisienne?' — Réserve Douaisienne':(magasin2?' — Magasin 2e étage':(magasin5?' — Magasin 5e étage':(magasin6?' — Magasin 6e étage':'')));
+    hits.push({type:'travee',label:travTitle(t.id),sub:(hasData(t.id)?'':'non inventorié')+suffix,tid:t.id});
+  });
+
+  let nc=0;
+  for(const[key,notices] of Object.entries(DET)){
+    if(nc>=8) break;
+    for(const n of notices){
+      if((n.c||'').toLowerCase().includes(q)||(n.t||'').toLowerCase().includes(q)||(n.a||'').toLowerCase().includes(q)||(n.b||'').toLowerCase().includes(q)){
+        const[tid,col,etage]=key.split('|');
+        hits.push({type:'notice',label:n.t||n.c,sub:`${n.c} — ${travTitle(tid)}, col. ${col}, ${etageWordFor(tid)} ${etage}`,tid,col,etage,barcode:n.b});
+        nc++; break;
+      }
+    }
+  }
+
+  if(!hits.length){box.innerHTML='<div class="sr-item" style="color:rgba(255,255,255,0.5)">Aucun résultat.</div>';}
+  else{
+    box.innerHTML=hits.slice(0,14).map((h,i)=>`<div class="sr-item" data-i="${i}"><strong>${esc(h.label)}</strong> <em>${esc(h.sub)}</em></div>`).join('');
+    box.querySelectorAll('.sr-item').forEach((el,i)=>{
+      const h=hits[i];
+      el.addEventListener('click',()=>{
+        document.getElementById('sq').value=''; box.style.display='none';
+        if(h.type==='travee'){const tDef=LOCATIONS_ALL.find(x=>x.id===h.tid);selectTravee(h.tid,tDef,colsOf(tDef));}
+        else if(h.type==='notice'){
+          const tDef=LOCATIONS_ALL.find(x=>x.id===h.tid);
+          selectTravee(h.tid,tDef,colsOf(tDef));
+          setTimeout(()=>showNotices(h.tid,h.col,h.etage,h.barcode),60);
+        }
+      });
+    });
+  }
+  box.style.display='block';
+});
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#sq')&&!e.target.closest('#sres')) document.getElementById('sres').style.display='none';
+});
+
+/* Surcouche Syracuse (voir js/syracuse-sync-shared.js) : { barcode:
+   {cote,titre,auteur,dt,section,site,statut,rscId,ts} } pour les
+   exemplaires modifiés depuis le dernier rebuild XML. Utilisée par
+   noticeRows() pour afficher un badge « live » à côté du fonds figé au
+   moment du scan — voir CLAUDE.md, section « Synchronisation incrémentale
+   Syracuse ». Rafraîchie bien moins souvent que le récolement (45 s) : la
+   synchro elle-même ne peut pas avancer plus vite qu'une tranche toutes
+   les 5 min (voir api/syracuse-tick.mjs), interroger plus fréquemment
+   n'apporterait rien. */
+let SYRACUSE_OVERLAY={};
+function loadSyracuseOverlay(){
+  fetchSyracuseSyncOverlay().then(data=>{ SYRACUSE_OVERLAY=data||{}; });
+}
+
+/* ════════════ DÉMARRAGE ════════════ */
+loadRecolement();
+loadSyracuseOverlay();
+// Suspendu pendant que l'onglet est en arrière-plan (voir même logique côté
+// recolement.html/livres-spolies.html) — un rafraîchissement immédiat a lieu
+// au retour sur l'onglet.
+setInterval(()=>{ if(!document.hidden) loadRecolement(); }, 45000);
+setInterval(()=>{ if(!document.hidden) loadSyracuseOverlay(); }, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ loadRecolement(); loadSyracuseOverlay(); } });
+
+</script>
+</body>
+</html>

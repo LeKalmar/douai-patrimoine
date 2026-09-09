@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Exemplarisation rapide — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css">
+<script src="js/sync-queue.js"></script>
+<link rel="stylesheet" href="style.css">
+<script src="js/reserve-shared.js"></script>
+<style>
+  :root{
+    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
+  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:600px;line-height:1.6}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
+  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+
+  .section{padding:1.5rem 0 3rem}
+  .ex-note{font-size:.8rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
+  .ex-note strong{color:#665c00}
+
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem}
+  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+  .stat-card-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#12157A}
+
+  .form-card{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
+  .form-card h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 1rem;color:#12157A}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.9rem;margin-bottom:.5rem}
+  .form-field{display:flex;flex-direction:column;gap:.3rem}
+  .form-field label{font-size:.72rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .form-field input{font-family:inherit;font-size:.95rem;padding:.55rem .7rem;border:1px solid #ccc;border-radius:8px;outline:none}
+  .form-field input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
+  .form-field.barcode input{font-family:monospace;font-size:1.05rem}
+  .form-warn{font-size:.78rem;color:#e65100;background:#fff8e1;border:1px solid #ffe0a3;border-radius:6px;padding:.5rem .7rem;margin-top:.3rem;display:none}
+  .form-warn.show{display:block}
+
+  .loc-toggle{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#333;margin:1rem 0 .75rem;padding-top:.9rem;border-top:1px dashed #e0e0e0}
+  .loc-fields{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-bottom:.5rem}
+  .loc-sel{font-family:inherit;font-size:.85rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
+  .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
+  .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
+  .stepper button:hover{background:#e0e0e0}
+  .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#12157A}
+  .loc-readout{font-size:.85rem;color:#12157A;font-weight:600;background:#F5F5FF;border:1px solid #ccc;border-radius:20px;padding:.45rem 1rem}
+
+  .photo-toggle{font-size:.85rem;color:#333;margin:1rem 0 .6rem;padding-top:.9rem;border-top:1px dashed #e0e0e0}
+  .photo-dz{border:1.5px dashed #ccc;border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-size:.85rem;color:#777}
+  .photo-dz:hover,.photo-dz.over{border-color:#12157A;background:#F5F5FF}
+  .photo-editor{display:none}
+  .photo-editor.show{display:block}
+  .photo-crow{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.6rem}
+  .photo-cwrap{display:flex;flex-direction:column;gap:.3rem;min-width:0}
+  .photo-clabel{font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#888;display:flex;justify-content:space-between}
+  .photo-cbox{height:220px;background:#111;border:1px solid #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+  .photo-cbox canvas{max-width:100%;max-height:100%;object-fit:contain;display:block}
+  #photo-origbox{cursor:crosshair}
+  #photo-overlay{position:absolute;pointer-events:none}
+  .photo-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;font-size:.75rem;color:#888}
+  .btn-mini{font-family:inherit;font-size:.75rem;padding:.35rem .8rem;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;color:#555}
+  .btn-mini:hover{background:#f5f5f5}
+  .photo-status{font-size:.78rem;margin-top:.5rem}
+  .photo-status.ok{color:#2e7d32}
+  .photo-status.warn{color:#e65100}
+  #photo-loupe{position:fixed;width:170px;height:170px;border-radius:50%;border:2px solid #12157A;box-shadow:0 4px 24px rgba(0,0,0,.4);pointer-events:none;display:none;overflow:hidden;z-index:1000}
+  #photo-loupe canvas{position:absolute;top:0;left:0}
+
+  .form-submit{display:flex;align-items:center;gap:.75rem;margin-top:1rem}
+  .btn-primary{font-family:inherit;font-size:.9rem;padding:.65rem 1.4rem;border:1px solid #12157A;border-radius:8px;background:#12157A;color:#fff;cursor:pointer}
+  .btn-primary:hover{background:#1c1fa0}
+
+  .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9}
+  .fb-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
+  .fb-badge{font-size:.68rem;padding:2px 9px;border-radius:20px;font-weight:600;background:#c8e6c9;color:#1b5e20}
+  .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
+  .fb-meta{font-size:.75rem;color:#888}
+
+  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.5rem}
+  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
+  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:180px}
+  .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s}
+  .export-btn:hover{background:#f5f5f5;border-color:#999}
+  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
+  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0;white-space:nowrap}
+  .log-table td{padding:.4rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .log-table tr:hover td{background:#fafafa}
+  .log-body{max-height:420px;overflow-y:auto}
+  .log-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:.85rem;padding:2px 6px}
+  .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
+  .log-cote{font-family:monospace;color:#12157A}
+  .log-bc{font-family:monospace;color:#888}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+</style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
+      <h1 class="page-title">Exemplarisation <em>rapide</em></h1>
+      <p class="page-lead">Créez un exemplaire (titre, auteur, date, cote, code-barre) sans passer par une notice bibliographique complète — utile pour les documents non catalogués en attendant leur vrai traitement dans Syracuse.</p>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <p class="ex-note">
+        <strong>Comment ça marche :</strong> les exemplaires créés ici apparaissent immédiatement dans la recherche du
+        catalogue (page d'accueil, sous un sous-fonds « Exemplarisation rapide ») et dans <a href="analyse-cotes.html">l'analyse des cotes</a>,
+        pour toute l'équipe. Si vous renseignez l'emplacement, il est aussi envoyé au <a href="recolement.html">récolement</a> partagé
+        et apparaît tout de suite sur <a href="reserve.html">le plan de la réserve</a> — le code-barre sera ensuite reconnu
+        si quelqu'un le rescanne. Cet outil ne remplace pas un vrai catalogage Syracuse : c'est un pense-bête partagé, à réconcilier plus tard.
+        Vous pouvez aussi joindre une photo (import, rognage, envoi vers R2) directement depuis le formulaire ci-dessous.
+      </p>
+
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="form-card">
+        <h2>Ajouter un exemplaire</h2>
+        <form id="add-form">
+          <div class="form-grid">
+            <div class="form-field barcode">
+              <label for="f-barcode">Code-barre</label>
+              <input type="text" id="f-barcode" autocomplete="off" autofocus placeholder="Scannez ou saisissez…" required>
+            </div>
+            <div class="form-field">
+              <label for="f-titre">Titre</label>
+              <input type="text" id="f-titre" autocomplete="off" required>
+            </div>
+            <div class="form-field">
+              <label for="f-auteur">Auteur</label>
+              <input type="text" id="f-auteur" autocomplete="off">
+            </div>
+            <div class="form-field">
+              <label for="f-date">Date de publication</label>
+              <input type="text" id="f-date" autocomplete="off" placeholder="ex. 1875 ou [18xx]">
+            </div>
+            <div class="form-field">
+              <label for="f-cote">Cote</label>
+              <input type="text" id="f-cote" autocomplete="off" placeholder="ex. D104214">
+            </div>
+          </div>
+          <div class="form-warn" id="dup-warn"></div>
+
+          <div class="loc-toggle">
+            <label><input type="checkbox" id="loc-enabled" checked> J'indique l'emplacement maintenant</label>
+          </div>
+          <div id="loc-block">
+            <div class="loc-fields">
+              <select class="loc-sel" id="sel-reserve"></select>
+              <select class="loc-sel" id="sel-loctype">
+                <option value="etagere">Étagère</option>
+                <option value="armoire">Armoire</option>
+                <option value="tiroir">Tiroir</option>
+              </select>
+              <div class="stepper" id="stp-travee-wrap">
+                <button type="button" data-step="travee" data-dir="-1">−</button>
+                <span id="val-travee">I</span>
+                <button type="button" data-step="travee" data-dir="1">+</button>
+              </div>
+              <div class="stepper" id="stp-colonne-wrap">
+                <button type="button" data-step="colonne" data-dir="-1">−</button>
+                <span id="val-colonne">1</span>
+                <button type="button" data-step="colonne" data-dir="1">+</button>
+              </div>
+              <div class="stepper" id="stp-etage-wrap">
+                <button type="button" data-step="etage" data-dir="-1">−</button>
+                <span id="val-etage">1</span>
+                <button type="button" data-step="etage" data-dir="1">+</button>
+              </div>
+              <span class="loc-readout" id="loc-readout">—</span>
+            </div>
+          </div>
+
+          <div class="photo-toggle">Photo de l'exemplaire (optionnel)</div>
+          <input type="file" id="photo-input" accept="image/*" style="display:none">
+          <div class="photo-dz" id="photo-dz">📷 Cliquez ou déposez une photo ici</div>
+          <div class="photo-editor" id="photo-editor">
+            <div class="photo-crow">
+              <div class="photo-cwrap">
+                <div class="photo-clabel"><span>Originale</span><span id="photo-od"></span></div>
+                <div class="photo-cbox" id="photo-origbox">
+                  <canvas id="photo-co"></canvas>
+                  <canvas id="photo-overlay"></canvas>
+                </div>
+              </div>
+              <div class="photo-cwrap">
+                <div class="photo-clabel"><span>Rognée</span><span id="photo-cd"></span></div>
+                <div class="photo-cbox"><canvas id="photo-cc"></canvas></div>
+              </div>
+            </div>
+            <div class="photo-ctrl">
+              <span>Marge <input type="range" id="photo-ms" min="0" max="80" value="8" step="1" style="vertical-align:middle"> <span id="photo-mv">8</span>px</span>
+              <button type="button" class="btn-mini" id="photo-redetect">🔲 Re-détecter</button>
+              <button type="button" class="btn-mini" id="photo-remove">✕ Retirer la photo</button>
+            </div>
+          </div>
+          <div class="photo-status" id="photo-status"></div>
+
+          <div class="form-submit">
+            <button type="submit" class="btn-primary">Ajouter l'exemplaire</button>
+          </div>
+          <div class="feedback" id="feedback"></div>
+        </form>
+      </div>
+      <div id="photo-loupe"><canvas id="photo-loupe-canvas"></canvas></div>
+
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title" id="log-title">Exemplaires créés</span>
+          <input type="text" class="log-search" id="log-search" placeholder="Filtrer (titre, cote, code-barre)…">
+          <button type="button" class="export-btn" id="btn-export">Exporter le JSON</button>
+        </div>
+        <div class="log-body">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Code-barre</th><th>Titre</th><th>Auteur</th><th>Date</th><th>Cote</th><th>Emplacement</th><th>Ajouté le</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="log-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (localStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+document.getElementById('logout-btn').addEventListener('click', function() {
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+
+/* ════════════════════════════════════════════════════════════
+   ÉTAT PARTAGÉ (R2 via /api/exemplaires-manuels) + code-barres
+   déjà présents dans data/inventaire.json (avertissement de doublon)
+   ════════════════════════════════════════════════════════════ */
+const LS_KEY = 'rp_exemplaires_manuels';
+let EXEMPLAIRES = {};   // { [barcode]: {barcode,titre,auteur,date,cote,ts} }
+let SYRACUSE_BARCODES = {}; // { [barcode]: {titre,cote} } — pour l'avertissement de doublon
+let NONCAT = {}; // { [travee|colonne|etage]: {travee,colonne,etage,count,ts} } — estimation "non catalogués" du récolement partagé
+function nonCatKey(f){ return `${f.travee}|${f.colonne}|${f.etage}`; }
+function loadNonCatFromServer(){
+  return fetch('/api/recolement').then(r => r.ok ? r.json() : null).then(data => {
+    if(!data) return;
+    NONCAT = {};
+    (data.nonCatalogues || []).forEach(r => { if(r.travee && r.etage !== undefined) NONCAT[nonCatKey(r)] = r; });
+  }).catch(() => {});
+}
+
+function loadLocal(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(EXEMPLAIRES)); }
+
+/* ════ File d'attente de synchro (deux endpoints possibles) ════ */
+const LS_PENDING = 'rp_exemplaires_manuels_pending_sync';
+/* File de synchronisation : implémentation commune aux cinq pages qui
+   écrivent dans un état partagé R2 — voir js/sync-queue.js (localStorage
+   comme source de vérité locale, rejeu à la reconnexion, indicateur
+   #sync-status). Ce bloc était auparavant recopié à l'identique dans chacune.
+   Deux endpoints : la création d'un exemplaire poste aussi un scan
+//   et un décrément de non-catalogués vers /api/recolement (voir CLAUDE.md,
+//   « Exemplarisation rapide »). D'où les éléments {endpoint, patch}. */
+const syncQueue = createSyncQueue({
+  storageKey: LS_PENDING,
+  endpoint: item => item.endpoint === 'recolement' ? '/api/recolement' : '/api/exemplaires-manuels',
+  bodyOf: item => item.patch,
+});
+const authHeaders = syncAuthHeaders;
+function queuePatch(item){ syncQueue.queue(item); }
+function flushPendingSync(){ return syncQueue.flush(); }
+function updateSyncIndicator(){ syncQueue.updateIndicator(); }
+
+function mergeIncoming(serverState){
+  const pendingBarcodes = new Set(syncQueue.items.filter(p => p.endpoint !== 'recolement').map(p => p.patch.record ? p.patch.record.barcode : p.patch.barcode));
+  Object.keys(serverState || {}).forEach(bc => {
+    if(!pendingBarcodes.has(bc)) EXEMPLAIRES[bc] = serverState[bc];
+  });
+  saveLocal();
+  renderAll();
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/exemplaires-manuels');
+    if(!res.ok) return;
+    mergeIncoming(await res.json());
+  }catch(e){ /* hors ligne : on reste sur le cache local */ }
+}
+
+setInterval(()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ syncFromServer(); loadNonCatFromServer(); } });
+
+/* ════════════════════════════════════════════════════════════
+   EMPLACEMENT — même géométrie que recolement.html (js/reserve-shared.js),
+   sans le mode "hors réserve" (un exemplaire tout juste créé n'a pas de
+   sens hors réserve) ni le mode "à cataloguer" (propre au récolement).
+   ════════════════════════════════════════════════════════════ */
+const LOC_LS_KEY = 'rp_exemplarisation_loc';
+let loc = (function(){ try { return JSON.parse(localStorage.getItem(LOC_LS_KEY)) || {}; } catch(e){ return {}; } })();
+loc.reserve = loc.reserve || 'patrimoniale';
+loc.locType = loc.locType || 'etagere';
+loc.travee = loc.travee || 'I';
+loc.colonne = loc.colonne || 1;
+loc.etage = loc.etage || 1;
+function saveLoc(){ localStorage.setItem(LOC_LS_KEY, JSON.stringify(loc)); }
+
+const selReserve = document.getElementById('sel-reserve');
+const selLocType = document.getElementById('sel-loctype');
+const locEnabled = document.getElementById('loc-enabled');
+const locBlock = document.getElementById('loc-block');
+
+RESERVES.filter(r => r.id !== 'horsreserve').forEach(r => {
+  const o = document.createElement('option'); o.value = r.id; o.textContent = r.label;
+  selReserve.appendChild(o);
+});
+selReserve.value = loc.reserve;
+selLocType.value = loc.locType;
+
+function activeTravees(){ return traveesOfReserve(loc.reserve); }
+function currentTraveeDef(){ const list = activeTravees(); return list.find(t => t.id === loc.travee) || list[0]; }
+function currentLocDef(){
+  if(loc.locType === 'armoire') return EMPLACEMENTS_ARMOIRE[0];
+  if(loc.locType === 'tiroir') return EMPLACEMENTS_TIROIR[0];
+  return currentTraveeDef();
+}
+function colLetter(n){ return String.fromCharCode(64 + n); }
+function locFieldsOf(l){
+  if(l.locType === 'armoire') return { travee:'ARMOIRE', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  if(l.locType === 'tiroir') return { travee:'TIROIR', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
+}
+function displayTraveeId(t){
+  if(t === 'ARMOIRE') return 'Armoire (bois)';
+  if(t === 'TIROIR') return 'Armoire à tiroirs';
+  return (t || '').replace(/^RD-/, '');
+}
+
+function setLocType(type, skipRefresh){
+  loc.locType = type;
+  document.getElementById('stp-travee-wrap').style.display = type === 'etagere' ? '' : 'none';
+  const def = currentLocDef();
+  loc.colonne = Math.min(def.nbCols, Math.max(1, loc.colonne || 1));
+  loc.etage = type === 'etagere' ? Math.max(1, loc.etage || 1) : Math.min(def.maxEt, Math.max(1, loc.etage || 1));
+  if(!skipRefresh) refreshLoc();
+}
+selLocType.addEventListener('change', () => setLocType(selLocType.value));
+
+function applyReserveVisibility(){
+  const hasArmoires = loc.reserve === 'patrimoniale';
+  [...selLocType.options].forEach(o => { if(o.value !== 'etagere') o.disabled = !hasArmoires; });
+  if(!hasArmoires && loc.locType !== 'etagere'){ loc.locType = 'etagere'; selLocType.value = 'etagere'; }
+}
+
+selReserve.addEventListener('change', () => {
+  loc.reserve = selReserve.value;
+  applyReserveVisibility();
+  const list = activeTravees();
+  loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
+  setLocType(loc.locType);
+});
+
+document.querySelectorAll('[data-step]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const field = btn.dataset.step, dir = parseInt(btn.dataset.dir, 10);
+    if(field === 'travee'){
+      const list = activeTravees();
+      const idx = Math.min(list.length - 1, Math.max(0, list.findIndex(t => t.id === loc.travee) + dir));
+      loc.travee = list[idx].id; loc.colonne = 1; loc.etage = 1;
+    } else if(field === 'colonne'){
+      const max = currentLocDef().nbCols;
+      loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
+    } else if(field === 'etage'){
+      const max = loc.locType === 'etagere' ? Infinity : currentLocDef().maxEt;
+      loc.etage = Math.min(max, Math.max(1, loc.etage + dir));
+    }
+    refreshLoc();
+  });
+});
+
+function refreshLoc(){
+  saveLoc();
+  document.getElementById('val-colonne').textContent = colLetter(loc.colonne);
+  document.getElementById('val-etage').textContent = loc.etage;
+  if(loc.locType === 'etagere') document.getElementById('val-travee').textContent = displayTraveeId(loc.travee);
+  const reserveLabel = (RESERVES.find(r => r.id === loc.reserve) || {}).label || '';
+  let readout;
+  if(loc.locType === 'armoire') readout = `${reserveLabel} · Armoire (bois) · Meuble ${colLetter(loc.colonne)} · Niveau ${loc.etage}`;
+  else if(loc.locType === 'tiroir') readout = `${reserveLabel} · Armoire à tiroirs · Meuble ${colLetter(loc.colonne)} · Tiroir ${loc.etage}`;
+  else readout = `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
+  document.getElementById('loc-readout').textContent = readout;
+}
+
+locEnabled.addEventListener('change', () => {
+  locBlock.style.display = locEnabled.checked ? '' : 'none';
+});
+
+applyReserveVisibility();
+setLocType(loc.locType, true);
+refreshLoc();
+
+/* ════════════════════════════════════════════════════════════
+   STATS, TABLEAU, RECHERCHE
+   ════════════════════════════════════════════════════════════ */
+function renderStats(){
+  const rows = Object.values(EXEMPLAIRES);
+  const avecEmplacement = rows.filter(r => r.location).length;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">Exemplaires créés</div><div class="stat-card-val">${rows.length.toLocaleString('fr-FR')}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Avec emplacement</div><div class="stat-card-val">${avecEmplacement.toLocaleString('fr-FR')}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Sans emplacement</div><div class="stat-card-val">${(rows.length-avecEmplacement).toLocaleString('fr-FR')}</div></div>
+  `;
+}
+
+function locationLabel(l){
+  if(!l) return '<em style="color:#bbb">—</em>';
+  if(l.locType === 'armoire') return `Armoire · ${esc(l.colonne)} · niv. ${esc(l.etage)}`;
+  if(l.locType === 'tiroir') return `Tiroir · ${esc(l.colonne)} · tir. ${esc(l.etage)}`;
+  return `${esc(displayTraveeId(l.travee))} · ${esc(l.colonne)} · ét. ${esc(l.etage)}`;
+}
+
+function renderTable(){
+  const q = norm(document.getElementById('log-search').value.trim());
+  const rows = Object.values(EXEMPLAIRES)
+    .filter(r => !q || norm([r.titre, r.auteur, r.cote, r.barcode].join(' ')).includes(q))
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+  document.getElementById('log-title').textContent = `Exemplaires créés (${Object.keys(EXEMPLAIRES).length})`;
+
+  const tbody = document.getElementById('log-tbody');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="8"><div class="log-empty">Aucun exemplaire${q ? ' pour ce filtre' : ' créé pour le moment'}.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="log-bc">${esc(r.barcode)}</td>
+      <td>${esc(r.titre) || '<em style="color:#bbb">Sans titre</em>'}</td>
+      <td>${esc(r.auteur) || '—'}</td>
+      <td>${esc(r.date) || '—'}</td>
+      <td class="log-cote">${esc(r.cote) || '—'}</td>
+      <td>${locationLabel(r.location)}</td>
+      <td>${r.ts ? new Date(r.ts).toLocaleString('fr-FR') : '—'}</td>
+      <td><button class="log-del" data-bc="${esc(r.barcode)}" title="Supprimer cet exemplaire">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderAll(){ renderStats(); renderTable(); }
+
+document.getElementById('log-tbody').addEventListener('click', function(e){
+  const btn = e.target.closest('.log-del');
+  if(!btn) return;
+  const bc = btn.dataset.bc;
+  const rec = EXEMPLAIRES[bc];
+  if(!confirm(`Supprimer l'exemplaire « ${rec ? rec.titre || bc : bc} » (code-barre ${bc}) ? Cela ne supprime pas un éventuel scan déjà enregistré dans le récolement — gérez-le depuis recolement.html si besoin.`)) return;
+  delete EXEMPLAIRES[bc];
+  saveLocal();
+  renderAll();
+  queuePatch({ endpoint:'exemplaires-manuels', patch:{ type:'delete', barcode:bc } });
+});
+
+document.getElementById('log-search').addEventListener('input', renderTable);
+
+document.getElementById('btn-export').addEventListener('click', function(){
+  const blob = new Blob([JSON.stringify(Object.values(EXEMPLAIRES), null, 2)], { type:'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'exemplaires-manuels.json';
+  a.click();
+});
+
+/* ════════════════════════════════════════════════════════════
+   PHOTO (import + rognage + envoi R2) — intégré directement dans le
+   formulaire pour créer l'exemplaire et attacher sa photo en un seul
+   geste. Reprend la mécanique de rognage de scan-docs.html (détection de
+   bords par projection, poignées, loupe) sans lecture OCR du code-barre :
+   ici le code-barre est celui déjà saisi dans le champ #f-barcode. Toutes
+   les identifiants sont préfixés "photo" pour ne pas entrer en collision
+   avec le reste de la page.
+   ════════════════════════════════════════════════════════════ */
+let photoImg = null;        // Image() chargée
+let photoCropR = null;      // {x,y,w,h} sans marge
+let photoDisplayScale = 1;
+let photoDragState = null;  // {edge} pendant un drag
+
+const photoInput = document.getElementById('photo-input');
+const photoDz = document.getElementById('photo-dz');
+const photoEditor = document.getElementById('photo-editor');
+const photoCo = document.getElementById('photo-co'), photoCc = document.getElementById('photo-cc');
+const photoOverlayEl = document.getElementById('photo-overlay'), photoOrigbox = document.getElementById('photo-origbox');
+const photoOd = document.getElementById('photo-od'), photoCd = document.getElementById('photo-cd');
+const photoMs = document.getElementById('photo-ms'), photoMv = document.getElementById('photo-mv');
+const photoStatus = document.getElementById('photo-status');
+
+photoDz.addEventListener('click', () => photoInput.click());
+photoDz.addEventListener('dragover', e => { e.preventDefault(); photoDz.classList.add('over'); });
+photoDz.addEventListener('dragleave', () => photoDz.classList.remove('over'));
+photoDz.addEventListener('drop', e => { e.preventDefault(); photoDz.classList.remove('over'); handlePhotoFile(e.dataTransfer.files[0]); });
+photoInput.addEventListener('change', e => { handlePhotoFile(e.target.files[0]); photoInput.value = ''; });
+photoMs.addEventListener('input', () => { photoMv.textContent = photoMs.value; if(photoImg){ photoDrawOverlay(); photoRenderCrop(); } });
+document.getElementById('photo-redetect').addEventListener('click', () => { if(photoImg) photoDoAutoCrop(photoImg); });
+document.getElementById('photo-remove').addEventListener('click', photoRemove);
+
+function handlePhotoFile(file){
+  if(!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      photoImg = img;
+      photoOd.textContent = img.width + '×' + img.height;
+      photoDz.style.display = 'none';
+      photoEditor.classList.add('show');
+      photoDrawOrig(img);
+      photoDoAutoCrop(img);
+      photoStatus.textContent = '';
+      photoStatus.className = 'photo-status';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Ne touche pas #photo-status : appelé juste après avoir lancé l'envoi de la
+// photo courante (voir le submit du formulaire), pour que son statut
+// ("Envoi…" puis succès/échec + bouton "Réessayer") reste visible même une
+// fois l'éditeur réinitialisé pour la photo suivante.
+function photoRemove(){
+  photoImg = null; photoCropR = null;
+  photoDz.style.display = '';
+  photoEditor.classList.remove('show');
+}
+
+/* ── Recadrage (poignées + drag), identique à scan-docs.html ── */
+function photoPosFromEvent(e){
+  const r = photoOverlayEl.getBoundingClientRect();
+  const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+  return { x: cx, y: cy };
+}
+function photoGetHandles(){
+  if(!photoCropR || !photoImg) return [];
+  const m = parseInt(photoMs.value);
+  const sc = photoDisplayScale;
+  const rx = Math.max(0, photoCropR.x - m) * sc;
+  const ry = Math.max(0, photoCropR.y - m) * sc;
+  const rw = Math.min(photoImg.width, photoCropR.w + m * 2) * sc;
+  const rh = Math.min(photoImg.height, photoCropR.h + m * 2) * sc;
+  return [
+    { x: rx + rw/2, y: ry,        edge: 'top'    },
+    { x: rx + rw/2, y: ry + rh,   edge: 'bottom' },
+    { x: rx,        y: ry + rh/2, edge: 'left'   },
+    { x: rx + rw,   y: ry + rh/2, edge: 'right'  },
+  ];
+}
+photoOrigbox.addEventListener('mousedown', photoStartDrag);
+photoOrigbox.addEventListener('mousemove', e => {
+  if(photoDragState) return photoDoDrag(e);
+  if(!photoCropR) return;
+  const { x, y } = photoPosFromEvent(e);
+  const hit = photoGetHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  photoOrigbox.style.cursor = hit ? (hit.edge === 'top' || hit.edge === 'bottom' ? 'ns-resize' : 'ew-resize') : 'crosshair';
+});
+window.addEventListener('mouseup', photoEndDrag);
+photoOrigbox.addEventListener('touchstart', photoStartDrag, { passive: false });
+photoOrigbox.addEventListener('touchmove', photoDoDrag, { passive: false });
+window.addEventListener('touchend', photoEndDrag);
+
+function photoStartDrag(e){
+  if(!photoCropR) return;
+  const { x, y } = photoPosFromEvent(e);
+  const hit = photoGetHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  if(hit){ e.preventDefault(); photoDragState = { edge: hit.edge }; }
+}
+function photoDoDrag(e){
+  if(!photoDragState || !photoCropR || !photoImg) return;
+  e.preventDefault();
+  const { x, y } = photoPosFromEvent(e);
+  const sc = photoDisplayScale;
+  const m = parseInt(photoMs.value);
+  const imgX = x / sc, imgY = y / sc;
+  const r = photoCropR;
+  const { edge } = photoDragState;
+  if(edge === 'top'){
+    const nt = Math.max(0, Math.min(imgY + m, r.y + r.h - 30));
+    r.h = r.h + (r.y - nt); r.y = nt;
+  } else if(edge === 'bottom'){
+    r.h = Math.max(30, Math.min(imgY - m, photoImg.height) - r.y);
+  } else if(edge === 'left'){
+    const nl = Math.max(0, Math.min(imgX + m, r.x + r.w - 30));
+    r.w = r.w + (r.x - nl); r.x = nl;
+  } else if(edge === 'right'){
+    r.w = Math.max(30, Math.min(imgX - m, photoImg.width) - r.x);
+  }
+  photoDrawOverlay(); photoRenderCrop();
+}
+function photoEndDrag(){ photoDragState = null; }
+
+function photoDrawOrig(img){
+  const box = photoCo.parentElement;
+  const scale = Math.min((box.clientWidth - 2) / img.width, (box.clientHeight - 2) / img.height, 1);
+  photoDisplayScale = scale;
+  const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+  photoCo.width = w; photoCo.height = h;
+  photoOverlayEl.width = w; photoOverlayEl.height = h;
+  photoOverlayEl.style.width = w + 'px'; photoOverlayEl.style.height = h + 'px';
+  const offsetX = (box.clientWidth - w) / 2, offsetY = (box.clientHeight - h) / 2;
+  photoOverlayEl.style.left = offsetX + 'px'; photoOverlayEl.style.top = offsetY + 'px';
+  const ctx = photoCo.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+}
+function photoDrawOverlay(){
+  const ctx = photoOverlayEl.getContext('2d');
+  ctx.clearRect(0, 0, photoOverlayEl.width, photoOverlayEl.height);
+  if(!photoCropR || !photoImg) return;
+  const m = parseInt(photoMs.value);
+  const sc = photoDisplayScale;
+  const rx = Math.max(0, photoCropR.x - m) * sc;
+  const ry = Math.max(0, photoCropR.y - m) * sc;
+  const rw = Math.min(photoImg.width, photoCropR.w + m * 2) * sc;
+  const rh = Math.min(photoImg.height, photoCropR.h + m * 2) * sc;
+  ctx.fillStyle = 'rgba(0,0,0,.5)';
+  ctx.fillRect(0, 0, photoOverlayEl.width, ry);
+  ctx.fillRect(0, ry + rh, photoOverlayEl.width, photoOverlayEl.height - ry - rh);
+  ctx.fillRect(0, ry, rx, rh);
+  ctx.fillRect(rx + rw, ry, photoOverlayEl.width - rx - rw, rh);
+  ctx.strokeStyle = '#12157A'; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.strokeRect(rx, ry, rw, rh);
+  [[rx + rw/2, ry], [rx + rw/2, ry + rh], [rx, ry + rh/2], [rx + rw, ry + rh/2]].forEach(([hx, hy]) => {
+    ctx.fillStyle = '#12157A';
+    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.stroke();
+  });
+}
+function photoDoAutoCrop(img){
+  const MAX = 1400;
+  const sc = Math.min(MAX/img.width, MAX/img.height, 1);
+  const W = Math.round(img.width*sc), H = Math.round(img.height*sc);
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  tmp.getContext('2d').drawImage(img, 0, 0, W, H);
+  const d = tmp.getContext('2d').getImageData(0, 0, W, H).data;
+  const g = new Float32Array(W*H);
+  for(let i = 0; i < W*H; i++) g[i] = .299*d[i*4] + .587*d[i*4+1] + .114*d[i*4+2];
+  const bw = Math.max(6, Math.round(W*.03)), bh = Math.max(6, Math.round(H*.03));
+  const med = arr => { const s = [...arr].sort((a,b)=>a-b); return s[s.length>>1]; };
+  const bgTop = (()=>{const v=[];for(let y=0;y<bh;y++)for(let x=bw;x<W-bw;x++)v.push(g[y*W+x]);return med(v)})();
+  const bgBot = (()=>{const v=[];for(let y=H-bh;y<H;y++)for(let x=bw;x<W-bw;x++)v.push(g[y*W+x]);return med(v)})();
+  const bgL = (()=>{const v=[];for(let x=0;x<bw;x++)for(let y=bh;y<H-bh;y++)v.push(g[y*W+x]);return med(v)})();
+  const bgR = (()=>{const v=[];for(let x=W-bw;x<W;x++)for(let y=bh;y<H-bh;y++)v.push(g[y*W+x]);return med(v)})();
+  const THR = 22, FRAC = 0.18;
+  const rowDiff = (y, bg) => { let n=0; for(let x=0;x<W;x++) if(Math.abs(g[y*W+x]-bg)>THR) n++; return n/W; };
+  const colDiff = (x, bg) => { let n=0; for(let y=0;y<H;y++) if(Math.abs(g[y*W+x]-bg)>THR) n++; return n/H; };
+  let top=0, bot=H-1, left=0, right=W-1;
+  for(let y=0;y<H;y++){if(rowDiff(y,bgTop)>FRAC){top=y;break}}
+  for(let y=H-1;y>=0;y--){if(rowDiff(y,bgBot)>FRAC){bot=y;break}}
+  for(let x=0;x<W;x++){if(colDiff(x,bgL)>FRAC){left=x;break}}
+  for(let x=W-1;x>=0;x--){if(colDiff(x,bgR)>FRAC){right=x;break}}
+  const isc = 1/sc;
+  photoCropR = {
+    x: Math.max(0, Math.round((left-2)*isc)),
+    y: Math.max(0, Math.round((top-2)*isc)),
+    w: Math.round((right-left+4)*isc),
+    h: Math.round((bot-top+4)*isc),
+  };
+  photoCropR.w = Math.min(img.width - photoCropR.x, photoCropR.w);
+  photoCropR.h = Math.min(img.height - photoCropR.y, photoCropR.h);
+  photoDrawOverlay();
+  photoRenderCrop();
+}
+function photoRenderCrop(){
+  if(!photoImg || !photoCropR) return;
+  const m = parseInt(photoMs.value);
+  const x = Math.max(0, photoCropR.x - m);
+  const y = Math.max(0, photoCropR.y - m);
+  const w = Math.min(photoImg.width - x, photoCropR.w + m*2);
+  const h = Math.min(photoImg.height - y, photoCropR.h + m*2);
+  photoCd.textContent = w + '×' + h;
+  const box = photoCc.parentElement;
+  const scale = Math.min((box.clientWidth - 2)/w, (box.clientHeight - 2)/h, 1);
+  photoCc.width = Math.round(w*scale); photoCc.height = Math.round(h*scale);
+  const ctx = photoCc.getContext('2d');
+  ctx.clearRect(0, 0, photoCc.width, photoCc.height);
+  ctx.drawImage(photoImg, x, y, w, h, 0, 0, photoCc.width, photoCc.height);
+}
+
+/* ── Loupe ── */
+const photoLoupe = document.getElementById('photo-loupe');
+const photoLoupeCanvas = document.getElementById('photo-loupe-canvas');
+const PHOTO_LOUPE_SIZE = 170, PHOTO_ZOOM = 0.25;
+photoOrigbox.addEventListener('mousemove', e => {
+  if(photoDragState || !photoImg) return;
+  const rect = photoCo.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  if(mx < 0 || my < 0 || mx > photoCo.width || my > photoCo.height){ photoLoupe.style.display = 'none'; return; }
+  const ix = mx / photoDisplayScale, iy = my / photoDisplayScale;
+  const capture = PHOTO_LOUPE_SIZE / PHOTO_ZOOM;
+  const sx = ix - capture / 2, sy = iy - capture / 2;
+  photoLoupeCanvas.width = PHOTO_LOUPE_SIZE; photoLoupeCanvas.height = PHOTO_LOUPE_SIZE;
+  const ctx = photoLoupeCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#111'; ctx.fillRect(0, 0, PHOTO_LOUPE_SIZE, PHOTO_LOUPE_SIZE);
+  ctx.drawImage(photoImg, sx, sy, capture, capture, 0, 0, PHOTO_LOUPE_SIZE, PHOTO_LOUPE_SIZE);
+  photoLoupe.style.display = 'block';
+  photoLoupe.style.left = (e.clientX + 18) + 'px';
+  photoLoupe.style.top = (e.clientY - PHOTO_LOUPE_SIZE/2) + 'px';
+});
+photoOrigbox.addEventListener('mouseleave', () => { photoLoupe.style.display = 'none'; });
+
+/* ── Envoi vers R2 (vignette/<code-barre>.jpg) ──
+   img/cropR/margin sont capturés en paramètres (pas relus depuis les
+   variables globales photoImg/photoCropR) pour que l'envoi d'une photo
+   reste correct même si l'utilisateur·rice a déjà chargé la photo de
+   l'exemplaire suivant pendant que l'envoi précédent est encore en cours. */
+const PHOTO_UPLOAD_MAX_DIM = 1600, PHOTO_UPLOAD_QUALITY = 0.85;
+function photoCropToUploadBlob(img, cropR, margin){
+  const x = Math.max(0, cropR.x - margin);
+  const y = Math.max(0, cropR.y - margin);
+  const w = Math.min(img.width - x, cropR.w + margin*2);
+  const h = Math.min(img.height - y, cropR.h + margin*2);
+  const sc = Math.min(PHOTO_UPLOAD_MAX_DIM/w, PHOTO_UPLOAD_MAX_DIM/h, 1);
+  const out = document.createElement('canvas');
+  out.width = Math.round(w*sc); out.height = Math.round(h*sc);
+  out.getContext('2d').drawImage(img, x, y, w, h, 0, 0, out.width, out.height);
+  return new Promise(res => out.toBlob(res, 'image/jpeg', PHOTO_UPLOAD_QUALITY));
+}
+function blobToBase64(blob){
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result);
+    reader.onerror = rej;
+    reader.readAsDataURL(blob);
+  });
+}
+async function uploadPhoto(barcode, img, cropR, margin){
+  const blob = await photoCropToUploadBlob(img, cropR, margin);
+  const imageBase64 = await blobToBase64(blob);
+  const res = await fetch('/api/vignette', { method:'POST', headers: authHeaders(), body: JSON.stringify({ barcode, imageBase64 }) });
+  if(!res.ok){
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Erreur serveur (${res.status})`);
+  }
+}
+function attemptPhotoUpload(barcode, img, cropR, margin, statusEl){
+  statusEl.textContent = '⏳ Envoi de la photo…';
+  statusEl.className = 'photo-status';
+  uploadPhoto(barcode, img, cropR, margin).then(() => {
+    statusEl.textContent = `✓ Photo envoyée (${barcode})`;
+    statusEl.className = 'photo-status ok';
+  }).catch(err => {
+    statusEl.innerHTML = `⚠ Échec de l'envoi de la photo (${esc(barcode)}) : ${esc(err.message)} `;
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.className = 'btn-mini';
+    retryBtn.textContent = 'Réessayer';
+    retryBtn.addEventListener('click', () => attemptPhotoUpload(barcode, img, cropR, margin, statusEl));
+    statusEl.appendChild(retryBtn);
+    statusEl.className = 'photo-status warn';
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   AJOUT D'UN EXEMPLAIRE
+   ════════════════════════════════════════════════════════════ */
+const fBarcode = document.getElementById('f-barcode');
+const fTitre = document.getElementById('f-titre');
+const fAuteur = document.getElementById('f-auteur');
+const fDate = document.getElementById('f-date');
+const fCote = document.getElementById('f-cote');
+const dupWarn = document.getElementById('dup-warn');
+
+fBarcode.addEventListener('input', function(){
+  const bc = fBarcode.value.trim();
+  const syr = bc ? SYRACUSE_BARCODES[bc] : null;
+  const local = bc ? EXEMPLAIRES[bc] : null;
+  if(syr){
+    dupWarn.textContent = `⚠ Ce code-barre existe déjà dans le catalogue Syracuse : « ${syr.titre || '(sans titre)'} » (cote ${syr.cote || '—'}). Vérifiez qu'il ne s'agit pas d'une erreur de scan avant de continuer.`;
+    dupWarn.classList.add('show');
+  } else if(local){
+    dupWarn.textContent = `ℹ Un exemplaire a déjà été créé ici avec ce code-barre : « ${local.titre || '(sans titre)'} ». Valider le formulaire le mettra à jour.`;
+    dupWarn.classList.add('show');
+  } else {
+    dupWarn.classList.remove('show');
+  }
+});
+
+document.getElementById('add-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const barcode = fBarcode.value.trim();
+  const titre = fTitre.value.trim();
+  if(!barcode || !titre) return;
+
+  const record = {
+    barcode,
+    titre,
+    auteur: fAuteur.value.trim(),
+    date: fDate.value.trim(),
+    cote: fCote.value.trim(),
+    location: locEnabled.checked ? { ...locFieldsOf(loc), locType: loc.locType } : null,
+    ts: Date.now(),
+  };
+
+  EXEMPLAIRES[barcode] = record;
+  saveLocal();
+  renderAll();
+  queuePatch({ endpoint:'exemplaires-manuels', patch:{ type:'upsert', record } });
+
+  if(locEnabled.checked){
+    const fields = locFieldsOf(loc);
+    queuePatch({
+      endpoint: 'recolement',
+      patch: {
+        type: 'scan',
+        record: {
+          barcode,
+          cote: record.cote,
+          titre: record.titre,
+          auteur: record.auteur,
+          fonds: getFondsFromCote(record.cote),
+          etat: '',
+          manuel: true,
+          kind: loc.locType,
+          travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+          barcodeAbime: false,
+          ts: record.ts,
+        },
+      },
+    });
+
+    // Cet exemplaire vient d'être identifié individuellement : il ne doit
+    // plus compter dans l'estimation vague "non catalogués" du même
+    // emplacement (sinon il serait compté deux fois — une fois comme
+    // exemplaire réel, une fois dans l'estimation). Ne change rien si
+    // l'estimation est déjà à 0.
+    const ncKey = nonCatKey(fields);
+    const curNc = NONCAT[ncKey];
+    const curCount = curNc ? curNc.count : 0;
+    if(curCount > 0){
+      const newCount = curCount - 1;
+      const newRecord = newCount > 0 ? { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, count:newCount, ts:Date.now() } : null;
+      if(newRecord) NONCAT[ncKey] = newRecord; else delete NONCAT[ncKey];
+      queuePatch({ endpoint:'recolement', patch:{ type:'nonCat', key:ncKey, record:newRecord } });
+    }
+  }
+
+  // Envoi de la photo, si une a été chargée — capturée en instantané
+  // (img/cropR/margin) pour continuer correctement même si une photo pour
+  // l'exemplaire suivant est chargée avant la fin de cet envoi.
+  if(photoImg && photoCropR){
+    attemptPhotoUpload(barcode, photoImg, { ...photoCropR }, parseInt(photoMs.value), photoStatus);
+    photoRemove();
+  }
+
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback show ok';
+  fb.innerHTML = `<div class="fb-top"><span class="fb-badge">✓ Exemplaire ajouté</span></div>
+    <div class="fb-titre">${esc(titre)}</div>
+    <div class="fb-meta">${esc(record.auteur)}${record.auteur && record.cote ? ' · ' : ''}${esc(record.cote)} · code-barre ${esc(barcode)}${locEnabled.checked ? ' · ' + esc(document.getElementById('loc-readout').textContent) : ' · emplacement non renseigné'}</div>`;
+
+  fTitre.value = ''; fAuteur.value = ''; fDate.value = ''; fCote.value = ''; fBarcode.value = '';
+  dupWarn.classList.remove('show');
+  fBarcode.focus();
+});
+
+/* ════════════════════════════════════════════════════════════
+   DÉMARRAGE
+   ════════════════════════════════════════════════════════════ */
+EXEMPLAIRES = loadLocal();
+renderAll();
+updateSyncIndicator();
+
+fetch('data/inventaire.json').then(r => r.ok ? r.json() : []).then(items => {
+  (items || []).forEach(it => {
+    const bc = (it['915$b'] || it['995$f'] || '').trim();
+    if(!bc) return;
+    SYRACUSE_BARCODES[bc] = { titre:(it['200$a']||'').trim(), cote:(it['930$g']||'').trim() };
+  });
+}).catch(() => {});
+
+syncFromServer();
+loadNonCatFromServer();
+flushPendingSync();
+</script>
+</body>
+</html>

@@ -1,0 +1,3669 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Récolement — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="style.css">
+<script src="js/reserve-shared.js"></script>
+<script src="js/exemplaires-manuels-shared.js"></script>
+<script src="js/reliures-manuelles-shared.js"></script>
+<script src="js/columnar.js"></script>
+<script src="js/catalog-cache.js"></script>
+<script src="js/syracuse-sync-shared.js"></script>
+<style>
+  :root{
+    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+    /* Mêmes couleurs que le code couleur catégoriel de reserve.html (voir
+       CLAUDE.md), pour que le mini-plan ci-dessous se lise de façon
+       cohérente avec le plan complet. */
+    --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
+    --plan-cat:#1A1E99; --plan-manuel:#F9A825; --plan-noncat:#c54545; --plan-nonrange:#8E24AA;
+    --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#12157A;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0;line-height:1.15}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+  .hero-actions a,.hero-actions button{
+    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  }
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
+  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+
+  .locbar{position:sticky;top:0;z-index:20;background:#F5F5FF;border-bottom:1px solid #ddd;padding:.75rem 0;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  main{display:block;padding-top:1rem}
+  .locbar .container{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
+  .loc-sel{font-family:inherit;font-size:.85rem;padding:.4rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
+  .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
+  .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
+  .stepper button:hover{background:#e0e0e0}
+  .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#12157A}
+  .loc-readout{margin-left:auto;font-size:.85rem;color:#12157A;font-weight:600;background:#fff;border:1px solid #ccc;border-radius:20px;padding:.4rem 1rem}
+
+  .section{padding:1.5rem 0}
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem}
+  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
+  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
+  .stat-card-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1}
+
+  .scan-layout{display:flex;gap:1.25rem;align-items:stretch;flex-wrap:wrap;margin-bottom:1.25rem}
+  .scan-layout .scan-zone{flex:2 1 340px;margin-bottom:0}
+  .travee-mini-panel{flex:1 1 230px;max-width:320px;background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1rem;display:flex;flex-direction:column}
+  .mp-header{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.75rem}
+  .mp-title{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1rem;color:#12157A;line-height:1.25}
+  .mp-occ{font-size:.75rem;color:#888;white-space:nowrap}
+  .mp-actions{display:flex;justify-content:flex-end;margin-bottom:.5rem}
+  .mp-actions .export-btn{font-size:.68rem;padding:.25rem .6rem}
+  .mp-room{flex:1;display:flex;align-items:center;justify-content:center;overflow-x:auto;min-height:120px;padding-bottom:.25rem}
+  .mp-box{border:1px solid #ccc;border-radius:var(--radius-sm);padding:4px;background:#fafafa;display:flex;flex-direction:row;gap:4px}
+  .mp-col{display:flex;flex-direction:column;gap:2px;align-items:center}
+  .mp-slot{border-radius:1px}
+  .mp-slot.cur{outline:2px solid var(--red);outline-offset:1px;position:relative;z-index:2}
+  .mp-collbl{font-size:8px;color:#aaa;text-align:center;margin-top:3px;line-height:1}
+  .mp-collbl.cur{color:var(--red);font-weight:700}
+  .mp-legend{display:flex;flex-wrap:wrap;gap:.35rem .7rem;font-size:.64rem;color:#666;margin-top:.75rem}
+  .mp-leg{display:flex;align-items:center;gap:.3rem}
+  .mp-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+  .mp-hint{font-size:.72rem;color:#999;font-style:italic;margin:.5rem 0 0;text-align:center}
+
+  .scan-zone{background:#fff;border:2px solid #12157A;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
+  .scan-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  #scan-input{flex:1;min-width:220px;font-size:1.2rem;font-family:'DM Mono',monospace,inherit;padding:.75rem 1rem;border:1px solid #ccc;border-radius:8px;outline:none}
+  #scan-input:focus{border-color:#12157A;box-shadow:0 0 0 3px rgba(18,21,122,.12)}
+  .sound-toggle{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#666;white-space:nowrap}
+  .vide-row{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .vide-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#555;cursor:pointer;transition:all .15s}
+  .vide-btn:hover{background:#f5f5f5}
+  .vide-btn.active{background:var(--ok);border-color:var(--ok);color:#fff}
+  .vide-btn.nonrange.active{background:#8E24AA;border-color:#8E24AA;color:#fff}
+  .vide-btn.lastshelf.active{background:#455A64;border-color:#455A64;color:#fff}
+  .vide-note{font-size:.75rem;color:#888;flex-basis:100%}
+  .horsreserve-note{font-size:.8rem;color:#7a4a00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;line-height:1.5}
+  #noncat-mode-zone{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0}
+  .noncat-label{font-size:.9rem;color:#333}
+  #stp-noncat-wrap{padding:.15rem .3rem}
+  #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#12157A;background:transparent;font-family:inherit;-moz-appearance:textfield}
+  #noncat-input::-webkit-inner-spin-button,#noncat-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+  .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9}
+  .feedback.warn{background:#fff8e1;border:1px solid #ffe0b2}
+  .feedback.dup{background:#e3f2fd;border:1px solid #bbdefb}
+  .fb-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
+  .fb-badge{font-size:.68rem;padding:2px 9px;border-radius:20px;font-weight:600}
+  .fb-badge.ok{background:#c8e6c9;color:#1b5e20}
+  .fb-badge.warn{background:#ffe0b2;color:#e65100}
+  .fb-badge.dup{background:#bbdefb;color:#0d47a1}
+  .fb-badge.abime{background:#f3e5f5;color:#6a1b9a}
+  .fb-cote{font-family:monospace;font-weight:700;color:#12157A}
+  .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
+  .fb-meta{font-size:.75rem;color:#888}
+  .fb-manual{margin-top:.5rem;display:flex;gap:.4rem;align-items:center}
+  .fb-manual input{font-size:.8rem;padding:.35rem .6rem;border:1px solid #ccc;border-radius:6px;flex:1;max-width:220px}
+  .fb-manual button{font-size:.78rem;padding:.35rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer}
+
+  .expected-panel{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem;margin-bottom:1.25rem}
+  .expected-title{font-size:.8rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
+  .expected-count{font-weight:400;text-transform:none;letter-spacing:0;color:#888;font-size:.78rem}
+  /* Panneaux repliables "Attendu à cet emplacement"/"Scans récents ici"/
+     "Tous les scans" (2026-09-01) : <details>/<summary> natifs, même
+     mécanique que .adv-details plus bas — mais le marqueur ▸/▾ est posé sur
+     le premier enfant du <summary> plutôt que sur le <summary> lui-même
+     (qui reste en display:flex/space-between hérité de .expected-title/
+     .log-header) : le poser directement dessus en ferait un item flex à
+     part entière, écarté du titre par justify-content:space-between.
+     summary::marker natif retiré (list-style:none + masquage webkit) pour
+     ne garder que ce marqueur maison, cohérent visuellement avec .adv-details. */
+  .expected-panel > summary, .log-wrap > summary{cursor:pointer;list-style:none}
+  .expected-panel > summary::-webkit-details-marker, .log-wrap > summary::-webkit-details-marker{display:none}
+  .expected-panel > summary > .expected-title-text::before, .log-wrap > summary > .log-title::before{content:'▸ ';color:#999}
+  .expected-panel[open] > summary > .expected-title-text::before, .log-wrap[open] > summary > .log-title::before{content:'▾ '}
+  .adv-group-title{font-size:.95rem;font-weight:700;color:#12157A;margin:1.5rem 0 .75rem;padding-top:1.25rem;border-top:2px solid #ddd}
+  .adv-group-title:first-child{margin-top:0;padding-top:0;border-top:none}
+  .adv-details{border-top:1px solid #e5e5e5;padding-top:.75rem;margin-top:.9rem}
+  .adv-details summary{cursor:pointer;font-size:.82rem;font-weight:600;color:#333;list-style:none}
+  .adv-details summary::-webkit-details-marker{display:none}
+  .adv-details summary::before{content:'▸ ';color:#999}
+  .adv-details[open] summary::before{content:'▾ '}
+  .adv-details summary .adv-count{font-weight:400;color:#888}
+  .adv-details .log-wrap{margin:.6rem 0 0}
+  .log-header-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .log-toggle{font-size:.72rem;color:#666;display:flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer}
+  .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s;white-space:nowrap}
+  .export-btn:hover{background:#f5f5f5;border-color:#999}
+  .adv-pager{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.5rem .9rem;border-top:1px solid #e8e8e8;font-size:.75rem;color:#777;flex-wrap:wrap}
+  .adv-pager-btns{display:flex;align-items:center;gap:.4rem}
+  .adv-pager button{font-family:inherit;font-size:.75rem;padding:.3rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#333}
+  .adv-pager button:disabled{opacity:.4;cursor:default}
+  .adv-pager button:not(:disabled):hover{background:#f5f5f5}
+  .exp-list{max-height:220px;overflow-y:auto;font-size:.8rem}
+  .exp-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem;border-bottom:1px solid #f0f0f0}
+  .exp-row:last-child{border-bottom:none}
+  .exp-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .exp-dot.conf{background:var(--ok)}.exp-dot.moved{background:var(--warn)}.exp-dot.missing{background:#ccc}
+  .exp-cote{font-family:monospace;min-width:80px;color:#12157A}
+  .exp-titre{flex:1;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .exp-empty{font-size:.8rem;color:#999;font-style:italic}
+
+  .shelf-bar-block{margin-bottom:1.1rem}
+  .shelf-bar-heading{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap}
+  .shelf-bar-heading-label{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .shelf-bar-heading-total{font-size:.78rem;color:#999}
+  .shelf-bar{display:flex;height:16px;border-radius:20px;overflow:hidden;background:#eceef7;box-shadow:inset 0 0 0 1px #e2e2ee}
+  .shelf-bar-seg{height:100%;min-width:0;transition:width .4s cubic-bezier(.4,0,.2,1);position:relative}
+  .shelf-bar-seg.recoled{background:linear-gradient(90deg,#12157A,#2b30c9)}
+  .shelf-bar-seg.vide{background:linear-gradient(90deg,#2e7d32,#4caf50)}
+  .shelf-bar-seg.nonrange{background:linear-gradient(90deg,#6a1b9a,#8E24AA)}
+  .shelf-bar-seg.nontraite{background:#e4e4ec}
+  .shelf-legend{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;margin-top:.65rem}
+  .shelf-legend-item{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#555}
+  .shelf-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .shelf-legend-dot.recoled{background:#12157A}
+  .shelf-legend-dot.vide{background:var(--ok)}
+  .shelf-legend-dot.nonrange{background:#8E24AA}
+  .shelf-legend-dot.nontraite{background:#c2c2cc}
+  .shelf-legend-val{font-weight:700;color:#1a1a1a}
+  .shelf-legend-pct{color:#999}
+  .shelf-bar-seg.notice-recolees{background:linear-gradient(90deg,#12157A,#2b30c9)}
+  .shelf-bar-seg.notice-noncat{background:linear-gradient(90deg,#f9a825,#ffca28)}
+  .shelf-bar-seg.notice-jamais{background:#c6c6d0}
+  .shelf-legend-dot.notice-recolees{background:#12157A}
+  .shelf-legend-dot.notice-noncat{background:#f9a825}
+  .shelf-legend-dot.notice-jamais{background:#c6c6d0}
+  .notice-progress-block{margin-bottom:1.5rem}
+
+  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem}
+  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
+  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
+  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:160px}
+  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
+  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0}
+  .log-table td{padding:.35rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+  .log-table tr:hover td{background:#fafafa}
+  .log-body{max-height:340px;overflow-y:auto}
+  .log-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:.85rem;padding:2px 6px}
+  .log-empty{padding:1rem;text-align:center;color:#bbb;font-style:italic;font-size:.8rem}
+
+  .tools-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem;margin-bottom:2rem}
+  .tool-card{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem}
+  .tool-card h3{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1rem;margin:0 0 .5rem;color:#12157A}
+  .tool-card p{font-size:.78rem;color:#888;margin:0 0 .7rem;line-height:1.4}
+  .tool-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #12157A;border-radius:8px;background:#12157A;color:#fff;cursor:pointer;display:inline-block;text-decoration:none}
+  .tool-btn:hover{background:#1c1fa0}
+  .tool-btn.secondary{background:#fff;color:#12157A}
+  .tool-btn.secondary:hover{background:#F5F5FF}
+  .tool-btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
+  .tool-btn.danger:hover{background:#fff5f5}
+  .tool-btn:disabled{opacity:.6;cursor:default}
+  .tool-btn-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .backup-list{margin-top:.6rem;border:1px solid #eee;border-radius:8px;overflow:hidden;display:none}
+  .backup-item{padding:.45rem .7rem;font-size:.78rem;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;gap:.5rem;transition:background .1s}
+  .backup-item:last-child{border-bottom:none}
+  .backup-item:hover{background:#F5F5FF}
+  .backup-item.disabled{cursor:default;color:#999}
+  .backup-item.disabled:hover{background:none}
+  .backup-item-arrow{color:#bbb;flex-shrink:0}
+  input[type=file]{display:none}
+
+  footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+  @media(max-width:640px){.loc-readout{margin-left:0;order:99;width:100%;text-align:center}.travee-mini-panel{max-width:none}}
+</style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
+  <!-- Synchronisation incrémentale Syracuse (fraîcheur des cotes/statuts
+       entre deux exports) : déclenchement en tâche de fond. La surcouche
+       elle-même (js/syracuse-sync-shared.js, chargée plus haut) est
+       consommée par loadSyracuseOverlay() dans le script principal — voir
+       "CATALOGUE(S)" — pour corriger cote/titre/auteur affichés dans les
+       Statistiques avancées sans attendre le prochain export XML. -->
+  <script src="js/syracuse-sync-trigger.js" defer></script>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
+      <h1 class="page-title">Récolement</h1>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
+      <a href="reserve.html">Plan des magasins</a>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<div class="locbar">
+  <div class="container">
+    <select class="loc-sel" id="sel-reserve"></select>
+    <select class="loc-sel" id="sel-loctype">
+      <option value="etagere">Étagère</option>
+      <option value="armoire">Armoire</option>
+      <option value="tiroir">Tiroir</option>
+    </select>
+
+    <div class="stepper" id="stp-travee-wrap">
+      <button type="button" data-step="travee" data-dir="-1">−</button>
+      <span id="val-travee">I</span>
+      <button type="button" data-step="travee" data-dir="1">+</button>
+    </div>
+    <div class="stepper" id="stp-colonne-wrap">
+      <button type="button" data-step="colonne" data-dir="-1">−</button>
+      <span id="val-colonne">1</span>
+      <button type="button" data-step="colonne" data-dir="1">+</button>
+    </div>
+    <div class="stepper" id="stp-etage-wrap">
+      <button type="button" data-step="etage" data-dir="-1">−</button>
+      <span id="val-etage">1</span>
+      <button type="button" data-step="etage" data-dir="1">+</button>
+    </div>
+
+    <span class="loc-readout" id="loc-readout">—</span>
+  </div>
+</div>
+
+<main>
+  <div class="section">
+    <div class="container">
+
+      <div class="notice-progress-block shelf-bar-block">
+        <div class="shelf-bar-heading">
+          <span class="shelf-bar-heading-label" id="notice-progress-label">Progression — Réserve</span>
+          <span class="shelf-bar-heading-total" id="notice-progress-total"></span>
+        </div>
+        <div class="shelf-bar" id="notice-progress-bar">
+          <div class="shelf-bar-seg notice-recolees" id="seg-notice-recolees" style="width:0%" title="Récolées"></div>
+          <div class="shelf-bar-seg notice-noncat" id="seg-notice-noncat" style="width:0%" title="À cataloguer"></div>
+          <div class="shelf-bar-seg notice-jamais" id="seg-notice-jamais" style="width:0%" title="Jamais récolées"></div>
+        </div>
+        <div class="shelf-legend">
+          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-recolees"></span>Récolées : <span class="shelf-legend-val" id="leg-notice-recolees">0</span> <span class="shelf-legend-pct" id="leg-notice-recolees-pct"></span></span>
+          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-noncat"></span>À cataloguer : <span class="shelf-legend-val" id="leg-notice-noncat">0</span> <span class="shelf-legend-pct" id="leg-notice-noncat-pct"></span></span>
+          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-jamais"></span>Jamais récolées : <span class="shelf-legend-val" id="leg-notice-jamais">0</span> <span class="shelf-legend-pct" id="leg-notice-jamais-pct"></span></span>
+        </div>
+      </div>
+
+      <div class="scan-layout">
+        <div class="scan-zone">
+          <div class="horsreserve-note" id="horsreserve-note" style="display:none">
+            Scannez ici un exemplaire retrouvé hors de la réserve (posé ailleurs dans le bâtiment, par exemple). S'il a déjà été récolé auparavant et qu'un récolement de référence est chargé, son emplacement d'origine s'affichera pour le remettre en place. Sinon, rangez-le à l'emplacement indiqué par sa cote puis rescannez-le une fois en rayon, avec le bon emplacement sélectionné, pour l'ajouter au récolement principal.
+          </div>
+          <div id="scan-mode-zone">
+            <div class="scan-row">
+              <input type="text" id="scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
+              <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
+            </div>
+            <div class="feedback" id="feedback"></div>
+            <div class="scan-row" id="nobarcode-row">
+              <input type="text" id="nobarcode-input" placeholder="Cote d'un livre sans code-barre" autocomplete="off">
+              <button type="button" class="tool-btn" id="nobarcode-save">Ajouter</button>
+            </div>
+          </div>
+          <div class="vide-row" id="vide-row">
+            <button type="button" class="vide-btn" id="btn-vide">Emplacement vide</button>
+            <button type="button" class="vide-btn nonrange" id="btn-nonrange">Emplacement non rangé</button>
+            <button type="button" class="vide-btn lastshelf" id="btn-lastshelf">Dernière étagère de cette colonne</button>
+          </div>
+          <div id="noncat-mode-zone">
+            <div class="scan-row">
+              <span class="noncat-label">Livres non catalogués sur cette étagère :</span>
+              <div class="stepper" id="stp-noncat-wrap">
+                <button type="button" id="noncat-minus">−</button>
+                <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric">
+                <button type="button" id="noncat-plus">+</button>
+              </div>
+            </div>
+            <div class="feedback" id="noncat-feedback"></div>
+          </div>
+        </div>
+
+        <div class="travee-mini-panel" id="travee-mini-panel">
+          <div class="mp-header">
+            <span class="mp-title" id="mp-title">—</span>
+            <span class="mp-occ" id="mp-occ"></span>
+          </div>
+          <div class="mp-actions" id="mp-actions">
+            <button type="button" class="export-btn" id="mp-export-btn">⬇ Exporter (.txt)</button>
+          </div>
+          <div class="mp-room" id="mp-room"></div>
+          <div class="mp-legend" id="mp-legend">
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-cat)"></span>Catalogué</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-manuel)"></span>Exemplarisé rapide</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-noncat)"></span>Non catalogué (estimé)</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></span>Vide</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-nonrange)"></span>Non rangé</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></span>Non inventorié</span>
+          </div>
+          <p class="mp-hint" id="mp-hint" style="display:none"></p>
+        </div>
+      </div>
+
+      <details class="expected-panel">
+        <summary class="expected-title">
+          <span class="expected-title-text">Attendu à cet emplacement <span class="expected-count" id="exp-count"></span></span>
+        </summary>
+        <div class="exp-list" id="exp-list"><p class="exp-empty">Aucune donnée de référence importée — chargez un récolement de référence pour comparer.</p></div>
+      </details>
+
+      <details class="log-wrap">
+        <summary class="log-header">
+          <span class="log-title">Scans récents ici</span>
+        </summary>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Cote</th><th>Titre</th><th>Heure</th><th>Code-barre</th><th></th></tr></thead>
+          <tbody id="log-here"></tbody>
+        </table></div>
+      </details>
+
+      <details class="log-wrap">
+        <summary class="log-header">
+          <span class="log-title">Tous les scans</span>
+        </summary>
+        <div class="log-header-actions" style="padding:.5rem .9rem;border-bottom:1px solid #e0e0e0">
+          <input type="text" class="log-search" id="log-search" placeholder="Filtrer (cote, titre, code-barre)…">
+        </div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
+          <tbody id="log-all"></tbody>
+        </table></div>
+      </details>
+
+      <div class="expected-panel">
+        <div class="expected-title"><span>Statistiques avancées du récolement</span></div>
+        <p style="font-size:.75rem;color:#888;margin:0 0 .5rem;line-height:1.5">Le temps de travail réel additionne les intervalles entre deux scans consécutifs, sauf si l'écart dépasse 1 h : ces trous (pauses, changements de jour…) ne sont pas comptés dans la durée réelle. Le nombre de sessions correspond au nombre de fois où un tel écart d'au moins 1 h a été détecté, plus une.</p>
+        <div id="adv-groups"><!-- généré par renderAdvGroups(), voir "LISTES AVANCÉES" plus bas --></div>
+      </div>
+
+      <div class="tools-row">
+        <div class="tool-card">
+          <h3>Exporter</h3>
+          <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués, des emplacements marqués vides ou non rangés et des dernières étagères de colonne marquées. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
+          <div class="tool-btn-row">
+            <button type="button" class="tool-btn" id="btn-export">⬇ Exporter (fichier local)</button>
+            <button type="button" class="tool-btn secondary" id="btn-save-server">☁ Sauvegarder ce récolement</button>
+          </div>
+        </div>
+        <div class="tool-card">
+          <h3>Reprendre une session</h3>
+          <p>Importe un export JSON précédent (scans, non-catalogués, emplacements vides ou non rangés, dernières étagères de colonne) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
+          <label class="tool-btn secondary" for="file-resume">⬆ Importer et fusionner</label>
+          <input type="file" id="file-resume" accept="application/json">
+        </div>
+        <div class="tool-card">
+          <h3>Récolement de référence</h3>
+          <p>Charge un récolement précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher à la session en cours — soit un fichier, soit l'une des 5 dernières sauvegardes serveur.</p>
+          <div class="tool-btn-row">
+            <label class="tool-btn secondary" for="file-baseline">⬆ Charger un fichier</label>
+            <input type="file" id="file-baseline" accept="application/json">
+            <button type="button" class="tool-btn secondary" id="btn-backup-list-toggle">🕘 Dernières sauvegardes</button>
+          </div>
+          <div class="backup-list" id="backup-list"></div>
+        </div>
+        <div class="tool-card">
+          <h3>Réinitialiser</h3>
+          <p>Efface tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
+          <button type="button" class="tool-btn danger" id="btn-reset">✕ Tout effacer</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(async function(){
+/* ════════════ AUTH ════════════ */
+if (localStorage.getItem('rp_admin_auth') !== '1') {
+  window.location.href = 'index.html';
+  return;
+}
+document.getElementById('logout-btn').addEventListener('click', function(){
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+/* ════════════ CONSTANTES / STOCKAGE ════════════
+   TRAVEES, GROUPES, EMPLACEMENTS_ARMOIRE, EMPLACEMENTS_TIROIR, compareCotes,
+   getFondsFromCote viennent de js/reserve-shared.js */
+const LS_SCANS  = 'rp_recolement_scans';
+const LS_LOC    = 'rp_recolement_loc';
+const LS_BASE   = 'rp_recolement_baseline';
+const LS_NONCAT = 'rp_recolement_noncat';
+const LS_VIDE   = 'rp_recolement_vide';
+const LS_NONRANGE = 'rp_recolement_nonrange';
+const LS_LASTSHELF = 'rp_recolement_lastshelf';
+const LS_NOBARCODE = 'rp_recolement_nobarcode';
+const LS_PENDING = 'rp_recolement_pending_sync';
+const IDB_NAME = 'rp_recolement_idb';
+const IDB_VERSION = 1;
+const IDB_MIGRATED_KEY = 'rp_recolement_idb_migrated_v1';
+const IDB_MIGRATION_FAILCOUNT_KEY = 'rp_recolement_idb_migration_failcount';
+const GAP_MS = 60*60*1000; // seuil d'écart entre deux scans au-delà duquel "temps réel" arrête de comptabiliser (voir updateTimeStats)
+
+// scans/baseline : remplis par initStorage() (IndexedDB, avec migration
+// rétroactive depuis localStorage la première fois — voir plus bas), pas par
+// loadJSON() directement comme les autres clés ci-dessous. scans à lui seul
+// pèse maintenant ~5,5 Mo en JSON (16 248 scans sur l'état partagé actuel) —
+// au ras ou au-delà du quota localStorage (~5-10 Mo) de certains
+// navigateurs/appareils (incident "quota has been exceeded" du 2026-09-01),
+// et resérialiser tout l'objet à CHAQUE scan (l'ancien saveScans()) coûtait
+// de plus en plus cher à mesure que le récolement avançait — cause aussi du
+// bug du bip inaudible (thread bloqué par ce JSON.stringify, voir plus bas).
+// IndexedDB n'a pas ce plafond bas et permet une écriture par scan (O(1))
+// plutôt qu'une réécriture de tout l'historique (O(n)).
+let scans = {};
+let baseline = null;
+let idbDb = null; // connexion IndexedDB ouverte, ou null si indisponible/repli localStorage classique
+let loc = loadJSON(LS_LOC, { locType:'etagere', reserve:'patrimoniale', travee:'I', colonne:1, etage:1 });
+loc.reserve = loc.reserve || 'patrimoniale';  // compat anciennes sessions sans champ "reserve"
+loc.locType = loc.locType || 'etagere';       // compat anciennes sessions (ex-loc.kind)
+let catalog = null;                           // barcode -> {cote,titre,auteur,fonds,etat,noticeId}
+let catalogNoticeCount = 0;                   // nombre de notices distinctes (une notice peut avoir plusieurs exemplaires/barcodes)
+let nonCat = loadJSON(LS_NONCAT, {});         // "travee|colonne|etage" -> {travee,colonne,etage,count,ts}
+let videShelves = loadJSON(LS_VIDE, {});      // "travee|colonne|etage" -> {travee,colonne,etage,ts}
+let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {travee,colonne,etage,ts}
+let lastShelves = loadJSON(LS_LASTSHELF, {});  // "travee|colonne" -> {travee,colonne,etage,ts} (dernière étagère réelle de la colonne)
+let noBarcodeCotes = loadJSON(LS_NOBARCODE, {}); // cote normalisée -> {cote,travee,colonne,etage,ts} — voir "LIVRES SANS CODE-BARRE"
+let pendingSync = loadJSON(LS_PENDING, []);   // patches en attente d'envoi à /api/recolement
+
+function loadJSON(key, fallback){
+  try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch(e){ return fallback; }
+}
+// À true dès qu'une écriture localStorage échoue (quota dépassé) : ne
+// bloque plus rien, juste affiché dans l'indicateur de synchro
+// (updateSyncIndicator) pour prévenir que le cache local de cet appareil
+// n'est plus à jour. Ne concerne plus scans/baseline (IndexedDB, voir plus
+// bas) mais reste utile pour les petites clés encore sur localStorage
+// (nonCat, videShelves...) et pour le repli IndexedDB-indisponible.
+let localStorageBroken = false;
+// Ne JAMAIS laisser une erreur d'écriture localStorage remonter jusqu'à
+// l'appelant : un save*()/queuePatch() est en général suivi d'autre code
+// dans son appelant, et une exception ici l'interromprait en plein milieu —
+// pour scans, ça pouvait même empêcher queuePatch() de s'exécuter, donc le
+// scan n'était même plus envoyé au serveur (perdu pour de bon, pas
+// seulement absent du cache local). Incident du 2026-09-01 : "quota has
+// been exceeded" sur l'ancien saveScans() (qui resérialisait tout l'objet
+// scans en JSON à CHAQUE scan) faisait échouer le scan entièrement ; le
+// cache local scans à lui seul pesait ~5,5 Mo, au ras ou au-delà du quota
+// localStorage (~5-10 Mo) de certains navigateurs/appareils. scans/baseline
+// sont passés à IndexedDB pour ça (voir plus bas) ; safeSetLocal() reste le
+// filet de sécurité pour les clés qui restent sur localStorage.
+function safeSetLocal(key, value){
+  try{
+    localStorage.setItem(key, value);
+    if(localStorageBroken){ localStorageBroken = false; updateSyncIndicator(); }
+    return true;
+  }catch(e){
+    console.error(`Écriture locale impossible (${key}), stockage best-effort désormais côté serveur :`, e);
+    if(!localStorageBroken){ localStorageBroken = true; updateSyncIndicator(); }
+    return false;
+  }
+}
+function saveLoc(){ safeSetLocal(LS_LOC, JSON.stringify(loc)); }
+function saveNonCat(){ safeSetLocal(LS_NONCAT, JSON.stringify(nonCat)); }
+function saveVideShelves(){ safeSetLocal(LS_VIDE, JSON.stringify(videShelves)); }
+function saveNonRangeShelves(){ safeSetLocal(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
+function saveLastShelves(){ safeSetLocal(LS_LASTSHELF, JSON.stringify(lastShelves)); }
+function saveNoBarcodeCotes(){ safeSetLocal(LS_NOBARCODE, JSON.stringify(noBarcodeCotes)); }
+function savePendingSync(){ safeSetLocal(LS_PENDING, JSON.stringify(pendingSync)); }
+function normalizeCote(s){ return (s||'').trim().toUpperCase(); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ════════════ INDEXEDDB (scans / baseline) ════════════
+   scans/baseline sont trop volumineux pour continuer à resérialiser l'objet
+   entier en JSON dans localStorage à chaque scan (voir migrateLocalStorageToIdb
+   plus bas pour la migration rétroactive) — un object store IndexedDB par
+   barcode permet des écritures O(1) par scan (juste l'enregistrement
+   modifié) plutôt que O(n) (tout l'historique à chaque fois). Les autres
+   clés (nonCat, videShelves, pendingSync...) restent sur localStorage —
+   elles pèsent quelques dizaines de Ko max, largement sous le quota. */
+function openIdb(){
+  return new Promise((resolve, reject)=>{
+    if(!window.indexedDB){ reject(new Error('IndexedDB indisponible')); return; }
+    let settled = false;
+    // Filet de sécurité : onupgradeneeded/onsuccess/onerror ne se déclenchent
+    // jamais si une autre connexion (autre onglet resté ouvert sur une
+    // ancienne version) bloque l'upgrade (onblocked) — sans timeout, l'appel
+    // resterait bloqué indéfiniment et la page ne démarrerait jamais.
+    const timeout = setTimeout(()=>{
+      if(!settled){ settled = true; reject(new Error('IndexedDB open timeout (onblocked ?)')); }
+    }, 5000);
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains('scans')) db.createObjectStore('scans', {keyPath:'barcode'});
+      if(!db.objectStoreNames.contains('baseline')) db.createObjectStore('baseline', {keyPath:'barcode'});
+    };
+    req.onsuccess = ()=>{ if(!settled){ settled = true; clearTimeout(timeout); resolve(req.result); } };
+    req.onerror = ()=>{ if(!settled){ settled = true; clearTimeout(timeout); reject(req.error || new Error('IndexedDB open failed')); } };
+  });
+}
+function idbGetAll(storeName){
+  return new Promise((resolve, reject)=>{
+    const req = idbDb.transaction(storeName,'readonly').objectStore(storeName).getAll();
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function idbPut(storeName, record){
+  return new Promise((resolve, reject)=>{
+    const tx = idbDb.transaction(storeName,'readwrite');
+    tx.objectStore(storeName).put(record);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+function idbBulkPut(storeName, records){
+  return new Promise((resolve, reject)=>{
+    if(!records.length){ resolve(); return; }
+    const tx = idbDb.transaction(storeName,'readwrite');
+    const store = tx.objectStore(storeName);
+    records.forEach(r=>store.put(r));
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+function idbDelete(storeName, key){
+  return new Promise((resolve, reject)=>{
+    const tx = idbDb.transaction(storeName,'readwrite');
+    tx.objectStore(storeName).delete(key);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+function idbClear(storeName){
+  return new Promise((resolve, reject)=>{
+    const tx = idbDb.transaction(storeName,'readwrite');
+    tx.objectStore(storeName).clear();
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+
+// Repli si IndexedDB est indisponible/casse en cours de route (très vieux
+// navigateur, mode privé strict...) : identique au comportement d'avant
+// cette migration — jamais pire que ce qui était déjà en production.
+function saveScansLegacyWholeBlob(){ safeSetLocal(LS_SCANS, JSON.stringify(scans)); }
+
+function putScanRecord(record){
+  if(idbDb){
+    idbPut('scans', record).catch(e=>{
+      console.error('IndexedDB (scans, put) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+function bulkPutScanRecords(records){
+  if(!records || !records.length) return;
+  if(idbDb){
+    idbBulkPut('scans', records).catch(e=>{
+      console.error('IndexedDB (scans, bulkPut) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+function deleteScanRecord(barcode){
+  if(idbDb){
+    idbDelete('scans', barcode).catch(e=>{
+      console.error('IndexedDB (scans, delete) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+function clearAllScanRecords(){
+  if(idbDb){
+    idbClear('scans').catch(e=>{
+      console.error('IndexedDB (scans, clear) a échoué, repli localStorage :', e);
+      idbDb = null; saveScansLegacyWholeBlob();
+    });
+  } else { saveScansLegacyWholeBlob(); }
+}
+async function saveBaseline(){
+  if(idbDb){
+    try{
+      await idbClear('baseline');
+      await idbBulkPut('baseline', Object.values(baseline || {}));
+      return;
+    }catch(e){ console.error('IndexedDB (baseline) a échoué, repli localStorage :', e); idbDb = null; }
+  }
+  safeSetLocal(LS_BASE, baseline ? JSON.stringify(baseline) : '');
+}
+
+/* Charge scans/baseline au démarrage : depuis IndexedDB si disponible (avec
+   une migration rétroactive, une seule fois par appareil, depuis les
+   anciennes clés localStorage — voir migrateLocalStorageToIdb), sinon repli
+   sur l'ancien comportement localStorage pur. Awaited tout en bas de la
+   section STOCKAGE, avant tout le reste du script (voir la note à cet
+   endroit) : setLocType(loc.locType, true), plus bas dans la section
+   EMPLACEMENT, est appelée de façon synchrone pendant l'initialisation et
+   lit scans via updateStats() — elle doit donc être peuplée avant. */
+async function initStorage(){
+  try{
+    idbDb = await openIdb();
+  }catch(e){
+    console.error('IndexedDB indisponible, repli sur localStorage (comportement identique à avant cette migration) :', e);
+    idbDb = null;
+    scans = loadJSON(LS_SCANS, {});
+    baseline = loadJSON(LS_BASE, null);
+    return;
+  }
+  const migrated = localStorage.getItem(IDB_MIGRATED_KEY) === '1';
+  if(!migrated){
+    const ok = await migrateLocalStorageToIdb();
+    if(!ok){
+      scans = loadJSON(LS_SCANS, {});
+      baseline = loadJSON(LS_BASE, null);
+      return;
+    }
+  }
+  try{
+    const scanRows = await idbGetAll('scans');
+    scans = {};
+    scanRows.forEach(r=>{ scans[r.barcode] = r; });
+    const baseRows = await idbGetAll('baseline');
+    baseline = baseRows.length ? {} : null;
+    baseRows.forEach(r=>{ baseline[r.barcode] = r; });
+  }catch(e){
+    console.error('Lecture IndexedDB impossible, démarrage à vide (syncFromServer() rattrapera depuis le serveur) :', e);
+    idbDb = null;
+    scans = {};
+    baseline = null;
+  }
+}
+
+/* Migration rétroactive, une seule fois par appareil : reprend les données
+   déjà accumulées dans localStorage (clés LS_SCANS/LS_BASE) et les copie
+   dans IndexedDB, avec une sauvegarde de précaution téléchargée AVANT toute
+   modification (demande explicite : "en faisant une sauvegarde pour ne rien
+   supprimer"). Vérifie une comparaison profonde, pas seulement un décompte,
+   avant de toucher aux anciennes clés localStorage — même esprit que la
+   vérification Content-Length ajoutée dans r2Get() après l'incident de
+   troncature silencieuse de xml/bib.xml (voir CLAUDE.md) : ne jamais faire
+   confiance à une écriture qui n'a pas été relue et comparée. */
+async function migrateLocalStorageToIdb(){
+  const failCount = parseInt(localStorage.getItem(IDB_MIGRATION_FAILCOUNT_KEY) || '0', 10);
+  if(failCount >= 2){
+    console.error('Migration IndexedDB abandonnée après plusieurs échecs — mode localStorage classique conservé.');
+    idbDb = null;
+    return false;
+  }
+
+  const oldScans = loadJSON(LS_SCANS, {});
+  const oldBaseline = loadJSON(LS_BASE, null);
+  const scanCount = Object.keys(oldScans).length;
+  const baseCount = oldBaseline ? Object.keys(oldBaseline).length : 0;
+
+  if(scanCount || baseCount){
+    // Même format que "Exporter (fichier local)" (exportPayload(), voir la
+    // section EXPORT/IMPORT/RESET plus bas — hors ligne dans ce fichier,
+    // donc réutilisable ici malgré l'ordre textuel), plus un champ baseline
+    // additif (ignoré sans risque par un futur import, qui ne lit que les
+    // clés qu'il connaît).
+    downloadJSON({
+      scans: Object.values(oldScans),
+      nonCatalogues: Object.values(nonCat),
+      videShelves: Object.values(videShelves),
+      nonRangeShelves: Object.values(nonRangeShelves),
+      lastShelves: Object.values(lastShelves),
+      noBarcodeCotes: Object.values(noBarcodeCotes),
+      baseline: oldBaseline ? Object.values(oldBaseline) : []
+    }, 'recolement-backup-avant-migration-idb');
+  }
+
+  try{
+    if(scanCount) await idbBulkPut('scans', Object.values(oldScans));
+    if(baseCount) await idbBulkPut('baseline', Object.values(oldBaseline));
+
+    const reScans = await idbGetAll('scans');
+    const reBase = await idbGetAll('baseline');
+    if(reScans.length !== scanCount || reBase.length !== baseCount){
+      throw new Error(`décompte incohérent après migration (scans ${reScans.length}/${scanCount}, baseline ${reBase.length}/${baseCount})`);
+    }
+    const reScanMap = {}; reScans.forEach(r=>{ reScanMap[r.barcode] = r; });
+    for(const bc in oldScans){
+      if(JSON.stringify(oldScans[bc]) !== JSON.stringify(reScanMap[bc])) throw new Error(`enregistrement scans différent après relecture (${bc})`);
+    }
+    const reBaseMap = {}; reBase.forEach(r=>{ reBaseMap[r.barcode] = r; });
+    for(const bc in (oldBaseline || {})){
+      if(JSON.stringify(oldBaseline[bc]) !== JSON.stringify(reBaseMap[bc])) throw new Error(`enregistrement baseline différent après relecture (${bc})`);
+    }
+  }catch(e){
+    console.error('Migration IndexedDB avortée, localStorage laissé intact :', e);
+    try{ await idbClear('scans'); await idbClear('baseline'); }catch(_e){ /* best-effort */ }
+    localStorage.setItem(IDB_MIGRATION_FAILCOUNT_KEY, String(failCount + 1));
+    idbDb = null;
+    return false;
+  }
+
+  localStorage.removeItem(LS_SCANS);
+  localStorage.removeItem(LS_BASE);
+  localStorage.removeItem(IDB_MIGRATION_FAILCOUNT_KEY);
+  localStorage.setItem(IDB_MIGRATED_KEY, '1');
+
+  if(scanCount || baseCount){
+    alert(`Migration du stockage local terminée : ${scanCount} scan(s) et ${baseCount} emplacement(s) de référence déplacés vers un stockage plus robuste (IndexedDB).\n\nUne sauvegarde de sécurité a été téléchargée avant la migration (dossier de téléchargements de ce navigateur).`);
+  }
+  return true;
+}
+
+// Doit se terminer avant tout le reste du script : setLocType(loc.locType,
+// true), appelée de façon synchrone plus bas (section EMPLACEMENT) pendant
+// l'initialisation de la page, lit scans via updateStats() — sans cet
+// await ici, ce premier rendu verrait un objet scans vide.
+await initStorage();
+
+/* ════════════ SYNCHRONISATION PARTAGÉE (R2 via /api/recolement) ════════════
+   Le localStorage reste la source de vérité locale (fonctionne hors ligne) ;
+   chaque mutation est en plus envoyée en arrière-plan vers /api/recolement,
+   qui la fusionne côté serveur (compare-and-swap) dans l'état partagé lu par
+   tous les collègues et par reserve.html. Si la requête échoue (hors ligne,
+   R2 non configuré), le patch reste dans une file locale et sera retenté —
+   rien n'est jamais perdu, seulement pas encore visible par les autres. */
+function authHeaders(){
+  const token = localStorage.getItem('rp_admin_token');
+  const h = { 'Content-Type': 'application/json' };
+  if(token) h['Authorization'] = 'Basic ' + token;
+  return h;
+}
+
+let lastSyncError = null;
+
+function updateSyncIndicator(){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  const storageWarning = localStorageBroken ? '⚠ stockage local plein, cache hors-ligne de cet appareil non à jour (la synchro serveur continue normalement)' : '';
+  if(pendingSync.length){
+    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
+    el.title = lastSyncError ? `Dernière erreur de synchro : ${lastSyncError}` : 'Synchronisation avec les autres postes (via R2)';
+    el.classList.add('pending');
+  } else if(storageWarning){
+    el.textContent = storageWarning;
+    el.title = storageWarning;
+    el.classList.add('pending');
+  } else {
+    el.textContent = '✓ synchronisé';
+    el.title = 'Synchronisation avec les autres postes (via R2)';
+    el.classList.remove('pending');
+  }
+}
+
+function queuePatch(patch){
+  pendingSync.push(patch);
+  savePendingSync();
+  updateSyncIndicator();
+  flushPendingSync();
+}
+
+const SYNC_BATCH_SIZE = 200; // patches par requête — voir 'batch' côté api/recolement.mjs
+
+let flushingSync = false;
+async function flushPendingSync(){
+  if(flushingSync) return;
+  flushingSync = true;
+  try{
+    while(pendingSync.length){
+      // Regroupe jusqu'à SYNC_BATCH_SIZE patches en attente dans une seule
+      // requête ('batch' côté serveur = une seule lecture/écriture R2) au
+      // lieu d'un aller-retour réseau par scan — sinon vider une longue
+      // session hors ligne peut prendre plusieurs minutes une fois reconnecté.
+      const chunk = pendingSync.slice(0, SYNC_BATCH_SIZE);
+      const body = chunk.length === 1 ? chunk[0] : { type:'batch', patches: chunk };
+      let res;
+      try{
+        res = await fetch('/api/recolement', { method:'POST', headers: authHeaders(), body: JSON.stringify(body) });
+      }catch(e){
+        lastSyncError = 'hors ligne ou serveur injoignable';
+        break; // réseau indisponible : on retentera plus tard
+      }
+      if(res.status===401){
+        lastSyncError = 'non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel';
+        break;
+      }
+      if(res.status===503){
+        lastSyncError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
+        break;
+      }
+      if(!res.ok){
+        lastSyncError = `erreur serveur (${res.status})`;
+        break; // autre erreur serveur : on retentera plus tard
+      }
+      lastSyncError = null;
+      pendingSync.splice(0, chunk.length);
+      savePendingSync();
+      updateSyncIndicator();
+    }
+  } finally {
+    flushingSync = false;
+    updateSyncIndicator();
+  }
+}
+
+async function syncFromServer(){
+  try{
+    const res = await fetch('/api/recolement');
+    if(!res.ok) return;
+    const data = await res.json();
+    mergeIncomingData(data);
+  }catch(e){ /* hors ligne ou API non disponible : on reste sur le cache local */ }
+}
+
+window.addEventListener('online', flushPendingSync);
+setInterval(flushPendingSync, 20000);
+// Lecture seule (GET) : espacée à 45s et suspendue pendant que l'onglet est en
+// arrière-plan, pour ne pas cumuler des requêtes R2 inutiles sur des postes
+// laissés ouverts toute la journée — avec un rafraîchissement immédiat au
+// retour sur l'onglet pour ne pas perdre en fraîcheur perçue.
+setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
+
+// Surcouche Syracuse (voir loadSyracuseOverlay() plus bas, section
+// CATALOGUE(S)) : même cadence que reserve.html (5 min — la synchro
+// elle-même n'avance de toute façon pas plus vite qu'une tranche par
+// tranche de ~1 min, voir CLAUDE.md), plus un rafraîchissement immédiat au
+// retour sur l'onglet. Le premier appel a lieu plus bas, une fois
+// loadSyracuseOverlay() déclarée (hissée de toute façon, mais gardé au même
+// endroit que sa déclaration pour la lisibilité).
+setInterval(()=>{ if(!document.hidden) loadSyracuseOverlay(); }, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadSyracuseOverlay(); });
+
+/* ════════════ CATALOGUE(S) ════════════
+   Deux catalogues indépendants de reconnaissance de code-barre, un par
+   catalogGroup (voir js/reserve-shared.js) : 'reserve' pour la réserve
+   patrimoniale/Douaisienne/hors-réserve (data/inventaire.json, fusionné
+   avec les exemplaires créés via exemplarisation.html — un code-barre créé
+   là-bas, même sans emplacement renseigné, doit être reconnu ici comme
+   "connu du catalogue" dès le premier scan, sinon handleScan() le
+   traiterait comme inconnu et n'enregistrerait rien, voir status 'unknown'
+   plus bas), 'magasin' pour les magasins d'étage (data/magasins.json,
+   construit depuis bib.xml — voir magasins.html et CLAUDE.md ; partagé
+   entre les magasins 2e/5e/6e étage, ce catalogue n'étant pas scindé par
+   étage — chaque exemplaire porte son propre `_fondsLabel` pour distinguer
+   étage/secteur à l'affichage).
+   catalog/catalogNoticeCount restent les variables globales utilisées
+   partout ailleurs dans ce fichier (handleScan, cascade reliures,
+   updateStats, notScannedList, manualCoteList, updateAdvListsCount) : elles
+   ne pointent jamais directement vers un des deux catalogues construits
+   ci-dessous, seulement vers celui du groupe actif — voir
+   syncActiveCatalog(), appelée ici et à chaque changement de réserve. */
+function buildCatalogFromItems(items, fondsOverride, opts){
+  // `scoped` (magasins uniquement) : data/magasins.json couvre toute la
+  // bibliothèque de Douai depuis 2026-08-26, pas seulement les magasins.
+  // Avant, on construisait DEUX catalogues à partir de ce même fichier — un
+  // filtré _isMagasin (statistiques) et un complet (reconnaissance au scan,
+  // ex-magasinWideCatalog) — soit 287 000 entrées matérialisées pour 199 583
+  // exemplaires, et ~75 Mo de tas. On n'en construit plus qu'un seul, où
+  // chaque entrée porte `isMagasin` ; inGroupScope() ci-dessous filtre
+  // partout où le périmètre « magasins » doit être respecté.
+  const scoped = !!(opts && opts.scoped);
+  const cat = {};
+  const noticeIds = new Set();
+  // forEachRow accepte aussi bien un tableau plat (data/inventaire.json,
+  // exemplaires manuels) qu'un conteneur colonnaire (data/magasins.json
+  // depuis 2026-09-02, voir js/columnar.js) — et, dans ce second cas, il
+  // reconstruit chaque ligne à la volée sans jamais matérialiser les 199 583
+  // objets d'un coup.
+  window.columnar.forEachRow(items, it=>{
+    const bc = (it['915$b'] || it['995$f'] || '').trim();
+    if(!bc) return;
+    // Jointe 930$g/h/i plutôt que $g seul : nécessaire pour les magasins
+    // (data/magasins.json, cote éclatée sur 3 propriétés bib.xml, voir
+    // build-magasins.mjs) — sans quoi "livres sans code-barre" ne verrait
+    // qu'un fragment de cote (ex. juste "R") pour ces exemplaires.
+    const cote = [it['930$g'], it['930$h'], it['930$i']].filter(Boolean).join(' ').trim();
+    // it._noticeId (posé par build-inventory.mjs à partir du 001 MARC) n'existe
+    // que pour les vraies notices Syracuse de la réserve — les exemplaires de
+    // magasins (data/magasins.json, export GESMARC "à plat", vérifié
+    // 2026-08-26 : "Identifiant" y est en bijection avec le code-barre, aucune
+    // notice ne regroupe plusieurs exemplaires) et les exemplaires manuels
+    // (exemplarisation.html) n'en ont jamais. Repli sur le code-barre lui-même
+    // dans ce cas : chacun compte alors comme sa propre "notice" plutôt que
+    // d'être silencieusement exclu du compteur — sans ce repli,
+    // catalogNoticeCount valait 0 pour tout le catalogue magasins (bug
+    // "Notices récolées" bloqué à 0 malgré des scans réels, 2026-08-26).
+    const noticeId = it._noticeId || bc;
+    cat[bc] = {
+      cote, titre:(it['200$a']||'').trim(), auteur:(it['700$a']||'').trim(),
+      // _fondsLabel (posé par build-magasins.mjs, par exemplaire : étage +
+      // secteur adulte/jeunesse) prime sur un fondsOverride global — sinon
+      // repli sur getFondsFromCote() (réserve patrimoniale/Douaisienne).
+      fonds: it._fondsLabel || fondsOverride || getFondsFromCote(cote), etat:(it['316$a']||'').trim(), noticeId,
+      // Vient d'exemplarisation.html (pas une vraie notice Syracuse) — voir
+      // js/exemplaires-manuels-shared.js. Propagé jusque dans le scan pour
+      // que reserve.html puisse le colorer différemment (orange) d'un
+      // exemplaire réellement catalogué.
+      manuel: !!it._manuel,
+      // Reliures ($481/$482 → _relies, voir build-inventory.mjs) : autres
+      // codes-barres physiquement dans le même volume que celui-ci. Utilisé
+      // par handleScan() pour récoler tout le groupe d'un coup — voir
+      // applyReliureCascade(). Absent du catalogue magasins (pas de
+      // reliures manuelles pour ce fonds).
+      relies: Array.isArray(it._relies) ? it._relies : [],
+      // Champ Syracuse "Piège" (ex. "Pilon", "Braderie", "En magasin") — posé
+      // par build-inventory.mjs (résolu depuis les codes MARC 921$a/$b) ou
+      // build-magasins.mjs (déjà résolu côté GESMARC), voir CLAUDE.md.
+      // Affiché dans les tableaux d'anomalies des "Statistiques avancées"
+      // pour repérer un exemplaire à traiter sans avoir à rouvrir Syracuse.
+      piege: it._piege || '',
+      // Répercuté depuis data/magasins.json (voir build-magasins.mjs) —
+      // utilisé uniquement par magasinFloorStats()/notScannedList() plus bas
+      // pour classer un exemplaire 2e/5e étage (présent) vs 6e étage
+      // (absent). undefined pour la réserve, sans effet là où ce champ n'est
+      // pas lu.
+      coteDigitRun: it._coteDigitRun || null,
+      // Périmètre "magasins" (_isMagasin, posé par build-magasins.mjs) —
+      // toujours true pour le catalogue réserve, qui n'a pas cette notion.
+      // Un exemplaire à false est reconnu au scan (titre/cote affichés) mais
+      // exclu des statistiques de progression : c'est une anomalie de
+      // classement, voir handleScan()/ADV_CATS.horssection.
+      isMagasin: !scoped || it._isMagasin !== false,
+    };
+    // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
+    // le compteur et la progression se basent sur des notices distinctes, pas
+    // sur des scans bruts, pour qu'un même exemplaire rescanné par erreur ou
+    // pour vérification ne compte jamais deux fois. Hors périmètre : exclu,
+    // pour que le total affiché reste celui des seuls magasins (identique à
+    // ce que comptait l'ancien catalogue filtré).
+    if(cat[bc].isMagasin) noticeIds.add(noticeId);
+  });
+  return { catalog: cat, noticeCount: noticeIds.size };
+}
+
+/* Une entrée de catalogue est-elle dans le périmètre du groupe ? Toujours
+   vrai pour la réserve (catalogue non filtré) ; pour les magasins, exclut
+   les exemplaires catalogués sous une autre section Syracuse (voir
+   `isMagasin` ci-dessus). Remplace l'ancien couple
+   catalogByGroup.magasin (filtré) / magasinWideCatalog (complet). */
+function inGroupScope(entry){ return !!entry && entry.isMagasin !== false; }
+
+let catalogByGroup = { reserve:null, magasin:null };
+let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
+let catalogFailedGroup = { reserve:false, magasin:false }; // distingue "pas encore chargé" (—) de "échec" (indisponible)
+
+/* Surcouche de synchronisation incrémentale Syracuse (voir
+   js/syracuse-sync-shared.js, api/syracuse-tick.mjs et CLAUDE.md, section
+   « Synchronisation incrémentale Syracuse ») : { barcode: {cote, titre,
+   auteur, dt, section, site, statut, rscId, ts} } pour chaque code-barre
+   modifié dans Syracuse depuis le dernier export XML. Contrairement à
+   inventaire.html/reserve.html (simple badge ou correction d'affichage),
+   ici la correction est appliquée DIRECTEMENT sur les entrées de
+   catalogByGroup (cote/titre/auteur) : les tableaux des "Statistiques
+   avancées" — notamment "Jamais scannés" et "Documents probablement
+   perdus" — lisent ces champs en direct sur le catalogue plutôt que sur un
+   instantané figé, donc la correction s'y reflète sans attendre un nouveau
+   `npm run build`/`build:magasins`. Déclarée ici (tôt, comme
+   catalogByGroup) plutôt que plus bas avec le reste de la synchro : voir la
+   note sur la temporal dead zone plus haut dans cette section — même risque
+   si une fonction appelée pendant l'init synchrone venait à la lire. */
+let SYRACUSE_OVERLAY = {};
+
+/* Corrige en place cote/titre/auteur des entrées de `cat` déjà connues de
+   la surcouche — jamais le contraire (une entrée absente de la surcouche,
+   ou un champ vide dans la surcouche, garde sa valeur issue de l'export
+   XML). N'appelle jamais fetch : suppose SYRACUSE_OVERLAY déjà à jour.
+   `snapshotOut`, si fourni, reçoit { [barcode]: {cote,titre,auteur} } — les
+   valeurs D'AVANT correction pour chaque entrée effectivement touchée. Sert
+   uniquement au chemin réseau froid de loadMagasinCatalog() : le cache
+   IndexedDB doit rester une image fidèle de data/magasins.json, jamais de la
+   version corrigée en direct (voir plus bas, "4. Remplissage du cache"). */
+function applySyracuseOverlayToCatalog(cat, snapshotOut){
+  if(!cat) return;
+  for(const bc in SYRACUSE_OVERLAY){
+    const entry = cat[bc];
+    const fresh = SYRACUSE_OVERLAY[bc];
+    if(!entry || !fresh) continue;
+    if(!fresh.cote && !fresh.titre && !fresh.auteur) continue;
+    if(snapshotOut && !(bc in snapshotOut)){
+      snapshotOut[bc] = { cote:entry.cote, titre:entry.titre, auteur:entry.auteur };
+    }
+    if(fresh.cote) entry.cote = fresh.cote;
+    if(fresh.titre) entry.titre = fresh.titre;
+    if(fresh.auteur) entry.auteur = fresh.auteur;
+  }
+}
+
+/* Recharge la surcouche puis la réapplique à tout catalogue déjà chargé
+   (reserve et/ou magasin — peu importe lequel des deux est prêt à cet
+   instant, l'autre sera couvert à son propre chargement ou au prochain
+   passage). L'index cote→code-barre est reconstruit ensuite (une cote
+   corrigée doit rester trouvable via "Livres sans code-barre") ; l'index
+   par run de chiffres, lui, ne dépend pas du texte de la cote et n'a donc
+   pas besoin de l'être. Appelée une première fois au chargement puis
+   toutes les 5 min (comme reserve.html — la synchro elle-même n'avance de
+   toute façon pas plus vite qu'une tranche par tranche de ~1 min, voir
+   CLAUDE.md) et à chaque retour d'onglet. Échoue silencieusement si l'API
+   est indisponible (fetchSyracuseSyncOverlay() ne lève jamais). */
+function loadSyracuseOverlay(){
+  if(typeof fetchSyracuseSyncOverlay !== 'function') return;
+  fetchSyracuseSyncOverlay().then(data=>{
+    SYRACUSE_OVERLAY = data || {};
+    ['reserve','magasin'].forEach(group=>{
+      const cat = catalogByGroup[group];
+      if(!cat) return;
+      applySyracuseOverlayToCatalog(cat);
+      catalogCoteIndexByGroup[group] = buildCoteIndex(cat);
+    });
+    updateStats(); // rafraîchit aussi le panneau ouvert, voir refreshAdvList() appelé depuis updateAdvListsCount()
+  });
+}
+// Premier appel : en parallèle du chargement des catalogues plus bas (peu
+// importe lequel des deux finit en premier, voir applySyracuseOverlayToCatalog()
+// appelée à l'installation de chacun) — pas besoin d'attendre 5 min pour une
+// première correction. L'intervalle/visibilitychange sont posés plus haut,
+// avant la déclaration de cette fonction (hissée) : gardés groupés avec le
+// reste de la synchro Syracuse côté "SCAN"/sync, voir plus haut.
+loadSyracuseOverlay();
+
+/* Badge affiché dans une cellule "Syracuse" des tableaux de "Statistiques
+   avancées" (voir ADV_CATS) quand ce code-barre a une correction plus
+   récente que le dernier export XML. Sur demande explicite (2026-09-09) :
+   la ligne reste affichée EN PLUS de ce badge plutôt que d'être retirée de
+   la liste — corriger cote/titre/auteur ne "règle" pas le problème que la
+   ligne signale (code-barre endommagé, jamais scanné, anomalie de
+   classement...), donc l'exemplaire doit rester visible tant qu'il n'a pas
+   été traité physiquement. */
+function syracuseCorrectionCell(barcode){
+  const fresh = barcode ? SYRACUSE_OVERLAY[barcode] : null;
+  if(!fresh) return '—';
+  const d = fresh.ts ? new Date(fresh.ts) : null;
+  const dateStr = d && !isNaN(d) ? d.toLocaleDateString('fr-FR') : '';
+  return `<span style="color:#1565c0" title="Cote/titre/auteur relevés par la synchronisation incrémentale Syracuse${dateStr ? ', le '+dateStr : ''} — plus récents que le dernier export XML complet">🔄 corrigé${dateStr?' le '+esc(dateStr):''}</span>`;
+}
+// Utilisé uniquement par "Récolés" (ADV_CATS.scanned), à la place du badge
+// "corrigé" ci-dessus : cette section liste des documents déjà localisés
+// physiquement, une correction de cote/titre/auteur n'y est pas une anomalie
+// à traiter (demande explicite, 2026-09-09). En revanche, savoir qu'un
+// exemplaire qu'on vient de scanner en rayon est enregistré "en prêt" côté
+// Syracuse EST une info utile (livre non rendu, ou statut pas à jour) — lu
+// sur le champ `statut` de la surcouche (h.Statut, voir api/syracuse-tick.mjs),
+// jamais exposé ailleurs dans cette page. Détection par sous-chaîne
+// insensible à la casse plutôt qu'une liste de valeurs exactes : Syracuse
+// combine parfois plusieurs informations dans ce champ (ex. "En prêt, en
+// magasin"), et la formulation exacte n'est pas documentée côté ILS.
+function syracuseLoanBadge(barcode){
+  const fresh = barcode ? SYRACUSE_OVERLAY[barcode] : null;
+  const statut = fresh && fresh.statut;
+  if(!statut || !/pr[eê]t/i.test(statut)) return '—';
+  return `<span style="color:#c62828" title="${esc(statut)} — relevé par la synchronisation incrémentale Syracuse">📕 en prêt</span>`;
+}
+// Utilisé par les boutons d'export (voir "Exclure les codes-barres déjà
+// corrigés" dans advDetailsTemplate()) pour ne garder que les lignes dont le
+// code-barre n'a encore aucune correction Syracuse connue.
+function syracuseNotCorrectedFilter(r){ return !(r.barcode && SYRACUSE_OVERLAY[r.barcode]); }
+// Combine plusieurs filtres d'export (ex. tranche de travées + non corrigés)
+// en un seul, en ignorant les filtres absents (null/undefined) — évite de
+// dupliquer exportAdvBarcodes() pour chaque combinaison possible.
+function combineExportFilters(){
+  const fns = Array.prototype.filter.call(arguments, Boolean);
+  if(!fns.length) return null;
+  return r => fns.every(fn=>fn(r));
+}
+
+/* Il n'y a plus qu'UN catalogue magasins (2026-09-02). Il y en avait deux,
+   construits depuis le même data/magasins.json : catalogByGroup.magasin
+   filtré aux exemplaires _isMagasin (statistiques de progression) et
+   magasinWideCatalog non filtré (reconnaissance au scan d'un code-barre
+   catalogué sous une autre section, pour signaler une anomalie de
+   classement plutôt qu'un "inconnu du catalogue"). Comme le second est un
+   sur-ensemble du premier, les matérialiser tous les deux coûtait 287 000
+   entrées pour 199 583 exemplaires — ~75 Mo de tas.
+   Désormais : un seul catalogue complet, chaque entrée portant `isMagasin`,
+   et inGroupScope() (voir plus haut) partout où le périmètre compte. */
+
+// Index inverse cote -> code-barre, un par catalogGroup — sert à
+// handleNoBarcodeCote() (voir "LIVRES SANS CODE-BARRE" plus bas) pour
+// vérifier si une cote saisie à la main correspond à un exemplaire déjà
+// catalogué. Premier code-barre trouvé pour une cote donnée en cas de
+// doublon (rare, cotes normalement uniques par exemplaire).
+let catalogCoteIndexByGroup = { reserve:null, magasin:null };
+
+// Second index, par RUN DE CHIFFRES de la cote (coteDigitRun, voir plus haut
+// — uniquement présent pour le catalogue magasins, data/inventaire.json n'a
+// pas d'équivalent) — sert de repli dans handleNoBarcodeCote() quand la cote
+// tapée à la main ne correspond pas EXACTEMENT à celle du catalogue mais que
+// son numéro séquentiel s'y retrouve (ex. "136854" tapé pour un exemplaire
+// dont la vraie cote est "136854 PUJ" ou "856.7 136854 PUJ" — un suffixe
+// auteur/une classification Dewey secondaire que l'utilisateur·rice ne
+// connaît pas forcément par cœur). extractCoteDigitRun() applique EXACTEMENT
+// le même algorithme que magasinDigitRun() de scripts/build-magasins.mjs
+// (fusion du séparateur de milliers, recherche d'un groupe de 5 ou 6
+// chiffres), pour que le numéro extrait du texte tapé et celui déjà stocké
+// sur chaque entrée du catalogue soient directement comparables.
+// Un run de chiffres n'est PAS garanti unique : un même numéro peut
+// désigner plusieurs volumes d'un même ensemble, distingués par un suffixe
+// ("133538-1", "133538-3"...). Dans ce cas on ne devine pas — le run est
+// retiré de l'index (jamais associé au hasard à l'un des volumes).
+function extractCoteDigitRun(str){
+  if(!str) return null;
+  const merged = String(str).replace(/(?<!\d)(\d{1,2})\.(\d{3})(?!\d)/g, '$1$2');
+  const runs = merged.match(/\d+/g) || [];
+  for(let run of runs){
+    if(run.length===7 && run[0]==='0') run = run.slice(1);
+    if(run.length===5 || run.length===6) return run;
+  }
+  return null;
+}
+let catalogDigitRunIndexByGroup = { reserve:null, magasin:null };
+function buildDigitRunIndex(cat){
+  const idx = {};
+  const ambiguous = new Set();
+  Object.keys(cat).forEach(bc=>{
+    const entry = cat[bc];
+    if(!inGroupScope(entry) || !entry.coteDigitRun) return;
+    const run = entry.coteDigitRun;
+    if(ambiguous.has(run)) return;
+    if(idx[run] !== undefined){
+      delete idx[run];
+      ambiguous.add(run);
+      return;
+    }
+    idx[run] = bc;
+  });
+  return idx;
+}
+function buildCoteIndex(cat){
+  const idx = {};
+  Object.keys(cat).forEach(bc=>{
+    // Hors périmètre exclu, comme quand cet index était construit à partir
+    // du catalogue magasins filtré : saisir la cote d'un document classé
+    // dans une autre section ne doit pas le récoler ici sans passer par un
+    // vrai scan (qui, lui, le marquera en anomalie de classement).
+    if(!inGroupScope(cat[bc])) return;
+    const c = normalizeCote(cat[bc].cote);
+    if(c && !idx[c]) idx[c] = bc;
+  });
+  return idx;
+}
+
+function syncActiveCatalog(){
+  const group = catalogGroupOfReserve(loc.reserve);
+  catalog = catalogByGroup[group];
+  catalogNoticeCount = catalogNoticeCountByGroup[group];
+}
+
+Promise.all([
+  fetch('data/inventaire.json').then(r=>r.json()),
+  fetchExemplairesManuelsAsCatalogRows(),
+  fetchReliuresManuelles(),
+]).then(([data, manuels, reliuresManuelles])=>{
+  const items = data.concat(manuels);
+  const built = buildCatalogFromItems(items);
+  applyManualReliureGroups(built.catalog, reliuresManuelles);
+  // Corrige cote/titre/auteur avec ce que loadSyracuseOverlay() a déjà pu
+  // charger (souvent le cas : la surcouche, un petit JSON, résout en
+  // général avant data/inventaire.json) — sinon la correction arrivera au
+  // premier passage de loadSyracuseOverlay(), voir plus haut.
+  applySyracuseOverlayToCatalog(built.catalog);
+  catalogByGroup.reserve = built.catalog;
+  catalogNoticeCountByGroup.reserve = built.noticeCount;
+  catalogCoteIndexByGroup.reserve = buildCoteIndex(built.catalog);
+  catalogDigitRunIndexByGroup.reserve = buildDigitRunIndex(built.catalog);
+  syncActiveCatalog();
+  updateStats();
+}).catch(()=>{
+  catalogFailedGroup.reserve = true;
+  syncActiveCatalog();
+});
+
+/* ──────── CATALOGUE MAGASINS : cache IndexedDB ────────
+   data/magasins.json pèse ~85 Mo bruts (199 583 exemplaires). Le
+   retélécharger et le reparser à chaque ouverture de cette page coûtait
+   ~6,9 Mo de réseau, un JSON.parse de plusieurs secondes sur un poste
+   modeste, et ~112 Mo de tas pour un tableau intermédiaire dont on
+   n'extrait que 8 champs par exemplaire.
+
+   On met donc en cache le CATALOGUE CONSTRUIT (pas le JSON brut), sous
+   forme colonnaire, dans une base IndexedDB dédiée — voir
+   js/catalog-cache.js, qui détaille le format et pourquoi cette base est
+   séparée de celle du récolement.
+
+   Fraîcheur : la clé de version est le `generatedAt` de
+   data/magasins-build-report.json (quelques Ko, toujours téléchargé). Un
+   nouveau `npm run build:magasins` change cette date, donc le cache est
+   invalidé et le catalogue rechargé automatiquement. Si le rapport est
+   injoignable, on ne fait pas confiance au cache et on repasse par le
+   réseau — jamais l'inverse.
+
+   Dégradation : toute défaillance du cache (IndexedDB indisponible, quota
+   dépassé, entrée corrompue) ramène exactement au comportement d'avant,
+   fetch + build. Le cache n'est jamais une source de vérité, seulement une
+   copie reconstructible. */
+const MAGASIN_CACHE_NAME = 'magasins';
+
+function installMagasinCatalog(catalogObj, noticeCount){
+  // N'applique PAS la surcouche Syracuse ici (voir loadMagasinCatalog(), qui
+  // s'en charge à chaque site d'appel) : sur le chemin réseau froid,
+  // catalogObj EST l'objet réencodé plus bas pour le cache IndexedDB — le
+  // muter ici le ferait fuiter dans ce cache, qui doit rester une image
+  // fidèle de data/magasins.json (voir "4. Remplissage du cache").
+  catalogByGroup.magasin = catalogObj;
+  catalogNoticeCountByGroup.magasin = noticeCount;
+  catalogCoteIndexByGroup.magasin = buildCoteIndex(catalogObj);
+  catalogDigitRunIndexByGroup.magasin = buildDigitRunIndex(catalogObj);
+  syncActiveCatalog();
+  updateStats();
+}
+
+async function loadMagasinCatalog(){
+  const cache = window.catalogCache || null;
+
+  // 1. Version courante des données (petit fichier, ~3 Ko).
+  let version = null;
+  try{
+    const res = await fetch('data/magasins-build-report.json');
+    if(res.ok){ const report = await res.json(); version = report && report.generatedAt || null; }
+  }catch(e){ /* rapport injoignable : on ira au réseau, sans toucher au cache */ }
+
+  // 2. Cache à jour ? Alors ni téléchargement ni JSON.parse.
+  if(cache && version){
+    const payload = await cache.read(MAGASIN_CACHE_NAME, version);
+    if(payload){
+      try{
+        const catalogObj = cache.decode(payload);
+        // Recompté plutôt que mis en cache : c'est une somme sur le
+        // catalogue restauré, pas une donnée à conserver — et la recompter
+        // garantit qu'elle reste cohérente avec ce qui a été décodé.
+        const notices = new Set();
+        for(const bc in catalogObj){
+          const e = catalogObj[bc];
+          if(e.isMagasin) notices.add(e.noticeId);
+        }
+        // Sans risque pour le cache ici (contrairement au chemin froid plus
+        // bas) : catalogObj vient d'un decode() tout juste reconstruit à
+        // partir du payload lu, jamais réencodé/réécrit dans ce cache.
+        applySyracuseOverlayToCatalog(catalogObj);
+        installMagasinCatalog(catalogObj, notices.size);
+        return;
+      }catch(e){
+        // Entrée illisible malgré la bonne version : on la jette et on
+        // repart du réseau plutôt que de démarrer sur un catalogue douteux.
+        console.warn('[catalogue magasins] cache illisible, rechargement réseau :', e && e.message);
+        cache.clear(MAGASIN_CACHE_NAME);
+      }
+    }
+  }
+
+  // 3. Chemin froid : téléchargement + construction, comme avant.
+  //    `scoped:true` : data/magasins.json couvre toute la bibliothèque de
+  //    Douai depuis 2026-08-26 (voir build-magasins.mjs) — chaque entrée
+  //    garde son drapeau isMagasin plutôt que d'être filtrée en amont, ce
+  //    qui permet de reconnaître au scan un code-barre catalogué sous une
+  //    autre section (anomalie de classement) sans second catalogue.
+  //    Pas de fondsOverride : chaque exemplaire porte déjà son propre
+  //    _fondsLabel (étage + secteur), posé par build-magasins.mjs.
+  const data = await fetch('data/magasins.json').then(r=>{
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  });
+  const built = buildCatalogFromItems(data, undefined, { scoped:true });
+  // Capture les cote/titre/auteur D'AVANT correction pour les (rares)
+  // entrées touchées par la surcouche Syracuse — proportionnel à sa taille,
+  // pas à celle du catalogue (~200 000 entrées) — avant de les corriger sur
+  // built.catalog, l'objet réellement affiché (catalogByGroup.magasin).
+  // Sert à reconstituer une image pristine pour le cache, voir "4." plus
+  // bas : built.catalog est le MÊME objet que celui réencodé pour le cache
+  // IndexedDB, donc une correction appliquée ici s'y retrouverait sinon
+  // figée jusqu'au prochain npm run build:magasins.
+  const originalOverlaidFields = {};
+  applySyracuseOverlayToCatalog(built.catalog, originalOverlaidFields);
+  installMagasinCatalog(built.catalog, built.noticeCount);
+
+  // 4. Remplissage du cache, une fois la page déjà utilisable. Encoder puis
+  //    écrire ~16 Mo prend quelques centaines de ms : on laisse d'abord le
+  //    navigateur peindre et le premier scan passer, plutôt que de retarder
+  //    l'affichage pour un gain qui ne servira qu'au chargement suivant.
+  if(cache && version){
+    // requestIdleCallback doit rester appelé sur `window` : détacher la
+    // référence puis l'appeler nue lève "Illegal invocation" (le `this`
+    // attendu est l'objet global). D'où le passage par une lambda plutôt
+    // qu'un `window.requestIdleCallback || setTimeout`.
+    const later = typeof window.requestIdleCallback === 'function'
+      ? cb => window.requestIdleCallback(cb, { timeout:5000 })
+      : cb => setTimeout(cb, 2000);
+    later(()=>{
+      try{
+        let toEncode = built.catalog;
+        const touched = Object.keys(originalOverlaidFields);
+        if(touched.length){
+          // Copie superficielle (juste des pointeurs, pas un clone profond
+          // — coût proportionnel au catalogue entier mais fait ici, en
+          // temps d'inactivité, jamais sur le chemin d'affichage) où les
+          // quelques entrées touchées par la surcouche retrouvent leurs
+          // cote/titre/auteur d'origine, SANS toucher à built.catalog —
+          // même objet que catalogByGroup.magasin, activement affiché.
+          toEncode = Object.assign({}, built.catalog);
+          touched.forEach(bc=>{
+            if(toEncode[bc]) toEncode[bc] = Object.assign({}, toEncode[bc], originalOverlaidFields[bc]);
+          });
+        }
+        cache.write(MAGASIN_CACHE_NAME, version, cache.encode(toEncode));
+      }
+      catch(e){ console.warn('[catalogue magasins] mise en cache impossible :', e && e.message); }
+    });
+  }
+}
+
+loadMagasinCatalog().catch(err=>{
+  console.error('[catalogue magasins] indisponible :', err);
+  catalogFailedGroup.magasin = true;
+  syncActiveCatalog();
+});
+
+/* ADV_GROUPS/ADV_CATS + génération du HTML de "Statistiques avancées"
+   (voir "LISTES AVANCÉES" plus bas pour le reste — damagedList,
+   renderAdvTable, etc.) : déclarés ici, tôt dans le script, et pas plus bas
+   avec le reste de cette section, parce qu'updateStats() (qui lit
+   ADV_GROUPS) est déjà appelée pendant l'initialisation synchrone de la
+   page ci-dessous (setLocType(loc.locType) à la fin de la section
+   "EMPLACEMENT") — les déclarer plus bas provoquait un ReferenceError
+   (temporal dead zone) dès le chargement de la page, qui interrompait tout
+   le reste du script (scan, mini-plan, etc. jamais initialisés).
+
+   Depuis 2026-08-27, les magasins ne forment plus un seul groupe combiné
+   mais trois groupes distincts (un panneau complet — occupation, temps,
+   listes de problèmes — par étage physique 2e/5e/6e), pour pouvoir consulter
+   et exporter les anomalies de chaque magasin indépendamment (demande
+   explicite). `catalogGroup` indique, pour chaque groupe de statistiques
+   avancées, quel catalogue de reconnaissance (catalogByGroup, voir plus
+   haut — lui reste binaire reserve/magasin, non scindé par étage) utiliser :
+   catalogGroupOf() ci-dessous fait la traduction id-de-groupe-stats →
+   id-de-catalogue. */
+const ADV_GROUPS = [
+  { id:'reserve', label:'Réserve' },
+  { id:'magasin-2e', label:'Magasin — 2e étage', catalogGroup:'magasin' },
+  { id:'magasin-5e', label:'Magasin — 5e étage', catalogGroup:'magasin' },
+  { id:'magasin-6e', label:'Magasin — 6e étage', catalogGroup:'magasin' },
+];
+const MAGASIN_ADV_GROUPS = ADV_GROUPS.filter(g=>g.catalogGroup==='magasin');
+const ADV_GROUP_BY_ID = {};
+ADV_GROUPS.forEach(g=>{ ADV_GROUP_BY_ID[g.id] = g; });
+function catalogGroupOf(advGroupId){ return (ADV_GROUP_BY_ID[advGroupId]||{}).catalogGroup || 'reserve'; }
+
+/* Debounce de updateAdvListsCount(). updateAdvListsCount() reste rapide
+   depuis le passage aux fonctions *Count() (plus de tri, voir "LISTES
+   AVANCÉES" plus bas), mais handleScan() peut appeler updateStats()
+   plusieurs fois en rafale (scan physique rapide au pistolet) : un debounce
+   (dernier appel gagne, ~150 ms) laisse d'abord le navigateur peindre le
+   retour visuel immédiat du scan (showFeedback, mini-plan) avant de
+   recalculer ces compteurs, plutôt que de les empiler de façon synchrone
+   dans la pile d'appel de chaque scan.
+
+   Déclaré ICI et pas avec le reste du debounce/des listes avancées plus bas,
+   pour exactement la même raison qu'ADV_GROUPS ci-dessus : updateStats()
+   appelle scheduleAdvListsCount() et tourne pendant l'initialisation
+   synchrone de la page (refreshLoc(), fin de la section "EMPLACEMENT"), donc
+   un `let` déclaré plus bas est encore en temporal dead zone à ce
+   moment-là — ReferenceError qui interrompait tout le reste du script
+   (mini-plan jamais construit, aucun écouteur de scan branché). Régression
+   introduite le 2026-09-02 avec ce debounce, corrigée le même jour. */
+let advListsCountTimer = null;
+function scheduleAdvListsCount(){
+  if(advListsCountTimer) return;
+  advListsCountTimer = setTimeout(()=>{ advListsCountTimer = null; updateAdvListsCount(); }, 150);
+}
+
+/* "Notices récolées" par magasin physique distinct (2e/5e/6e étage) — un
+   stat-card dédié dans chacun des 3 panneaux magasin ci-dessus.
+   catalogByGroup.magasin reste un catalogue UNIQUE, non scindé par étage
+   (voir CLAUDE.md), donc on reclasse chaque exemplaire a posteriori, sur
+   deux axes différents :
+   - récolé (numérateur) : d'après la travée réelle du scan (préfixe
+     M2-/M5-/M6-, terrain — exactement ce que le récolement vérifie,
+     traveeGroupOf() plus bas).
+   - total (dénominateur) : d'après la cote (coteDigitRun, propagé depuis
+     _coteDigitRun de data/magasins.json dans buildCatalogFromItems — mêmes
+     seuils que magasins.html/ETAGE_THRESHOLDS), seule information
+     disponible côté catalogue, qui lui n'a pas de notion d'emplacement
+     physique tant qu'un exemplaire n'a pas été scanné.
+   Déclaré ici, tôt comme ADV_GROUPS/ADV_CATS, pour la même raison (temporal
+   dead zone, voir commentaire ci-dessus) — magasinFloorStats() appelle
+   traveeGroupOf(), déclarée plus bas, mais c'est une `function` (hoisted),
+   donc l'ordre ne compte que pour les `const`/appels immédiats. */
+const MAGASIN_ETAGE_THRESHOLDS = { 5: 13830, 6: 133530 };
+
+// Sous-découpage additionnel du groupe "Magasin — 5e étage", pour l'export
+// de la seule catégorie "Récolés" (ADV_CATS.scanned) — demande explicite de
+// l'équipe : pouvoir exporter séparément trois tranches de travées plutôt
+// que tout l'étage d'un coup. TRAVEES_MAGASIN5 (js/reserve-shared.js) va de
+// M5-I à M5-XIX plus M5-ALPHA ; "le reste" est défini par exclusion (tout ce
+// qui n'est ni dans la 1re ni dans la 2e tranche) plutôt que listé en dur,
+// pour rester correct si la géométrie du 5e étage change un jour. Déclaré
+// ici, tôt comme MAGASIN_ETAGE_THRESHOLDS juste au-dessus (même raison,
+// temporal dead zone) : advGroupTemplate() le lit, et advGroupTemplate() est
+// appelée dès la ligne `document.getElementById('adv-groups').innerHTML = …`
+// plus bas, avant que d'éventuelles déclarations tardives ne soient
+// initialisées.
+const MAGASIN5_RANGE_1 = ['M5-I','M5-II','M5-III','M5-IV','M5-V'];
+const MAGASIN5_RANGE_2 = ['M5-VI','M5-VII','M5-VIII','M5-IX','M5-X','M5-XI','M5-XII','M5-XIII','M5-XIV','M5-XV','M5-XVI','M5-XVII'];
+const MAGASIN5_TRAVEE_RANGES = [
+  { key:'travee-i-v',     label:'Travée I à V',      test: t => MAGASIN5_RANGE_1.includes(t) },
+  { key:'travee-vi-xvii', label:'Travée VI à XVII',  test: t => MAGASIN5_RANGE_2.includes(t) },
+  { key:'reste',          label:'Le reste',          test: t => !MAGASIN5_RANGE_1.includes(t) && !MAGASIN5_RANGE_2.includes(t) },
+];
+
+function magasinEtageGroupOfDigitRun(digitRun){
+  if(!digitRun) return 'magasin-6e';
+  const threshold = MAGASIN_ETAGE_THRESHOLDS[digitRun.length];
+  if(!threshold) return 'magasin-6e';
+  const num = parseInt(digitRun, 10) || 0;
+  return num <= threshold ? 'magasin-2e' : 'magasin-5e';
+}
+function magasinFloorStats(group){
+  const cat = catalogByGroup.magasin;
+  if(!cat) return { scanned:0, total:0 };
+  let total = 0;
+  Object.values(cat).forEach(entry=>{
+    if(!inGroupScope(entry)) return;   // hors périmètre magasins : pas dans le total attendu
+    if(magasinEtageGroupOfDigitRun(entry.coteDigitRun)===group) total++;
+  });
+  const scannedNotices = new Set();
+  Object.values(scans).forEach(r=>{
+    if(traveeGroupOf(r.travee)!==group) return;
+    const entry = cat[r.barcode];
+    // inGroupScope : un document scanné ici mais catalogué sous une autre
+    // section (anomalie de classement) ne compte pas comme récolé, puisqu'il
+    // ne compte pas non plus dans le total attendu ci-dessus — les deux axes
+    // restent cohérents entre eux.
+    if(inGroupScope(entry)) scannedNotices.add(entry.noticeId);
+  });
+  return { scanned: scannedNotices.size, total };
+}
+// `only` (facultatif) : ne rafraîchir que ce groupe — les trois cartes ne
+// sont jamais visibles en même temps, et chaque appel à magasinFloorStats()
+// parcourt tout le catalogue magasins. Sans argument, les trois sont
+// recalculées (comportement d'origine, conservé pour tout appelant futur).
+function updateMagasinEtageStats(only){
+  const groups = only ? MAGASIN_ADV_GROUPS.filter(g=>g.id===only) : MAGASIN_ADV_GROUPS;
+  groups.forEach(g=>{
+    const el = document.getElementById('st-etage-'+g.id);
+    if(!el) return; // sécurité, toujours présent pour ces 3 groupes (voir advGroupTemplate())
+    const r = magasinFloorStats(g.id);
+    el.textContent = r.total
+      ? `${r.scanned.toLocaleString('fr-FR')} / ${r.total.toLocaleString('fr-FR')}`
+      : r.scanned.toLocaleString('fr-FR');
+  });
+}
+
+/* ════════════ PROGRESSION EN HAUT DE PAGE, PAR ÉTAGE ════════════
+   Les cartes récapitulatives et la barre de progression en tête de page ne
+   portent plus sur un catalogue "reserve"/"magasin" global (auparavant
+   trompeur : sélectionner "Magasin — 5e étage" affichait une progression
+   mêlant les 2e/5e/6e étage, catalogByGroup.magasin n'étant pas scindé par
+   étage) mais sur le même groupe que les "Statistiques avancées" plus bas
+   (ADV_GROUPS/traveeGroupOf) — déduit ici directement de loc.reserve pour
+   éviter de dépendre de loc.travee (pas toujours pertinent, ex. armoires).
+   Réutilise magasinFloorStats() pour les 3 étages de magasin ; pour la
+   réserve (patrimoniale + Douaisienne + armoires/tiroirs + hors-réserve,
+   qui partagent un seul catalogByGroup.reserve non scindé), même calcul
+   que l'ancien code de mise à jour de "Progression"/"Notices récolées". */
+function currentStatsGroup(){
+  if(loc.reserve==='magasin2') return 'magasin-2e';
+  if(loc.reserve==='magasin5') return 'magasin-5e';
+  if(loc.reserve==='magasin6') return 'magasin-6e';
+  return 'reserve';
+}
+
+function catalogStatsForGroup(group){
+  if(group==='reserve'){
+    const cat = catalogByGroup.reserve;
+    if(!cat) return null;
+    const noticesScanned = new Set(
+      Object.keys(scans).map(bc=>cat[bc] && cat[bc].noticeId).filter(Boolean)
+    );
+    return { scanned: noticesScanned.size, total: catalogNoticeCountByGroup.reserve };
+  }
+  if(!catalogByGroup.magasin) return null;
+  return magasinFloorStats(group);
+}
+
+function nonCatTotalForGroup(group){
+  return Object.keys(nonCat)
+    .filter(k=>traveeGroupOf(k.split('|')[0])===group)
+    .reduce((s,k)=>s+nonCat[k].count, 0);
+}
+
+function updateNoticeProgressBar(group, catStats, nonCatCount){
+  document.getElementById('notice-progress-label').textContent = 'Progression — ' + (ADV_GROUP_BY_ID[group] || ADV_GROUP_BY_ID.reserve).label;
+  const catalogTotal = catStats ? catStats.total : 0;
+  const scanned = catStats ? catStats.scanned : 0;
+  const jamais = Math.max(0, catalogTotal - scanned);
+  const total = catalogTotal + nonCatCount;
+  const pct = n => total ? Math.round(n/total*100) : 0;
+  document.getElementById('seg-notice-recolees').style.width = pct(scanned)+'%';
+  document.getElementById('seg-notice-noncat').style.width = pct(nonCatCount)+'%';
+  document.getElementById('seg-notice-jamais').style.width = pct(jamais)+'%';
+  document.getElementById('leg-notice-recolees').textContent = scanned.toLocaleString('fr-FR');
+  document.getElementById('leg-notice-noncat').textContent = nonCatCount.toLocaleString('fr-FR');
+  document.getElementById('leg-notice-jamais').textContent = jamais.toLocaleString('fr-FR');
+  document.getElementById('leg-notice-recolees-pct').textContent = total ? `(${pct(scanned)} %)` : '';
+  document.getElementById('leg-notice-noncat-pct').textContent = total ? `(${pct(nonCatCount)} %)` : '';
+  document.getElementById('leg-notice-jamais-pct').textContent = total ? `(${pct(jamais)} %)` : '';
+  document.getElementById('notice-progress-total').textContent = total
+    ? `${total.toLocaleString('fr-FR')} au total`
+    : (catStats ? 'aucune notice pour l\'instant' : (catalogFailedGroup[catalogGroupOf(group)] ? 'catalogue indisponible' : 'chargement du catalogue…'));
+}
+
+const ADV_CATS = {
+  abime: {
+    title: 'Codes-barres endommagés',
+    desc: 'Documents dont le code-barre a été saisi à la main (illisible au scanner)',
+    placeholder: 'Filtrer (cote, titre, code-barre, piège)…',
+    headers: ['Cote','Titre','Emplacement','Code-barre','Piège','Syracuse'],
+    colspan: 6,
+    emptyMsg: 'Aucun code-barre endommagé pour l\'instant.',
+    filterFields: ['cote','titre','barcode','piege'],
+    filePrefix: 'codes-barres-endommages',
+    needsCatalog: false,
+    showCorrectionFilter: true,
+    listFn: damagedList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
+    </tr>`,
+  },
+  manualcote: {
+    title: 'Scannés, non catalogués, cote saisie à la main',
+    desc: 'Code-barre absent du catalogue au moment du scan : seule la cote a été renseignée à la main, sans titre ni auteur',
+    placeholder: 'Filtrer (cote, code-barre)…',
+    headers: ['Cote','Emplacement','Code-barre','Syracuse'],
+    colspan: 4,
+    emptyMsg: 'Aucun code-barre dans ce cas pour l\'instant.',
+    filterFields: ['cote','barcode'],
+    filePrefix: 'codes-barres-non-catalogues',
+    needsCatalog: true,
+    showCorrectionFilter: true,
+    listFn: manualCoteList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
+    </tr>`,
+  },
+  notscanned: {
+    title: 'Jamais scannés — dans le catalogue mais pas encore récolés',
+    desc: 'Codes-barres du catalogue absents des scans : potentiellement perdus, ou récolement pas encore effectué',
+    placeholder: 'Filtrer (cote, titre, auteur, code-barre, piège)…',
+    headers: ['Cote','Titre','Auteur','Code-barre','Piège','Syracuse'],
+    colspan: 6,
+    emptyMsg: 'Tout le catalogue a été scanné au moins une fois.',
+    filterFields: ['cote','titre','auteur','barcode','piege'],
+    filePrefix: 'codes-barres-jamais-scannes',
+    needsCatalog: true,
+    showCorrectionFilter: true,
+    listFn: notScannedList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(titre inconnu)'}</td>
+      <td>${esc(r.auteur)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
+    </tr>`,
+  },
+  perdus: {
+    title: 'Documents probablement perdus (dans la plage déjà parcourue)',
+    desc: 'Uniquement pour les magasins 2e/5e étage (cotes numériques séquentielles) : jamais scannés, mais leur cote tombe entre la première et la dernière cote déjà scannée dans ce groupe — auraient donc dû être croisés en parcourant les rayons dans l\'ordre des cotes',
+    placeholder: 'Filtrer (cote, titre, auteur, code-barre, piège)…',
+    headers: ['Cote','Titre','Auteur','Code-barre','Piège','Syracuse'],
+    colspan: 6,
+    emptyMsg: 'Aucun document probablement perdu (ou pas encore assez de cotes scannées dans ce groupe pour définir une plage).',
+    filterFields: ['cote','titre','auteur','barcode','piege'],
+    filePrefix: 'documents-probablement-perdus',
+    needsCatalog: true,
+    showCorrectionFilter: true,
+    listFn: probablyLostList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(titre inconnu)'}</td>
+      <td>${esc(r.auteur)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
+    </tr>`,
+  },
+  scanned: {
+    title: 'Récolés — codes-barres déjà scannés',
+    desc: 'Tous les documents déjà récolés dans ce groupe (scan physique, y compris exemplarisation rapide et cascade de reliures) — export utile pour ajout panier SIGB ou recoupement avec une autre liste',
+    placeholder: 'Filtrer (cote, titre, auteur, code-barre)…',
+    headers: ['Cote','Titre','Auteur','Emplacement','Code-barre','Prêt'],
+    colspan: 6,
+    emptyMsg: 'Aucun document récolé pour l\'instant.',
+    filterFields: ['cote','titre','auteur','barcode'],
+    filePrefix: 'codes-barres-recoles',
+    needsCatalog: false,
+    listFn: scannedList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${esc(r.auteur)}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${syracuseLoanBadge(r.barcode)}</td>
+    </tr>`,
+  },
+  nobarcode: {
+    title: 'Mauvais numéro / code-barre absent',
+    desc: 'Cotes saisies à la main pour des documents sans code-barre physique — récolés automatiquement si la cote est reconnue dans le catalogue actif (exactement, ou par son seul numéro si un suffixe comme un code auteur ou une classification Dewey diffère), sinon juste listés ici pour savoir où en recoller un.',
+    placeholder: 'Filtrer (cote)…',
+    headers: ['Cote','Titre','Emplacement','Statut'],
+    colspan: 4,
+    emptyMsg: 'Aucun livre sans code-barre pour l\'instant.',
+    filterFields: ['cote','titre'],
+    filePrefix: 'cotes-sans-code-barre',
+    exportField: 'cote',
+    needsCatalog: false,
+    listFn: noBarcodeList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||(r.foundInCatalog?'':'(absent du catalogue)')}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td>${r.coteApprox ? '<span style="color:#f57f17" title="Numéro tapé différent de la cote complète du catalogue">≈ numéro approximatif — récolé</span>' : r.foundInCatalog ? '<span style="color:#2e7d32">✓ trouvée — récolé</span>' : '<span style="color:#c62828">✗ absente</span>'}</td>
+    </tr>`,
+  },
+  horssection: {
+    title: 'Anomalies de classement (hors magasin selon Syracuse)',
+    desc: 'Code-barre scanné dans un magasin mais catalogué dans Syracuse sous une autre section que Magasin/Magasin Jeunesse (colonne "Section réelle") — à vérifier : mauvais classement côté catalogue, ou document à ranger ailleurs.',
+    placeholder: 'Filtrer (cote, titre, section, code-barre, piège)…',
+    headers: ['Cote','Titre','Section réelle','Emplacement','Code-barre','Piège','Syracuse'],
+    colspan: 7,
+    emptyMsg: 'Aucune anomalie de classement détectée pour l\'instant.',
+    filterFields: ['cote','titre','sectionReelle','barcode','piege'],
+    filePrefix: 'anomalies-classement-magasin',
+    needsCatalog: false,
+    showCorrectionFilter: true,
+    listFn: horsSectionList,
+    rowHtml: r => `<tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(titre inconnu)'}</td>
+      <td>${esc(r.sectionReelle)||'—'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td>${esc(r.piege)||'—'}</td>
+      <td>${syracuseCorrectionCell(r.barcode)}</td>
+    </tr>`,
+  },
+};
+document.getElementById('adv-groups').innerHTML = ADV_GROUPS
+  .map(g=>`<div class="adv-group" id="adv-group-${g.id}">${advGroupTemplate(g)}</div>`).join('');
+
+// N'affiche que le groupe de statistiques avancées correspondant à
+// l'emplacement actuellement sélectionné (loc.reserve) — demande explicite
+// (2026-09-01) : les 4 panneaux (Réserve, Magasin 2e/5e/6e) affichés en même
+// temps rendaient la page trop longue à parcourir pour ne consulter que
+// celui qui correspond à l'étage où l'on se trouve physiquement. La
+// correspondance suit RESERVES → ADV_GROUPS : patrimoniale/douaisienne/
+// horsreserve → 'reserve' (même regroupement que catalogGroupOfReserve(),
+// resté binaire reserve/magasin — voir plus haut), magasin2/5/6 → leur
+// groupe dédié. Les autres groupes restent dans le DOM (juste masqués,
+// display:none) plutôt que retirés : rebasculer de réserve n'a pas besoin
+// de reconstruire leur HTML/écouteurs.
+function advGroupIdForReserve(reserveId){
+  if(reserveId==='magasin2') return 'magasin-2e';
+  if(reserveId==='magasin5') return 'magasin-5e';
+  if(reserveId==='magasin6') return 'magasin-6e';
+  return 'reserve';
+}
+function applyAdvGroupVisibility(){
+  const activeId = advGroupIdForReserve(loc.reserve);
+  ADV_GROUPS.forEach(g=>{
+    const el = document.getElementById('adv-group-'+g.id);
+    if(el) el.style.display = (g.id===activeId) ? '' : 'none';
+  });
+}
+
+/* ════════════ EMPLACEMENT ════════════
+   Le scan code-barre et le comptage des non-catalogués sont deux outils
+   affichés ensemble au même endroit (plus d'onglet à basculer entre les
+   deux) ; seul le type d'emplacement reste un axe séparé (loc.locType :
+   "etagere" = travée+colonne+étage, "armoire"/"tiroir" = colonne+étage
+   seuls, sur les pseudo-travées EMPLACEMENTS_ARMOIRE / EMPLACEMENTS_TIROIR
+   définies dans js/reserve-shared.js). */
+const scanInput = document.getElementById('scan-input');
+const damagedToggle = document.getElementById('damaged-toggle');
+const noncatInput = document.getElementById('noncat-input');
+const selReserve=document.getElementById('sel-reserve'), selLocType=document.getElementById('sel-loctype');
+
+RESERVES.forEach(r=>{
+  const o=document.createElement('option'); o.value=r.id; o.textContent=r.label;
+  selReserve.appendChild(o);
+});
+selReserve.value = loc.reserve;
+selLocType.value = loc.locType;
+
+function activeTravees(){ return traveesOfReserve(loc.reserve); }
+function currentTraveeDef(){ const list=activeTravees(); return list.find(t=>t.id===loc.travee) || list[0]; }
+function currentLocDef(){
+  if(loc.locType==='armoire') return EMPLACEMENTS_ARMOIRE[0];
+  if(loc.locType==='tiroir')  return EMPLACEMENTS_TIROIR[0];
+  return currentTraveeDef();
+}
+
+function updateVideRowVisibility(){
+  // Marquer un emplacement vide/non rangé n'a pas de sens en "Non rangé
+  // (hors réserve)" — il n'y a justement pas d'emplacement.
+  document.getElementById('vide-row').style.display = loc.reserve!=='horsreserve' ? '' : 'none';
+}
+
+function setLocType(type, skipRefresh){
+  if(loc.reserve==='horsreserve'){
+    // Pas de travée/colonne/étage en mode "hors réserve" — rien à calculer.
+    if(!skipRefresh) refreshLoc();
+    return;
+  }
+  loc.locType = type;
+  document.getElementById('stp-travee-wrap').style.display = type==='etagere' ? '' : 'none';
+  const def = currentLocDef();
+  loc.colonne = Math.min(def.nbCols, Math.max(1, loc.colonne||1));
+  // Les travées n'ont pas de plafond fixe (voir DEFAULT_MAX_ETAGE côté
+  // reserve-shared.js) : seules les armoires/tiroirs, à capacité physique
+  // réellement fixe, sont bornées ici.
+  loc.etage = type==='etagere' ? Math.max(1, loc.etage||1) : Math.min(def.maxEt, Math.max(1, loc.etage||1));
+  if(!skipRefresh) refreshLoc();
+}
+selLocType.addEventListener('change', ()=>setLocType(selLocType.value));
+
+function applyReserveVisibility(){
+  const isHorsReserve = loc.reserve === 'horsreserve';
+  // Les armoires et tiroirs sont physiquement dans la réserve patrimoniale uniquement.
+  const hasArmoires = loc.reserve === 'patrimoniale';
+  [...selLocType.options].forEach(o=>{ if(o.value!=='etagere') o.disabled = !hasArmoires; });
+  if(!hasArmoires && loc.locType!=='etagere'){
+    loc.locType='etagere'; selLocType.value='etagere';
+  }
+  // Aucun emplacement (travée/colonne/étage) n'a de sens pour des exemplaires
+  // hors réserve — on masque tout ce qui présuppose un emplacement (dont le
+  // comptage de non-catalogués, forcément lié à une étagère précise) et on
+  // cache le panneau "Attendu à cet emplacement".
+  selLocType.style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('stp-colonne-wrap').style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('stp-etage-wrap').style.display = isHorsReserve ? 'none' : '';
+  if(isHorsReserve) document.getElementById('stp-travee-wrap').style.display = 'none';
+  document.getElementById('noncat-mode-zone').style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('nobarcode-row').style.display = isHorsReserve ? 'none' : '';
+  document.querySelector('.expected-panel').style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
+  updateVideRowVisibility();
+  applyAdvGroupVisibility();
+}
+
+selReserve.addEventListener('change', ()=>{
+  loc.reserve = selReserve.value;
+  syncActiveCatalog();
+  applyReserveVisibility();
+  if(loc.reserve==='horsreserve'){
+    refreshLoc();
+  } else {
+    const list = activeTravees();
+    loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
+    setLocType(loc.locType);
+  }
+});
+
+document.querySelectorAll('[data-step]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const field = btn.dataset.step, dir = parseInt(btn.dataset.dir);
+    if(field==='travee'){
+      const list = activeTravees();
+      const idx = Math.min(list.length-1, Math.max(0, list.findIndex(t=>t.id===loc.travee) + dir));
+      loc.travee = list[idx].id; loc.colonne = 1; loc.etage = 1;
+    } else if(field==='colonne'){
+      const max = currentLocDef().nbCols;
+      loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
+    } else if(field==='etage'){
+      // Pas de plafond pour les travées (nombre d'étagères variable, voir
+      // DEFAULT_MAX_ETAGE / bouton "dernière étagère de cette colonne") ;
+      // seules les armoires/tiroirs ont une capacité physique réellement fixe.
+      const max = loc.locType==='etagere' ? Infinity : currentLocDef().maxEt;
+      loc.etage = Math.min(max, Math.max(1, loc.etage + dir));
+    }
+    refreshLoc();
+  });
+});
+
+function colLetter(n){ return String.fromCharCode(64+n); }
+
+function locFieldsOf(l){
+  if(l.reserve==='horsreserve') return { travee:'HORS-RESERVE', colonne:'', etage:'' };
+  if(l.locType==='armoire') return { travee:'ARMOIRE', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  if(l.locType==='tiroir')  return { travee:'TIROIR', colonne:colLetter(l.colonne), etage:String(l.etage) };
+  return { travee:l.travee, colonne:colLetter(l.colonne), etage:String(l.etage) };
+}
+
+function displayTraveeId(t){
+  if(t==='HORS-RESERVE') return 'Non rangé (hors réserve)';
+  if(t==='ARMOIRE') return 'Armoire (bois)';
+  if(t==='TIROIR') return 'Armoire à tiroirs';
+  return (t||'').replace(/^RD-/, '').replace(/^M2-/, '').replace(/^M5-/, '').replace(/^M6-/, '');
+}
+
+function locLabel(t){
+  if(t==='HORS-RESERVE' || t==='ARMOIRE' || t==='TIROIR') return displayTraveeId(t);
+  return 'Travée '+displayTraveeId(t);
+}
+
+function locSortIndex(t){
+  const i = TRAVEES_ALL.findIndex(x=>x.id===t);
+  if(i>=0) return i;
+  if(t==='ARMOIRE') return 1000;
+  if(t==='TIROIR') return 1001;
+  if(t==='HORS-RESERVE') return 1002;
+  return 999;
+}
+
+function refreshLoc(){
+  saveLoc();
+  document.getElementById('val-colonne').textContent = colLetter(loc.colonne);
+  document.getElementById('val-etage').textContent = loc.etage;
+  if(loc.locType==='etagere') document.getElementById('val-travee').textContent = displayTraveeId(loc.travee);
+  const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
+  let readout;
+  if(loc.reserve==='horsreserve') readout = reserveLabel;
+  else if(loc.locType==='armoire') readout = `${reserveLabel} · Armoire (bois) · Meuble ${colLetter(loc.colonne)} · Niveau ${loc.etage}`;
+  else if(loc.locType==='tiroir') readout = `${reserveLabel} · Armoire à tiroirs · Meuble ${colLetter(loc.colonne)} · Tiroir ${loc.etage}`;
+  else readout = `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
+  document.getElementById('loc-readout').textContent = readout;
+  renderExpected();
+  renderHereLog();
+  updateStats();
+  updateNonCatInput();
+  updateVideUI();
+  updateNonRangeUI();
+  updateLastShelfUI();
+  buildMiniPlan();
+  scanInput.focus();
+}
+applyReserveVisibility();
+setLocType(loc.locType, true);
+refreshLoc();
+
+/* ════════════ SON ════════════ */
+let audioCtx = null;
+function beep(freq, dur){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    // Le navigateur suspend parfois le contexte tout seul (économie d'énergie,
+    // onglet repassé au premier plan…) sans jamais le remettre en route :
+    // start()/stop() ne lèvent alors aucune erreur, juste aucun son. resume()
+    // est sans effet s'il tourne déjà — on l'appelle systématiquement plutôt
+    // que de vérifier audioCtx.state, par sécurité.
+    audioCtx.resume();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type='sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime+dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime+dur);
+  }catch(e){ console.error('beep() a échoué :', e); }
+}
+function beepError(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    audioCtx.resume();
+    const now = audioCtx.currentTime;
+    [0, .16].forEach(offset=>{
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type='square'; o.frequency.value=160;
+      g.gain.setValueAtTime(.15, now+offset);
+      g.gain.exponentialRampToValueAtTime(.001, now+offset+.14);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(now+offset); o.stop(now+offset+.14);
+    });
+  }catch(e){}
+}
+
+/* ════════════ SCAN ════════════ */
+scanInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    // Le champ DOIT être vidé même si handleScan()/handleScanHorsReserve()
+    // lève une exception (try/finally) : sans ça, le code-barre en cours
+    // reste dans le champ et le scan suivant vient s'y accoler tel quel —
+    // jusqu'à ce qu'un scan finisse par passer sans erreur, avec tous les
+    // codes-barres accumulés collés bout à bout comme un seul "inconnu du
+    // catalogue" (bug observé le 2026-09-01, cause exacte de l'exception
+    // encore à identifier via le console.error ci-dessous).
+    try{
+      if(loc.reserve==='horsreserve') handleScanHorsReserve(scanInput.value.trim(), damagedToggle.checked);
+      else handleScan(scanInput.value.trim(), damagedToggle.checked);
+    }catch(err){
+      console.error('Le scan a échoué, code-barre non enregistré :', err);
+    }finally{
+      scanInput.value='';
+      damagedToggle.checked=false;
+    }
+  }
+});
+document.addEventListener('click', e=>{
+  // .adv-details (menus dépliables des statistiques avancées), et depuis
+  // 2026-09-01 .expected-panel/.log-wrap (également des <details> repliables
+  // — "Attendu à cet emplacement"/"Scans récents ici"/"Tous les scans") sont
+  // exclus : refocuser scanInput (en haut de la page, hors de vue une fois
+  // qu'on a scrollé plus bas) forçait le navigateur à faire défiler la page
+  // jusqu'à lui à chaque clic sur un <summary> ou une ligne de tableau —
+  // sensation de "téléportation" en haut de page.
+  if(!e.target.closest('input,select,button,a,label,.adv-details,.expected-panel,.log-wrap')) scanInput.focus();
+});
+
+function handleScan(barcode, damaged, opts){
+  if(!barcode) return;
+  const fields = locFieldsOf(loc);
+  const group = catalogGroupOfReserve(loc.reserve);
+  let cat = catalog ? catalog[barcode] : null;
+  // Anomalie de classement : ce code-barre existe bien dans le catalogue
+  // magasins (qui couvre toute la bibliothèque de Douai depuis 2026-08-26),
+  // mais il y est catalogué sous une autre section Syracuse que
+  // Magasin/Magasin Jeunesse alors qu'on le scanne physiquement dans un
+  // magasin (ou l'inverse) — à faire remonter, ce n'est pas une absence du
+  // catalogue. Le scan est enregistré normalement, titre/cote affichés.
+  // Avant 2026-09-02 ce cas se détectait via un second catalogue complet
+  // (magasinWideCatalog) ; il se lit maintenant sur l'entrée elle-même.
+  let horsSection = false;
+  if(cat && group==='magasin' && !inGroupScope(cat)){
+    horsSection = true;
+  }
+  const prev = scans[barcode];
+
+  const record = {
+    barcode,
+    cote: cat ? cat.cote : (prev ? prev.cote : ''),
+    titre: cat ? cat.titre : (prev ? prev.titre : ''),
+    auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
+    fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
+    etat: cat ? cat.etat : (prev ? prev.etat : ''),
+    piege: cat ? cat.piege : (prev ? prev.piege : ''),
+    manuel: cat ? !!cat.manuel : (prev ? !!prev.manuel : false),
+    kind: loc.locType,
+    travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+    barcodeAbime: !!damaged,
+    // Vient de handleNoBarcodeCote() (cote saisie à la main, sans code-barre
+    // physique, mais reconnue dans le catalogue) — voir "LIVRES SANS
+    // CODE-BARRE" plus bas. Propagé sur le record pour que noBarcodeList()
+    // puisse retrouver ces scans-là sans structure de données séparée.
+    sansCodeBarre: !!(opts && opts.sansCodeBarre),
+    // Idem, mais pour le cas où la cote tapée dans "Livre sans code-barre"
+    // ne correspondait pas exactement à celle du catalogue et n'a été
+    // retrouvée que par son run de chiffres (voir extractCoteDigitRun() /
+    // handleNoBarcodeCote()) — à vérifier : le numéro tapé est peut-être
+    // erroné, ou la cote du catalogue porte un suffixe non relevé sur le
+    // document. Volontairement PAS "sticky" comme horsSection ci-dessous :
+    // un vrai scan physique ultérieur du code-barre (sans ces opts) doit
+    // faire disparaître ce doute, pas le conserver indéfiniment.
+    coteApprox: !!(opts && opts.coteApprox),
+    // Section Syracuse réelle (record.fonds ci-dessus) différente de
+    // Magasin/Magasin Jeunesse alors que ce scan a eu lieu dans un magasin —
+    // voir ADV_CATS.horssection plus bas. Ne s'efface pas tout seul si le
+    // même code-barre est rescanné plus tard sans que le catalogue soit
+    // chargé : on conserve le dernier statut connu.
+    horsSection: horsSection || (prev ? !!prev.horsSection : false),
+    ts: Date.now()
+  };
+
+  let status;
+  if(!cat && !prev) status = 'unknown';
+  else if(prev && prev.travee===fields.travee && prev.colonne===fields.colonne && prev.etage===fields.etage) status = 'dup';
+  else if(prev) status = 'moved';
+  else status = 'ok';
+
+  // Le bip doit partir tout de suite, avant tout autre traitement : avec
+  // l'ancien saveScans() (resérialisait en JSON l'intégralité de l'objet
+  // scans, des dizaines de milliers d'entrées sur un récolement avancé, à
+  // CHAQUE scan réussi), ce travail, s'il passait avant le bip, bloquait
+  // assez longtemps le thread principal pour que les 300ms programmées du
+  // son de validation s'écoulent avant même que le rendu audio ne démarre
+  // réellement — le son restait "programmé" (audioCtx.state affiche bien
+  // 'running', aucune erreur) mais ne sortait jamais. Le bip d'erreur, lui,
+  // n'était jamais précédé de saveScans()/queuePatch() (sautés pour un
+  // code-barre inconnu) et restait donc toujours audible — c'est ce qui a
+  // permis d'isoler la cause (2026-09-01). putScanRecord() (IndexedDB,
+  // migration du 2026-09-01) n'écrit plus qu'un seul enregistrement par
+  // scan, mais l'ordre est gardé par précaution.
+  if(status==='unknown') beepError(); else beep(880, .3);
+
+  if(status!=='unknown'){
+    scans[barcode] = record;
+    putScanRecord(record);
+    queuePatch({type:'scan', record});
+  }
+
+  // Reliures : cat.relies liste les codes-barres des autres documents
+  // catalogués physiquement dans le même volume (voir _relies dans
+  // build-inventory.mjs, à partir des champs $481/$482) — on les récole
+  // automatiquement au même emplacement, pour ne pas avoir à les scanner un
+  // par un.
+  const reliureRecords = (status!=='unknown' && cat && cat.relies && cat.relies.length)
+    ? applyReliureCascade(barcode, cat.relies, fields)
+    : [];
+
+  showFeedback(record, status, prev, reliureRecords);
+
+  renderExpected();
+  renderHereLog();
+  updateStats();
+  buildMiniPlan();
+}
+
+function applyReliureCascade(sourceBarcode, siblingBarcodes, fields){
+  const results = [];
+  siblingBarcodes.forEach(sibBarcode=>{
+    if(sibBarcode === sourceBarcode) return;
+    const sibCat = catalog ? catalog[sibBarcode] : null;
+    const sibPrev = scans[sibBarcode];
+    const sibRecord = {
+      barcode: sibBarcode,
+      cote: sibCat ? sibCat.cote : (sibPrev ? sibPrev.cote : ''),
+      titre: sibCat ? sibCat.titre : (sibPrev ? sibPrev.titre : ''),
+      auteur: sibCat ? sibCat.auteur : (sibPrev ? sibPrev.auteur : ''),
+      fonds: sibCat ? sibCat.fonds : (sibPrev ? sibPrev.fonds : ''),
+      etat: sibCat ? sibCat.etat : (sibPrev ? sibPrev.etat : ''),
+      piege: sibCat ? sibCat.piege : (sibPrev ? sibPrev.piege : ''),
+      manuel: sibCat ? !!sibCat.manuel : (sibPrev ? !!sibPrev.manuel : false),
+      kind: loc.locType,
+      travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+      barcodeAbime: sibPrev ? !!sibPrev.barcodeAbime : false,
+      // Marque que ce scan n'est pas un scan physique mais une propagation
+      // automatique depuis le code-barre effectivement scanné — voir le
+      // badge 🔗 dans renderHereLog()/renderAllLog().
+      viaReliure: sourceBarcode,
+      ts: Date.now(),
+    };
+    scans[sibBarcode] = sibRecord;
+    queuePatch({type:'scan', record: sibRecord});
+    results.push(sibRecord);
+  });
+  bulkPutScanRecords(results);
+  return results;
+}
+
+function showFeedback(record, status, prev, reliureRecords){
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback show ' + (status==='unknown' ? 'warn' : status==='dup' ? 'dup' : status==='moved' ? 'dup' : 'ok');
+  const badgeTxt = { ok:'✓ Enregistré', dup:'🔁 Déjà scanné ici', moved:'↔ Déplacé depuis un autre emplacement', unknown:'⚠ Code-barre inconnu du catalogue' }[status];
+  const badgeCls = status==='unknown' ? 'warn' : (status==='dup'||status==='moved') ? 'dup' : 'ok';
+  let html = `<div class="fb-top"><span class="fb-badge ${badgeCls}">${badgeTxt}</span>
+    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
+    ${record.manuel ? `<span class="fb-badge" style="background:var(--plan-manuel);color:#fff" title="Créé via exemplarisation.html, pas encore une vraie notice Syracuse">⚡ Exemplarisé rapide</span>` : ''}
+    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}
+    ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Mauvais numéro / code-barre absent »">📎 Sans code-barre</span>` : ''}
+    ${record.coteApprox ? `<span class="fb-badge" style="background:#f57f17;color:#fff" title="La cote tapée ne correspondait pas exactement à celle du catalogue — retrouvé par son numéro, à vérifier">≈ Cote approximative</span>` : ''}
+    ${record.horsSection ? `<span class="fb-badge" style="background:#c62828;color:#fff" title="Catalogué sous une autre section que Magasin/Magasin Jeunesse — à vérifier dans Syracuse">⚠ Anomalie de classement</span>` : ''}</div>`;
+  html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
+  html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
+  if(status==='moved' && prev){
+    html += `<div class="fb-meta">Précédemment : ${esc(locLabel(prev.travee))}${prev.colonne?' · col. '+esc(prev.colonne):''} · étage/n° ${esc(prev.etage)}</div>`;
+  }
+  if(reliureRecords && reliureRecords.length){
+    html += `<div class="fb-meta" style="color:#00897b">🔗 Relié avec ${reliureRecords.length} autre(s) document(s), récolé(s) automatiquement au même emplacement : ${reliureRecords.map(r=>esc(r.cote||r.barcode)).join(', ')}</div>`;
+  }
+  if(status==='unknown'){
+    html += `<div class="fb-manual">
+      <input type="text" id="manual-cote" placeholder="Cote (si connue)">
+      <button type="button" id="manual-save">Renseigner</button>
+    </div>`;
+  }
+  fb.innerHTML = html;
+  if(status==='unknown'){
+    document.getElementById('manual-save').addEventListener('click', ()=>{
+      const v = document.getElementById('manual-cote').value.trim();
+      if(v){
+        record.cote = v;
+        record.fonds = getFondsFromCote(v);
+        scans[record.barcode] = record;
+        putScanRecord(record); renderExpected(); renderHereLog(); updateStats(); buildMiniPlan();
+        queuePatch({type:'scan', record});
+      }
+      scanInput.focus();
+    });
+  }
+}
+
+/* ════════════ LIVRES SANS CODE-BARRE ════════════
+   Pour les documents qui n'ont jamais eu de code-barre collé (courant dans
+   les magasins d'étage) : on saisit la cote plutôt que de scanner. Trois cas,
+   dans cet ordre (voir catalogCoteIndexByGroup/catalogDigitRunIndexByGroup
+   ci-dessus) :
+   - la cote correspond EXACTEMENT à un exemplaire du catalogue actif → on
+     le récole normalement via handleScan() (même emplacement, même
+     mécanique de dup/déplacé, cascade reliures...), avec le flag
+     sansCodeBarre:true sur le record pour qu'il apparaisse *en plus* dans
+     la liste d'export "Mauvais numéro / code-barre absent" (voir
+     noBarcodeList() et ADV_CATS.nobarcode).
+   - sinon, le RUN DE CHIFFRES de la cote tapée correspond, sans ambiguïté, à
+     celui d'un exemplaire du catalogue (ex. "136854" tapé pour une cote
+     réelle "136854 PUJ" ou "856.7 136854 PUJ" — l'utilisateur·rice ne
+     connaît pas forcément le suffixe auteur ou la classification Dewey
+     secondaire recopiés sur la cote complète) → récolé de la même façon,
+     avec sansCodeBarre:true ET coteApprox:true, pour rester distinguable
+     d'une correspondance exacte (à vérifier : bon exemplaire ? cote du
+     catalogue à corriger ?).
+   - la cote ne correspond à rien de connu (même approximativement) → pas de
+     scan (rien à récoler, on ne connaît même pas le titre), juste un
+     enregistrement dans noBarcodeCotes (clé = cote normalisée) pour la même
+     liste d'export — "et c'est tout", pas d'effet sur les statistiques de
+     progression. */
+function handleNoBarcodeCote(coteRaw){
+  const cote = (coteRaw||'').trim();
+  if(!cote) return;
+  const group = catalogGroupOfReserve(loc.reserve);
+  const idx = catalogCoteIndexByGroup[group];
+  const foundBarcode = idx ? idx[normalizeCote(cote)] : null;
+
+  const digitRunIdx = catalogDigitRunIndexByGroup[group];
+  const digitRun = !foundBarcode ? extractCoteDigitRun(cote) : null;
+  const approxBarcode = (!foundBarcode && digitRun && digitRunIdx) ? digitRunIdx[digitRun] : null;
+
+  if(foundBarcode){
+    handleScan(foundBarcode, false, { sansCodeBarre:true });
+  } else if(approxBarcode){
+    handleScan(approxBarcode, false, { sansCodeBarre:true, coteApprox:true });
+  } else {
+    const fields = locFieldsOf(loc);
+    const record = { cote, travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    noBarcodeCotes[normalizeCote(cote)] = record;
+    saveNoBarcodeCotes();
+    queuePatch({ type:'noBarcode', key:normalizeCote(cote), record });
+    showNoBarcodeFeedback(record);
+    beepError();
+    updateStats();
+  }
+  document.getElementById('nobarcode-input').value = '';
+  document.getElementById('nobarcode-input').focus();
+}
+function showNoBarcodeFeedback(record){
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback show warn';
+  fb.innerHTML = `<div class="fb-top"><span class="fb-badge warn">⚠ Cote absente du catalogue</span>
+    <span class="fb-cote">${esc(record.cote)}</span></div>
+    <div class="fb-titre">(non catalogué)</div>
+    <div class="fb-meta">Ajouté à la liste « Mauvais numéro / code-barre absent » — pas compté comme récolé.</div>`;
+}
+document.getElementById('nobarcode-save').addEventListener('click', ()=>{
+  handleNoBarcodeCote(document.getElementById('nobarcode-input').value);
+});
+document.getElementById('nobarcode-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); handleNoBarcodeCote(document.getElementById('nobarcode-input').value); }
+});
+
+/* ════════════ SCAN "NON RANGÉ" (exemplaire retrouvé hors réserve) ════════════
+   Distinct du scan normal : pas d'emplacement (travée/colonne/étage), donc
+   pas de notion "ok/dup/déplacé" par rapport à la session en cours — à la
+   place, on consulte le récolement de référence (baseline), s'il y en a un
+   de chargé, pour indiquer où ce livre se trouvait lors du dernier
+   récolement. Le scan est quand même enregistré (travée conventionnelle
+   "HORS-RESERVE", voir locFieldsOf) : ça permet de retrouver ces exemplaires
+   dans "Tous les scans", et si le livre est ensuite rescanné à son vrai
+   emplacement, le scan normal détectera correctement un "déplacement" depuis
+   "Non rangé (hors réserve)". */
+function handleScanHorsReserve(barcode, damaged){
+  if(!barcode) return;
+  const fields = locFieldsOf(loc);
+  const cat = catalog ? catalog[barcode] : null;
+  const prev = scans[barcode];
+  const known = !!(cat || prev);
+
+  const record = {
+    barcode,
+    cote: cat ? cat.cote : (prev ? prev.cote : ''),
+    titre: cat ? cat.titre : (prev ? prev.titre : ''),
+    auteur: cat ? cat.auteur : (prev ? prev.auteur : ''),
+    fonds: cat ? cat.fonds : (prev ? prev.fonds : ''),
+    etat: cat ? cat.etat : (prev ? prev.etat : ''),
+    manuel: cat ? !!cat.manuel : (prev ? !!prev.manuel : false),
+    kind: 'horsreserve',
+    travee: fields.travee, colonne: fields.colonne, etage: fields.etage,
+    barcodeAbime: !!damaged,
+    ts: Date.now()
+  };
+
+  // Voir le commentaire de handleScan() : le bip doit partir avant
+  // putScanRecord()/queuePatch(), par précaution.
+  if(known) beep(880, .3); else beepError();
+
+  if(known){
+    scans[barcode] = record;
+    putScanRecord(record);
+    queuePatch({type:'scan', record});
+  }
+
+  showHorsReserveFeedback(record, !known);
+
+  renderHereLog();
+  updateStats();
+}
+
+function showHorsReserveFeedback(record, unknown){
+  const fb = document.getElementById('feedback');
+  const baselineRec = baseline ? baseline[record.barcode] : null;
+  fb.className = 'feedback show ' + (baselineRec ? 'dup' : 'warn');
+  const badgeTxt = baselineRec ? '📍 Déjà récolé — emplacement d\'origine ci-dessous' : '⚠ Hors réserve';
+  let html = `<div class="fb-top"><span class="fb-badge ${baselineRec?'dup':'warn'}">${badgeTxt}</span>
+    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
+    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}</div>`;
+  html += `<div class="fb-titre">${esc(record.titre) || (unknown ? '(non catalogué)' : '(titre inconnu)')}</div>`;
+  html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
+  if(baselineRec){
+    html += `<div class="fb-meta"><strong>Emplacement lors du récolement de référence :</strong> ${esc(locLabel(baselineRec.travee))}${baselineRec.colonne?' · col. '+esc(baselineRec.colonne):''} · étage/n° ${esc(baselineRec.etage)}. Remettez-le à cet emplacement.</div>`;
+  } else {
+    html += `<div class="fb-meta">${baseline ? 'Aucune trace de ce livre dans le récolement de référence chargé.' : 'Aucun récolement de référence chargé.'} Veuillez mettre ce livre à l'emplacement indiqué par sa cote. Une fois cela fait, scannez le code-barre avec le bon emplacement sélectionné pour l'ajouter au récolement principal.</div>`;
+  }
+  if(unknown){
+    html += `<div class="fb-manual">
+      <input type="text" id="manual-cote" placeholder="Cote (si connue)">
+      <button type="button" id="manual-save">Renseigner</button>
+    </div>`;
+  }
+  fb.innerHTML = html;
+  if(unknown){
+    document.getElementById('manual-save').addEventListener('click', ()=>{
+      const v = document.getElementById('manual-cote').value.trim();
+      if(v){
+        record.cote = v;
+        record.fonds = getFondsFromCote(v);
+        scans[record.barcode] = record;
+        putScanRecord(record); updateStats();
+        queuePatch({type:'scan', record});
+      }
+      scanInput.focus();
+    });
+  }
+}
+
+/* ════════════ NON CATALOGUÉS (mode "Catalogage") ════════════ */
+function nonCatKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.etage}`; }
+
+function currentNonCatCount(){
+  const rec = nonCat[nonCatKey(locFieldsOf(loc))];
+  return rec ? rec.count : 0;
+}
+
+function updateNonCatInput(){
+  noncatInput.value = currentNonCatCount();
+}
+
+function saveNonCatCount(){
+  const fields = locFieldsOf(loc);
+  const key = nonCatKey(fields);
+  let count = parseInt(noncatInput.value, 10);
+  if(isNaN(count) || count < 0) count = 0;
+  noncatInput.value = count;
+  if(count === 0) delete nonCat[key];
+  else nonCat[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, count, ts:Date.now() };
+  beep(880, .3);
+  saveNonCat();
+  showNonCatFeedback(count);
+  updateStats();
+  buildMiniPlan();
+  queuePatch({type:'nonCat', key, record: nonCat[key] || null});
+}
+
+function showNonCatFeedback(count){
+  const fb = document.getElementById('noncat-feedback');
+  fb.className = 'feedback show ok';
+  fb.innerHTML = count > 0
+    ? `<div class="fb-top"><span class="fb-badge ok">✓ Enregistré</span></div><div class="fb-titre">${count} livre${count>1?'s':''} non catalogué${count>1?'s':''} estimé${count>1?'s':''} sur cet emplacement.</div>`
+    : `<div class="fb-top"><span class="fb-badge ok">✓ Enregistré</span></div><div class="fb-titre">Emplacement marqué sans livre non catalogué.</div>`;
+}
+
+// Enregistrement automatique dès que la valeur change, avec un petit délai
+// pour ne pas envoyer une requête réseau à chaque clic quand on incrémente
+// plusieurs fois de suite (voir queuePatch/flushPendingSync plus haut).
+let noncatSaveTimer = null;
+function scheduleNonCatSave(){
+  clearTimeout(noncatSaveTimer);
+  noncatSaveTimer = setTimeout(saveNonCatCount, 600);
+}
+noncatInput.addEventListener('input', scheduleNonCatSave);
+noncatInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); clearTimeout(noncatSaveTimer); saveNonCatCount(); }
+});
+document.getElementById('noncat-minus').addEventListener('click', ()=>{
+  noncatInput.value = Math.max(0, (parseInt(noncatInput.value,10)||0) - 1);
+  scheduleNonCatSave();
+});
+document.getElementById('noncat-plus').addEventListener('click', ()=>{
+  noncatInput.value = (parseInt(noncatInput.value,10)||0) + 1;
+  scheduleNonCatSave();
+});
+
+/* ════════════ ÉTAGÈRES VIDES / NON RANGÉES ════════════
+   Deux marquages mutuellement exclusifs sur un même emplacement (même clé
+   travee|colonne|etage) : "vide" (aucun livre) et "non rangé" (documents de
+   natures différentes en désordre, impossibles à compter facilement). */
+function emplacementKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.etage}`; }
+
+function isCurrentVide(){ return !!videShelves[emplacementKey(locFieldsOf(loc))]; }
+function isCurrentNonRange(){ return !!nonRangeShelves[emplacementKey(locFieldsOf(loc))]; }
+
+function updateVideUI(){
+  const btn = document.getElementById('btn-vide');
+  const marked = isCurrentVide();
+  btn.textContent = marked ? '☑ Vide' : '☐ Vide';
+  btn.classList.toggle('active', marked);
+}
+
+function updateNonRangeUI(){
+  const btn = document.getElementById('btn-nonrange');
+  const marked = isCurrentNonRange();
+  btn.textContent = marked ? '☑ Non rangé' : '☐ Non rangé';
+  btn.classList.toggle('active', marked);
+}
+
+document.getElementById('btn-vide').addEventListener('click', ()=>{
+  const fields = locFieldsOf(loc);
+  const key = emplacementKey(fields);
+  if(!videShelves[key]){
+    const hereCount = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
+    if(hereCount>0 && !confirm(`${hereCount} scan(s) déjà enregistré(s) sur cet emplacement. Marquer quand même comme vide ?`)) return;
+    videShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    if(nonRangeShelves[key]){ delete nonRangeShelves[key]; saveNonRangeShelves(); }
+    beep(660,.1);
+  } else {
+    delete videShelves[key];
+  }
+  saveVideShelves();
+  updateVideUI();
+  updateNonRangeUI();
+  updateStats();
+  buildMiniPlan();
+  queuePatch({type:'vide', key, record: videShelves[key] || null});
+});
+
+document.getElementById('btn-nonrange').addEventListener('click', ()=>{
+  const fields = locFieldsOf(loc);
+  const key = emplacementKey(fields);
+  if(!nonRangeShelves[key]){
+    nonRangeShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    if(videShelves[key]){ delete videShelves[key]; saveVideShelves(); }
+    beep(560,.1);
+  } else {
+    delete nonRangeShelves[key];
+  }
+  saveNonRangeShelves();
+  updateVideUI();
+  updateNonRangeUI();
+  updateStats();
+  buildMiniPlan();
+  queuePatch({type:'nonrange', key, record: nonRangeShelves[key] || null});
+});
+
+/* ════════════ DERNIÈRE ÉTAGÈRE D'UNE COLONNE ════════════
+   Distinct de vide/non rangé : ne marque pas un emplacement précis mais une
+   propriété de la colonne entière ("elle s'arrête à l'étage N"), donc clé
+   travee|colonne (sans étage) plutôt que travee|colonne|etage. Consommé par
+   maxEtageOf() dans reserve.html pour arrêter d'afficher des placeholders
+   "non inventorié" au-delà de l'étage marqué. */
+function lastShelfKey(fields){ return `${fields.travee}|${fields.colonne}`; }
+
+function currentLastShelfRecord(){ return lastShelves[lastShelfKey(locFieldsOf(loc))] || null; }
+
+function updateLastShelfUI(){
+  const btn = document.getElementById('btn-lastshelf');
+  const rec = currentLastShelfRecord();
+  const markedHere = rec && String(rec.etage) === String(loc.etage);
+  btn.classList.toggle('active', markedHere);
+  if(markedHere) btn.textContent = '☑ Dernière étagère';
+  else if(rec) btn.textContent = `☐ Dernière étagère (étage ${rec.etage})`;
+  else btn.textContent = '☐ Dernière étagère';
+}
+
+document.getElementById('btn-lastshelf').addEventListener('click', ()=>{
+  const fields = locFieldsOf(loc);
+  const key = lastShelfKey(fields);
+  const rec = lastShelves[key];
+  const markedHere = rec && String(rec.etage) === String(fields.etage);
+  if(markedHere){
+    delete lastShelves[key];
+    beep(560,.1);
+  } else {
+    lastShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+    beep(660,.1);
+  }
+  saveLastShelves();
+  updateLastShelfUI();
+  updateStats();
+  buildMiniPlan();
+  queuePatch({type:'lastShelf', key, record: lastShelves[key] || null});
+});
+
+/* ════════════ MINI-PLAN DE LA TRAVÉE ACTIVE ════════════
+   Aperçu du même code couleur catégoriel que reserve.html (voir CLAUDE.md),
+   mais limité à la seule travée/armoire/tiroir actuellement sélectionnée
+   (pas tout le plan, pour ne pas surcharger l'affichage) et recalculé
+   directement depuis l'état local (scans/nonCat/videShelves/nonRangeShelves/
+   lastShelves), pas depuis /api/recolement — donc à jour à l'instant même
+   où l'on scanne, sans attendre un aller-retour réseau. Logique dupliquée
+   (et non factorisée avec reserve.html) volontairement : les deux pages
+   partent de représentations différentes des mêmes données (reserve.html
+   lit un JSON déjà agrégé par emplacement ; ici on part de `scans`, indexé
+   par code-barre, avec dédoublonnage par cote comme le fait
+   parseRecolement() côté reserve.html). */
+function etageWordForMini(tid){
+  if(tid==='ARMOIRE') return 'niveau';
+  if(tid==='TIROIR') return 'tiroir';
+  return 'étage';
+}
+
+function travMiniTitle(tid){
+  if(tid==='ARMOIRE') return 'Armoires (bois)';
+  if(tid==='TIROIR') return 'Armoires à tiroirs';
+  const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
+  return `${reserveLabel} · Travée ${displayTraveeId(tid)}`;
+}
+
+// Reconstruit, pour la seule travée tid, les mêmes maps que CNT/NONCAT/VIDE/
+// NONRANGE dans reserve.html — dédoublonnage par cote identique à
+// parseRecolement() là-bas (voir isMagasinTravee() côté reserve.html pour
+// le détail) : réservé à la réserve, où une cote identifie une notice
+// unique (deux exemplaires la partageant sont deux copies de la même
+// notice, à ne compter qu'une fois) ; sauté pour les magasins d'étage, où
+// la cote du 6e étage est littéraire (ex. "R BEN") et partagée par des
+// dizaines de livres différents — y dédoublonner par cote sous-compterait
+// gravement le nombre réel de livres récolés.
+function buildLocalSlotState(tid){
+  // cnt = exemplaires réellement catalogués (Syracuse), manuel = exemplaires
+  // créés via exemplarisation.html (voir catalog[bc].manuel plus haut) —
+  // deux compteurs distincts pour que le mini-plan les colore différemment
+  // (bleu vs orange), même logique que parseRecolement() dans reserve.html.
+  const isMagasin = traveeGroupOf(tid) !== 'reserve';
+  const cnt={}, manuel={}, seenCotes={};
+  Object.values(scans).forEach(r=>{
+    if(r.kind==='horsreserve' || r.travee!==tid) return;
+    const key=`${r.travee}|${r.colonne}|${r.etage}`;
+    if(!isMagasin){
+      if(!seenCotes[key]) seenCotes[key]=new Set();
+      const cote=(r.cote||'').trim();
+      if(cote){
+        if(seenCotes[key].has(cote)) return;
+        seenCotes[key].add(cote);
+      }
+    }
+    if(r.manuel) manuel[key]=(manuel[key]||0)+1;
+    else cnt[key]=(cnt[key]||0)+1;
+  });
+  const nc={};
+  Object.values(nonCat).forEach(r=>{ if(r.travee===tid) nc[`${r.travee}|${r.colonne}|${r.etage}`]=r.count; });
+  const vide={};
+  Object.values(videShelves).forEach(r=>{ if(r.travee===tid) vide[`${r.travee}|${r.colonne}|${r.etage}`]=true; });
+  const nonrange={};
+  Object.values(nonRangeShelves).forEach(r=>{ if(r.travee===tid) nonrange[`${r.travee}|${r.colonne}|${r.etage}`]=true; });
+  return {cnt, manuel, nc, vide, nonrange};
+}
+
+// Colonnes/étages affichés : toujours l'ensemble par défaut de la travée,
+// complété par les données réelles — même logique que colsOf()/maxEtageOf()
+// dans reserve.html (voir CLAUDE.md, correctif du 2026-08-11).
+function miniColsOf(tDef, maps){
+  const from=new Set();
+  for(let i=1;i<=tDef.nbCols;i++) from.add(String.fromCharCode(64+i));
+  [maps.cnt,maps.manuel,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
+    Object.keys(dict).forEach(k=>{ from.add(k.split('|')[1]); });
+  });
+  Object.keys(lastShelves).forEach(k=>{const[t,c]=k.split('|'); if(t===tDef.id) from.add(c);});
+  return [...from].sort((a,b)=>{
+    const na=parseInt(a),nb=parseInt(b);
+    if(!isNaN(na)&&!isNaN(nb)) return na-nb;
+    return a.localeCompare(b,'fr');
+  });
+}
+
+function miniMaxEtageOf(tDef, col, maps){
+  const rec=lastShelves[`${tDef.id}|${col}`];
+  const marked=rec?parseInt(rec.etage,10):NaN;
+  let m=!isNaN(marked)?marked:defaultMaxEtageOf(tDef);
+  [maps.cnt,maps.manuel,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
+    Object.keys(dict).forEach(k=>{
+      const parts=k.split('|');
+      if(parts[1]!==col) return;
+      const n=parseInt(parts[2],10);
+      if(!isNaN(n)&&n>m) m=n;
+    });
+  });
+  return m;
+}
+
+function miniSlotState(maps,tid,col,e){
+  const key=`${tid}|${col}|${e}`;
+  if((maps.cnt[key]||0)>0) return 'cat';
+  if((maps.manuel[key]||0)>0) return 'manuel';
+  if((maps.nc[key]||0)>0) return 'noncat';
+  if(maps.nonrange[key]) return 'nonrange';
+  if(maps.vide[key]) return 'vide';
+  return 'unknown';
+}
+function miniStateColor(state){
+  if(state==='cat') return 'var(--plan-cat)';
+  if(state==='manuel') return 'var(--plan-manuel)';
+  if(state==='noncat') return 'var(--plan-noncat)';
+  if(state==='nonrange') return 'var(--plan-nonrange)';
+  if(state==='vide') return 'var(--plan-free)';
+  return 'var(--plan-unknown)';
+}
+// Dégradé proportionnel quand plusieurs catégories coexistent sur la même
+// case (ex. un exemplaire catalogué + un exemplarisé rapidement + une
+// estimation de non catalogués sur la même étagère) — même logique que
+// gradientOf() dans reserve.html.
+function miniGradientOf(segments){
+  const nonZero = segments.filter(s=>s.count>0);
+  if(!nonZero.length) return null;
+  if(nonZero.length===1) return nonZero[0].color;
+  const total = nonZero.reduce((s,x)=>s+x.count,0);
+  let acc=0; const stops=[];
+  nonZero.forEach(seg=>{
+    const from=Math.round(acc/total*100);
+    acc+=seg.count;
+    const to=Math.round(acc/total*100);
+    stops.push(`${seg.color} ${from}%`, `${seg.color} ${to}%`);
+  });
+  return `linear-gradient(to right, ${stops.join(', ')})`;
+}
+function miniSlotColor(maps,tid,col,e,state){
+  if(state==='cat' || state==='manuel'){
+    const key=`${tid}|${col}|${e}`;
+    const g = miniGradientOf([
+      {color:'var(--plan-cat)', count:maps.cnt[key]||0},
+      {color:'var(--plan-manuel)', count:maps.manuel[key]||0},
+      {color:'var(--plan-noncat)', count:maps.nc[key]||0},
+    ]);
+    if(g) return g;
+  }
+  return miniStateColor(state);
+}
+function miniSlotTitle(tDef,col,e,state,maps){
+  const key=`${tDef.id}|${col}|${e}`;
+  const n=maps.cnt[key]||0, mCount=maps.manuel[key]||0, ncCount=maps.nc[key]||0;
+  let detail;
+  if(state==='cat' || state==='manuel'){
+    const parts=[];
+    if(n>0) parts.push(`${n} catalogué(s)`);
+    if(mCount>0) parts.push(`${mCount} exemplarisé(s) rapidement`);
+    if(ncCount>0) parts.push(`${ncCount} non catalogué(s)`);
+    detail = parts.join(' + ');
+  }
+  else if(state==='noncat') detail = `${ncCount} non catalogué(s) estimé(s)`;
+  else if(state==='nonrange') detail = 'non rangé';
+  else if(state==='vide') detail = 'vide (confirmé)';
+  else detail = 'non inventorié';
+  return `Col. ${col}, ${etageWordForMini(tDef.id)} ${e} — ${detail}`;
+}
+
+function buildMiniPlan(){
+  const titleEl=document.getElementById('mp-title'), occEl=document.getElementById('mp-occ'),
+        room=document.getElementById('mp-room'), legend=document.getElementById('mp-legend'),
+        hintEl=document.getElementById('mp-hint'), actionsEl=document.getElementById('mp-actions');
+
+  if(loc.reserve==='horsreserve'){
+    titleEl.textContent='Non rangé (hors réserve)';
+    occEl.textContent='';
+    room.innerHTML='';
+    legend.style.display='none';
+    hintEl.style.display='';
+    hintEl.textContent='Pas de plan pour les documents hors réserve — aucun emplacement associé.';
+    if(actionsEl) actionsEl.style.display='none';
+    return;
+  }
+  legend.style.display='';
+  if(actionsEl) actionsEl.style.display='';
+  hintEl.style.display='none';
+
+  const tDef=currentLocDef(), tid=tDef.id;
+  const maps=buildLocalSlotState(tid);
+  const cols=miniColsOf(tDef,maps);
+  const curCol=colLetter(loc.colonne);
+
+  titleEl.textContent=travMiniTitle(tid);
+
+  const GAP=2, BASE_SLOT_H=10;
+  const refMaxEt=defaultMaxEtageOf(tDef);
+  const targetH=refMaxEt*BASE_SLOT_H+(refMaxEt-1)*GAP;
+  const w=tDef.nbCols<=5?14:11;
+
+  let total=0, filled=0;
+  const box=document.createElement('div'); box.className='mp-box';
+  cols.forEach(col=>{
+    const maxE=miniMaxEtageOf(tDef,col,maps);
+    const cd=document.createElement('div'); cd.className='mp-col';
+    const h=Math.max(5,(targetH-(maxE-1)*GAP)/maxE);
+    for(let e=1;e<=maxE;e++){
+      total++;
+      const state=miniSlotState(maps,tid,col,String(e));
+      if(state==='cat'||state==='manuel'||state==='noncat'||state==='nonrange') filled++;
+      const isCur = col===curCol && e===loc.etage;
+      const s=document.createElement('div'); s.className='mp-slot'+(isCur?' cur':'');
+      s.style.cssText=`width:${w}px;height:${h}px;background:${miniSlotColor(maps,tid,col,String(e),state)}`;
+      s.title=miniSlotTitle(tDef,col,e,state,maps);
+      cd.appendChild(s);
+    }
+    const lbl=document.createElement('div'); lbl.className='mp-collbl'+(col===curCol?' cur':''); lbl.textContent=col;
+    cd.appendChild(lbl);
+    box.appendChild(cd);
+  });
+  room.innerHTML='';
+  room.appendChild(box);
+  occEl.textContent = total ? Math.round(filled/total*100)+'% occupé' : '';
+}
+
+// Codes-barres scannés sur l'étagère actuellement sélectionnée (même filtre
+// que renderHereLog()), un par ligne — pour aller les rajouter en panier
+// dans le SIGB sans les retaper à la main.
+function exportMiniPlanBarcodes(){
+  const fields = locFieldsOf(loc);
+  const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage);
+  if(!here.length){ alert('Aucun code-barre scanné sur cet emplacement.'); return; }
+  const slug = displayTraveeId(fields.travee).replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase();
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  downloadTxt(here.map(r=>r.barcode).join('\n'),
+    `codes-barres-${slug}-col${fields.colonne}-${fields.etage}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+}
+document.getElementById('mp-export-btn').addEventListener('click', exportMiniPlanBarcodes);
+
+/* ════════════ ATTENDU ICI ════════════ */
+function renderExpected(){
+  const list = document.getElementById('exp-list');
+  const countEl = document.getElementById('exp-count');
+  if(!baseline){
+    list.innerHTML = '<p class="exp-empty">Aucune donnée de référence importée — chargez un récolement de référence pour comparer.</p>';
+    countEl.textContent = '';
+    return;
+  }
+  const fields = locFieldsOf(loc);
+  const expected = Object.values(baseline).filter(r =>
+    r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage
+  ).sort((a,b)=>compareCotes(a.cote,b.cote));
+
+  if(!expected.length){
+    list.innerHTML = '<p class="exp-empty">Rien d\'attendu ici d\'après la référence chargée.</p>';
+    countEl.textContent = '';
+    return;
+  }
+
+  let confirmed = 0;
+  const rows = expected.map(r=>{
+    const cur = scans[r.barcode];
+    let cls, label;
+    if(cur && cur.travee===fields.travee && cur.colonne===fields.colonne && cur.etage===fields.etage){
+      cls='conf'; label='confirmé'; confirmed++;
+    } else if(cur){
+      cls='moved'; label='déplacé';
+    } else {
+      cls='missing'; label='manquant';
+    }
+    return `<div class="exp-row"><span class="exp-dot ${cls}" title="${label}"></span>
+      <span class="exp-cote">${esc(r.cote)}</span><span class="exp-titre">${esc(r.titre)}</span></div>`;
+  }).join('');
+  list.innerHTML = rows;
+  countEl.textContent = `(${confirmed} / ${expected.length} confirmés)`;
+}
+
+/* ════════════ LOGS ════════════ */
+function renderHereLog(){
+  const fields = locFieldsOf(loc);
+  const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage)
+    .sort((a,b)=>b.ts-a.ts).slice(0,30);
+  const tbody = document.getElementById('log-here');
+  if(!here.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun scan sur cet emplacement pour l\'instant.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = here.map(r=>`
+    <tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#f57f17">≈</span>':''}</td>
+      <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
+}
+
+function renderAllLog(filter){
+  const q = (filter||'').trim().toLowerCase();
+  const all = Object.values(scans).sort((a,b)=>b.ts-a.ts);
+  const filtered = q ? all.filter(r =>
+    (r.cote||'').toLowerCase().includes(q) || (r.titre||'').toLowerCase().includes(q) || (r.barcode||'').toLowerCase().includes(q)
+  ) : all;
+  const tbody = document.getElementById('log-all');
+  if(!filtered.length){
+    tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun scan.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.slice(0,300).map(r=>`
+    <tr>
+      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
+      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#f57f17">≈</span>':''}</td>
+      <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
+    </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${filtered.length-300} de plus (affinez la recherche)</td></tr>` : '');
+  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
+}
+document.getElementById('log-search').addEventListener('input', function(){ renderAllLog(this.value); });
+
+function deleteScan(barcode){
+  delete scans[barcode];
+  deleteScanRecord(barcode);
+  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats(); buildMiniPlan();
+  queuePatch({type:'deleteScan', barcode});
+}
+
+/* ════════════ STATS ════════════ */
+function updateStats(){
+  // Barre de progression : scopée à l'étage/groupe actuellement sélectionné
+  // (voir "PROGRESSION EN HAUT DE PAGE, PAR ÉTAGE" plus haut) plutôt qu'au
+  // catalogue reserve/magasin global.
+  const group = currentStatsGroup();
+  const catStats = catalogStatsForGroup(group);
+  const nonCatCount = nonCatTotalForGroup(group);
+  updateNoticeProgressBar(group, catStats, nonCatCount);
+
+  // Un seul panneau de "Statistiques avancées" est affiché à la fois depuis
+  // le 2026-09-01 (celui de la réserve sélectionnée, voir
+  // applyAdvGroupVisibility) — on ne recalcule donc que celui-là au lieu des
+  // quatre. Les trois autres gardaient des chiffres qui n'étaient de toute
+  // façon jamais lus, au prix, pour chaque groupe magasin, d'un parcours
+  // complet du catalogue (~200 000 entrées) à chaque scan.
+  // Rien ne se périme : refreshLoc() rappelle updateStats() à chaque
+  // changement de réserve, donc un panneau est toujours recalculé au moment
+  // précis où il devient visible.
+  const visible = visibleAdvGroupId();
+  updateShelfBar(visible);
+  updateTimeStats(visible);
+  updateMagasinEtageStats(visible);
+  scheduleAdvListsCount();
+}
+
+/* Groupe de "Statistiques avancées" actuellement à l'écran. Déclarée en
+   `function` (donc hissée) : updateStats() tourne pendant l'initialisation
+   synchrone de la page, avant cette ligne — voir la note sur la temporal
+   dead zone en tête de la section CATALOGUE(S). */
+function visibleAdvGroupId(){ return advGroupIdForReserve(loc.reserve); }
+
+// Le debounce de updateAdvListsCount() (advListsCountTimer /
+// scheduleAdvListsCount) est déclaré tôt dans le script, avec ADV_GROUPS —
+// voir la note sur la temporal dead zone à cet endroit.
+
+// Emplacements distincts (étagère/armoire/tiroir) déjà traités : au moins un
+// scan (hors "Non rangé (hors réserve)", qui n'est pas un vrai emplacement),
+// un comptage de non-catalogués, ou marqué vide/non rangé.
+// Classe chaque emplacement touché dans une seule des 3 catégories (priorité
+// contenu > non rangé > vide, comme le code couleur de reserve.html), pour
+// que la barre empilée totalise toujours exactement 100 % sans double compte
+// — même dans le cas marginal où un emplacement a été scanné puis marqué
+// vide après coup (les scans n'y sont jamais effacés automatiquement).
+// Groupe d'un emplacement/scan à partir de sa travée : 'magasin-2e'/
+// 'magasin-5e'/'magasin-6e' pour les travées préfixées M2-/M5-/M6-
+// (magasins d'étage, un groupe par étage physique), 'reserve' pour tout le
+// reste (patrimoniale, Douaisienne RD-, armoires, tiroirs, hors-réserve) —
+// à ne pas confondre avec catalogGroupOfReserve() dans js/reserve-shared.js
+// (binaire reserve/magasin, sert au CATALOGUE de reconnaissance au scan,
+// pas scindé par étage). Sert à scinder "Statistiques avancées" par groupe
+// (voir ADV_GROUPS plus haut).
+function traveeGroupOf(travee){
+  if(travee && travee.startsWith('M2-')) return 'magasin-2e';
+  if(travee && travee.startsWith('M5-')) return 'magasin-5e';
+  if(travee && travee.startsWith('M6-')) return 'magasin-6e';
+  return 'reserve';
+}
+
+// Nombre total d'emplacements possibles (étagères) d'un groupe, d'après la
+// géométrie par défaut de js/reserve-shared.js (nbCols × defaultMaxEtageOf
+// par travée/meuble) — sert de dénominateur à computeShelfBreakdown() pour
+// afficher aussi la part JAMAIS traitée, pas seulement la répartition parmi
+// les emplacements déjà traités. Approximatif par nature (comme maxEtageOf()
+// de reserve.html) : une travée dont la colonne réelle dépasse le maxEt par
+// défaut compte quand même intégralement grâce au Math.max() dans
+// computeShelfBreakdown() ci-dessous.
+function totalSlotsForGroup(group){
+  const defs = group==='magasin-2e' ? TRAVEES_MAGASIN2
+    : group==='magasin-5e' ? TRAVEES_MAGASIN5
+    : group==='magasin-6e' ? TRAVEES_MAGASIN6
+    : [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_TIROIR];
+  return defs.reduce((s,def)=>s + def.nbCols * defaultMaxEtageOf(def), 0);
+}
+
+function computeShelfBreakdown(group){
+  const contentKeys = new Set();
+  Object.values(scans).forEach(r=>{
+    if(r.kind==='horsreserve') return;
+    if(traveeGroupOf(r.travee)!==group) return;
+    contentKeys.add(`${r.travee}|${r.colonne}|${r.etage}`);
+  });
+  Object.keys(nonCat).filter(k=>traveeGroupOf(k.split('|')[0])===group).forEach(k=>contentKeys.add(k));
+
+  const videKeys = Object.keys(videShelves).filter(k=>traveeGroupOf(k.split('|')[0])===group);
+  const nonRangeKeys = Object.keys(nonRangeShelves).filter(k=>traveeGroupOf(k.split('|')[0])===group);
+  const allKeys = new Set([...contentKeys, ...videKeys, ...nonRangeKeys]);
+  let recoled=0, vide=0, nonrange=0;
+  allKeys.forEach(k=>{
+    if(contentKeys.has(k)) recoled++;
+    else if(nonRangeShelves[k]) nonrange++;
+    else if(videShelves[k]) vide++;
+  });
+  const treated = allKeys.size;
+  // Au moins autant que le traité réel, au cas où les données dépassent la
+  // géométrie par défaut (colonne réellement plus profonde que son maxEt).
+  const possible = Math.max(totalSlotsForGroup(group), treated);
+  const nontraite = possible - treated;
+  return { recoled, vide, nonrange, nontraite, treated, possible };
+}
+
+function updateShelfBar(group){
+  const { recoled, vide, nonrange, nontraite, treated, possible } = computeShelfBreakdown(group);
+  const pct = n => possible ? Math.round(n/possible*100) : 0;
+  document.getElementById('seg-recoled-'+group).style.width = pct(recoled)+'%';
+  document.getElementById('seg-vide-'+group).style.width = pct(vide)+'%';
+  document.getElementById('seg-nonrange-'+group).style.width = pct(nonrange)+'%';
+  document.getElementById('seg-nontraite-'+group).style.width = pct(nontraite)+'%';
+  document.getElementById('leg-recoled-'+group).textContent = recoled.toLocaleString('fr-FR');
+  document.getElementById('leg-vide-'+group).textContent = vide.toLocaleString('fr-FR');
+  document.getElementById('leg-nonrange-'+group).textContent = nonrange.toLocaleString('fr-FR');
+  document.getElementById('leg-nontraite-'+group).textContent = nontraite.toLocaleString('fr-FR');
+  document.getElementById('leg-recoled-pct-'+group).textContent = possible ? `(${pct(recoled)} %)` : '';
+  document.getElementById('leg-vide-pct-'+group).textContent = possible ? `(${pct(vide)} %)` : '';
+  document.getElementById('leg-nonrange-pct-'+group).textContent = possible ? `(${pct(nonrange)} %)` : '';
+  document.getElementById('leg-nontraite-pct-'+group).textContent = possible ? `(${pct(nontraite)} %)` : '';
+  document.getElementById('shelf-bar-total-'+group).textContent = possible
+    ? `${treated.toLocaleString('fr-FR')} / ${possible.toLocaleString('fr-FR')} (${pct(treated)} %)`
+    : 'aucun emplacement pour l\'instant';
+}
+
+/* ════════════ STATISTIQUES AVANCÉES (temps) ════════════
+   "Temps réel" : somme des écarts entre scans consécutifs, sauf si l'écart
+   dépasse GAP_MS (1 h) — ces trous (pause, nuit, changement de jour lors
+   d'un récolement étalé sur plusieurs jours) ne sont pas comptés comme du
+   temps de travail. Basé uniquement sur scans[] (comptage code-barre), pas
+   sur nonCat/videShelves/nonRangeShelves. */
+function formatDateTimeFR(ts){
+  return new Date(ts).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function formatDuration(ms){
+  if(!ms || ms<=0) return '0 min';
+  const totalMin = Math.round(ms/60000);
+  const days = Math.floor(totalMin/1440);
+  const hours = Math.floor((totalMin%1440)/60);
+  const mins = totalMin%60;
+  const parts = [];
+  if(days) parts.push(days+' j');
+  if(hours) parts.push(hours+' h');
+  if(mins || !parts.length) parts.push(mins+' min');
+  return parts.join(' ');
+}
+
+function updateTimeStats(group){
+  // st-abime-<group> est mis à jour par updateAdvListsCount() — voir
+  // "LISTES AVANCÉES" plus bas.
+  const list = Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group).map(r=>r.ts).filter(t=>t).sort((a,b)=>a-b);
+  const elStart=document.getElementById('st-start-'+group), elLast=document.getElementById('st-last-'+group),
+        elSpan=document.getElementById('st-span-'+group), elReal=document.getElementById('st-realtime-'+group),
+        elSessions=document.getElementById('st-sessions-'+group);
+  if(!list.length){
+    elStart.textContent='—'; elLast.textContent='—'; elSpan.textContent='—'; elReal.textContent='—'; elSessions.textContent='—';
+    return;
+  }
+  const startTs = list[0], lastTs = list[list.length-1];
+  elStart.textContent = formatDateTimeFR(startTs);
+  elLast.textContent = formatDateTimeFR(lastTs);
+  elSpan.textContent = formatDuration(lastTs-startTs);
+
+  let real = 0, sessions = 1;
+  for(let i=1;i<list.length;i++){
+    const gap = list[i]-list[i-1];
+    if(gap < GAP_MS) real += gap; else sessions++;
+  }
+  elReal.textContent = formatDuration(real);
+  elSessions.textContent = sessions.toLocaleString('fr-FR');
+}
+
+/* ════════════ LISTES AVANCÉES (endommagés / cote manuelle / jamais scannés) ════════════
+   Le panneau "Statistiques avancées" (occupation, temps, et les listes
+   ci-dessous) est dupliqué en plusieurs groupes indépendants — ADV_GROUPS :
+   'reserve' (patrimoniale/Douaisienne/armoires/tiroirs/hors-réserve) et un
+   groupe par magasin d'étage ('magasin-2e'/'magasin-5e'/'magasin-6e') —
+   déterminé par traveeGroupOf() sur la travée de chaque scan (catalogGroupOf()
+   fait le lien vers catalogByGroup, lui resté binaire reserve/magasin — voir
+   ADV_GROUPS plus haut). Le HTML de chaque groupe est généré une fois au
+   chargement (advGroupTemplate(), injecté dans #adv-groups) plutôt qu'écrit
+   à la main pour chacun, pour n'avoir qu'une seule source de vérité pour la
+   structure d'un groupe — tous les id sont suffixés par l'id du groupe (ex.
+   "adv-abime-magasin-2e").
+
+   Les compteurs (stat-card + badge dans le <summary>) sont recalculés à
+   chaque updateStats() — mais UNIQUEMENT via les fonctions `*Count()`
+   ci-dessous (filtre seul, sans .map()/.sort()), jamais via `list.length`
+   sur les fonctions `*List()` complètes : celles-ci trient certaines listes
+   par cote avec localeCompare (notScannedList/probablyLostList/scannedList),
+   coûteux sur catalogByGroup.magasin (~200 000 exemplaires) — un tri inutile
+   puisque seule la longueur du résultat est affichée ici. Avant ce
+   correctif (2026-09-02), updateAdvListsCount() appelait list(...).length
+   sur ces fonctions triées, refaisant ce tri complet à CHAQUE scan, pour les
+   4 groupes, même panneau fermé — cause principale du lag ressenti pendant
+   le récolement des magasins. Les tableaux détaillés, eux, ne sont
+   construits/rendus que si le <details> correspondant est déjà ouvert
+   (refreshAdvList) — reconstruire des milliers de lignes de DOM à chaque
+   scan serait inutile et coûteux tant que le panneau est fermé. */
+function damagedList(group){
+  return Object.values(scans).filter(r=>r.barcodeAbime && traveeGroupOf(r.travee)===group)
+    .sort((a,b)=>b.ts-a.ts);
+}
+function damagedCount(group){
+  let n=0;
+  for(const bc in scans){ if(scans[bc].barcodeAbime && traveeGroupOf(scans[bc].travee)===group) n++; }
+  return n;
+}
+function manualCoteList(group){
+  // Scanné, mais absent du catalogue *actuel* du groupe (comparaison en
+  // direct contre catalogByGroup[catalogGroupOf(group)], pas figée sur les
+  // titre/auteur enregistrés au moment du scan) : la cote a été saisie à la
+  // main via le champ "Renseigner" du feedback (voir showFeedback/manual-save)
+  // parce que le code-barre était introuvable dans le catalogue à ce
+  // moment-là. Comparer au catalogue courant plutôt qu'au scan figé permet à
+  // un exemplaire de sortir tout seul de cette liste dès qu'un nouvel export
+  // Syracuse le fait apparaître (ex. correction d'une mauvaise localisation
+  // côté SIGB), sans avoir à le rescanner physiquement. Exclut les
+  // exemplaires "manuel" (créés via exemplarisation.html), qui sont dans le
+  // catalogue mais pas une vraie notice Syracuse.
+  const cat = catalogByGroup[catalogGroupOf(group)];
+  if(!cat) return [];
+  // inGroupScope plutôt qu'une simple présence dans `cat` : le catalogue
+  // magasins couvre toute la bibliothèque, un exemplaire d'une autre section
+  // doit rester compté ici comme il l'était quand ce catalogue était filtré.
+  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode]))
+    .sort((a,b)=>b.ts-a.ts);
+}
+function manualCoteCount(group){
+  const cat = catalogByGroup[catalogGroupOf(group)];
+  if(!cat) return 0;
+  let n=0;
+  for(const bc in scans){
+    const r=scans[bc];
+    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode])) n++;
+  }
+  return n;
+}
+function notScannedList(group){
+  const cat = catalogByGroup[catalogGroupOf(group)];
+  if(!cat) return [];
+  // Pour un groupe magasin (2e/5e/6e), catalogByGroup.magasin reste un
+  // catalogue unique non scindé par étage (voir ADV_GROUPS plus haut) — on
+  // filtre donc en plus chaque entrée par son étage déduit de la cote
+  // (magasinEtageGroupOfDigitRun), même logique que magasinFloorStats().
+  const isMagasin = catalogGroupOf(group)==='magasin';
+  return Object.keys(cat)
+    .filter(bc=>!scans[bc] && inGroupScope(cat[bc]) && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group))
+    .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
+    .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
+}
+// Pas de .map()/.sort() : seule la longueur du résultat de notScannedList()
+// nous intéresse ici (voir la note en tête de section "LISTES AVANCÉES").
+function notScannedCount(group){
+  const cat = catalogByGroup[catalogGroupOf(group)];
+  if(!cat) return 0;
+  const isMagasin = catalogGroupOf(group)==='magasin';
+  let n=0;
+  for(const bc in cat){
+    if(!scans[bc] && inGroupScope(cat[bc]) && (!isMagasin || magasinEtageGroupOfDigitRun(cat[bc].coteDigitRun)===group)) n++;
+  }
+  return n;
+}
+// Sous-ensemble de notScannedList(), restreint aux magasins à cotes
+// numériques séquentielles (2e/5e étage — pas le 6e, cotes littérales/Dewey,
+// magasinEtageGroupOfDigitRun ne renvoie ce groupe que pour ces deux-là) :
+// dans ces deux magasins, parcourir les rayons pour récoler revient
+// grosso modo à parcourir les cotes dans l'ordre. Un exemplaire du
+// catalogue dont la cote tombe entre la plus petite et la plus grande cote
+// déjà scannée dans ce groupe aurait donc dû être croisé au passage — s'il
+// n'a lui-même jamais été scanné, il est probablement égaré (perdu, sorti
+// sans décharge, mal reclassé...) plutôt que "juste pas encore visité"
+// (contrairement à notScannedList(), qui liste tout le reste du catalogue
+// sans tenir compte de ce qui a déjà été parcouru). Ne renvoie rien tant que
+// ce groupe n'a pas au moins 2 cotes numériques scannées (pas de plage
+// définissable).
+// Factorisé entre probablyLostList() et probablyLostCount() : la plage de
+// cotes déjà scannées dans ce groupe (bornée par min/max), coûte au plus
+// O(scans du groupe) — sans rapport avec la taille de catalogByGroup.magasin,
+// donc pas besoin d'une variante "count" séparée pour ce calcul-là.
+// Une plage par LONGUEUR de cote (5 chiffres = grands formats, 6 chiffres =
+// cotes séquentielles normales) plutôt qu'une seule plage globale : ce sont
+// deux séquences d'enregistrement indépendantes (même principe que
+// ETAGE_THRESHOLDS dans cotes-numeriques.html — voir CLAUDE.md, "comparer un
+// numéro à 5 chiffres et un numéro à 6 chiffres sur une même échelle n'aurait
+// aucun sens"). Les mélanger dans un même min/max produit une plage
+// aberrante : un grand format scanné à 14521 combiné à des cotes 6 chiffres
+// 133726-136824 donnait une plage 14521-136824, qui engloutissait alors la
+// quasi-totalité du catalogue du magasin comme "probablement perdu".
+// Les scans posés par applyReliureCascade() (record.viaReliure) sont exclus
+// de ce calcul de plage : ils héritent de l'emplacement du code-barre
+// effectivement scanné, mais portent LEUR PROPRE cote catalographique — qui
+// peut être très éloignée de celle du document scanné si les deux notices
+// reliées ont été cataloguées à des moments différents. Les inclure ferait
+// croire que le rayon a été parcouru jusqu'à cette cote alors que
+// l'emplacement réellement visité est celui du code-barre scanné. Ces
+// scans restent bien comptés comme "trouvés" ailleurs (via `scans[bc]`),
+// seule leur contribution à la plage explorée est écartée ici.
+// Un simple min/max sur les cotes scannées reste fragile face à un livre
+// isolé mal rangé : un seul exemplaire physiquement égaré au milieu d'un
+// rayon par ailleurs parfaitement continu suffit à étendre artificiellement
+// toute la plage jusqu'à sa propre cote. Vérifié sur le 5e étage
+// (2026-09-03) : un rayon scanné en continu de 133531 à 136824 (écarts
+// quasi toujours ≤ 20 entre deux cotes consécutives) contenait deux livres
+// mal rangés à 136989 et 137665 (écarts de 165 et 676 avec leur voisin) —
+// suffisant pour faire passer ~840 documents jamais rencontrés comme
+// "probablement perdus" alors que le rayon n'avait pas été parcouru
+// jusque-là. SCAN_GAP_CLUSTER_THRESHOLD (100, entre les deux) sépare les
+// écarts normaux d'un livre isolé : on ne retient, pour définir min/max,
+// que le plus grand groupe de cotes scannées consécutives (une fois
+// triées) dont chaque écart reste sous ce seuil — les cotes isolées hors de
+// ce groupe restent comptées comme "trouvées" ailleurs, seule leur
+// contribution à la plage explorée est écartée.
+const SCAN_GAP_CLUSTER_THRESHOLD = 100;
+function largestGapCluster(sortedRuns){
+  let bestStart = 0, bestLen = 1, curStart = 0;
+  for(let i=1;i<=sortedRuns.length;i++){
+    if(i===sortedRuns.length || sortedRuns[i]-sortedRuns[i-1] > SCAN_GAP_CLUSTER_THRESHOLD){
+      const len = i - curStart;
+      if(len > bestLen){ bestLen = len; bestStart = curStart; }
+      curStart = i;
+    }
+  }
+  return { min: sortedRuns[bestStart], max: sortedRuns[bestStart + bestLen - 1] };
+}
+function scannedDigitRunRange(group){
+  const cat = catalogByGroup.magasin;
+  if(!cat) return null;
+  const runsByLen = {};
+  Object.values(scans)
+    .filter(r=>traveeGroupOf(r.travee)===group && !r.viaReliure)
+    .forEach(r=>{
+      const entry = cat[r.barcode];
+      if(!entry || !inGroupScope(entry) || !entry.coteDigitRun) return;
+      if(magasinEtageGroupOfDigitRun(entry.coteDigitRun)!==group) return;
+      const len = entry.coteDigitRun.length;
+      (runsByLen[len] || (runsByLen[len] = [])).push(parseInt(entry.coteDigitRun, 10));
+    });
+  const ranges = {};
+  for(const len in runsByLen){
+    const runs = runsByLen[len];
+    if(runs.length < 2) continue;
+    runs.sort((a,b)=>a-b);
+    ranges[len] = largestGapCluster(runs);
+  }
+  if(!Object.keys(ranges).length) return null;
+  return { cat, ranges };
+}
+function probablyLostList(group){
+  if(group!=='magasin-2e' && group!=='magasin-5e') return [];
+  const range = scannedDigitRunRange(group);
+  if(!range) return [];
+  const { cat, ranges } = range;
+  return Object.keys(cat)
+    .filter(bc=>{
+      if(scans[bc] || !inGroupScope(cat[bc])) return false;
+      const run = cat[bc].coteDigitRun;
+      if(!run || magasinEtageGroupOfDigitRun(run)!==group) return false;
+      const r = ranges[run.length];
+      if(!r) return false;
+      const n = parseInt(run, 10);
+      return n>=r.min && n<=r.max;
+    })
+    .map(bc=>({barcode:bc, cote:cat[bc].cote, titre:cat[bc].titre, auteur:cat[bc].auteur, piege:cat[bc].piege||''}))
+    .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
+}
+// Pas de .map()/.sort() — voir la note en tête de section "LISTES AVANCÉES".
+function probablyLostCount(group){
+  if(group!=='magasin-2e' && group!=='magasin-5e') return 0;
+  const range = scannedDigitRunRange(group);
+  if(!range) return 0;
+  const { cat, ranges } = range;
+  let n=0;
+  for(const bc in cat){
+    if(scans[bc] || !inGroupScope(cat[bc])) continue;
+    const run = cat[bc].coteDigitRun;
+    if(!run || magasinEtageGroupOfDigitRun(run)!==group) continue;
+    const r = ranges[run.length];
+    if(!r) continue;
+    const v = parseInt(run, 10);
+    if(v>=r.min && v<=r.max) n++;
+  }
+  return n;
+}
+// Complément direct de notScannedList() : tous les codes-barres déjà récolés
+// (présents dans `scans`) pour ce groupe, quel que soit leur statut par
+// ailleurs (catalogué, exemplarisé rapide, cascade reliures via
+// viaReliure…) — sert à exporter d'un coup tout ce qui a été traité, par ex.
+// pour ajout panier SIGB ou recoupement avec une autre liste.
+function scannedList(group){
+  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group)
+    .sort((a,b)=>(a.cote||'').localeCompare(b.cote||'', 'fr'));
+}
+function scannedCount(group){
+  let n=0;
+  for(const bc in scans){ if(traveeGroupOf(scans[bc].travee)===group) n++; }
+  return n;
+}
+
+// Anomalies de classement : scans dont handleScan() a posé horsSection:true
+// (voir plus haut) — le code-barre est bien dans le catalogue magasins mais
+// son entrée porte isMagasin:false, donc il est catalogué sous une autre
+// section que Magasin/Magasin Jeunesse alors qu'il est physiquement dans un
+// magasin.
+// record.fonds porte déjà le libellé de cette section réelle (_fondsLabel
+// posé par build-magasins.mjs pour les exemplaires hors magasin — voir
+// CLAUDE.md), pas besoin d'une structure de données séparée.
+function horsSectionList(group){
+  return Object.values(scans).filter(r=>r.horsSection && traveeGroupOf(r.travee)===group)
+    .map(r=>Object.assign({}, r, { sectionReelle:r.fonds }))
+    .sort((a,b)=>b.ts-a.ts);
+}
+function horsSectionCount(group){
+  let n=0;
+  for(const bc in scans){ const r=scans[bc]; if(r.horsSection && traveeGroupOf(r.travee)===group) n++; }
+  return n;
+}
+
+// Livres sans code-barre : union des scans enregistrés via handleNoBarcodeCote()
+// quand la cote a été reconnue (sansCodeBarre:true, comptent comme récolés)
+// et des cotes non reconnues (noBarcodeCotes, ne comptent pas comme récolées).
+function noBarcodeList(group){
+  const foundRows = Object.values(scans)
+    .filter(r=>r.sansCodeBarre && traveeGroupOf(r.travee)===group)
+    .map(r=>({ cote:r.cote, titre:r.titre, travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:true, coteApprox:!!r.coteApprox }));
+  const notFoundRows = Object.values(noBarcodeCotes)
+    .filter(r=>traveeGroupOf(r.travee)===group)
+    .map(r=>({ cote:r.cote, titre:'', travee:r.travee, colonne:r.colonne, etage:r.etage, ts:r.ts, foundInCatalog:false, coteApprox:false }));
+  return [...foundRows, ...notFoundRows].sort((a,b)=>b.ts-a.ts);
+}
+function noBarcodeCount(group){
+  let n=0;
+  for(const bc in scans){ const r=scans[bc]; if(r.sansCodeBarre && traveeGroupOf(r.travee)===group) n++; }
+  for(const k in noBarcodeCotes){ if(traveeGroupOf(noBarcodeCotes[k].travee)===group) n++; }
+  return n;
+}
+
+function advDetailsTemplate(id, spec, opts){
+  const showAllExport = !!(opts && opts.showAllExport);
+  const rangeExports = (opts && opts.rangeExports) || [];
+  return `
+    <details class="adv-details" id="adv-${id}">
+      <summary>${esc(spec.title)} <span class="adv-count">(<span id="sum-${id}-count">0</span>)</span></summary>
+      <div class="log-wrap">
+        <div class="log-header">
+          <span class="log-title">${esc(spec.desc)}</span>
+          <div class="log-header-actions">
+            <input type="text" class="log-search" id="${id}-search" placeholder="${esc(spec.placeholder)}">
+            ${spec.showCorrectionFilter ? `<label class="adv-corr-filter" style="font-size:.75rem;display:inline-flex;align-items:center;gap:.3em;white-space:nowrap">
+              <input type="checkbox" id="${id}-export-uncorrected">
+              Exclure les corrigés (Syracuse)
+            </label>` : ''}
+            <button type="button" class="export-btn" id="${id}-export">⬇ Exporter (.txt)</button>
+            ${showAllExport ? `<button type="button" class="export-btn" id="${id}-export-all" title="Réunit les codes-barres de cette catégorie pour les 3 magasins (2e/5e/6e), sans tenir compte de la recherche en cours">⬇ Exporter tous les magasins</button>` : ''}
+            ${rangeExports.map(rg=>`<button type="button" class="export-btn" id="${id}-export-${rg.key}" title="N'exporte que les codes-barres de ${esc(rg.label)}, en respectant la recherche en cours">⬇ ${esc(rg.label)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="log-body"><table class="log-table">
+          <thead><tr>${spec.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
+          <tbody id="log-${id}"></tbody>
+        </table></div>
+        <div class="adv-pager" id="${id}-pager"></div>
+      </div>
+    </details>`;
+}
+
+function advGroupTemplate(g){
+  const gid = g.id;
+  const isMagasin = g.catalogGroup==='magasin';
+  return `
+    <h3 class="adv-group-title">${esc(g.label)}</h3>
+
+    <div class="shelf-bar-block">
+      <div class="shelf-bar-heading">
+        <span class="shelf-bar-heading-label">Répartition des emplacements</span>
+        <span class="shelf-bar-heading-total" id="shelf-bar-total-${gid}"></span>
+      </div>
+      <div class="shelf-bar" id="shelf-bar-${gid}">
+        <div class="shelf-bar-seg recoled" id="seg-recoled-${gid}" style="width:0%" title="Récolés"></div>
+        <div class="shelf-bar-seg vide" id="seg-vide-${gid}" style="width:0%" title="Vides"></div>
+        <div class="shelf-bar-seg nonrange" id="seg-nonrange-${gid}" style="width:0%" title="Non rangés"></div>
+        <div class="shelf-bar-seg nontraite" id="seg-nontraite-${gid}" style="width:0%" title="Jamais traités"></div>
+      </div>
+      <div class="shelf-legend" id="shelf-legend-${gid}">
+        <span class="shelf-legend-item"><span class="shelf-legend-dot recoled"></span>Récolés : <span class="shelf-legend-val" id="leg-recoled-${gid}">0</span> <span class="shelf-legend-pct" id="leg-recoled-pct-${gid}"></span></span>
+        <span class="shelf-legend-item"><span class="shelf-legend-dot vide"></span>Vides : <span class="shelf-legend-val" id="leg-vide-${gid}">0</span> <span class="shelf-legend-pct" id="leg-vide-pct-${gid}"></span></span>
+        <span class="shelf-legend-item"><span class="shelf-legend-dot nonrange"></span>Non rangés : <span class="shelf-legend-val" id="leg-nonrange-${gid}">0</span> <span class="shelf-legend-pct" id="leg-nonrange-pct-${gid}"></span></span>
+        <span class="shelf-legend-item"><span class="shelf-legend-dot nontraite"></span>Jamais traités : <span class="shelf-legend-val" id="leg-nontraite-${gid}">0</span> <span class="shelf-legend-pct" id="leg-nontraite-pct-${gid}"></span></span>
+      </div>
+    </div>
+
+    <div class="stats-row" style="margin-bottom:0">
+      <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime-${gid}">0</div></div>
+      <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote-${gid}">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned-${gid}">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Probablement perdus</div><div class="stat-card-val" id="st-perdus-${gid}">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Récolés (codes-barres scannés)</div><div class="stat-card-val" id="st-scanned-${gid}">0</div></div>
+      <div class="stat-card"><div class="stat-card-label">Mauvais numéro / code-barre absent</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
+      <div class="stat-card"><div class="stat-card-label">Anomalies de classement</div><div class="stat-card-val" id="st-horssection-${gid}">0</div></div>
+      ${isMagasin ? `<div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-etage-${gid}" style="font-size:1.2rem">—</div></div>` : ''}
+      <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start-${gid}" style="font-size:1rem">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last-${gid}" style="font-size:1rem">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Durée écoulée (calendaire)</div><div class="stat-card-val" id="st-span-${gid}" style="font-size:1.2rem">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Temps de travail réel (estimé)</div><div class="stat-card-val" id="st-realtime-${gid}" style="font-size:1.2rem">—</div></div>
+      <div class="stat-card"><div class="stat-card-label">Sessions de travail détectées</div><div class="stat-card-val" id="st-sessions-${gid}">—</div></div>
+    </div>
+
+    ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey], {
+      showAllExport:isMagasin,
+      rangeExports: (gid==='magasin-5e' && catKey==='scanned') ? MAGASIN5_TRAVEE_RANGES : []
+    })).join('')}
+  `;
+}
+
+// Pagination plutôt qu'un plafond fixe (300) avec message "affinez la
+// recherche" : on veut pouvoir consulter l'intégralité d'une liste, y
+// compris "jamais scannés" qui peut compter plusieurs milliers d'entrées —
+// juste pas toutes rendues dans le DOM d'un coup.
+const ADV_PAGE_SIZE = 150;
+const advPage = {};
+ADV_GROUPS.forEach(g=>{
+  advPage[g.id] = {};
+  Object.keys(ADV_CATS).forEach(catKey=>{ advPage[g.id][catKey] = 1; });
+});
+
+function renderAdvTable(tbodyId, pagerId, category, rows, filterFields, filter, rowHtml, colspan, emptyMsg, page, onPageChange){
+  const q = (filter||'').trim().toLowerCase();
+  let filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
+  const tbody = document.getElementById(tbodyId);
+  const pager = document.getElementById(pagerId);
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td class="log-empty" colspan="${colspan}">${emptyMsg}</td></tr>`;
+    pager.innerHTML = '';
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ADV_PAGE_SIZE));
+  const curPage = Math.min(Math.max(1, page), totalPages);
+  const start = (curPage-1) * ADV_PAGE_SIZE;
+  tbody.innerHTML = filtered.slice(start, start+ADV_PAGE_SIZE).map(rowHtml).join('');
+
+  pager.innerHTML = `
+    <span>${filtered.length.toLocaleString('fr-FR')} résultat${filtered.length>1?'s':''} — page ${curPage} / ${totalPages}</span>
+    <span class="adv-pager-btns">
+      <button type="button" id="${pagerId}-prev" ${curPage<=1?'disabled':''}>‹ Précédent</button>
+      <button type="button" id="${pagerId}-next" ${curPage>=totalPages?'disabled':''}>Suivant ›</button>
+    </span>`;
+  if(curPage>1) document.getElementById(`${pagerId}-prev`).addEventListener('click', ()=>onPageChange(curPage-1));
+  if(curPage<totalPages) document.getElementById(`${pagerId}-next`).addEventListener('click', ()=>onPageChange(curPage+1));
+}
+
+function refreshAdvList(group, catKey){
+  const spec = ADV_CATS[catKey];
+  const id = `${catKey}-${group}`;
+  if(!document.getElementById('adv-'+id).open) return;
+  if(spec.needsCatalog && !catalogByGroup[catalogGroupOf(group)]){
+    document.getElementById('log-'+id).innerHTML = `<tr><td class="log-empty" colspan="${spec.colspan}">Chargement du catalogue…</td></tr>`;
+    document.getElementById(id+'-pager').innerHTML = '';
+    return;
+  }
+  renderAdvTable('log-'+id, id+'-pager', catKey, spec.listFn(group), spec.filterFields,
+    document.getElementById(id+'-search').value, spec.rowHtml, spec.colspan, spec.emptyMsg,
+    advPage[group][catKey], p=>{ advPage[group][catKey]=p; refreshAdvList(group, catKey); });
+}
+
+ADV_GROUPS.forEach(g=>{
+  Object.keys(ADV_CATS).forEach(catKey=>{
+    const id = `${catKey}-${g.id}`;
+    document.getElementById('adv-'+id).addEventListener('toggle', ()=>refreshAdvList(g.id, catKey));
+    document.getElementById(id+'-search').addEventListener('input', function(){ advPage[g.id][catKey]=1; refreshAdvList(g.id, catKey); });
+  });
+});
+
+function updateAdvListsCount(){
+  // Idem updateStats() : seul le panneau visible est recalculé. C'était le
+  // point chaud du scan — pour chacun des 3 groupes magasin,
+  // notScannedCount() et probablyLostCount() parcourent le catalogue entier,
+  // soit ~1 million de lectures par scan pour des chiffres masqués.
+  const visibleId = visibleAdvGroupId();
+  ADV_GROUPS.filter(g=>g.id===visibleId).forEach(g=>{
+    const nAbime = damagedCount(g.id);
+    document.getElementById('st-abime-'+g.id).textContent = nAbime.toLocaleString('fr-FR');
+    document.getElementById('sum-abime-'+g.id+'-count').textContent = nAbime.toLocaleString('fr-FR');
+
+    const nScanned = scannedCount(g.id);
+    document.getElementById('st-scanned-'+g.id).textContent = nScanned.toLocaleString('fr-FR');
+    document.getElementById('sum-scanned-'+g.id+'-count').textContent = nScanned.toLocaleString('fr-FR');
+
+    if(catalogByGroup[catalogGroupOf(g.id)]){
+      const nManualCote = manualCoteCount(g.id);
+      document.getElementById('st-manualcote-'+g.id).textContent = nManualCote.toLocaleString('fr-FR');
+      document.getElementById('sum-manualcote-'+g.id+'-count').textContent = nManualCote.toLocaleString('fr-FR');
+
+      const nNotScanned = notScannedCount(g.id);
+      document.getElementById('st-notscanned-'+g.id).textContent = nNotScanned.toLocaleString('fr-FR');
+      document.getElementById('sum-notscanned-'+g.id+'-count').textContent = nNotScanned.toLocaleString('fr-FR');
+
+      const nPerdus = probablyLostCount(g.id);
+      document.getElementById('st-perdus-'+g.id).textContent = nPerdus.toLocaleString('fr-FR');
+      document.getElementById('sum-perdus-'+g.id+'-count').textContent = nPerdus.toLocaleString('fr-FR');
+    }
+
+    const nNobarcode = noBarcodeCount(g.id);
+    document.getElementById('st-nobarcode-'+g.id).textContent = nNobarcode.toLocaleString('fr-FR');
+    document.getElementById('sum-nobarcode-'+g.id+'-count').textContent = nNobarcode.toLocaleString('fr-FR');
+
+    const nHorsSection = horsSectionCount(g.id);
+    document.getElementById('st-horssection-'+g.id).textContent = nHorsSection.toLocaleString('fr-FR');
+    document.getElementById('sum-horssection-'+g.id+'-count').textContent = nHorsSection.toLocaleString('fr-FR');
+
+    Object.keys(ADV_CATS).forEach(catKey=>refreshAdvList(g.id, catKey));
+  });
+}
+
+/* Export .txt : un code-barre par ligne, respectant le filtre de recherche
+   en cours (pas de plafond à 300 lignes ici, contrairement à l'affichage à
+   l'écran — un export doit contenir tout ce qui correspond, pas juste
+   l'aperçu). */
+function downloadTxt(text, filename){
+  const blob = new Blob([text], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+}
+function exportAdvBarcodes(rows, filterFields, filter, filenamePrefix, field, extraFilterFn){
+  const q = (filter||'').trim().toLowerCase();
+  let filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
+  if(extraFilterFn) filtered = filtered.filter(extraFilterFn);
+  if(!filtered.length){ alert('Aucun élément à exporter pour ce filtre.'); return; }
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  downloadTxt(filtered.map(r=>r[field||'barcode']).join('\n'),
+    `${filenamePrefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+}
+// Coché sur la case "Exclure les corrigés (Syracuse)" d'un panneau donné —
+// voir advDetailsTemplate(). Absent (spec.showCorrectionFilter falsy, ex.
+// "Mauvais numéro / code-barre absent") : toujours null, aucun filtre.
+function uncorrectedOnlyFilter(id, spec){
+  if(!spec.showCorrectionFilter) return null;
+  const cb = document.getElementById(id+'-export-uncorrected');
+  return (cb && cb.checked) ? syracuseNotCorrectedFilter : null;
+}
+ADV_GROUPS.forEach(g=>{
+  Object.keys(ADV_CATS).forEach(catKey=>{
+    const id = `${catKey}-${g.id}`;
+    const spec = ADV_CATS[catKey];
+    document.getElementById(id+'-export').addEventListener('click', ()=>{
+      const onlyNew = uncorrectedOnlyFilter(id, spec);
+      exportAdvBarcodes(spec.listFn(g.id), spec.filterFields, document.getElementById(id+'-search').value,
+        `${spec.filePrefix}-${g.id}${onlyNew?'-non-corriges':''}`, spec.exportField, onlyNew);
+    });
+    // Bouton "Exporter tous les magasins" (2e+5e+6e réunis, voir
+    // advDetailsTemplate) — présent uniquement dans les 3 groupes magasin,
+    // ignore volontairement la recherche en cours de CE groupe précis (le
+    // résultat mélange les 3 étages, garder un seul filtre n'aurait pas de
+    // sens univoque).
+    if(g.catalogGroup==='magasin'){
+      const allBtn = document.getElementById(id+'-export-all');
+      if(allBtn) allBtn.addEventListener('click', ()=>{
+        const onlyNew = uncorrectedOnlyFilter(id, spec);
+        const allRows = MAGASIN_ADV_GROUPS.flatMap(mg=>spec.listFn(mg.id));
+        exportAdvBarcodes(allRows, spec.filterFields, '', `${spec.filePrefix}-magasins-tous-etages${onlyNew?'-non-corriges':''}`, spec.exportField, onlyNew);
+      });
+    }
+    // Boutons par tranche de travées (voir MAGASIN5_TRAVEE_RANGES) — pour
+    // l'instant uniquement "Récolés" du 5e étage, seule combinaison demandée.
+    // Respecte la recherche en cours, contrairement au bouton "tous les
+    // magasins" ci-dessus : ici on reste dans le même groupe, un filtre de
+    // travée en plus du texte tapé garde un sens univoque.
+    if(g.id==='magasin-5e' && catKey==='scanned'){
+      MAGASIN5_TRAVEE_RANGES.forEach(rg=>{
+        const rangeBtn = document.getElementById(id+'-export-'+rg.key);
+        if(!rangeBtn) return;
+        rangeBtn.addEventListener('click', ()=>{
+          const onlyNew = uncorrectedOnlyFilter(id, spec);
+          exportAdvBarcodes(spec.listFn(g.id), spec.filterFields, document.getElementById(id+'-search').value,
+            `${spec.filePrefix}-${g.id}-${rg.key}${onlyNew?'-non-corriges':''}`, spec.exportField,
+            combineExportFilters(r=>rg.test(r.travee), onlyNew));
+        });
+      });
+    }
+  });
+});
+
+/* ════════════ EXPORT / IMPORT / RESET ════════════
+   Un seul fichier JSON regroupe scans, non-catalogués, étagères vides,
+   emplacements non rangés, dernières étagères de colonne marquées et
+   cotes sans code-barre non reconnues :
+   { scans:[...], nonCatalogues:[...], videShelves:[...], nonRangeShelves:[...],
+   lastShelves:[...], noBarcodeCotes:[...] }.
+   Les anciens exports (simple tableau de scans, ou sans lastShelves/
+   noBarcodeCotes) restent importables. */
+function exportPayload(){
+  return {
+    scans: Object.values(scans),
+    nonCatalogues: Object.values(nonCat),
+    videShelves: Object.values(videShelves),
+    nonRangeShelves: Object.values(nonRangeShelves),
+    lastShelves: Object.values(lastShelves),
+    noBarcodeCotes: Object.values(noBarcodeCotes)
+  };
+}
+function downloadJSON(data, prefix){
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  a.download = `${prefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}h${pad(d.getMinutes())}.json`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+}
+
+document.getElementById('btn-export').addEventListener('click', ()=>{
+  downloadJSON(exportPayload(), 'recolement');
+});
+
+/* ════════════ SAUVEGARDES DATÉES SUR LE SERVEUR (R2, /api/recolement-backups) ════════════
+   Distinct de la synchro incrémentale (/api/recolement) : ici on fige un
+   instantané complet et daté à la demande, pour pouvoir revenir en arrière
+   ou le recharger comme référence — sans avoir à exporter/réimporter un
+   fichier à la main. */
+document.getElementById('btn-save-server').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btn-save-server');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sauvegarde en cours…';
+  try{
+    const res = await fetch('/api/recolement-backups', { method:'POST', headers: authHeaders(), body: JSON.stringify(exportPayload()) });
+    if(res.status===401){ alert('Non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel pour sauvegarder sur le serveur.'); return; }
+    if(res.status===503){ alert('R2 non configuré côté serveur (variables Vercel manquantes).'); return; }
+    if(!res.ok){ const err = await res.json().catch(()=>({})); alert('Erreur lors de la sauvegarde : '+(err.error||res.status)); return; }
+    const data = await res.json();
+    alert('Récolement sauvegardé sur le serveur ('+data.key+').');
+  }catch(e){
+    alert('Sauvegarde impossible : hors ligne ou serveur injoignable.');
+  }finally{
+    btn.disabled=false; btn.textContent=original;
+  }
+});
+
+function formatBackupLabel(item){
+  const d = item.lastModified ? new Date(item.lastModified) : null;
+  if(d && !isNaN(d)) return d.toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  return item.key.replace(/^recolement-backups\//,'').replace(/\.json$/,'');
+}
+
+async function loadBackupAsReference(key){
+  try{
+    const res = await fetch(`/api/recolement-backups?key=${encodeURIComponent(key)}`);
+    if(!res.ok) throw new Error('fetch failed');
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.scans||[]);
+    baseline = {};
+    rows.forEach(r=>{ if(r.barcode) baseline[r.barcode]=r; });
+    saveBaseline();
+    document.getElementById('backup-list').style.display='none';
+    alert(`Référence chargée depuis la sauvegarde du ${formatBackupLabel({key,lastModified:null})} : ${Object.keys(baseline).length} emplacements connus.`);
+    renderExpected();
+  }catch(e){
+    alert('Impossible de charger cette sauvegarde (hors ligne ou serveur injoignable).');
+  }
+}
+
+document.getElementById('btn-backup-list-toggle').addEventListener('click', async ()=>{
+  const box = document.getElementById('backup-list');
+  if(box.style.display==='block'){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML = '<div class="backup-item disabled">Chargement…</div>';
+  try{
+    const res = await fetch('/api/recolement-backups?list=1&count=5');
+    if(!res.ok) throw new Error('liste indisponible');
+    const items = await res.json();
+    if(!items.length){ box.innerHTML='<div class="backup-item disabled">Aucune sauvegarde disponible pour le moment.</div>'; return; }
+    box.innerHTML = items.map(it=>`<div class="backup-item" data-key="${esc(it.key)}"><span>${esc(formatBackupLabel(it))}</span><span class="backup-item-arrow">charger →</span></div>`).join('');
+    box.querySelectorAll('.backup-item[data-key]').forEach(el=>{
+      el.addEventListener('click', ()=>loadBackupAsReference(el.dataset.key));
+    });
+  }catch(e){
+    box.innerHTML = '<div class="backup-item disabled">Liste indisponible (hors ligne ou serveur injoignable).</div>';
+  }
+});
+
+/* Fusionne un objet {scans,nonCatalogues,videShelves,nonRangeShelves} (ou un
+   simple tableau de scans, ancien format) dans l'état local — réutilisé par
+   l'import de fichier ci-dessous et par syncFromServer() (état partagé R2).
+   Avec syncToServer=true (import manuel d'une sauvegarde), le lot est aussi
+   poussé vers /api/recolement (patch 'bulkMerge') pour réamorcer/rattraper
+   l'état partagé — sans ça, un import ne met à jour QUE ce navigateur, et le
+   reste de l'équipe continue de voir un état partagé incomplet. */
+function mergeIncomingData(data, { syncToServer = false } = {}){
+  const scanRows = Array.isArray(data) ? data : (data.scans||[]);
+  const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
+  const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
+  const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
+  const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
+  const noBarcodeRows = Array.isArray(data) ? [] : (data.noBarcodeCotes||[]);
+
+  // N'écrit dans IndexedDB que ce qui a réellement changé (changedScans),
+  // pas tout l'objet scans à chaque appel : mergeIncomingData() est aussi
+  // appelée par syncFromServer() toutes les 45s (voir plus haut), où le cas
+  // courant est "rien de nouveau" — inutile de réécrire des dizaines de
+  // milliers d'enregistrements identiques à chaque poll.
+  let added=0, updated=0;
+  const changedScans = [];
+  scanRows.forEach(r=>{
+    if(!r.barcode) return;
+    if(scans[r.barcode]){
+      if(!scans[r.barcode].ts || (r.ts||0) > scans[r.barcode].ts) { scans[r.barcode]=r; updated++; changedScans.push(r); }
+    } else { scans[r.barcode]=r; added++; changedScans.push(r); }
+  });
+  bulkPutScanRecords(changedScans);
+
+  nonCatRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonCat[nonCatKey(r)] = r; });
+  saveNonCat();
+
+  videRows.forEach(r=>{ if(r.travee && r.etage!==undefined) videShelves[emplacementKey(r)] = r; });
+  saveVideShelves();
+
+  nonRangeRows.forEach(r=>{ if(r.travee && r.etage!==undefined) nonRangeShelves[emplacementKey(r)] = r; });
+  saveNonRangeShelves();
+
+  lastShelfRows.forEach(r=>{ if(r.travee && r.colonne!==undefined && r.etage!==undefined) lastShelves[lastShelfKey(r)] = r; });
+  saveLastShelves();
+
+  noBarcodeRows.forEach(r=>{
+    if(!r.cote) return;
+    const key = normalizeCote(r.cote);
+    if(!noBarcodeCotes[key] || !noBarcodeCotes[key].ts || (r.ts||0) > noBarcodeCotes[key].ts) noBarcodeCotes[key] = r;
+  });
+  saveNoBarcodeCotes();
+
+  renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
+  updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
+
+  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || noBarcodeRows.length)){
+    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, noBarcodeCotes:noBarcodeRows } });
+  }
+
+  return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length, noBarcode: noBarcodeRows.length };
+}
+
+document.getElementById('file-resume').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      const r = mergeIncomingData(data, { syncToServer:true });
+      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s), ${r.lastShelf} dernière(s) étagère(s) de colonne fusionnée(s), ${r.noBarcode} cote(s) sans code-barre fusionnée(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
+    }catch(err){ alert('Fichier invalide : '+err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+});
+
+document.getElementById('file-baseline').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      const rows = Array.isArray(data) ? data : (data.scans||[]);
+      baseline = {};
+      rows.forEach(r=>{ if(r.barcode) baseline[r.barcode]=r; });
+      saveBaseline();
+      alert(`Référence chargée : ${Object.keys(baseline).length} emplacements connus.`);
+      renderExpected();
+    }catch(err){ alert('Fichier invalide : '+err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+});
+
+document.getElementById('btn-reset').addEventListener('click', ()=>{
+  if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués, tous les emplacements marqués vides ou non rangés, toutes les dernières étagères de colonne marquées et toutes les cotes sans code-barre sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
+  scans = {}; clearAllScanRecords();
+  nonCat = {}; saveNonCat();
+  videShelves = {}; saveVideShelves();
+  nonRangeShelves = {}; saveNonRangeShelves();
+  lastShelves = {}; saveLastShelves();
+  noBarcodeCotes = {}; saveNoBarcodeCotes();
+  pendingSync = []; savePendingSync(); updateSyncIndicator();
+  renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
+});
+
+/* ════════════ DÉMARRAGE ════════════ */
+renderAllLog('');
+scanInput.focus();
+updateSyncIndicator();
+syncFromServer();
+flushPendingSync();
+})();
+</script>
+</body>
+</html>

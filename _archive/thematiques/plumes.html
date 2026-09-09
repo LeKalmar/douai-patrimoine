@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auteurs douaisiens — Bibliothèques de Douai</title>
+  <meta name="description" content="Portraits des auteurs et autrices liés à Douai, de l'Antiquité à nos jours.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+  <style>
+    /* ── Barre de recherche ── */
+    .authors-toolbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .authors-toolbar .container {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .toolbar-search {
+      flex: 1 1 260px;
+      position: relative;
+    }
+    .toolbar-search input {
+      width: 100%;
+      padding: .55rem .9rem .55rem 2.4rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: .88rem;
+      color: var(--ink);
+      background: var(--paper);
+      outline: none;
+      transition: border-color var(--transition);
+    }
+    .toolbar-search input:focus { border-color: var(--warm); }
+    .toolbar-search svg {
+      position: absolute;
+      left: .7rem; top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      color: var(--text-light);
+      pointer-events: none;
+    }
+    .toolbar-select {
+      padding: .55rem .9rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: .82rem;
+      color: var(--text);
+      background: var(--paper);
+      cursor: pointer;
+      outline: none;
+    }
+    .toolbar-count {
+      font-size: .8rem;
+      color: var(--text-light);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .toolbar-count strong { color: var(--ink); }
+
+    /* ── Grille auteurs ── */
+    .authors-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Carte auteur ── */
+    .author-card {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      min-height: 320px;
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition);
+    }
+    .author-card:last-child { border-bottom: none; }
+
+    /* Alternance section / section-alt */
+    .author-card:nth-child(odd)  { background: #fff; }
+    .author-card:nth-child(even) { background: var(--cream, #f9f5ee); }
+
+    .author-card:hover { background: var(--accent-light, #fdf5e8); }
+
+    /* Image */
+    .author-img-wrap {
+      position: relative;
+      overflow: hidden;
+      padding: 50px;
+    }
+    .author-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+      transition: transform .4s ease;
+    }
+    .author-card:hover .author-img-wrap img {
+      transform: scale(1.03);
+    }
+    .author-img-placeholder {
+      width: 100%;
+      height: 100%;
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--cream, #f0ebe0);
+      color: var(--text-light);
+    }
+    .author-img-placeholder svg { opacity: .25; }
+
+    /* Texte */
+    .author-body {
+      padding: 2.5rem 2.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1rem;
+    }
+    .author-meta {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .author-tag {
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--warm-dark, #8b5e2a);
+      background: var(--warm-light, #faebd4);
+      border: 1px solid var(--warm, #c8913a);
+      padding: .15rem .55rem;
+      border-radius: 50px;
+    }
+    .author-dates {
+      font-size: .78rem;
+      color: var(--text-light);
+    }
+    .author-name {
+      font-family: var(--font-display);
+      font-size: 1.9rem;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+    .author-name em {
+      color: var(--accent, #8b3a1e);
+      font-style: italic;
+    }
+    .author-desc {
+      font-size: .9rem;
+      line-height: 1.75;
+      color: var(--text);
+      max-width: 56ch;
+    }
+    .author-links {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      margin-top: .25rem;
+    }
+    .author-link {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--warm-dark, #8b5e2a);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color var(--transition);
+    }
+    .author-link:hover { border-bottom-color: var(--warm-dark, #8b5e2a); }
+
+    /* ── État vide ── */
+    .empty-state {
+      padding: 4rem 1rem;
+      text-align: center;
+      color: var(--text-light);
+      font-size: .9rem;
+      grid-column: 1 / -1;
+    }
+    .empty-state svg {
+      width: 40px; height: 40px;
+      margin: 0 auto .75rem;
+      display: block;
+      opacity: .3;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 800px) {
+      .author-card { grid-template-columns: 1fr; }
+      .author-img-wrap { height: 240px; }
+      .author-img-placeholder { min-height: 240px; }
+      .author-body { padding: 1.5rem 1.25rem; }
+      .author-name { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<a href="#main" class="skip-nav">Aller au contenu</a>
+
+<section class="page-hero">
+  <nav class="breadcrumb" aria-label="Fil d'Ariane">
+    <a href="../index.html">Patrimoine</a> / Plumes de Douai
+  </nav>
+  <div class="container">
+    <h1 class="page-title">Plumes <em>de Douai</em></h1>
+    <p class="page-lead">Figures littéraires, poètes, savants et artistes liés à Douai, du Moyen Âge à nos jours.</p>
+  </div>
+</section>
+
+<div class="authors-toolbar" role="search">
+  <div class="container">
+    <div class="toolbar-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="search-auteur" placeholder="Rechercher un auteur, un genre…" autocomplete="off" aria-label="Rechercher un auteur">
+    </div>
+    <select class="toolbar-select" id="filter-epoque" aria-label="Filtrer par époque">
+      <option value="">Toutes les époques</option>
+      <option value="Moyen Âge">Moyen Âge</option>
+      <option value="Renaissance">Renaissance</option>
+      <option value="XVIIe siècle">XVIIe siècle</option>
+      <option value="XVIIIe siècle">XVIIIe siècle</option>
+      <option value="XIXe siècle">XIXe siècle</option>
+      <option value="XXe siècle">XXe siècle</option>
+      <option value="Contemporain">Contemporain</option>
+    </select>
+    <select class="toolbar-select" id="filter-genre" aria-label="Filtrer par genre littéraire">
+      <option value="">Tous les genres</option>
+    </select>
+    <span class="toolbar-count" id="result-count" aria-live="polite"></span>
+  </div>
+</div>
+
+<main id="main" tabindex="-1">
+  <div id="authors-list" class="authors-list"></div>
+
+  <footer>
+    <div class="consultation-card">
+      <div class="consultation-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+      </div>
+      <div class="consultation-text">
+        <h2>Consulter les fonds liés à ces auteurs</h2>
+        <p>Manuscrits autographes, correspondances et éditions originales sont consultables <strong>sur place, sur rendez-vous préalable</strong>.</p>
+        <div class="contact-row">
+          <a href="tel:0327978851" class="contact-pill">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            03 27 97 88 51
+          </a>
+          <a href="mailto:bibliotheque@ville-douai.fr" class="contact-pill">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+            bibliotheque@ville-douai.fr
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<script>
+
+// ══════════════════════════════════════════
+//  Initialisation
+// ══════════════════════════════════════════
+function init() {
+  // Remplir le filtre genres
+  const allGenres = [...new Set(AUTEURS.flatMap(a => a.genres))].sort();
+  const selGenre = document.getElementById('filter-genre');
+  allGenres.forEach(g => {
+    const o = document.createElement('option');
+    o.value = g; o.textContent = g;
+    selGenre.appendChild(o);
+  });
+
+  document.getElementById('search-auteur').addEventListener('input', render);
+  document.getElementById('filter-epoque').addEventListener('change', render);
+  selGenre.addEventListener('change', render);
+
+  render();
+}
+
+// ══════════════════════════════════════════
+//  Rendu filtré
+// ══════════════════════════════════════════
+function render() {
+  const q      = document.getElementById('search-auteur').value.trim().toLowerCase();
+  const epoque = document.getElementById('filter-epoque').value;
+  const genre  = document.getElementById('filter-genre').value;
+
+  const filtered = AUTEURS.filter(a => {
+    if (epoque && a.epoque !== epoque) return false;
+    if (genre  && !a.genres.includes(genre)) return false;
+    if (q) {
+      const hay = [a.nom, a.description, ...a.genres, a.epoque].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const container = document.getElementById('authors-list');
+  container.innerHTML = '';
+
+  document.getElementById('result-count').innerHTML =
+    `<strong>${filtered.length}</strong> auteur${filtered.length > 1 ? 's' : ''}`;
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 21l-4.35-4.35M11 5a6 6 0 100 12 6 6 0 000-12z"/>
+        </svg>
+        Aucun auteur ne correspond à votre recherche.
+      </div>`;
+    return;
+  }
+
+  filtered.forEach(a => {
+    const card = document.createElement('article');
+    card.className = 'author-card';
+
+    // Image
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'author-img-wrap';
+    if (a.image) {
+      const img = document.createElement('img');
+      img.src = a.image;
+      img.alt = `Portrait de ${a.nom}`;
+      img.loading = 'lazy';
+      imgWrap.appendChild(img);
+    } else {
+      imgWrap.innerHTML = `
+        <div class="author-img-placeholder">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>`;
+    }
+
+    // Corps
+    const body = document.createElement('div');
+    body.className = 'author-body';
+
+    const genresTags = a.genres.map(g =>
+      `<span class="author-tag">${esc(g)}</span>`
+    ).join('');
+
+    const lienHTML = a.lien
+      ? `<div class="author-links">
+          <a class="author-link" href="${a.lien.url}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            ${esc(a.lien.label)}
+          </a>
+         </div>`
+      : '';
+
+    body.innerHTML = `
+      <div class="author-meta">
+        ${genresTags}
+        <span class="author-dates">${esc(a.dates)}</span>
+      </div>
+      <h2 class="author-name">${esc(a.nom)}</h2>
+      <p class="author-desc">${esc(a.description)}</p>
+      ${lienHTML}
+    `;
+
+    card.appendChild(imgWrap);
+    card.appendChild(body);
+    container.appendChild(card);
+  });
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+Papa.parse('../csv/auteurs.csv', {
+  download: true,
+  header: true,
+  delimiter: ';',
+  encoding: 'UTF-8',
+  skipEmptyLines: true,
+  complete(results) {
+    AUTEURS = results.data.map(row => ({
+      nom:         row['nom']         || '',
+      dates:       row['dates']       || '',
+      epoque:      row['epoque']      || '',
+      genres:      row['genres'] ? row['genres'].split(',').map(g => g.trim()) : [],
+      description: row['description'] || '',
+      image:       row['image']       || '',
+      lien: row['lien_url'] ? { label: row['lien_label'], url: row['lien_url'] } : null,
+    }));
+    init();
+  }
+});
+</script>
+</body>
+</html>

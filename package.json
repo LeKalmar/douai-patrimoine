@@ -1,0 +1,33 @@
+{
+  "name": "reserve-patrimoniale-douai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site public de la Réserve patrimoniale — build de l'inventaire depuis les exports Syracuse.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build-inventory.mjs",
+    "build:force": "SYRACUSE_FORCE=1 node scripts/build-inventory.mjs",
+    "build:magasins": "node scripts/build-magasins.mjs",
+    "build:cotes-numeriques": "node scripts/build-cotes-numeriques.mjs",
+    "build:desherbage": "node scripts/build-desherbage.mjs",
+    "upload:xml": "node scripts/upload-xml-to-r2.mjs",
+    "upload:desherbage": "node scripts/upload-desherbage-to-r2.mjs",
+    "upload:bib": "node scripts/upload-bib-to-r2.mjs",
+    "test:r2": "node scripts/test-r2.mjs",
+    "sync:syracuse": "node scripts/run-syracuse-sync.mjs",
+    "backfill:reliure": "node scripts/backfill-reliure.mjs",
+    "db:apply-schema": "node scripts/db-apply-schema.mjs",
+    "db:test": "node scripts/db-test.mjs",
+    "db:migrate:reserve": "node scripts/db-migrate-reserve.mjs",
+    "db:migrate:bib": "node scripts/db-migrate-bib.mjs"
+  },
+  "devDependencies": {
+    "neon": "^4.14.5"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
+}

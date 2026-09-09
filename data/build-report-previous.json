@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-08-27T07:34:57.534Z",
+  "durationMs": 3537,
+  "status": "ok",
+  "warnings": [],
+  "stats": {
+    "notices": 15518,
+    "items": 15518,
+    "joinedByPrimary": 15518,
+    "joinedByCote": 0,
+    "orphans": 0,
+    "joinRate": 100,
+    "reserveDouaisienne": 6614,
+    "reservePatrimoniale": 8904,
+    "reliureGroups": 178,
+    "reliureItems": 703
+  },
+  "orphansSample": []
+}

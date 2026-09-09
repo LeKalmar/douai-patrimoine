@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Réserve patrimoniale — Réseau des Bibliothèques Douai Cuincy</title>
+  <meta name="description" content="La Réserve patrimoniale des Bibliothèques de Douai conserve manuscrits enluminés, incunables et fonds historiques classés.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
+</head>
+<body>
+
+<a href="#main" class="skip-nav">Aller au contenu</a>
+
+<main id="main" tabindex="-1">
+
+  <!-- ============ HERO ============ -->
+  <section class="rp-hero">
+    <div class="rp-hero-editorial">
+      <h1 class="rp-hero-title">Réserve<br><span>patrimoniale</span></h1>
+      <p class="rp-hero-lead">Manuscrits enluminés, incunables et fonds historiques classés, conservés au premier étage de la bibliothèque Marceline Desbordes-Valmore.</p>
+      <dl class="rp-hero-stats">
+        <div class="rp-stat">
+          <dt class="rp-stat-value" id="stat-documents">15 518</dt>
+          <dd class="rp-stat-label">documents inventoriés</dd>
+        </div>
+        <div class="rp-stat">
+          <dt class="rp-stat-value">7</dt>
+          <dd class="rp-stat-label">fonds patrimoniaux</dd>
+        </div>
+        <div class="rp-stat">
+          <dt class="rp-stat-value">1543</dt>
+          <dd class="rp-stat-label">première presse douaisienne</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="rp-hero-portrait" role="img" aria-label="Portrait de Marceline Desbordes-Valmore">
+      <span class="rp-hero-portrait-img" style="background-image:url('images/marceline.jpg')"></span>
+      <span class="rp-hero-portrait-wash"></span>
+      <span class="rp-hero-portrait-lines"></span>
+      <div class="rp-hero-portrait-caption">
+        <p class="rp-hero-portrait-name">Marceline Desbordes-Valmore</p>
+        <p class="rp-hero-portrait-meta">Douai, 1786 — Paris, 1859 · Fonds propre</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EXPOSITION EN COURS ============ -->
+  <section class="rp-expo" aria-label="Exposition en cours">
+    <p class="rp-expo-eyebrow">Exposition en cours</p>
+    <h2 class="rp-expo-title">500 ans d'histoire des métiers du livre à Douai</h2>
+    <a href="histoire-du-livre.html" class="rp-expo-cta">Visiter →</a>
+  </section>
+
+  <!-- ============ LES FONDS ============ -->
+  <section class="rp-fonds">
+    <div class="rp-section-head">
+      <h2 class="rp-section-title">Les fonds</h2>
+      <span class="rp-section-rule" aria-hidden="true"></span>
+      <a href="inventaire.html" class="rp-section-link">Tout l'inventaire →</a>
+    </div>
+
+    <div class="rp-fonds-grid">
+      <a class="rp-fonds-card" href="inventaire.html?fonds=Imprim%C3%A9s">
+        <span class="rp-fonds-cover" style="background-image:url('images/documents.jpg')" aria-hidden="true">
+          <span class="rp-fonds-era">XVIᵉ — XXᵉ siècle</span>
+        </span>
+        <span class="rp-fonds-body">
+          <span class="rp-fonds-name">Imprimés</span>
+          <span class="rp-fonds-desc">Collection générale d'imprimés anciens couvrant du XVIᵉ au XXᵉ siècle, réunissant des ouvrages divers tant par leur provenance que leur sujet.</span>
+          <span class="rp-fonds-more">Explorer le fonds →</span>
+        </span>
+      </a>
+
+      <a class="rp-fonds-card" href="inventaire.html?fonds=Douaisien">
+        <span class="rp-fonds-cover" style="background-image:url('images/beffroi.jpg')" aria-hidden="true">
+          <span class="rp-fonds-era">1543 — 1958</span>
+        </span>
+        <span class="rp-fonds-body">
+          <span class="rp-fonds-name">Fonds Douaisien</span>
+          <span class="rp-fonds-desc">Ensemble de publications liées à Douai par leur auteur ou leur sujet, témoin de l'activité typographique locale depuis le XVIᵉ siècle.</span>
+          <span class="rp-fonds-more">Explorer le fonds →</span>
+        </span>
+      </a>
+
+      <a class="rp-fonds-card" href="inventaire.html?fonds=Livres%20d'Artiste">
+        <span class="rp-fonds-cover" style="background-image:url('images/patrimoine-2.jpg')" aria-hidden="true">
+          <span class="rp-fonds-era">XXᵉ — XXIᵉ siècle</span>
+        </span>
+        <span class="rp-fonds-body">
+          <span class="rp-fonds-name">Livres d'Artiste</span>
+          <span class="rp-fonds-desc">Ensemble exceptionnel de livres d'artistes contemporains alliant création plastique et littéraire, souvent en édition unique ou tirée à très peu d'exemplaires.</span>
+          <span class="rp-fonds-more">Explorer le fonds →</span>
+        </span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ============ INFORMATIONS PRATIQUES ============ -->
+  <section class="rp-pratique" id="pratique">
+    <div class="rp-pratique-grid">
+
+      <div class="rp-pratique-col">
+        <h2 class="rp-pratique-title">Horaires</h2>
+        <dl class="rp-horaires">
+          <div class="rp-horaire rp-horaire--closed"><dt>Mardi</dt><dd>Fermé</dd></div>
+          <div class="rp-horaire"><dt>Mercredi</dt><dd>10h – 12h30 · 14h – 17h</dd></div>
+          <div class="rp-horaire rp-horaire--closed"><dt>Jeudi</dt><dd>Fermé</dd></div>
+          <div class="rp-horaire"><dt>Vendredi</dt><dd>10h – 12h30 · 14h – 17h</dd></div>
+          <div class="rp-horaire"><dt>Samedi</dt><dd>10h – 12h30</dd></div>
+        </dl>
+        <p class="rp-pratique-note">La consultation s'effectue sur place, sur rendez-vous préalable.</p>
+      </div>
+
+      <div class="rp-pratique-col">
+        <h2 class="rp-pratique-title">Modalités</h2>
+        <ul class="rp-dashed">
+          <li>Demande écrite ou téléphonique <strong>48 h à l'avance</strong> minimum (jours ouvrés)</li>
+          <li>Carte de bibliothèque de consultation sur place requise — délivrée gratuitement sur pièce d'identité</li>
+          <li>Formulaire de consultation à signer avant chaque séance</li>
+        </ul>
+        <h2 class="rp-pratique-title rp-pratique-title--second">Conditions</h2>
+        <ul class="rp-dashed">
+          <li>Crayons de bois uniquement — pas de stylos</li>
+          <li>Photos sans flash autorisées, pas de photocopies</li>
+          <li>5 documents maximum par consultation</li>
+          <li>Communications arrêtées 30 min avant la fermeture</li>
+          <li>Gants, futon ou lutrin selon les documents — le matériel est fourni</li>
+          <li>Les 2 premières reproductions sont gratuites</li>
+        </ul>
+      </div>
+
+      <div class="rp-pratique-col">
+        <h2 class="rp-pratique-title">Nous trouver</h2>
+        <p class="rp-adresse">
+          <strong>Bibliothèque Marceline Desbordes-Valmore</strong><br>
+          8 rue de la Fonderie, 59500 Douai
+        </p>
+        <div id="venir-map" class="rp-map"></div>
+        <p class="rp-contact">
+          <a href="tel:0327978851">03 27 97 88 51</a><br>
+          <a href="mailto:bibliotheque@ville-douai.fr">bibliotheque@ville-douai.fr</a>
+        </p>
+      </div>
+
+    </div>
+
+    <div class="rp-pratique-foot">
+      <button type="button" id="admin-trigger" class="rp-admin-trigger" aria-label="Espace professionnel">
+        <span aria-hidden="true">⚙</span>
+      </button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== CHIFFRE D'INVENTAIRE (rapport de build) ===== -->
+<script>
+/* Le seul chiffre de l'accueil qui bouge d'un export Syracuse à l'autre. Il
+   est lu dans data/build-report.json (quelques centaines d'octets) plutôt
+   qu'écrit en dur, pour qu'il ne se périme pas tout seul entre deux exports.
+   La valeur du HTML sert de repli si le rapport est indisponible. */
+fetch('data/build-report.json')
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (report) {
+    var n = report && report.stats && report.stats.notices;
+    if (n != null) {
+      document.getElementById('stat-documents').textContent = n.toLocaleString('fr-FR');
+    }
+  })
+  .catch(function () { /* repli : la valeur déjà présente dans le HTML */ });
+</script>
+
+<!-- ===== CARTE MAPLIBRE — Bibliothèque Marceline Desbordes-Valmore ===== -->
+<script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+(function () {
+  /* Coordonnées de la bibliothèque Marceline Desbordes-Valmore, Douai */
+  var LNG = 3.073883;
+  var LAT = 50.367657;
+
+  function initMap() {
+    var mapEl = document.getElementById('venir-map');
+    if (!mapEl || typeof maplibregl === 'undefined') return;
+
+    var map = new maplibregl.Map({
+      container: 'venir-map',
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          }
+        },
+        layers: [{
+          id: 'osm-tiles',
+          type: 'raster',
+          source: 'osm'
+        }]
+      },
+      center: [LNG, LAT],
+      zoom: 15,
+      attributionControl: false,
+      /* Publication en iframe (voir js/parent-page-height.js) : la molette
+         doit faire défiler la page hôte, pas zoomer cette petite carte de
+         localisation qu'on ne fait que survoler en descendant. Ctrl (⌘ sur
+         Mac) + molette zoome toujours, et les boutons +/− restent là. */
+      cooperativeGestures: document.documentElement.classList.contains('rp-embedded'),
+      locale: {
+        'CooperativeGesturesHandler.WindowsHelpText': 'Utilisez Ctrl + molette pour zoomer',
+        'CooperativeGesturesHandler.MacHelpText': 'Utilisez ⌘ + molette pour zoomer',
+        'CooperativeGesturesHandler.MobileHelpText': 'Utilisez deux doigts pour déplacer la carte'
+      }
+    });
+
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+    /* Marqueur personnalisé */
+    var el = document.createElement('div');
+    el.style.cssText = [
+      'width:34px', 'height:34px', 'border-radius:50% 50% 50% 0',
+      'transform:rotate(-45deg)', 'background:#B4213C',
+      'border:3px solid #fff', 'box-shadow:0 2px 8px rgba(0,0,0,.35)',
+      'cursor:pointer'
+    ].join(';');
+
+    new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([LNG, LAT])
+      .setPopup(
+        new maplibregl.Popup({ offset: 10, closeButton: false })
+          .setHTML(
+            '<strong>Bibliothèque Marceline Desbordes-Valmore</strong><br>' +
+            '8 Rue de la Fonderie<br>59500 Douai'
+          )
+      )
+      .addTo(map);
+
+    map.on('load', function () {
+      document.querySelector('.maplibregl-marker')
+        && map._markers && map._markers[0] && map._markers[0].togglePopup();
+    });
+  }
+
+  /* La carte n'est plus dans un accordéon depuis la révision de design : elle
+     est toujours dans le DOM, en bas de page. On l'initialise donc quand elle
+     approche du viewport plutôt qu'au chargement, pour ne pas payer les tuiles
+     OSM sur une visite qui ne descend jamais jusque-là. */
+  function watch() {
+    var mapEl = document.getElementById('venir-map');
+    if (!mapEl) return;
+
+    if (!('IntersectionObserver' in window)) { initMap(); return; }
+
+    var obs = new IntersectionObserver(function (entries) {
+      if (entries.some(function (e) { return e.isIntersecting; })) {
+        obs.disconnect();
+        initMap();
+      }
+    }, { rootMargin: '200px' });
+    obs.observe(mapEl);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', watch);
+  } else {
+    watch();
+  }
+})();
+
+/* ===== ESPACE PROFESSIONNEL =====
+   Les identifiants ne sont plus en clair ici : le formulaire est vérifié
+   côté serveur par /api/login (voir lib/auth.mjs), contre les variables
+   d'environnement ADMIN_USER / ADMIN_PASS sur Vercel. Cet endpoint ne fait
+   que confirmer si la saisie est correcte — le jeton Basic utilisé ensuite
+   par récolement.html / livres-spolies.html pour authentifier leurs appels
+   vers /api/recolement et /api/spolies est construit ici à partir de ce que
+   l'utilisateur vient de saisir (déjà en sa possession), pas d'une
+   constante. */
+document.addEventListener('DOMContentLoaded', function() {
+  var trigger = document.getElementById('admin-trigger');
+  var modal = document.getElementById('admin-modal');
+  var form = document.getElementById('admin-login-form');
+  var userField = document.getElementById('admin-user');
+  var passField = document.getElementById('admin-pass');
+  var errorMsg = document.getElementById('admin-login-error');
+  var cancelBtn = document.getElementById('admin-modal-cancel');
+  var submitBtn = form.querySelector('button[type=submit]');
+
+  function openModal() {
+    modal.hidden = false;
+    errorMsg.hidden = true;
+    form.reset();
+    userField.focus();
+  }
+  function closeModal() {
+    modal.hidden = true;
+  }
+
+  trigger.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
+  });
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var user = userField.value.trim();
+    var pass = passField.value;
+    errorMsg.hidden = true;
+    submitBtn.disabled = true;
+
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: user, pass: pass })
+    })
+      .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+      .then(function(result) {
+        if (result.ok && result.data.ok) {
+          localStorage.setItem('rp_admin_auth', '1');
+          localStorage.setItem('rp_admin_token', btoa(user + ':' + pass));
+          window.location.href = 'admin.html';
+        } else {
+          errorMsg.textContent = (result.data && result.data.error === 'ADMIN_USER / ADMIN_PASS non configurés côté serveur (variables Vercel).')
+            ? 'Connexion indisponible pour le moment (configuration serveur). Contactez l\'administrateur.'
+            : 'Identifiant ou mot de passe incorrect.';
+          errorMsg.hidden = false;
+        }
+      })
+      .catch(function() {
+        errorMsg.textContent = 'Connexion impossible (hors ligne ou serveur injoignable).';
+        errorMsg.hidden = false;
+      })
+      .finally(function() {
+        submitBtn.disabled = false;
+      });
+  });
+});
+</script>
+
+<!-- ============ MODALE ESPACE PROFESSIONNEL ============ -->
+<div id="admin-modal" class="admin-modal" hidden>
+  <div class="admin-modal-box" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+    <h2 id="admin-modal-title">Espace professionnel</h2>
+    <form id="admin-login-form" novalidate>
+      <label for="admin-user">Identifiant</label>
+      <input type="text" id="admin-user" autocomplete="username" required>
+      <label for="admin-pass">Mot de passe</label>
+      <input type="password" id="admin-pass" autocomplete="current-password" required>
+      <p id="admin-login-error" class="admin-login-error" hidden>Identifiant ou mot de passe incorrect.</p>
+      <div class="admin-modal-actions">
+        <button type="button" id="admin-modal-cancel" class="admin-btn-secondary">Annuler</button>
+        <button type="submit" class="admin-btn-primary">Se connecter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+</body>
+</html>
