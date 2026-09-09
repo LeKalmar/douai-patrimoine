@@ -22,16 +22,22 @@
  * restent donc des fonctions internes, jamais routées.
  *
  * ─── Garde-fous (tous ici, aucun reporté à plus tard) ───
- * 1. Plancher de 5 min + verrou anti-concurrence, tous deux vérifiés
- *    AVANT le moindre appel réseau vers Syracuse (voir claimSlot()) : posés
- *    via une écriture R2 en compare-and-swap (r2CasUpdate), qui garantit
- *    qu'un seul appel concurrent « prend la main » — un second appel
- *    presque simultané relit l'état que le premier vient de poser et se
- *    déclare `too-soon`/`in-progress` à son tour. Un verrou resté posé
- *    plus de 2 min (LOCK_STALE_MS) est considéré comme issu d'une
- *    invocation plantée et peut être repris, plancher ignoré.
+ * 1. Plancher (FLOOR_MS, 1 min) + verrou anti-concurrence, tous deux
+ *    vérifiés AVANT le moindre appel réseau vers Syracuse (voir
+ *    claimSlot()) : posés via une écriture R2 en compare-and-swap
+ *    (r2CasUpdate), qui garantit qu'un seul appel concurrent « prend la
+ *    main » — un second appel presque simultané relit l'état que le
+ *    premier vient de poser et se déclare `too-soon`/`in-progress` à son
+ *    tour. Un verrou resté posé plus de 2 min (LOCK_STALE_MS, largement
+ *    au-dessus de la durée réelle d'une tranche — voir MAX_DURATION_S) est
+ *    considéré comme issu d'une invocation plantée et peut être repris,
+ *    plancher ignoré.
  * 2. Jamais de Promise.all entre appels Syracuse : boucle for séquentielle,
- *    300 ms d'attente entre deux appels (CALL_SPACING_MS), search compris.
+ *    300 ms d'attente entre deux appels (CALL_SPACING_MS, INTOUCHÉ — c'est
+ *    la seule protection réelle du débit vers Syracuse), search compris.
+ *    FLOOR_MS et MAX_HOLDINGS_PER_TICK (cadence relevée le 2026-09-09, voir
+ *    CLAUDE.md) ne changent que la durée/fréquence des rafales, jamais
+ *    leur intensité crête.
  * 3. Comparaison avant écriture : une réindexation en masse bouge
  *    `timestamp` sans changer le contenu (§19) — on ne grossit l'état que
  *    sur un vrai changement.
@@ -59,13 +65,25 @@ const COMMON_HEADERS = {
   'Referer': 'https://www.bm-douai.fr/',
 };
 
-const FLOOR_MS = 5 * 60 * 1000;
+/* Cadence relevée le 2026-09-09 (voir CLAUDE.md, section « Synchronisation
+   incrémentale Syracuse » — « Cadence relevée ») : un retard initial de
+   plusieurs dizaines de milliers de notices, et des modifications groupées
+   fréquentes côté équipe (corrections de pièges en masse), rendaient la
+   cadence d'origine (10 notices / 5 min) beaucoup trop lente. Le levier de
+   sécurité reste CALL_SPACING_MS — jamais touché — c'est lui qui fixe le
+   débit RÉEL vers Syracuse (recherche du doc : « ~300 ms entre deux
+   appels »). FLOOR_MS et MAX_HOLDINGS_PER_TICK ne changent que la durée et
+   la fréquence des rafales, jamais leur intensité crête. */
+const FLOOR_MS = 60 * 1000; // 1 min (était 5 min)
 const LOCK_STALE_MS = 2 * 60 * 1000;
-const MAX_HOLDINGS_PER_TICK = 10;
-const RESULT_SIZE = 25; // liste blanche §11 : seuls 5/10/25/50 sont honorés
-const CALL_SPACING_MS = 300;
+const MAX_HOLDINGS_PER_TICK = 40; // était 10 — voir MAX_DURATION_S ci-dessous
+const RESULT_SIZE = 50; // liste blanche §11 : 50 = valeur max autorisée (était 25)
+const CALL_SPACING_MS = 300; // ⚠️ ne pas réduire — c'est la seule protection réelle de Syracuse
 const MAX_CONSECUTIVE_ERRORS = 3;
 const SANITY_CHECK_QUIET_MS = 12 * 60 * 60 * 1000;
+// Budget mesuré pour 40 GetHoldings : ~1,5 s (recherche) + 40×(~0,3-0,5 s
+// d'appel + 300 ms d'attente) ≈ 33 s — sous MAX_DURATION_S avec marge.
+const MAX_DURATION_S = 45; // voir `export const config` plus bas
 
 class SkipTick extends Error {
   constructor(reason, extra) {
@@ -215,11 +233,12 @@ async function checkTimestampFieldAlive() {
    ordre de résultats à la tranche suivante si l'index a bougé entre-temps
    — une notice pourrait en théorie glisser sous un offset déjà traité et
    être manquée pour ce passage. Risque étroit en pratique (une page ne
-   s'étale que sur ~2-3 tranches vu MAX_HOLDINGS_PER_TICK < RESULT_SIZE) et
-   auto-cicatrisant (rattrapé à la prochaine modification de cette notice,
-   ou par le rebuild mensuel complet — voir CLAUDE.md). Pas corrigé pour
-   ne pas complexifier une phase pensée pour être observée avant d'être
-   affichée. */
+   s'étale plus que sur 1-2 tranches maintenant que MAX_HOLDINGS_PER_TICK
+   se rapproche de RESULT_SIZE, contre ~2-3 avant la cadence du 2026-09-09)
+   et auto-cicatrisant (rattrapé à la prochaine modification de cette
+   notice, ou par le rebuild mensuel complet — voir CLAUDE.md). Pas corrigé
+   pour ne pas complexifier une phase pensée pour être observée avant
+   d'être affichée. */
 async function runSlice(state, origin) {
   const nowIso = new Date().toISOString();
   const cursor = state.cursor;
@@ -351,6 +370,15 @@ function commitFailure(state, err) {
   }
   return next;
 }
+
+/* Durée max explicite (convention Vercel Serverless Functions) : sans ce
+   `config`, la fonction reste sur la limite par défaut de la plateforme
+   (10 s sur beaucoup de configurations Hobby), trop courte pour
+   MAX_HOLDINGS_PER_TICK=40 (~33 s mesurés). 45 s reste sous le plafond
+   documenté (« 60 s, 300 s max en plan Pro », API-SYRACUSE.MD §20) avec de
+   la marge — si la plateforme refuse cette valeur, la fonction retombe
+   simplement sur son défaut habituel plutôt que d'échouer au déploiement. */
+export const config = { maxDuration: MAX_DURATION_S };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

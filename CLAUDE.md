@@ -853,10 +853,10 @@ sont justes, avant d'y raccrocher une première fusion dans l'affichage
     sans intervalle non couvert. Conséquence acceptée sur ce premier
     démarrage : l'écart avec le dernier rebuild peut représenter des
     dizaines de milliers de notices (§19-20, ~32 000 sur une semaine de
-    retard mesurées) — donc plusieurs jours à rythme réel de tick avant
-    résorption complète. Sans risque de surcharge pour autant : le débit
-    par tranche (plancher de 5 min, ≤10 `GetHoldings`) est identique quel
-    que soit le volume restant, seul le temps total de rattrapage varie.
+    retard mesurées). Sans risque de surcharge pour autant : le débit par
+    tranche est identique quel que soit le volume restant, seul le temps
+    total de rattrapage varie — voir « Cadence relevée » ci-dessous pour le
+    réglage de ce débit.
     Après un futur rebuild, `{type:'reset'}` (voir `api/syracuse-sync.mjs`)
     remet `lastSync` à zéro, et le prochain amorçage se recale
     automatiquement sur le nouveau `generatedAt` — rien à retoucher dans ce
@@ -888,6 +888,44 @@ sont justes, avant d'y raccrocher une première fusion dans l'affichage
     déjà en main pour la même notice — pas d'appel supplémentaire. `dt`
     sert notamment à corriger les dates de publication cassées côté
     catalogue affiché (voir la fusion côté client à venir).
+
+**Cadence relevée (2026-09-09)** : la cadence d'origine (10 `GetHoldings`
+par tranche, plancher de 5 min) rendait le rattrapage du retard initial
+(~32 000 notices) interminable — aggravé par des sessions de correction en
+masse côté équipe (pièges corrigés sur de nombreux exemplaires d'un coup),
+diagnostiquées en conditions réelles le jour même : une notice modifiée
+n'apparaissait toujours pas sur le site après plusieurs rechargements.
+Resserrée ainsi :
+
+| Constante | Avant | Après |
+|---|---|---|
+| `FLOOR_MS` | 5 min | 1 min |
+| `MAX_HOLDINGS_PER_TICK` | 10 | 40 |
+| `RESULT_SIZE` | 25 | 50 (max autorisé, §11) |
+
+Soit ~20× de débit (5× la fréquence des tranches × 4× leur taille). **Le
+seul levier qui protège réellement Syracuse, `CALL_SPACING_MS` (300 ms
+entre deux appels quels qu'ils soient), n'a volontairement pas bougé** :
+FLOOR_MS et MAX_HOLDINGS_PER_TICK ne changent que la durée et la fréquence
+des rafales, jamais leur intensité crête — chaque appel individuel reste
+espacé exactement comme avant. Une tranche de 40 `GetHoldings` prend
+~33 s (mesuré), d'où l'ajout d'un `export const config = { maxDuration:
+45 }` (`api/syracuse-tick.mjs`) — absent de tout le reste du projet
+jusqu'ici (aucun `maxDuration` n'était configuré nulle part) ; 45 s reste
+sous le plafond documenté par la plateforme (« 60 s, 300 s en plan Pro »,
+API-SYRACUSE.MD §20) avec de la marge. `LOCK_STALE_MS` (2 min) reste très
+au-dessus de cette durée réelle, donc `claimSlot()` ne confond toujours pas
+une tranche normale avec une invocation plantée.
+
+Corollaire côté client : `js/syracuse-sync-trigger.js` ne se contentait que
+d'un appel au chargement de la page — insuffisant une fois le plancher
+resserré à 1 min, puisque laisser une page ouverte sans la recharger
+n'aurait fait avancer le rattrapage que d'une seule tranche. Il se rappelle
+désormais toutes les 65 s tant que la page reste visible (`setInterval` +
+`visibilitychange`, même patron que `loadRecolement()`/`loadSyracuseOverlay()`
+dans `reserve.html`) — pour qu'une session de correction en masse, page
+ouverte pendant que l'équipe travaille dans Syracuse, rattrape vraiment son
+retard au lieu de ne progresser qu'au prochain rechargement manuel.
 
 - **`api/syracuse-sync.mjs`** — accès à l'état stocké, sur le patron
   `createPatchEndpoint()` des sept autres endpoints « proxy classique »
