@@ -4,16 +4,22 @@
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* Palette « Révision design » (planche 1d, 2026-09-08).
+/* Palette « Révision design » (planche 1d, révisée 2026-09-09).
    Elle remplace l'ancienne palette or/vert par celle du rollup patrimoine.
 
+   Le bleu et l'encre ont été recalculés sur le bleu vif du centre du
+   kakémono, #2A3CD4, et non plus sur la teinte sombre des bords (#101E8C) —
+   d'où le passage --bleu #101E8C → #2A3CD4 et --encre #14183F → #141B4F.
+   Papier, papier ombré, carmin, corail et rose pâle sont inchangés.
+
    Point de vigilance qui motive tout le reste : le corail #F44E62 du rollup
-   ne monte qu'à 3,0:1 sur le papier #F7F5F0 — en dessous du seuil de lecture
-   de 4,5:1, donc illisible en texte courant pour beaucoup de lecteurs. Il est
-   réservé aux APLATS et aux très gros titres posés sur le bleu (3,6:1, ce qui
-   passe le seuil « grande taille » de 3:1). Pour tout ce qui est réellement
-   lu — liens, surtitres, emphase, petits libellés — c'est le carmin #B4213C
-   (6,1:1) qui sert : même famille chromatique, mais lisible.
+   ne monte qu'à 3,0:1 sur le papier #F7F5F0 et à 2,3:1 sur le bleu vif — sous
+   le seuil de lecture de 4,5:1, et même sous le seuil « grande taille » de
+   3:1 depuis le recalcul sur ce bleu plus vif. Il est donc réservé aux
+   APLATS, encre posée dessus (4,7:1) : plus aucun emploi en lettres, sur
+   papier comme sur bleu. Pour tout ce qui est réellement lu — liens,
+   surtitres, emphase, petits libellés — c'est le carmin #B4213C (6,1:1) qui
+   sert : même famille chromatique, mais lisible.
 
    Les noms historiques (--warm, --accent…) sont conservés : ils sont employés
    dans une quinzaine de pages, les renommer aurait touché tout le projet sans
@@ -21,17 +27,17 @@
    bleu Patrimoine. Les tokens explicites ci-dessous (--carmin, --corail…) sont
    là pour le code neuf, qui n'a plus à deviner ce que « warm » veut dire. */
 :root {
-  --ink: #14183F;
+  --ink: #141B4F;
   --ink-soft: #3E3E52;
   --paper: #F7F5F0;
   --cream: #EFEBE2;
   --warm: #B4213C;
   --warm-light: #FFCAD7;
   --warm-dark: #8E1A30;
-  --accent: #101E8C;
+  --accent: #2A3CD4;
   --accent-light: #E6E8F7;
   --red: #A0182F;
-  --blue: #101E8C;
+  --blue: #2A3CD4;
   --text: #3E3E52;
   --text-light: #6B6B7B;
   --border: #DDD8CD;
@@ -39,8 +45,8 @@
   /* Tokens nommés de la planche 1d — à préférer dans tout code nouveau. */
   --papier: #F7F5F0;         /* fond de toutes les pages */
   --papier-ombre: #EFEBE2;   /* sections alternées, barres latérales */
-  --encre: #14183F;          /* texte, bandeaux, boutons pleins */
-  --bleu: #101E8C;           /* titres de données, chiffres, bandeaux */
+  --encre: #141B4F;          /* texte, bandeaux, boutons pleins */
+  --bleu: #2A3CD4;           /* titres de données, chiffres, bandeaux */
   --carmin: #B4213C;         /* emphase, liens, surtitres — 6,1:1 sur papier */
   --corail: #F44E62;         /* APLATS et très gros titres sur bleu, jamais en texte */
   --rose: #FFCAD7;           /* surtitres et italiques sur bleu */

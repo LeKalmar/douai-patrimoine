@@ -1027,12 +1027,12 @@ let SYRACUSE_OVERLAY = {};
 /* Corrige en place cote/titre/auteur des entrées de `cat` déjà connues de
    la surcouche — jamais le contraire (une entrée absente de la surcouche,
    ou un champ vide dans la surcouche, garde sa valeur issue de l'export
-   XML). N'appelle jamais fetch : suppose SYRACUSE_OVERLAY déjà à jour. */
-// `snapshotOut`, si fourni, reçoit { [barcode]: {cote,titre,auteur} } — les
-// valeurs D'AVANT correction pour chaque entrée effectivement touchée. Sert
-// uniquement au chemin réseau froid de loadMagasinCatalog() : le cache
-// IndexedDB doit rester une image fidèle de data/magasins.json, jamais de la
-// version corrigée en direct (voir plus bas, "4. Remplissage du cache").
+   XML). N'appelle jamais fetch : suppose SYRACUSE_OVERLAY déjà à jour.
+   `snapshotOut`, si fourni, reçoit { [barcode]: {cote,titre,auteur} } — les
+   valeurs D'AVANT correction pour chaque entrée effectivement touchée. Sert
+   uniquement au chemin réseau froid de loadMagasinCatalog() : le cache
+   IndexedDB doit rester une image fidèle de data/magasins.json, jamais de la
+   version corrigée en direct (voir plus bas, "4. Remplissage du cache"). */
 function applySyracuseOverlayToCatalog(cat, snapshotOut){
   if(!cat) return;
   for(const bc in SYRACUSE_OVERLAY){

@@ -1049,9 +1049,42 @@ vois pas mon changement » sans redemander une vérification manuelle.
 
 `analyse-cotes.html` et les autres pages qui chargent `data/inventaire.json`
 indépendamment (`exemplarisation.html`, `reliures.html`,
-`livres-spolies.html`, `transfert-magasins.html`, `recolement.html`) n'ont
-pas cette fusion — à dupliquer au même patron si un besoin similaire s'y
-fait sentir.
+`livres-spolies.html`, `transfert-magasins.html`) n'ont pas cette fusion —
+à dupliquer au même patron si un besoin similaire s'y fait sentir.
+
+**`recolement.html`** (2026-09-09) a sa propre fusion, plus poussée que les
+deux ci-dessus : elle corrige directement `cote`/`titre`/`auteur` sur les
+entrées de `catalogByGroup.reserve`/`catalogByGroup.magasin`
+(`applySyracuseOverlayToCatalog()`), pas seulement l'affichage — les
+tableaux des « Statistiques avancées » qui lisent le catalogue en direct
+(« Jamais scannés », « Documents probablement perdus ») reflètent donc la
+correction sans attendre un nouveau `npm run build`/`build:magasins`. Sur
+demande explicite, la ligne concernée n'est jamais retirée de ces
+tableaux : chaque catégorie (sauf « Mauvais numéro / code-barre absent »,
+qui exporte des cotes et non des codes-barres) gagne une colonne
+« Syracuse » — badge « 🔄 corrigé le JJ/MM/AAAA » (date = `ts` de la
+surcouche) si ce code-barre a une correction, `—` sinon — et une case à
+cocher « Exclure les corrigés (Syracuse) » à côté de son bouton d'export
+.txt, qui s'applique aussi aux boutons « tous les magasins »/tranche de
+travées de la même catégorie (`syracuseNotCorrectedFilter()`,
+`combineExportFilters()`). `loadSyracuseOverlay()` (appelée au chargement,
+toutes les 5 min et au retour d'onglet, même cadence que `reserve.html`)
+réapplique la correction et reconstruit l'index cote→code-barre
+(`catalogCoteIndexByGroup`) de chaque catalogue déjà chargé — peu importe
+lequel des deux finit de charger en premier, l'autre est couvert à son
+propre chargement (`applySyracuseOverlayToCatalog()` appelée aussi dans
+chaque site d'installation de catalogue) ou au prochain passage. Piège
+évité : le catalogue magasins est mis en cache dans IndexedDB (voir plus
+haut) et `built.catalog` est le MÊME objet que celui réinstallé dans
+`catalogByGroup.magasin` — le corriger avant l'encodage différé du cache
+(`loadMagasinCatalog()`, étape "4. Remplissage du cache") aurait figé une
+correction Syracuse ponctuelle dans un cache qui, lui, ne s'invalide qu'au
+prochain `build:magasins`. `applySyracuseOverlayToCatalog()` accepte donc
+un second paramètre `snapshotOut` qui capture les valeurs D'AVANT
+correction des seules entrées touchées (proportionnel à la taille de la
+surcouche, pas du catalogue) ; l'encodage pour le cache se fait sur une
+copie superficielle où ces quelques entrées sont temporairement restaurées,
+sans jamais toucher à `catalogByGroup.magasin` réellement affiché.
 
 ## Exemplarisation rapide (catalogage minimal)
 
