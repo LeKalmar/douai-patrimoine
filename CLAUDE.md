@@ -907,15 +907,48 @@ Soit ~20× de débit (5× la fréquence des tranches × 4× leur taille). **Le
 seul levier qui protège réellement Syracuse, `CALL_SPACING_MS` (300 ms
 entre deux appels quels qu'ils soient), n'a volontairement pas bougé** :
 FLOOR_MS et MAX_HOLDINGS_PER_TICK ne changent que la durée et la fréquence
-des rafales, jamais leur intensité crête — chaque appel individuel reste
-espacé exactement comme avant. Une tranche de 40 `GetHoldings` prend
-~33 s (mesuré), d'où l'ajout d'un `export const config = { maxDuration:
-45 }` (`api/syracuse-tick.mjs`) — absent de tout le reste du projet
-jusqu'ici (aucun `maxDuration` n'était configuré nulle part) ; 45 s reste
-sous le plafond documenté par la plateforme (« 60 s, 300 s en plan Pro »,
-API-SYRACUSE.MD §20) avec de la marge. `LOCK_STALE_MS` (2 min) reste très
-au-dessus de cette durée réelle, donc `claimSlot()` ne confond toujours pas
-une tranche normale avec une invocation plantée.
+des rafales, jamais leur intensité crête. Une tranche de 40 `GetHoldings`
+prend ~33 s (mesuré), d'où `export const config = { maxDuration: 45 }`
+(`api/syracuse-tick.mjs`) — 45 s choisi pour rester sous `FLOOR_MS` (garder
+un vrai repos entre deux tranches, pas pousser jusqu'au plafond du plan) ;
+absent de tout le reste du projet jusqu'ici. `LOCK_STALE_MS` (2 min) reste
+très au-dessus de cette durée réelle, donc `claimSlot()` ne confond
+toujours pas une tranche normale avec une invocation plantée.
+
+**Historique du déploiement, pour ne pas reproduire les deux mêmes
+erreurs :**
+
+1. Premier essai (commit `2c6462a`, 2026-09-09) : `export const config = {
+   maxDuration: MAX_DURATION_S }`, où `MAX_DURATION_S` était une constante
+   déclarée plus haut dans le fichier. **Build Vercel en échec**, avec pour
+   seul message `Error: Unhandled type: "Identifier"` — visible seulement
+   en ouvrant les logs de déploiement détaillés (le résumé ne dit rien).
+   Diagnostiqué d'abord à tort comme un dépassement de la limite du plan
+   Hobby (l'équipe a dû recopier le message d'erreur exact pour trancher).
+   **Cause réelle** : l'analyse statique de Vercel qui extrait
+   `maxDuration` de ce `config` fait un simple parcours d'AST, sans
+   exécuter le module — elle sait lire un nombre écrit en dur, pas
+   résoudre une référence vers une autre constante. **Leçon : la valeur de
+   `maxDuration` DOIT être un littéral numérique écrit directement dans
+   l'objet `config`, jamais une variable, même triviale.**
+2. Le temps de comprendre la vraie cause, `MAX_HOLDINGS_PER_TICK` est
+   brièvement revenu à 10 et le `config` a été retiré (déploiement de
+   repli, sûr). Une fois l'hypothèse « limite de plan » posée (avant
+   d'avoir le message d'erreur exact), vérification faite dans la
+   documentation Vercel officielle : avec Fluid Compute (actif par défaut
+   aujourd'hui), le plan Hobby autorise par défaut jusqu'à 300 s de
+   `maxDuration` — largement au-dessus de 45 s. Utile à savoir si le
+   besoin de dépasser ~33 s par tranche se représente : la marge existe
+   réellement sur ce compte, ce n'est pas ce qui limite la cadence
+   aujourd'hui.
+3. `export const config = { maxDuration: 45 };` redéclaré en littéral pur
+   — c'est l'état actuel, qui a déployé sans erreur.
+
+**Leçon générale retenue : ne jamais poser une hypothèse invérifiable sur
+le comportement de Vercel (au déploiement comme à l'exécution) sans lire le
+message d'erreur exact d'abord** — le premier diagnostic (limite de plan)
+était plausible mais faux, et aurait pu rester non corrigé si l'équipe
+n'avait pas fourni le texte precis de l'erreur.
 
 Corollaire côté client : `js/syracuse-sync-trigger.js` ne se contentait que
 d'un appel au chargement de la page — insuffisant une fois le plancher

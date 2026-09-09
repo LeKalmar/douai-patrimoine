@@ -29,7 +29,7 @@
  *    main » — un second appel presque simultané relit l'état que le
  *    premier vient de poser et se déclare `too-soon`/`in-progress` à son
  *    tour. Un verrou resté posé plus de 2 min (LOCK_STALE_MS, largement
- *    au-dessus de la durée réelle d'une tranche — voir MAX_DURATION_S) est
+ *    au-dessus de la durée réelle d'une tranche, de l'ordre de ~33 s) est
  *    considéré comme issu d'une invocation plantée et peut être repris,
  *    plancher ignoré.
  * 2. Jamais de Promise.all entre appels Syracuse : boucle for séquentielle,
@@ -76,14 +76,16 @@ const COMMON_HEADERS = {
    la fréquence des rafales, jamais leur intensité crête. */
 const FLOOR_MS = 60 * 1000; // 1 min (était 5 min)
 const LOCK_STALE_MS = 2 * 60 * 1000;
-const MAX_HOLDINGS_PER_TICK = 40; // était 10 — voir MAX_DURATION_S ci-dessous
+// Budget mesuré pour 40 GetHoldings : ~1,5 s (recherche) + 40×(~0,3-0,5 s
+// d'appel + 300 ms d'attente) ≈ 33 s — sous les 45 s de `export const
+// config` plus bas (voir ce bloc pour pourquoi ce n'est PAS FLOOR_MS : une
+// tranche plus longue que le plancher entre deux tranches ferait tourner
+// le job en continu, sans vrai repos entre deux rafales).
+const MAX_HOLDINGS_PER_TICK = 40; // était 10
 const RESULT_SIZE = 50; // liste blanche §11 : 50 = valeur max autorisée (était 25)
 const CALL_SPACING_MS = 300; // ⚠️ ne pas réduire — c'est la seule protection réelle de Syracuse
 const MAX_CONSECUTIVE_ERRORS = 3;
 const SANITY_CHECK_QUIET_MS = 12 * 60 * 60 * 1000;
-// Budget mesuré pour 40 GetHoldings : ~1,5 s (recherche) + 40×(~0,3-0,5 s
-// d'appel + 300 ms d'attente) ≈ 33 s — sous MAX_DURATION_S avec marge.
-const MAX_DURATION_S = 45; // voir `export const config` plus bas
 
 class SkipTick extends Error {
   constructor(reason, extra) {
@@ -232,11 +234,10 @@ async function checkTimestampFieldAlive() {
    qu'une page déjà partiellement consommée renvoie EXACTEMENT le même
    ordre de résultats à la tranche suivante si l'index a bougé entre-temps
    — une notice pourrait en théorie glisser sous un offset déjà traité et
-   être manquée pour ce passage. Risque étroit en pratique (une page ne
-   s'étale plus que sur 1-2 tranches maintenant que MAX_HOLDINGS_PER_TICK
-   se rapproche de RESULT_SIZE, contre ~2-3 avant la cadence du 2026-09-09)
-   et auto-cicatrisant (rattrapé à la prochaine modification de cette
-   notice, ou par le rebuild mensuel complet — voir CLAUDE.md). Pas corrigé
+   être manquée pour ce passage. Risque étroit en pratique (1-2 tranches
+   par page avec MAX_HOLDINGS_PER_TICK=40/RESULT_SIZE=50) et auto-cicatrisant
+   (rattrapé à la prochaine modification de cette notice, ou par le rebuild
+   mensuel complet — voir CLAUDE.md). Pas corrigé
    pour ne pas complexifier une phase pensée pour être observée avant
    d'être affichée. */
 async function runSlice(state, origin) {
@@ -371,14 +372,24 @@ function commitFailure(state, err) {
   return next;
 }
 
-/* Durée max explicite (convention Vercel Serverless Functions) : sans ce
-   `config`, la fonction reste sur la limite par défaut de la plateforme
-   (10 s sur beaucoup de configurations Hobby), trop courte pour
-   MAX_HOLDINGS_PER_TICK=40 (~33 s mesurés). 45 s reste sous le plafond
-   documenté (« 60 s, 300 s max en plan Pro », API-SYRACUSE.MD §20) avec de
-   la marge — si la plateforme refuse cette valeur, la fonction retombe
-   simplement sur son défaut habituel plutôt que d'échouer au déploiement. */
-export const config = { maxDuration: MAX_DURATION_S };
+/* Durée max explicite (convention Vercel Serverless Functions), pour que
+   la fonction dispose des ~33 s que prend une tranche de
+   MAX_HOLDINGS_PER_TICK=40 — sans ce `config`, une fonction reste sur la
+   limite par défaut du projet (peut être bien plus basse que ce que le
+   plan autorise, voir CLAUDE.md « Cadence relevée »).
+   ⚠️ La valeur DOIT être un littéral écrit ici, PAS une référence vers une
+   constante (`MAX_DURATION_S` par ex.) : l'analyse statique de Vercel qui
+   lit ce `config` ne fait qu'un parcours d'AST léger, sans exécuter le
+   module — elle sait lire un nombre en dur, pas résoudre un identifiant.
+   Une référence a fait échouer le déploiement du 2026-09-09 avec `Error:
+   Unhandled type: "Identifier"` (aucun rapport avec la limite du plan —
+   diagnostiqué à tort au départ, corrigé une fois le vrai message d'erreur
+   obtenu). Vérifié depuis auprès de la documentation Vercel : le plan
+   Hobby de ce compte autorise, avec Fluid Compute (actif par défaut),
+   jusqu'à 300 s — 45 s est donc large, choisi pour rester sous FLOOR_MS
+   (1 min) et garder un vrai repos entre deux tranches plutôt que pousser
+   la fonction jusqu'au plafond du plan. */
+export const config = { maxDuration: 45 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
