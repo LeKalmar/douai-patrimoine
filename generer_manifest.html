@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Générateur de manifest — Bibliothèques Douai</title>
+  <link rel="stylesheet" href="style.css">
   <style>
     :root {
-      --bg:       #f5f2ec;
+      --bg:       var(--papier);
       --surface:  #ffffff;
-      --border:   #ddd8ce;
-      --ink:      #1a1714;
-      --muted:    #6b6560;
-      --accent:   #8b3a1e;
-      --accent-l: #f0e8e3;
+      --border:   var(--trait);
+      --ink:      var(--text);
+      --muted:    var(--text-light);
+      --accent:   var(--carmin);
+      --accent-l: var(--papier-ombre);
       --green:    #2d5a4a;
       --green-l:  #e8f2ee;
       --orange:   #c0622e;
@@ -31,6 +32,7 @@
       color: var(--ink);
       min-height: 100vh;
       padding: 2rem 1rem 4rem;
+      line-height: normal;
     }
 
     .wrap { max-width: 860px; margin: 0 auto; }
@@ -146,6 +148,7 @@
       border-radius: 20px;
       font-size: .78rem; font-weight: 600;
     }
+    .stat-pill.blue   { background: var(--accent-light); color: var(--bleu); border: 1px solid #b8c4f0; }
     .stat-pill.green  { background: var(--green-l);  color: var(--green);  border: 1px solid #b2d4c8; }
     .stat-pill.orange { background: var(--orange-l); color: var(--orange); border: 1px solid #f0c8a8; }
     .stat-pill.red    { background: var(--red-l);    color: var(--red);    border: 1px solid #f0b8b8; }
@@ -168,7 +171,7 @@
     #log .err    { color: #f08080; }
     #log .info   { color: #80c0f0; }
     #log .dim    { color: #6b6560; }
-    #log .head   { color: #c9a96e; font-weight: bold; }
+    #log .head   { color: var(--rose); font-weight: bold; }
 
     /* ── Preview arbre ── */
     #preview {
@@ -419,8 +422,8 @@ function buildManifest(records) {
   const warnings = [];
 
   addLog('─'.repeat(52), 'dim');
-  addLog(`  Racine R2 : <span style="color:#c9a96e">${imagesRoot}</span>`, 'info');
-  addLog(`  Types livres : <span style="color:#c9a96e">${bookTypes.join(', ') || '(aucun)'}</span>`, 'info');
+  addLog(`  Racine R2 : <span style="color:var(--rose)">${imagesRoot}</span>`, 'info');
+  addLog(`  Types livres : <span style="color:var(--rose)">${bookTypes.join(', ') || '(aucun)'}</span>`, 'info');
   addLog('─'.repeat(52), 'dim');
 
   records.forEach((rec, i) => {

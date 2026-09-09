@@ -8,18 +8,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@500;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
 <style>
   :root {
-    --bg:#0e0f11; --surface:#16181c; --surface2:#1e2026;
-    --border:#2a2d35; --border2:#3a3e4a;
-    --accent:#5cffb1; --accent2:#3de89a;
-    --warn:#ffcc44; --danger:#ff5f5f;
-    --text:#e8eaf0; --muted:#7a7f90;
+    --bg:var(--papier); --surface:#ffffff; --surface2:var(--papier-ombre);
+    --border2:var(--trait-fort);
+    --accent2:var(--encre);
+    --warn:#e65100; --danger:#c62828;
+    --muted:var(--text-light);
     --r:10px; --rl:16px;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;overflow:hidden}
-  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;display:flex;flex-direction:column}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;line-height:normal;display:flex;flex-direction:column}
   header{height:54px;flex-shrink:0;border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between}
   .logo-mark{font-weight:800;font-size:1.15rem;color:var(--accent);letter-spacing:-.02em}
   .logo-sub{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-left:.5rem}
@@ -28,14 +29,14 @@
   main{flex:1;min-height:0;display:grid;grid-template-columns:320px 1fr;overflow:hidden}
   .lp{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;height:100%}
   .dz{flex-shrink:0;margin:.9rem .9rem .6rem;border:1.5px dashed var(--border2);border-radius:var(--rl);padding:1rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
-  .dz:hover,.dz.over{border-color:var(--accent);background:rgba(92,255,177,.04)}
+  .dz:hover,.dz.over{border-color:var(--accent);background:rgba(42,60,212,.04)}
   .dz-icon{font-size:1.4rem;display:block;margin-bottom:.3rem}
   .dz-title{font-weight:700;font-size:.82rem;margin-bottom:.1rem}
   .dz-sub{font-size:.67rem;color:var(--muted);font-family:'DM Mono',monospace}
   #fi{display:none}
   .qh{flex-shrink:0;padding:0 .9rem .35rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
   .clear-btn{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px}
-  .clear-btn:hover{color:var(--danger);background:rgba(255,95,95,.08)}
+  .clear-btn:hover{color:var(--danger);background:rgba(198,40,40,.08)}
   .ql{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 .45rem .75rem}
   .ql::-webkit-scrollbar{width:3px}
   .ql::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
@@ -60,16 +61,16 @@
   .cwrap{display:flex;flex-direction:column;gap:.35rem;min-height:0;overflow:hidden}
   .clabel{flex-shrink:0;font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:.4rem}
   .clabel .dim{color:var(--border2)}
-  .cbox{flex:1;min-height:0;background:#080a0c;border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+  .cbox{flex:1;min-height:0;background:var(--papier-ombre);border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
   canvas{max-width:100%;max-height:100%;object-fit:contain;display:block}
   #origbox{cursor:crosshair}
   #overlay{position:absolute;pointer-events:none}
   .ctrl{flex-shrink:0;border-top:1px solid var(--border);padding:.65rem .85rem;display:flex;flex-direction:column;gap:.55rem}
   .brow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
   .bb{font-family:'DM Mono',monospace;font-size:.63rem;padding:2px 9px;border-radius:999px;font-weight:500;flex-shrink:0}
-  .bb.ok{background:rgba(92,255,177,.12);color:var(--accent);border:1px solid rgba(92,255,177,.25)}
-  .bb.warn{background:rgba(255,204,68,.12);color:var(--warn);border:1px solid rgba(255,204,68,.25)}
-  .bb.load{background:rgba(122,127,144,.1);color:var(--muted);border:1px solid var(--border2)}
+  .bb.ok{background:rgba(42,60,212,.12);color:var(--accent);border:1px solid rgba(42,60,212,.25)}
+  .bb.warn{background:rgba(230,81,0,.12);color:var(--warn);border:1px solid rgba(230,81,0,.25)}
+  .bb.load{background:rgba(107,107,123,.1);color:var(--muted);border:1px solid var(--border2)}
   .bval{font-family:'DM Mono',monospace;font-size:.76rem;color:var(--accent)}
   .fnrow{display:flex;align-items:center;gap:.55rem}
   .fnrow label{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);white-space:nowrap}
@@ -83,9 +84,9 @@
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer}
   .mv{min-width:18px;color:var(--accent);font-weight:500}
   .btn{display:inline-flex;align-items:center;gap:.3rem;padding:5px 13px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Syne',sans-serif;font-size:.74rem;font-weight:500;cursor:pointer;transition:background .12s,transform .1s;white-space:nowrap}
-  .btn:hover{background:#2a2d35}
+  .btn:hover{background:#E3DED4}
   .btn:active{transform:scale(.97)}
-  .btn-a{background:var(--accent);color:#0a0c0f;border-color:var(--accent);font-weight:700}
+  .btn-a{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
   .btn-a:hover{background:var(--accent2);border-color:var(--accent2)}
   .mla{margin-left:auto}
   .sbar{flex-shrink:0;border-top:1px solid var(--border);padding:.28rem .85rem;display:flex;align-items:center;gap:.65rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}
@@ -440,7 +441,7 @@ function drawOverlay() {
   ctx.fillRect(0, ry, rx, rh);
   ctx.fillRect(rx + rw, ry, overlay.width - rx - rw, rh);
   // Bordure
-  ctx.strokeStyle = '#5cffb1'; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.strokeStyle = '#2A3CD4'; ctx.lineWidth = 2; ctx.setLineDash([]);
   ctx.strokeRect(rx, ry, rw, rh);
   // Poignées
   const handles = [
@@ -448,9 +449,9 @@ function drawOverlay() {
     [rx, ry + rh/2], [rx + rw, ry + rh/2]
   ];
   handles.forEach(([hx, hy]) => {
-    ctx.fillStyle = '#5cffb1';
+    ctx.fillStyle = '#2A3CD4';
     ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#0a0c0f'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.stroke();
   });
 }
@@ -712,7 +713,7 @@ origbox.addEventListener('mousemove', e => {
   loupeCanvas.height = LOUPE_SIZE;
   const ctx = loupeCanvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#080a0c';
+  ctx.fillStyle = '#EFEBE2';
   ctx.fillRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
   ctx.drawImage(origImg, sx, sy, capture, capture, 0, 0, LOUPE_SIZE, LOUPE_SIZE);
   // Positionner la loupe (décalée pour ne pas cacher le curseur)
