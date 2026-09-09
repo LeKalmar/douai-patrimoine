@@ -18,6 +18,16 @@
     "upload:bib": "node scripts/upload-bib-to-r2.mjs",
     "test:r2": "node scripts/test-r2.mjs",
     "sync:syracuse": "node scripts/run-syracuse-sync.mjs",
-    "backfill:reliure": "node scripts/backfill-reliure.mjs"
+    "backfill:reliure": "node scripts/backfill-reliure.mjs",
+    "db:apply-schema": "node scripts/db-apply-schema.mjs",
+    "db:test": "node scripts/db-test.mjs",
+    "db:migrate:reserve": "node scripts/db-migrate-reserve.mjs",
+    "db:migrate:bib": "node scripts/db-migrate-bib.mjs"
+  },
+  "devDependencies": {
+    "neon": "^4.14.5"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
   }
 }

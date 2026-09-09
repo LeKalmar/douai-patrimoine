@@ -1440,6 +1440,132 @@ stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
   triée par défaut sur les prêts cumulés décroissants : le livre le plus
   emprunté de l'export apparaît donc en première ligne sans manipulation.
 
+## Base "inventaire des collections" (Postgres/Neon, 2026-09-09)
+
+Chantier distinct de `data/inventaire.json`/`data/magasins.json` : une base
+Postgres (Neon, projet `patient-shape-42487842`, base dédiée
+`inventaire_des_collections` — pas la base par défaut `neondb`, restée
+inutilisée) qui unifie réserve + bib.xml dans un vrai modèle relationnel,
+pensée pour accueillir plus tard des imports Excel de collections non
+cataloguées (manuscrits, cartes géographiques). **Première dépendance npm
+runtime du projet** (`pg`, node-postgres — voir `package.json`
+`dependencies`) : un driver Postgres est incontournable, contrairement à R2
+dont la signature SigV4 est écrite à la main (`lib/r2.mjs`) précisément pour
+éviter `@aws-sdk/client-s3`.
+
+**N'affecte aujourd'hui AUCUNE page ni aucun endpoint `api/`.** C'est une
+fondation (schéma + scripts de migration) : `data/inventaire.json` continue
+d'être généré exactement comme avant par `npm run build`, aucune page
+HTML n'a changé. La bascule (export JSON généré depuis la base pour
+`recolement.html`/`reserve.html`, endpoints API de recherche pour
+`magasins.html`/`cotes-numeriques.html`, modèle des imports Excel) reste un
+lot ultérieur, volontairement pas commencé.
+
+Écart assumé par rapport à la recette Neon standard (`neon init`/`neon.ts`/
+`neon deploy`) : le schéma est un fichier `.sql` brut
+(`db/migrations/0001_init.sql`) appliqué par un script Node
+(`npm run db:apply-schema`, via `scripts/lib/pg.mjs`) plutôt qu'une config
+déclarative — cohérent avec le "aucune dépendance npm, scripts à la main"
+du reste du projet, et review-able comme n'importe quel autre fichier.
+`npx neon psql` n'est pas utilisable partout (binaire `psql` absent de
+certains environnements de dev), d'où ce choix.
+
+**Schéma** (6 tables) : `notices` (une par notice bibliographique — pour un
+exemplaire `bib.xml` sans vraie notice MARC, GESMARC dénormalisant
+titre/auteur sur l'exemplaire, une notice minimale 1:1 est créée quand même,
+`source='bib_xml_minimal'`, pour que `exemplaires.notice_id` reste toujours
+NOT NULL et que toute requête joigne de la même façon quelle que soit la
+provenance) ; `contributeurs`/`notice_contributeurs` (MARC 700/701/702,
+aujourd'hui joints par `§` dans `data/inventaire.json` — ici une vraie table
+de jonction, pour permettre « tous les documents d'un même auteur ») ;
+`reliure_groupes` (remplace le tableau `_relies` — `group_key` = sha256 des
+codes-barres du groupe triés, stable d'un run à l'autre malgré l'`id`
+bigserial, pour qu'un réimport retombe sur le même groupe) ; `pieges`
+(référentiel des codes 921$a/921$b, réflète `PIEGE_A_LABELS`/
+`PIEGE_B_LABELS`) ; `exemplaires` (une ligne par exemplaire physique, clé
+`barcode`, **22 colonnes booléennes `GENERATED ALWAYS AS (piege_a_code =
+'…') STORED`** — une par code piège connu, nommées par CODE et non par
+libellé : `piege_b_code='3'` et `piege_b_code='PER'` valent tous deux
+« perdu » mais sont deux codes Syracuse distincts, jamais fusionnés ; un
+code absent de la table `pieges` reste visible dans `piege_a_code`/
+`piege_b_code` bruts, jamais masqué, juste sans colonne dédiée tant qu'il
+n'a pas été ajouté au schéma). `type_document` (`imprime`/`manuscrit`/
+`carte`/`autre`, défaut `imprime`) est le point d'extension pour les futurs
+imports Excel, sur la même table plutôt qu'une hiérarchie séparée.
+Volontairement dérivé, jamais stocké : `lien_num` (URL vignette,
+reconstruite depuis `barcode`), `_isMagasin`, `_fondsLabel`,
+`_coteDigitRun` — mêmes règles de présentation propres à une page que
+`js/columnar.js` calcule déjà à la volée pour le JSON, pas dupliquées en
+base pour ne pas se périmer si la règle change.
+
+**Sources et dédoublonnage** :
+`scripts/lib/piege-labels.mjs` et `scripts/lib/reserve-index.mjs` sont
+extraits de `scripts/build-inventory.mjs` (même jointure notice/exemplaire,
+mêmes pièges, mêmes groupes de reliure — `npm run build` continue de
+produire un `data/inventaire.json` strictement identique, vérifié par diff
+au moment de l'extraction) pour que `scripts/db-migrate-reserve.mjs`
+(`npm run db:migrate:reserve`) n'ait aucune chance de diverger du JSON.
+`scripts/db-migrate-bib.mjs` (`npm run db:migrate:bib`) lit `xml/bib.xml` en
+flux (`iterateGesmarcItemsFromFile()`, comme `build-magasins.mjs` — jamais
+en mémoire, jamais une fonction Vercel) et lit les codes piège
+**structurés** de cet export (`Piège 921$a (Code)`/`Piège 921$b (Code)`),
+pas le texte concaténé `Pièges` que lit `build-magasins.mjs` — plus fiable
+pour les colonnes booléennes. Dédoublonnage réserve ↔ bib.xml par
+**code-barre strict** (jamais par `Bibliothèque (Libellé)` : vérifié que
+« Douai Réserve Patrimoniale » compte 15 535 items côté bib.xml contre
+15 518 dans la réserve — proche mais pas garanti exact), un seul mécanisme
+SQL qui fait aussi office d'idempotence :
+```sql
+ON CONFLICT (barcode) WHERE barcode IS NOT NULL DO UPDATE SET ...
+  WHERE exemplaires.source = 'bib_xml'
+```
+Si le code-barre en conflit appartient à une ligne `reserve_marc`, la
+condition est fausse, l'update ne fait rien : la réserve reste seule
+autorité. **Ordre d'exécution obligatoire : `db:migrate:reserve` avant
+`db:migrate:bib`** (un pré-filtre en mémoire des codes-barres déjà réserve
+évite en plus ~15 500 upserts inutiles sur les ~200 000 items de bib.xml).
+Chiffres de référence (export du 2026-09-09) : 15 518 exemplaires/14 477
+notices/551 notices multi-exemplaires/178 groupes de reliure côté réserve ;
+199 583 items Douai retenus côté bib.xml, 15 490 déjà réserve (ignorés),
+184 087 nouveaux exemplaires — zéro doublon de code-barre vérifié
+(`GROUP BY barcode HAVING count(*)>1` → 0 ligne). Les deux scripts sont
+rejouables sans dupliquer (`INSERT ... ON CONFLICT`, jamais de `TRUNCATE`).
+
+**Limite de stockage du plan gratuit Neon (512 Mo) — presque atteinte,
+décision explicite de l'équipe de ne rien changer pour l'instant (2026-09-09).**
+La colonne `raw jsonb` de `exemplaires` (fiche brute complète par exemplaire,
+pour ne jamais perdre une donnée au-delà des colonnes typées) domine le
+volume : 339 Mo sur les ~200 000 lignes de cette seule table. Un deuxième
+passage de `db:migrate:bib` juste après le premier a fait échouer la base
+avec `could not extend file because project size limit (512 MB) has been
+exceeded` — chaque `UPDATE` (même idempotent, mêmes valeurs) crée une
+nouvelle version de ligne en MVCC, gonflant transitoirement la taille avant
+qu'`autovacuum` ne récupère les anciennes versions. Réparé avec un simple
+`VACUUM` (`VACUUM exemplaires; VACUUM notices;` — jamais `VACUUM FULL`, qui
+demande jusqu'à 2× l'espace de la table en verrou exclusif, à éviter
+justement quand on est déjà près du plafond), base stabilisée à 482 Mo.
+**Aucune marge réelle** pour une prochaine ré-exécution des scripts de
+migration (après un nouvel export Syracuse) : si `could not extend file...`
+réapparaît, relancer un `VACUUM` (sans `FULL`) sur `exemplaires`/`notices`
+avant de réessayer. Deux vraies solutions existent si le besoin devient
+récurrent (non retenues pour l'instant, décision à reprendre avec
+l'équipe) : passer la base sur un plan Neon payant (lève le plafond), ou
+alléger `exemplaires.raw` côté `bib_xml` (déjà entièrement capté en colonnes
+typées — cote, piège, état, section, bibliothèque, titre, auteur, éditeur,
+ISBN/ISSN — la perte se limiterait à quelques champs mineurs jamais utilisés
+ailleurs : Tome, Titre de série, Imagette, Identifiant).
+
+**Variables d'environnement** (`.env`, jamais commitées, posées par
+`neon link`/`neon connection-string`) : `DATABASE_URL` (poolé, via le
+pooler pgbouncer Neon — destiné aux futurs endpoints Vercel, beaucoup
+d'invocations courtes) et `DATABASE_URL_UNPOOLED` (connexion directe —
+utilisée par les scripts de migration en lot, transactions/lots plus
+longs). `NEON_API_KEY` (scopée au seul projet `patient-shape-42487842`)
+sert au CLI `neon` (`devDependency` locale, invoqué via `npx neon`) —
+`neon login` (OAuth navigateur) ne fonctionne pas dans un environnement de
+dev sans navigateur, d'où l'authentification par clé API. `.neon` (lien du
+répertoire vers le projet Neon) est gitignored comme `.env`.
+
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
 Bucket R2 `douai-patrimoine` (compte Cloudflare de l'utilisateur), utilisé
