@@ -170,6 +170,12 @@ async function buildItems(path) {
       section: section || null,
       etat: props['Etat  (Libellé)'] || null,
       exclusionPret: props['Piège 921$a (Libellé)'] || null,
+      // Champ "Pièges" complet (texte libre, peut combiner plusieurs pièges,
+      // ex. "Exclu DEFINITIVEMENT du prêt Consultation sur place") — même
+      // champ que _piege dans build-magasins.mjs, plus informatif que
+      // exclusionPret (921$a seul) pour la colonne "Piège" des dormants de
+      // desherbage-stats.html. `piege` déjà extrait plus haut pour isMagasin().
+      _piege: piege,
       coteAffichee: coteJointe || props['Cotes'] || null,
       _coteDigitRun: digitRun,
       _isMagasin: magasin,

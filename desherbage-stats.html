@@ -89,6 +89,30 @@
 
   footer{background:#12157A;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
   footer a{color:#c9a96e;text-decoration:none}
+
+  .stv-tabs{display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:1.5rem;border-bottom:1px solid #e8e8f0}
+  .stv-tab{font-family:inherit;font-size:.85rem;color:#777;background:transparent;border:none;border-bottom:2px solid transparent;padding:.65rem .1rem;cursor:pointer;margin-bottom:-1px;transition:color .15s,border-color .15s}
+  .stv-tab:hover{color:#12157A}
+  .stv-tab.active{color:#12157A;border-bottom-color:#12157A;font-weight:600}
+  .stv-view{display:none}
+  .stv-view.active{display:block}
+
+  .rotation-note{font-size:.72rem;color:#999;margin:.5rem 0 0;line-height:1.5}
+  .agg-table-wrap{border:1px solid #e8e8f0;border-radius:8px;overflow:hidden;overflow-x:auto;margin-bottom:.5rem}
+  table.agg-table{width:100%;border-collapse:collapse;font-size:.82rem}
+  .agg-table th{background:#F5F5FF;padding:.5rem .7rem;text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#888;border-bottom:1px solid #e8e8f0;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+  .agg-table th:hover{color:#12157A}
+  .agg-table th.num{text-align:right}
+  .agg-table th .arrow{font-size:.65rem;margin-left:.2rem;color:#c9a96e}
+  .agg-table td{padding:.5rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:top;font-variant-numeric:tabular-nums}
+  .agg-table td.num{text-align:right}
+  .agg-table tr:last-child td{border-bottom:none}
+  .agg-table tr:hover td{background:#fafafa}
+  .agg-rotation-hi{font-weight:700;color:#12157A}
+
+  .piege-badge{display:inline-block;font-size:.68rem;padding:2px 9px;border-radius:20px;background:#ffebee;color:#c62828;border:1px solid #ffcdd2;white-space:nowrap}
+
+  .dorm-counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;margin-bottom:1.25rem}
 </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
        qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
@@ -123,6 +147,15 @@
         consultatif : aucune donnée n'est modifiée ici. Pour choisir un traitement conserver/pilon/braderie
         (magasins d'étage uniquement), direction <a href="rotobib.html">Rotobib</a>.
       </p>
+
+      <div class="stv-tabs" id="stv-tabs">
+        <button type="button" class="stv-tab active" data-tab="overview">Vue d'ensemble</button>
+        <button type="button" class="stv-tab" data-tab="section">Par section</button>
+        <button type="button" class="stv-tab" data-tab="magasin">Par magasin</button>
+        <button type="button" class="stv-tab" data-tab="dormant">Sans emprunt récent</button>
+      </div>
+
+      <div id="view-overview" class="stv-view active">
 
       <div class="stats-row" id="stats-row">
         <div class="stat-card"><div class="stat-card-label">Chargement…</div></div>
@@ -182,6 +215,124 @@
         <span class="pag-info" id="pag-info"></span>
         <div class="pag-controls" id="pag-controls"></div>
       </div>
+
+      </div><!-- /view-overview -->
+
+      <div id="view-section" class="stv-view">
+        <p class="ex-note">
+          <strong>Par section :</strong> statistiques agrégées par section Syracuse (<code>Section (Libellé)</code>),
+          toutes bibliothèques de Douai confondues. Le <strong>taux de rotation</strong> rapporte les prêts de
+          l'année de référence au nombre d'exemplaires de la section — proche de 0 : fonds qui circule peu ;
+          supérieur à 1 : le fonds tourne en moyenne plus d'une fois par an. Triable par colonne, trié par défaut
+          sur le taux de rotation croissant (les sections qui circulent le moins remontent en premier).
+        </p>
+        <div class="st-toolbar">
+          <div class="st-search">
+            <span>🔎</span>
+            <input type="text" id="sec-search-input" placeholder="Rechercher une section…">
+          </div>
+          <span class="st-count" id="sec-count"></span>
+        </div>
+        <div class="agg-table-wrap">
+          <table class="agg-table">
+            <thead>
+              <tr>
+                <th data-sort="section">Section<span class="arrow" data-arrow="sec-section"></span></th>
+                <th class="num" data-sort="count">Exemplaires<span class="arrow" data-arrow="sec-count"></span></th>
+                <th class="num" data-sort="prets4">Prêts (4 ans)<span class="arrow" data-arrow="sec-prets4"></span></th>
+                <th class="num" data-sort="moyenne">Moy. / ex.<span class="arrow" data-arrow="sec-moyenne"></span></th>
+                <th class="num" data-sort="cumules">Cumulés<span class="arrow" data-arrow="sec-cumules"></span></th>
+                <th class="num" data-sort="jamaisEmprunte">Jamais empr.<span class="arrow" data-arrow="sec-jamaisEmprunte"></span></th>
+                <th class="num" data-sort="rotation">Taux rotation<span class="arrow" data-arrow="sec-rotation"></span></th>
+              </tr>
+            </thead>
+            <tbody id="sec-tbody"><tr><td colspan="7" class="st-empty">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div><!-- /view-section -->
+
+      <div id="view-magasin" class="stv-view">
+        <p class="ex-note">
+          <strong>Par magasin :</strong> mêmes statistiques, restreintes aux exemplaires des magasins d'étage
+          (<code>_isMagasin</code> — voir <code>magasins.html</code>) et répartis par étage physique (2e, 5e, 6e)
+          d'après le numéro de cote, même logique que <code>recolement.html</code>.
+        </p>
+        <div class="charts-row">
+          <div class="chart-card">
+            <h2>Taux de rotation par étage</h2>
+            <p class="chart-note">Prêts de l'année de référence ÷ nombre d'exemplaires de l'étage.</p>
+            <div class="bar-chart" id="bar-magasin-rotation"></div>
+          </div>
+        </div>
+        <div class="agg-table-wrap">
+          <table class="agg-table">
+            <thead>
+              <tr>
+                <th>Étage</th>
+                <th class="num">Exemplaires</th>
+                <th class="num">Prêts (4 ans)</th>
+                <th class="num">Moy. / ex.</th>
+                <th class="num">Cumulés</th>
+                <th class="num">Jamais empr.</th>
+                <th class="num">Taux rotation</th>
+              </tr>
+            </thead>
+            <tbody id="mag-tbody"><tr><td colspan="7" class="st-empty">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div><!-- /view-magasin -->
+
+      <div id="view-dormant" class="stv-view">
+        <p class="ex-note">
+          <strong>Limite de données :</strong> l'export ne porte que 4 compteurs de prêts annuels glissants
+          (les 4 dernières années) et un cumul depuis l'acquisition — <strong>aucune date de dernier prêt</strong>.
+          Il n'est donc pas possible de calculer exactement « pas d'emprunt depuis 5 ans ». La liste ci-dessous
+          retient l'approximation la plus proche que permettent les données : <strong>aucun emprunt enregistré sur
+          les 4 dernières années disponibles</strong>. La colonne « Piège » (champ Syracuse 921) indique si la
+          bibliothèque a déjà statué sur cet exemplaire (pilon, braderie, exclu du prêt…) — un exemplaire dormant
+          <em>sans</em> piège renseigné est le candidat le plus utile à vérifier physiquement.
+        </p>
+        <div class="dorm-counts" id="dorm-counts"></div>
+        <div class="st-toolbar">
+          <div class="st-search">
+            <span>🔎</span>
+            <input type="text" id="dorm-search-input" placeholder="Rechercher un titre, un auteur, une cote, un code-barre…">
+          </div>
+          <select class="st-select" id="dorm-piege-filter">
+            <option value="all" selected>Tous</option>
+            <option value="no-piege">Sans piège renseigné</option>
+            <option value="has-piege">Avec un piège renseigné</option>
+          </select>
+          <select class="st-select" id="dorm-perpage">
+            <option value="25">25 / page</option>
+            <option value="50" selected>50 / page</option>
+            <option value="100">100 / page</option>
+            <option value="200">200 / page</option>
+          </select>
+          <span class="st-count" id="dorm-count"></span>
+          <button type="button" class="pag-btn" id="dorm-export">⬇ Exporter (.txt)</button>
+        </div>
+        <div class="st-table-wrap">
+          <table class="st-table">
+            <thead>
+              <tr>
+                <th data-sort="titre">Titre<span class="arrow" data-arrow="dorm-titre"></span></th>
+                <th data-sort="auteur">Auteur<span class="arrow" data-arrow="dorm-auteur"></span></th>
+                <th data-sort="cote">Cote<span class="arrow" data-arrow="dorm-cote"></span></th>
+                <th data-sort="section">Section / magasin<span class="arrow" data-arrow="dorm-section"></span></th>
+                <th class="num" data-sort="cumules">Prêts cumulés<span class="arrow" data-arrow="dorm-cumules"></span></th>
+                <th data-sort="piege">Piège<span class="arrow" data-arrow="dorm-piege"></span></th>
+                <th data-sort="barcode">Code-barre<span class="arrow" data-arrow="dorm-barcode"></span></th>
+              </tr>
+            </thead>
+            <tbody id="dorm-tbody"><tr><td colspan="7" class="st-empty">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="st-pagination">
+          <span class="pag-info" id="dorm-pag-info"></span>
+          <div class="pag-controls" id="dorm-pag-controls"></div>
+        </div>
+      </div><!-- /view-dormant -->
 
     </div>
   </div>
@@ -263,10 +414,53 @@ function normalize(rec){
     cote: rec.coteAffichee || '',
     barcode: rec._barcode || '',
     section: rec._fondsLabel || rec.section || '',
+    rawSection: rec.section || '(sans section)',
+    isMagasin: !!rec._isMagasin,
+    coteDigitRun: rec._coteDigitRun || null,
+    piege: rec._piege || '',
     an3: p.an3||0, an2: p.an2||0, an1: p.an1||0, an: p.an||0, cumules: p.cumules||0,
     resaCumulees: r.cumulees||0,
   };
 }
+
+/* ════════════════════════════════════════════════════════════
+   AGRÉGATION PAR GROUPE (section, magasin) + TAUX DE ROTATION
+   ════════════════════════════════════════════════════════════
+   Taux de rotation = prêts de l'année de référence (AN) ÷ nombre
+   d'exemplaires du groupe — métrique standard de bibliothéconomie
+   ("collection turnover rate") : proche de 0, le fonds circule peu ;
+   supérieur à 1, il tourne en moyenne plus d'une fois par an. */
+function aggregateGroup(rows){
+  const count = rows.length;
+  let prets4 = 0, cumules = 0, anTotal = 0, jamaisEmprunte = 0;
+  rows.forEach(r => {
+    prets4 += r.an3 + r.an2 + r.an1 + r.an;
+    cumules += r.cumules;
+    anTotal += r.an;
+    if(r.cumules === 0) jamaisEmprunte++;
+  });
+  return {
+    count, prets4, cumules, jamaisEmprunte,
+    moyenne: count ? prets4/count : 0,
+    jamaisEmpruntePct: count ? 100*jamaisEmprunte/count : 0,
+    rotation: count ? anTotal/count : 0,
+  };
+}
+function fmtRotation(n){ return (n||0).toFixed(2); }
+
+// Étage 2e/5e/6e d'un exemplaire de magasin, à partir de son coteDigitRun —
+// même seuils que MAGASIN_ETAGE_THRESHOLDS dans recolement.html/magasins.html
+// (voir CLAUDE.md « Cotes numériques »). Dupliqué ici volontairement : pas de
+// module partagé entre pages statiques dans ce projet.
+const MAGASIN_ETAGE_THRESHOLDS = { 5: 13830, 6: 133530 };
+function etageOfDigitRun(digitRun){
+  if(!digitRun) return 'magasin-6e';
+  const threshold = MAGASIN_ETAGE_THRESHOLDS[digitRun.length];
+  if(!threshold) return 'magasin-6e';
+  const num = parseInt(digitRun, 10) || 0;
+  return num <= threshold ? 'magasin-2e' : 'magasin-5e';
+}
+const ETAGE_LABELS = { 'magasin-2e':'Magasin — 2e étage', 'magasin-5e':'Magasin — 5e étage', 'magasin-6e':'Magasin — 6e étage' };
 
 const SORTERS = {
   titre:   (a,b) => a.titre.localeCompare(b.titre),
@@ -334,7 +528,7 @@ function render(){
   }
 
   renderPagination(total, totalPages);
-  document.querySelectorAll('.st-table th .arrow').forEach(elm => {
+  document.querySelectorAll('#view-overview .st-table th .arrow').forEach(elm => {
     const key = elm.dataset.arrow;
     elm.textContent = key === sortKey ? (sortDir === 1 ? '▲' : '▼') : '';
   });
@@ -360,7 +554,7 @@ function renderPagination(total, totalPages){
 
 document.getElementById('st-search-input').addEventListener('input', () => { page=1; render(); });
 document.getElementById('st-perpage').addEventListener('change', e => { perPage = parseInt(e.target.value,10); page=1; render(); });
-document.querySelectorAll('.st-table th[data-sort]').forEach(th => {
+document.querySelectorAll('#view-overview .st-table th[data-sort]').forEach(th => {
   th.addEventListener('click', () => {
     const key = th.dataset.sort;
     if(sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = -1; }
@@ -396,12 +590,13 @@ function buildCharts(rows, referenceYear){
   })));
 }
 
-function buildStats(rows){
+function buildStats(rows, referenceYear){
   const totalRecent = rows.reduce((s,r) => s + r.an3+r.an2+r.an1+r.an, 0);
   const totalCumules = rows.reduce((s,r) => s + r.cumules, 0);
   const jamaisEmprunte = rows.filter(r => r.cumules === 0).length;
   const top = rows.reduce((best,r) => (!best || r.cumules > best.cumules) ? r : best, null);
   const moyenne = rows.length ? (totalRecent / rows.length) : 0;
+  const agg = aggregateGroup(rows);
 
   document.getElementById('stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-card-label">Exemplaires (export)</div><div class="stat-card-val">${fmt(rows.length)}</div></div>
@@ -409,8 +604,246 @@ function buildStats(rows){
     <div class="stat-card"><div class="stat-card-label">Prêts (4 dernières années)</div><div class="stat-card-val">${fmt(totalRecent)}</div><div class="stat-card-sub">moyenne ${moyenne.toFixed(2)} / exemplaire</div></div>
     <div class="stat-card"><div class="stat-card-label">Prêts cumulés (total)</div><div class="stat-card-val">${fmt(totalCumules)}</div><div class="stat-card-sub">depuis l'acquisition</div></div>
     <div class="stat-card"><div class="stat-card-label">Le plus emprunté</div><div class="stat-card-val">${top ? fmt(top.cumules) : '—'}</div><div class="stat-card-sub">${top ? esc(top.titre) : ''}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Taux de rotation (${referenceYear})</div><div class="stat-card-val">${fmtRotation(agg.rotation)}</div><div class="stat-card-sub">prêts ${referenceYear} ÷ nb exemplaires — détail par section/magasin dans les onglets</div></div>
   `;
 }
+
+/* ════════════════════════════════════════════════════════════
+   ONGLETS
+   ════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.stv-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.stv-tab').forEach(b => b.classList.toggle('active', b===btn));
+    document.querySelectorAll('.stv-view').forEach(v => v.classList.toggle('active', v.id === 'view-'+tab));
+  });
+});
+
+function downloadTxt(text, filename){
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 300);
+}
+
+/* ════════════════════════════════════════════════════════════
+   ONGLET « PAR SECTION »
+   ════════════════════════════════════════════════════════════ */
+let SECTION_ENTRIES = [];
+let secSortKey = 'rotation';
+let secSortDir = 1; // rotation la plus faible en premier par défaut
+
+const SEC_SORTERS = {
+  section: (a,b) => a.section.localeCompare(b.section),
+  count: (a,b) => a.count - b.count,
+  prets4: (a,b) => a.prets4 - b.prets4,
+  moyenne: (a,b) => a.moyenne - b.moyenne,
+  cumules: (a,b) => a.cumules - b.cumules,
+  jamaisEmprunte: (a,b) => a.jamaisEmprunte - b.jamaisEmprunte,
+  rotation: (a,b) => a.rotation - b.rotation,
+};
+
+function renderSectionTab(){
+  const bySection = new Map();
+  ROWS.forEach(r => {
+    if(!bySection.has(r.rawSection)) bySection.set(r.rawSection, []);
+    bySection.get(r.rawSection).push(r);
+  });
+  SECTION_ENTRIES = Array.from(bySection.entries()).map(([section, rows]) => ({ section, ...aggregateGroup(rows) }));
+  renderSectionTable();
+}
+
+function renderSectionTable(){
+  const q = (document.getElementById('sec-search-input').value || '').trim().toLowerCase();
+  let rows = q ? SECTION_ENTRIES.filter(e => e.section.toLowerCase().includes(q)) : SECTION_ENTRIES;
+  const fn = SEC_SORTERS[secSortKey] || SEC_SORTERS.rotation;
+  rows = rows.slice().sort((a,b) => secSortDir * fn(a,b));
+
+  document.getElementById('sec-count').textContent =
+    fmt(rows.length) + ' section' + (rows.length>1?'s':'') +
+    (rows.length !== SECTION_ENTRIES.length ? ' (sur ' + fmt(SECTION_ENTRIES.length) + ')' : '');
+
+  const tbody = document.getElementById('sec-tbody');
+  tbody.innerHTML = rows.length ? rows.map(e => `
+    <tr>
+      <td>${esc(e.section)}</td>
+      <td class="num">${fmt(e.count)}</td>
+      <td class="num">${fmt(e.prets4)}</td>
+      <td class="num">${e.moyenne.toFixed(2)}</td>
+      <td class="num">${fmt(e.cumules)}</td>
+      <td class="num">${fmt(e.jamaisEmprunte)} <span class="st-meta">(${Math.round(e.jamaisEmpruntePct)}%)</span></td>
+      <td class="num agg-rotation-hi">${fmtRotation(e.rotation)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="st-empty">Aucun résultat.</td></tr>';
+
+  document.querySelectorAll('#view-section .agg-table th .arrow').forEach(elm => {
+    const key = elm.dataset.arrow.replace(/^sec-/, '');
+    elm.textContent = key === secSortKey ? (secSortDir === 1 ? '▲' : '▼') : '';
+  });
+}
+document.getElementById('sec-search-input').addEventListener('input', renderSectionTable);
+document.querySelectorAll('#view-section .agg-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if(secSortKey === key) secSortDir *= -1; else { secSortKey = key; secSortDir = key==='section' ? 1 : -1; }
+    renderSectionTable();
+  });
+});
+
+/* ════════════════════════════════════════════════════════════
+   ONGLET « PAR MAGASIN » (2e / 5e / 6e étage)
+   ════════════════════════════════════════════════════════════ */
+function renderMagasinTab(){
+  const buckets = { 'magasin-2e':[], 'magasin-5e':[], 'magasin-6e':[] };
+  ROWS.forEach(r => {
+    if(!r.isMagasin) return;
+    buckets[etageOfDigitRun(r.coteDigitRun)].push(r);
+  });
+  const order = ['magasin-2e','magasin-5e','magasin-6e'];
+  const entries = order.map(key => ({ key, label: ETAGE_LABELS[key], ...aggregateGroup(buckets[key]) }));
+
+  document.getElementById('mag-tbody').innerHTML = entries.map(e => `
+    <tr>
+      <td>${esc(e.label)}</td>
+      <td class="num">${fmt(e.count)}</td>
+      <td class="num">${fmt(e.prets4)}</td>
+      <td class="num">${e.moyenne.toFixed(2)}</td>
+      <td class="num">${fmt(e.cumules)}</td>
+      <td class="num">${fmt(e.jamaisEmprunte)} <span class="st-meta">(${Math.round(e.jamaisEmpruntePct)}%)</span></td>
+      <td class="num agg-rotation-hi">${fmtRotation(e.rotation)}</td>
+    </tr>
+  `).join('');
+
+  renderBarChart('bar-magasin-rotation', entries.map(e => ({
+    label: e.label.replace('Magasin — ',''),
+    value: Math.round(e.rotation*100)/100,
+    tooltip: `<span class="tt-val">${fmtRotation(e.rotation)}</span> — ${fmt(e.count)} exemplaire${e.count>1?'s':''}`,
+  })));
+}
+
+/* ════════════════════════════════════════════════════════════
+   ONGLET « SANS EMPRUNT RÉCENT » (0 prêt sur les 4 dernières
+   années disponibles — voir bandeau de limite dans le HTML)
+   ════════════════════════════════════════════════════════════ */
+let DORMANT_ROWS = [];
+let dormFiltered = [];
+let dormSortKey = 'cumules';
+let dormSortDir = -1;
+let dormPage = 1;
+let dormPerPage = 50;
+
+const DORM_SORTERS = {
+  titre:   (a,b) => a.titre.localeCompare(b.titre),
+  auteur:  (a,b) => a.auteur.localeCompare(b.auteur),
+  cote:    (a,b) => a.cote.localeCompare(b.cote),
+  section: (a,b) => a.section.localeCompare(b.section),
+  cumules: (a,b) => a.cumules - b.cumules,
+  piege:   (a,b) => a.piege.localeCompare(b.piege),
+  barcode: (a,b) => a.barcode.localeCompare(b.barcode),
+};
+
+function renderDormantTab(){
+  DORMANT_ROWS = ROWS.filter(r => r.an===0 && r.an1===0 && r.an2===0 && r.an3===0);
+  const neverBorrowed = DORMANT_ROWS.filter(r => r.cumules === 0).length;
+  const dormantWithHistory = DORMANT_ROWS.length - neverBorrowed;
+  const sansPiege = DORMANT_ROWS.filter(r => !r.piege).length;
+
+  document.getElementById('dorm-counts').innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">Sans emprunt (4 dernières années)</div><div class="stat-card-val">${fmt(DORMANT_ROWS.length)}</div><div class="stat-card-sub">${ROWS.length ? Math.round(100*DORMANT_ROWS.length/ROWS.length) : 0}% de l'export</div></div>
+    <div class="stat-card"><div class="stat-card-label">Dont jamais emprunté</div><div class="stat-card-val">${fmt(neverBorrowed)}</div><div class="stat-card-sub">aucun historique de prêt du tout</div></div>
+    <div class="stat-card"><div class="stat-card-label">Empruntés autrefois, dormants depuis</div><div class="stat-card-val">${fmt(dormantWithHistory)}</div><div class="stat-card-sub">signal le plus utile pour un ouvrage égaré</div></div>
+    <div class="stat-card"><div class="stat-card-label">Sans piège renseigné</div><div class="stat-card-val">${fmt(sansPiege)}</div><div class="stat-card-sub">pas encore statué côté bibliothèque</div></div>
+  `;
+  renderDormant();
+}
+
+function applyDormantFilter(){
+  const q = (document.getElementById('dorm-search-input').value || '').trim().toLowerCase();
+  const piegeFilter = document.getElementById('dorm-piege-filter').value;
+  dormFiltered = DORMANT_ROWS.filter(r => {
+    if(piegeFilter === 'no-piege' && r.piege) return false;
+    if(piegeFilter === 'has-piege' && !r.piege) return false;
+    if(!q) return true;
+    return r.titre.toLowerCase().includes(q) ||
+      r.auteur.toLowerCase().includes(q) ||
+      r.cote.toLowerCase().includes(q) ||
+      r.section.toLowerCase().includes(q) ||
+      r.barcode.toLowerCase().includes(q);
+  });
+}
+
+function renderDormant(){
+  applyDormantFilter();
+  const fn = DORM_SORTERS[dormSortKey] || DORM_SORTERS.cumules;
+  dormFiltered = dormFiltered.slice().sort((a,b) => dormSortDir * fn(a,b));
+
+  const total = dormFiltered.length;
+  const totalPages = Math.max(1, Math.ceil(total / dormPerPage));
+  if(dormPage > totalPages) dormPage = totalPages;
+  const start = (dormPage-1) * dormPerPage;
+  const pageRows = dormFiltered.slice(start, start + dormPerPage);
+
+  document.getElementById('dorm-count').textContent =
+    fmt(total) + ' exemplaire' + (total>1?'s':'') +
+    (total !== DORMANT_ROWS.length ? ' (sur ' + fmt(DORMANT_ROWS.length) + ')' : '');
+
+  const tbody = document.getElementById('dorm-tbody');
+  tbody.innerHTML = pageRows.length ? pageRows.map(r => `
+    <tr>
+      <td class="st-titre">${esc(r.titre)}</td>
+      <td>${esc(r.auteur) || '—'}</td>
+      <td class="st-cote">${esc(r.cote) || '—'}</td>
+      <td class="st-meta">${esc(r.section) || '—'}</td>
+      <td class="num st-meta">${fmt(r.cumules)}</td>
+      <td>${r.piege ? `<span class="piege-badge">${esc(r.piege)}</span>` : '—'}</td>
+      <td class="st-meta">${esc(r.barcode) || '—'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="st-empty">Aucun résultat.</td></tr>';
+
+  renderDormPagination(total, totalPages);
+  document.querySelectorAll('#view-dormant .st-table th .arrow').forEach(elm => {
+    const key = elm.dataset.arrow.replace(/^dorm-/, '');
+    elm.textContent = key === dormSortKey ? (dormSortDir === 1 ? '▲' : '▼') : '';
+  });
+}
+
+function renderDormPagination(total, totalPages){
+  document.getElementById('dorm-pag-info').textContent = total ? `Page ${dormPage} / ${totalPages}` : '';
+  const controls = document.getElementById('dorm-pag-controls');
+  const btn = (label, target, disabled, active) =>
+    `<button class="pag-btn${active?' active':''}" data-page="${target}" ${disabled?'disabled':''}>${label}</button>`;
+  let html = btn('«', 1, dormPage===1, false) + btn('‹', dormPage-1, dormPage===1, false);
+  const windowSize = 2;
+  for(let p=1; p<=totalPages; p++){
+    if(p===1 || p===totalPages || Math.abs(p-dormPage)<=windowSize) html += btn(String(p), p, false, p===dormPage);
+    else if(Math.abs(p-dormPage)===windowSize+1) html += '<span class="pag-ellipsis">…</span>';
+  }
+  html += btn('›', dormPage+1, dormPage===totalPages, false) + btn('»', totalPages, dormPage===totalPages, false);
+  controls.innerHTML = html;
+  controls.querySelectorAll('.pag-btn').forEach(b => {
+    b.addEventListener('click', () => { dormPage = parseInt(b.dataset.page,10); renderDormant(); });
+  });
+}
+
+document.getElementById('dorm-search-input').addEventListener('input', () => { dormPage=1; renderDormant(); });
+document.getElementById('dorm-piege-filter').addEventListener('change', () => { dormPage=1; renderDormant(); });
+document.getElementById('dorm-perpage').addEventListener('change', e => { dormPerPage = parseInt(e.target.value,10); dormPage=1; renderDormant(); });
+document.querySelectorAll('#view-dormant .st-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if(dormSortKey === key) dormSortDir *= -1; else { dormSortKey = key; dormSortDir = -1; }
+    renderDormant();
+  });
+});
+document.getElementById('dorm-export').addEventListener('click', () => {
+  applyDormantFilter();
+  if(!dormFiltered.length){ alert('Aucun exemplaire à exporter avec les filtres actuels.'); return; }
+  const barcodes = dormFiltered.map(r => r.barcode).filter(Boolean);
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  downloadTxt(barcodes.join('\n') + '\n', `desherbage-dormants-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+});
 
 Promise.all([
   fetch('data/desherbage.json').then(r => r.ok ? r.json() : []),
@@ -421,12 +854,18 @@ Promise.all([
   columnar.forEachRow(data, rec => ROWS.push(normalize(rec)));
   FILTERED = ROWS;
   const referenceYear = (report && report.stats && report.stats.referenceYear) || new Date().getFullYear();
-  buildStats(ROWS);
+  buildStats(ROWS, referenceYear);
   buildCharts(ROWS, referenceYear);
   render();
+  renderSectionTab();
+  renderMagasinTab();
+  renderDormantTab();
 }).catch(err => {
   document.getElementById('st-tbody').innerHTML =
     '<tr><td colspan="11" class="st-empty">Impossible de charger data/desherbage.json — lancez `npm run build:desherbage`.</td></tr>';
+  document.getElementById('sec-tbody').innerHTML = '<tr><td colspan="7" class="st-empty">Données indisponibles.</td></tr>';
+  document.getElementById('mag-tbody').innerHTML = '<tr><td colspan="7" class="st-empty">Données indisponibles.</td></tr>';
+  document.getElementById('dorm-tbody').innerHTML = '<tr><td colspan="7" class="st-empty">Données indisponibles.</td></tr>';
   document.getElementById('stats-row').innerHTML = '<div class="stat-card"><div class="stat-card-label">Données indisponibles</div></div>';
   console.error(err);
 });
