@@ -1001,7 +1001,20 @@ function exportShelfBarcodes(key){
 
 /* ════════════ RENDU DES LIGNES DE NOTICES ════════════ */
 function noticeRows(notices,sort){
-  const sorted=[...notices].sort((a,b)=>{
+  // Surcouche Syracuse : cote/titre/auteur sont remplacés par la valeur la
+  // plus récente si ce code-barre a une entrée dans la surcouche (touché
+  // depuis le dernier rebuild XML) — même principe que
+  // applySyracuseOverlayToCatalog() dans recolement.html, appliqué ici à la
+  // volée sur les notices déjà chargées plutôt qu'à un catalogue complet
+  // (reserve.html n'en a pas). Le fonds, lui, reste figé (voir liveBadge
+  // ci-dessous) : le recalculer proprement demanderait le même contexte que
+  // `_fondsLabel` (data/magasins.json), absent de cette page.
+  const withOverlay=notices.map(n=>{
+    const fresh=n.b&&SYRACUSE_OVERLAY[n.b];
+    if(!fresh) return n;
+    return {...n, c:fresh.cote||n.c, t:fresh.titre||n.t, a:fresh.auteur||n.a, _fresh:fresh};
+  });
+  const sorted=[...withOverlay].sort((a,b)=>{
     if(sort==='cote')   return compareCotes(a.c,b.c);
     if(sort==='titre')  return (a.t||'').localeCompare(b.t||'','fr');
     if(sort==='auteur') return (a.a||'').localeCompare(b.a||'','fr');
@@ -1019,12 +1032,14 @@ function noticeRows(notices,sort){
     if(hit) visible=[...visible.slice(0,MAX-1),hit];
   }
   let html=visible.map(n=>{
-    // Surcouche Syracuse : présente seulement si ce code-barre a été
-    // touché depuis le dernier rebuild XML — la plupart des notices n'ont
-    // donc aucun badge supplémentaire (voir loadSyracuseOverlay()).
-    const fresh=n.b&&SYRACUSE_OVERLAY[n.b];
+    // Présent seulement si ce code-barre a été touché depuis le dernier
+    // rebuild XML — la plupart des notices n'ont donc aucun badge
+    // supplémentaire (voir loadSyracuseOverlay()). cote/titre/auteur sont
+    // déjà fusionnés ci-dessus ; le badge ne porte plus que ce qui ne peut
+    // pas l'être (section/site, voir le commentaire au-dessus).
+    const fresh=n._fresh;
     const liveBadge=fresh
-      ? `<span class="notice-live" title="Relevé Syracuse au dernier passage de la synchronisation incrémentale, potentiellement plus récent que le fonds ci-dessus (figé au moment du scan)">🔄 ${esc(fresh.section||'')}${fresh.site?` · ${esc(fresh.site)}`:''}</span>`
+      ? `<span class="notice-live" title="Cote/titre/auteur déjà mis à jour par la synchronisation incrémentale Syracuse ; fonds ci-dessous toujours figé au moment du scan">🔄 ${esc(fresh.section||'')}${fresh.site?` · ${esc(fresh.site)}`:''}</span>`
       : '';
     return `
     <div class="notice-row${n.b&&n.b===hlBarcode?' hl':''}">

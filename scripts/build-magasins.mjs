@@ -49,6 +49,11 @@
  * (`_coteDigitRun` présent ou non) qui permet à magasins.html/récolement de
  * distinguer 2e/5e (numérique) du 6e (le reste) — voir CLAUDE.md.
  *
+ * La classification magasin (sections retenues, piège "en réserve", seuil
+ * 2e/5e vs 6e étage) vit dans ./lib/magasin-classify.mjs, partagée avec
+ * scripts/build-desherbage.mjs (2026-09-10) — les deux scripts lisent le même
+ * bib.xml et ne doivent jamais diverger sur ce qui compte comme "magasin".
+ *
  * Aucune dépendance npm. Node ≥ 18. Nécessite R2 configuré (.env local ou
  * variables Vercel) — ce jeu de données n'a pas de repli local committé.
  * ────────────────────────────────────────────────────────────────────────────
@@ -60,6 +65,7 @@ import { loadDotEnv } from './lib/dotenv.mjs';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
 import { iterateGesmarcItemsFromFile, parseGesmarcItem } from './lib/gesmarc.mjs';
 import { loadColumnar } from './lib/load-columnar.mjs';
+import { MAGASIN_SECTIONS, magasinDigitRun, isPiegeEnReserve, fondsLabel } from './lib/magasin-classify.mjs';
 
 loadDotEnv();
 
@@ -72,50 +78,9 @@ const CONFIG = {
   },
   vignetteBaseUrl: 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/vignette/',
   // Sections de bib.xml qui correspondent aux magasins d'étage (2e/5e/6e).
-  magasinSections: ['Magasin', 'Magasin Jeunesse'],
+  magasinSections: MAGASIN_SECTIONS,
   force: process.env.SYRACUSE_FORCE === '1',
 };
-
-// ── Filtre étage : la cote (jointe) désigne-t-elle un ouvrage 2e/5e étage ? ─
-// Voir l'en-tête du fichier. Retourne le groupe de chiffres identifié (2e/5e
-// étage) ou null (6e étage — désormais gardé, pas exclu).
-function magasinDigitRun(cote) {
-  if (!cote) return null;
-  // Fusionne "1-2 chiffres.3 chiffres" (séparateur de milliers) en un seul
-  // nombre. N'affecte pas un préfixe Dewey à 3 chiffres ("940.21" reste
-  // "940" + "." + "21").
-  const merged = cote.replace(/(?<!\d)(\d{1,2})\.(\d{3})(?!\d)/g, '$1$2');
-  const runs = merged.match(/\d+/g) || [];
-  for (let run of runs) {
-    if (run.length === 7 && run[0] === '0') run = run.slice(1);
-    if (run.length === 5 || run.length === 6) return run;
-  }
-  return null;
-}
-
-function secteurLabel(section) {
-  return section === 'Magasin Jeunesse' ? 'Jeunesse' : 'Adulte';
-}
-
-// Le piège "en réserve" (Syracuse 921$b code 2 — voir PIEGE_B_LABELS dans
-// build-inventory.mjs) compte aussi comme "en magasin", en plus des deux
-// sections normales : demande explicite de l'équipe, un exemplaire marqué
-// ainsi est physiquement traité comme du magasin même si sa Section (Libellé)
-// Syracuse n'est pas "Magasin"/"Magasin Jeunesse". Champ "Pièges" en texte
-// libre (peut combiner plusieurs pièges, ex. "Exclu DEFINITIVEMENT du prêt en
-// réserve") — d'où un test par sous-chaîne insensible à la casse plutôt qu'une
-// égalité stricte. Ne matche pas "Réserve Patrimoniale"/"Réserve Saint
-// Exupery" (pas de "en" devant "réserve" dans ces libellés-là).
-const PIEGE_EN_RESERVE_RE = /en réserve/i;
-
-function isPiegeEnReserve(piege) {
-  return !!piege && PIEGE_EN_RESERVE_RE.test(piege);
-}
-
-function fondsLabel(digitRun, section) {
-  const etage = digitRun ? '2e/5e étage' : '6e étage';
-  return `Magasin — ${etage} (${secteurLabel(section)})`;
-}
 
 // ── Itère les exemplaires de bib.xml, filtre bibliothèque seulement ────────
 // bib.xml (700+ Mo) est lu en flux (iterateGesmarcItemsFromFile) plutôt que
@@ -185,7 +150,8 @@ async function buildItems(path) {
       // MARC-XML brut). Repris tel quel par recolement.html pour signaler un
       // exemplaire à traiter (pilon/braderie…) dans les tableaux d'anomalies.
       // Un piège "en réserve" fait aussi basculer _isMagasin à true (voir
-      // isPiegeEnReserve() plus haut), même si Section (Libellé) diffère.
+      // isPiegeEnReserve() dans lib/magasin-classify.mjs), même si
+      // Section (Libellé) diffère.
       _piege: piege,
       // Pour un exemplaire hors magasin, le "fonds" affiché est sa vraie
       // section Syracuse (ex. "Adulte", "Réserve"…) plutôt qu'un libellé de

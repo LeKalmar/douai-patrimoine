@@ -55,12 +55,26 @@ export async function* iterateGesmarcItemsFromFile(path, { highWaterMark = 16 * 
   }
 }
 
+// Force une copie « à plat » d'une chaîne, indépendante de son support
+// d'origine. Sans ça, une valeur de 3 caractères extraite par regex d'un
+// `<item>` de ~9 Ko (bib.xml, export 2026-09-09) reste une V8 SlicedString :
+// elle retient tout le bloc XML source tant qu'elle existe, même minuscule.
+// Sur ~291 000 exemplaires accumulés dans un tableau (build-desherbage.mjs),
+// ça a fait grimper le tas à plusieurs Go pour un résultat qui ne pèse
+// réellement que quelques centaines de Mo — jusqu'à l'OOM. La concaténation
+// force V8 à matérialiser une chaîne plate ; `.slice(1)` retire le caractère
+// ajouté (idiome connu, pas de méthode dédiée en JS pour « détacher » une
+// chaîne).
+function flat(s) {
+  return (' ' + s).slice(1);
+}
+
 export function parseGesmarcItem(itemXml) {
   const props = {};
   const re = /<property\s+name="([^"]*)"[^>]*\svalue="([^"]*)"/g;
   let m;
   while ((m = re.exec(itemXml))) {
-    props[decodeXml(m[1])] = decodeXml(m[2]);
+    props[flat(decodeXml(m[1]))] = flat(decodeXml(m[2]));
   }
   return props;
 }

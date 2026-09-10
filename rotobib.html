@@ -151,12 +151,12 @@
     <div class="container">
 
       <p class="ex-note">
-        <strong>Comment ça marche :</strong> cet outil porte sur un export ponctuel de statistiques de prêt
-        (<code>xml/desherbage/desherbage.xml</code>), distinct du catalogue des magasins — mêmes exemplaires, profil
-        d'export différent pour obtenir les prêts par année. Scannez un code-barre : sa fiche (titre, auteur, cote,
-        date de parution) et son historique de prêts sur les 4 dernières années s'affichent. Choisissez ensuite un
-        traitement — les décisions sont partagées entre collègues (comme le récolement) et s'exportent en .txt pour
-        ajout panier dans le SIGB.
+        <strong>Comment ça marche :</strong> cet outil porte sur les magasins 2e/5e/6e étage, à partir des
+        statistiques de prêt de <code>xml/bib.xml</code> (export complet de la bibliothèque). Scannez un code-barre :
+        sa fiche (titre, auteur, cote, date de parution) et son historique de prêts sur les 4 dernières années
+        s'affichent. Choisissez ensuite un traitement — les décisions sont partagées entre collègues (comme le
+        récolement) et s'exportent en .txt pour ajout panier dans le SIGB. Pour une vue d'ensemble sur tout le
+        catalogue (pas seulement les magasins), voir <a href="desherbage-stats.html">Statistiques de prêt</a>.
       </p>
 
       <div class="stats-row" id="stats-row"></div>
@@ -266,11 +266,17 @@ Promise.all([
   fetch('data/desherbage.json').then(r => r.ok ? r.json() : []),
   fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : {}),
 ]).then(([data, report]) => {
-  // decode() : data/desherbage.json est un conteneur colonnaire (voir
-  // js/columnar.js), et DESHERB est ensuite utilisé comme un vrai tableau
-  // (.forEach, .length). L'export ne fait que 6 140 lignes — inutile
-  // d'optimiser davantage la matérialisation ici.
-  DESHERB = columnar.decode(data);
+  // data/desherbage.json couvre désormais toute la bibliothèque de Douai
+  // (voir build-desherbage.mjs), pour que desherbage-stats.html puisse
+  // afficher des statistiques sur l'ensemble du catalogue — Rotobib, lui,
+  // reste volontairement borné aux magasins d'étage (pas de bouton
+  // pilon/braderie sur un document patrimonial ou en circulation active dans
+  // les rayons), d'où ce filtre côté client, même patron que magasins.html.
+  // forEachRow plutôt que decode() + filter() : évite de matérialiser les
+  // ~291 000 lignes brutes pour n'en garder ensuite que les ~68 000 de
+  // magasin.
+  DESHERB = [];
+  columnar.forEachRow(data, r => { if (r._isMagasin) DESHERB.push(r); });
   BY_BC = new Map(DESHERB.map(r => [r._barcode, r]));
   if (report && report.stats && report.stats.referenceYear) REFERENCE_YEAR = report.stats.referenceYear;
   updateStats();
@@ -350,11 +356,9 @@ function updateStats(){
 const scanInput = document.getElementById('roto-scan-input');
 
 function titreComplet(rec){
-  const base = rec['200$a'] || rec.titreDesherbage || '(titre inconnu)';
-  return base;
+  return rec['200$a'] || '(titre inconnu)';
 }
 function sousTitre(rec){
-  if(rec['200$i']) return `${rec['200$h'] ? rec['200$h'] + '. ' : ''}${rec['200$i']}`;
   if(rec.titrePartie) return rec.titrePartie;
   return null;
 }
@@ -364,7 +368,7 @@ function auteurComplet(rec){
   if(noms.length){
     return noms.map((n,i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ');
   }
-  return rec.auteurDesherbage || null;
+  return rec['700$a'] || null;
 }
 
 function handleScanLookup(raw){
@@ -376,7 +380,7 @@ function handleScanLookup(raw){
     currentRecord = null;
     document.getElementById('roto-detail').classList.remove('show');
     const nf = document.getElementById('roto-notfound');
-    nf.innerHTML = `Code-barre <strong>${esc(bc)}</strong> introuvable dans l'export de désherbage en cours (${DESHERB.length} exemplaires). Ce n'est peut-être pas un livre concerné par cette campagne.`;
+    nf.innerHTML = `Code-barre <strong>${esc(bc)}</strong> introuvable parmi les ${DESHERB.length} exemplaires des magasins d'étage. Ce n'est peut-être pas un livre concerné par cette campagne (rayons, réserve patrimoniale…).`;
     nf.classList.add('show');
     scanInput.value = '';
     scanInput.focus();
@@ -418,11 +422,7 @@ function showDetail(rec){
   document.getElementById('roto-badges').innerHTML = badges.join(' ');
 
   const metaParts = [];
-  const editeur = rec['210$c'] || rec.editeurDesherbage;
-  const lieu = rec['210$a'];
-  if(editeur || lieu) metaParts.push(`<b>Éditeur</b> ${esc([lieu, editeur].filter(Boolean).join(', '))}`);
-  if(rec['215$a']) metaParts.push(`<b>Description</b> ${esc(rec['215$a'])}${rec['215$d'] ? ' ; ' + esc(rec['215$d']) : ''}`);
-  if(rec['686$a']) metaParts.push(`<b>Dewey</b> ${esc(rec['686$a'])}`);
+  if(rec['210$c']) metaParts.push(`<b>Éditeur</b> ${esc(rec['210$c'])}`);
   if(rec.bibliotheque) metaParts.push(`<b>Bibliothèque</b> ${esc(rec.bibliotheque)}`);
   if(rec.section) metaParts.push(`<b>Section</b> ${esc(rec.section)}`);
   if(rec.etat) metaParts.push(`<b>État</b> ${esc(rec.etat)}`);

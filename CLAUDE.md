@@ -1064,17 +1064,31 @@ vois pas mon changement » sans redemander une vérification manuelle.
   la synchro elle-même (voir `js/syracuse-sync-trigger.js` plus haut) — sans
   ça, une notice ne progresserait jamais tant que personne n'a ouvert
   `recolement.html`/`magasins.html` entretemps, ce qui s'est produit en
-  conditions réelles avant ce correctif. `noticeRows()` (fenêtre
-  modale au clic sur une étagère) affiche, pour chaque notice dont le
-  code-barre a une entrée dans la surcouche, un badge bleu `.notice-live`
-  (« 🔄 Section · Site ») à côté du `.notice-fonds` figé au moment du scan
-  — sans jamais reconstruire ce dernier : `reserve.html` n'a aucun accès à
-  `data/magasins.json` (son plan vient entièrement de `/api/recolement`,
-  voir plus haut), donc pas moyen d'y recalculer un `_fondsLabel` propre ;
-  la surcouche est affichée telle quelle, distinguée visuellement plutôt
-  que fusionnée dans le libellé existant. Absent pour l'immense majorité
-  des notices (celles non retouchées depuis le dernier rebuild) — le badge
-  n'apparaît que sur ce qui a effectivement changé.
+  conditions réelles avant ce correctif. `noticeRows()` (fenêtre modale au
+  clic sur une étagère, 2026-09-10) remplace `cote`/`titre`/`auteur` par la
+  valeur de la surcouche pour chaque notice dont le code-barre y a une
+  entrée (`fresh.cote||n.c`, etc.) — même principe que
+  `applySyracuseOverlayToCatalog()` de `recolement.html`, appliqué ici
+  directement sur les notices déjà chargées en mémoire (pas de catalogue
+  complet côté `reserve.html`) plutôt que sur un catalogue. Le tri
+  (`sort==='cote'`/`'titre'`/`'auteur'`) porte sur ces valeurs déjà
+  fusionnées, pas sur celles figées au moment du scan — une notice
+  corrigée se retrie donc à sa place à jour. Seul le **fonds**
+  (`.notice-fonds`) reste figé et non reconstruit : lui recalculer un
+  `_fondsLabel` propre demanderait `data/magasins.json`, dont
+  `reserve.html` n'a aucune copie (son plan vient entièrement de
+  `/api/recolement`, voir plus haut) — un badge bleu `.notice-live`
+  (« 🔄 Section · Site ») s'affiche à côté à la place, distinguée
+  visuellement plutôt que fusionnée dans le libellé existant. Ce badge, et
+  la fusion cote/titre/auteur qui l'accompagne, sont absents pour l'immense
+  majorité des notices (celles non retouchées depuis le dernier rebuild) —
+  n'apparaissent que sur ce qui a effectivement changé. Avant ce correctif,
+  la cote/titre/auteur affichés restaient figés au moment du scan même
+  après une correction Syracuse détectée par la synchro — seul un rescan
+  physique dans `recolement.html`, ou le prochain rebuild XML complet,
+  les mettait à jour ; un signalement concret (exemplaire 607603, cote
+  corrigée « L 61 » → « L61 » toujours affichée avec l'espace) a motivé ce
+  changement.
 
 `analyse-cotes.html` et les autres pages qui chargent `data/inventaire.json`
 indépendamment (`exemplarisation.html`, `reliures.html`,

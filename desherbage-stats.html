@@ -117,10 +117,11 @@
     <div class="container">
 
       <p class="ex-note">
-        <strong>À propos :</strong> ces chiffres portent sur l'export de désherbage
-        (<code>data/desherbage.json</code>, voir <a href="rotobib.html">Rotobib</a>) — les mêmes exemplaires des
-        magasins 2e/5e étage, avec leurs statistiques de prêt par année. Purement consultatif : aucune donnée n'est
-        modifiée ici, pour choisir un traitement (conserver/pilon/braderie/relocalisation) direction Rotobib.
+        <strong>À propos :</strong> ces chiffres portent sur <code>data/desherbage.json</code>, construit depuis
+        l'export complet de la bibliothèque (<code>xml/bib.xml</code>) — <strong>tout le catalogue de Douai</strong>
+        (rayons, magasins d'étage, réserve patrimoniale…), avec ses statistiques de prêt par année. Purement
+        consultatif : aucune donnée n'est modifiée ici. Pour choisir un traitement conserver/pilon/braderie
+        (magasins d'étage uniquement), direction <a href="rotobib.html">Rotobib</a>.
       </p>
 
       <div class="stats-row" id="stats-row">
@@ -161,6 +162,7 @@
               <th data-sort="titre">Titre<span class="arrow" data-arrow="titre"></span></th>
               <th data-sort="auteur">Auteur<span class="arrow" data-arrow="auteur"></span></th>
               <th data-sort="cote">Cote<span class="arrow" data-arrow="cote"></span></th>
+              <th data-sort="section">Section<span class="arrow" data-arrow="section"></span></th>
               <th class="num" data-sort="an3">AN-3<span class="arrow" data-arrow="an3"></span></th>
               <th class="num" data-sort="an2">AN-2<span class="arrow" data-arrow="an2"></span></th>
               <th class="num" data-sort="an1">AN-1<span class="arrow" data-arrow="an1"></span></th>
@@ -171,7 +173,7 @@
             </tr>
           </thead>
           <tbody id="st-tbody">
-            <tr><td colspan="10" class="st-empty">Chargement…</td></tr>
+            <tr><td colspan="11" class="st-empty">Chargement…</td></tr>
           </tbody>
         </table>
       </div>
@@ -252,14 +254,15 @@ function normalize(rec){
   const prenoms = (rec['700$b']||'').split('§').map(s=>s.trim());
   const auteur = noms.length
     ? noms.map((n,i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ')
-    : (rec.auteurDesherbage || '');
-  const titre = rec['200$a'] || rec.titreDesherbage || '(titre inconnu)';
+    : (rec['700$a'] || '');
+  const titre = rec['200$a'] || '(titre inconnu)';
   const p = rec.prets || { an3:0, an2:0, an1:0, an:0, cumules:0 };
   const r = rec.reservations || {};
   return {
     rec, titre, auteur,
     cote: rec.coteAffichee || '',
     barcode: rec._barcode || '',
+    section: rec._fondsLabel || rec.section || '',
     an3: p.an3||0, an2: p.an2||0, an1: p.an1||0, an: p.an||0, cumules: p.cumules||0,
     resaCumulees: r.cumulees||0,
   };
@@ -269,6 +272,7 @@ const SORTERS = {
   titre:   (a,b) => a.titre.localeCompare(b.titre),
   auteur:  (a,b) => a.auteur.localeCompare(b.auteur),
   cote:    (a,b) => a.cote.localeCompare(b.cote),
+  section: (a,b) => a.section.localeCompare(b.section),
   an3:     (a,b) => a.an3 - b.an3,
   an2:     (a,b) => a.an2 - b.an2,
   an1:     (a,b) => a.an1 - b.an1,
@@ -285,6 +289,7 @@ function applySearch(){
     r.titre.toLowerCase().includes(q) ||
     r.auteur.toLowerCase().includes(q) ||
     r.cote.toLowerCase().includes(q) ||
+    r.section.toLowerCase().includes(q) ||
     r.barcode.toLowerCase().includes(q)
   );
 }
@@ -309,13 +314,14 @@ function render(){
 
   const tbody = document.getElementById('st-tbody');
   if(!pageRows.length){
-    tbody.innerHTML = '<tr><td colspan="10" class="st-empty">Aucun résultat.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="st-empty">Aucun résultat.</td></tr>';
   } else {
     tbody.innerHTML = pageRows.map(r => `
       <tr>
         <td class="st-titre">${esc(r.titre)}</td>
         <td>${esc(r.auteur) || '—'}</td>
         <td class="st-cote">${esc(r.cote) || '—'}</td>
+        <td class="st-meta">${esc(r.section) || '—'}</td>
         <td class="num st-meta">${fmt(r.an3)}</td>
         <td class="num st-meta">${fmt(r.an2)}</td>
         <td class="num st-meta">${fmt(r.an1)}</td>
@@ -420,7 +426,7 @@ Promise.all([
   render();
 }).catch(err => {
   document.getElementById('st-tbody').innerHTML =
-    '<tr><td colspan="10" class="st-empty">Impossible de charger data/desherbage.json — lancez `npm run build:desherbage`.</td></tr>';
+    '<tr><td colspan="11" class="st-empty">Impossible de charger data/desherbage.json — lancez `npm run build:desherbage`.</td></tr>';
   document.getElementById('stats-row').innerHTML = '<div class="stat-card"><div class="stat-card-label">Données indisponibles</div></div>';
   console.error(err);
 });
