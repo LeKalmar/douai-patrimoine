@@ -110,20 +110,24 @@ partagé »).
   son rapport, également depuis `xml/bib.xml` (toute la bibliothèque, pas
   seulement les magasins). Voir « Cotes numériques » plus bas.
 - `npm run upload:bib` — pousse `data/xml/bib.xml` (export complet de la
-  bibliothèque, format GESMARC, plusieurs centaines de Mo) vers R2
-  (`xml/bib.xml`). À relancer après chaque nouvel export ; les deux scripts
-  ci-dessus le rapatrient alors automatiquement. Le parseur GESMARC est
-  partagé entre `build-magasins.mjs`, `build-cotes-numeriques.mjs` et
-  `build-desherbage.mjs` via `scripts/lib/gesmarc.mjs` (le parseur MARC-XML,
-  pour `data/xml/notices.xml`/`exemplaires.xml`, reste dans
+  bibliothèque, format GESMARC, plusieurs Go) vers R2 (`xml/bib.xml`). À
+  relancer après chaque nouvel export ; les trois scripts ci-dessus le
+  rapatrient alors automatiquement (un seul téléchargement suffit aux trois
+  s'ils sont lancés à la suite, le fichier local `data/xml/bib.xml` étant
+  partagé). Le parseur GESMARC est partagé entre `build-magasins.mjs`,
+  `build-cotes-numeriques.mjs` et `build-desherbage.mjs` via
+  `scripts/lib/gesmarc.mjs` (le parseur MARC-XML, pour
+  `data/xml/notices.xml`/`exemplaires.xml`, reste dans
   `scripts/lib/marc-xml.mjs`) — `bib.xml` étant trop volumineux pour tenir
-  dans une seule string JS, ces deux scripts le lisent en flux
+  dans une seule string JS, les trois scripts le lisent en flux
   (`iterateGesmarcItemsFromFile()`) plutôt qu'avec un `readFileSync()`
   classique.
 - `npm run build:desherbage` — régénère `data/desherbage.json` et
-  `data/desherbage-build-report.json` à partir de l'export Syracuse
-  « statistiques de prêt » utilisé par Rotobib (`rotobib.html`), indépendant
-  de `bib.xml` (voir « Rotobib » plus bas).
+  `data/desherbage-build-report.json`, les statistiques de prêt utilisées
+  par Rotobib (`rotobib.html`) et par `desherbage-stats.html`, désormais
+  depuis `xml/bib.xml` également (migré le 2026-09-10, ce script lisait
+  auparavant un export Syracuse dédié, distinct de `bib.xml` — voir
+  « Rotobib » plus bas pour le détail de cette migration).
 - Avant d'écraser `data/build-report.json`, `data/magasins-build-report.json`,
   `data/cotes-numeriques-build-report.json` ou `data/desherbage-build-report.json`,
   chaque script archive la version précédente dans un fichier `-previous.json`
@@ -583,9 +587,9 @@ séparément après un nouvel export + `npm run upload:bib`.
 Avant 2026-08-26, ce catalogue venait d'un export Syracuse dédié
 (`xml/magasin/notices.xml.xml` + `exemplaires.xml.xml`, MARC-XML classique)
 qui ne couvrait que le 2e/5e étage et excluait volontairement le 6e (motif
-historique : ces deux fichiers restent dans R2 et sont toujours utilisés
-par `build-desherbage.mjs`/Rotobib — voir plus bas — mais `build-magasins.mjs`
-ne les lit plus). `bib.xml` est un export "GESMARC" à plat (voir
+historique : ces deux fichiers restent dans R2, mais depuis 2026-09-10 plus
+aucun script ne les lit — `build-desherbage.mjs`/Rotobib est lui aussi passé
+à `bib.xml`, voir plus bas). `bib.xml` est un export "GESMARC" à plat (voir
 `scripts/lib/gesmarc.mjs`), pas du MARC-XML : chaque exemplaire porte
 directement `Titre`/`Auteur`/`Editeur`/`Publié le` (pas de jointure
 notice/exemplaire nécessaire), une `Bibliothèque (Libellé)` (le réseau
@@ -672,10 +676,10 @@ colonne "Entrée" (date d'entrée) de l'ancien `magasins.html` a été retirée 
 `bib.xml` ne porte pas d'équivalent au `920$d` de l'ancien export MARC-XML.
 
 `data/xml/magasin/` et `data/xml/all/` (anciens exports, gitignorés comme
-tout `data/xml/`) ne sont plus lus par `build-magasins.mjs`/
-`build-cotes-numeriques.mjs` — `xml/magasin/notices.xml.xml` reste
-cependant utilisé par `build-desherbage.mjs` (Rotobib, voir plus bas), donc
-pas retiré de R2.
+tout `data/xml/`) ne sont plus lus par aucun script depuis 2026-09-10
+(`build-desherbage.mjs`/Rotobib est passé à `bib.xml` ce jour-là, voir plus
+bas) — pas retirés de R2 pour autant, comme les autres exports devenus
+obsolètes.
 
 ## Cotes numériques (repérage dans le catalogue complet)
 
@@ -1323,43 +1327,105 @@ importance matérielle et dimensions apparaissent sans changement côté
 `rotobib.html` (2026-08-26) aide à décider, exemplaire par exemplaire, s'il
 faut le conserver, le mettre au pilon, le mettre en braderie ou le
 relocaliser — en s'appuyant sur ses statistiques de prêt plutôt que sur une
-inspection à l'œil. Porte sur un export Syracuse **ponctuel et distinct** de
-`data/magasins.json` : mêmes exemplaires (des magasins 2e/5e étage), mais
-avec un profil d'export différent donnant accès aux statistiques de prêt/
-réservation par année — informations absentes de l'export magasins habituel.
-**Cet export ne doit jamais être fusionné dans `data/magasins.json` comme
-s'il s'agissait de nouveaux exemplaires** : c'est la même collection, vue
-sous un autre angle, en parallèle, uniquement pour les besoins du
-désherbage.
+inspection à l'œil.
+
+**Migration de source (2026-09-10) :** jusqu'à cette date, les statistiques
+de prêt venaient d'un export Syracuse ponctuel et distinct de
+`data/magasins.json` (`xml/desherbage/desherbage.xml`, format GESMARC,
+~6 140 exemplaires des seuls magasins d'étage, joints à
+`xml/magasin/notices.xml.xml` pour le titre/auteur). Le 2026-09-09, le
+profil d'export Syracuse de `xml/bib.xml` a changé : chaque `<item>` porte
+désormais directement ses statistiques de prêt/réservation par année
+(`Nombre de prêts AN/AN-1/AN-2/AN-3/cumulés`, `Nombre de réservations
+AN/…/cumulées`), en plus des champs déjà lus par `build-magasins.mjs`
+(titre, auteur, éditeur, cote, section…) et de `Publié le` (qui manquait
+jusque-là, voir « Magasins 2e/5e/6e étage » plus haut) — pour les
+~291 000 exemplaires de toute la bibliothèque de Douai, pas seulement les
+magasins. L'export dédié devient donc inutile : `build-desherbage.mjs` lit
+désormais `bib.xml` exactement comme `build-magasins.mjs` (même fichier
+local `data/xml/bib.xml`, même filtre `Bibliothèque (Libellé)` commençant
+par "Douai"), sans plus jamais avoir besoin d'un export séparé ni d'une
+jointure notice/exemplaire. `xml/desherbage/desherbage.xml` et
+`npm run upload:desherbage` restent dans le projet (R2 garde l'ancien
+objet, comme `xml/magasin/exemplaires.xml.xml`/`xml/all/catalogue.xml`
+avant eux) mais ne sont plus lus par aucun script.
+
+Champs perdus dans ce nouveau format par rapport à l'ancien export dédié :
+`686$a` (Dewey), `215$a`/`215$d` (description/dimensions) — `bib.xml`/
+GESMARC ne porte pas ces informations, même perte déjà acceptée lors du
+passage de `magasins.html`/`cotes-numeriques.html` à `bib.xml` le
+2026-08-26.
+
+**Portée : deux usages volontairement séparés (demande explicite de
+l'équipe, 2026-09-10).** `data/desherbage.json` couvre désormais TOUTE la
+bibliothèque Douai (291 015 exemplaires gardés sur 291 022 lus), chaque
+exemplaire portant un flag `_isMagasin` — même sémantique que
+`data/magasins.json`, calculée par le même module partagé
+`scripts/lib/magasin-classify.mjs` (`MAGASIN_SECTIONS`, `isPiegeEnReserve`,
+`magasinDigitRun`, `fondsLabel`, `isMagasin` — extrait de
+`build-magasins.mjs` à cette occasion, pour que les deux scripts, qui
+lisent le même `bib.xml`, ne puissent jamais diverger sur ce qui compte
+comme « magasin » ; 88 808 exemplaires sur l'export du 2026-09-09) :
+
+- `rotobib.html` filtre côté client sur `_isMagasin` (même patron que
+  `magasins.html` avec son propre flag) : l'outil de décision
+  pilon/braderie reste volontairement borné aux magasins d'étage, pour ne
+  pas exposer ces boutons sur un document patrimonial ou en circulation
+  active dans les rayons.
+- `desherbage-stats.html`, purement statistique (aucune décision prise ni
+  stockée), affiche `data/desherbage.json` SANS filtre — sert de base à de
+  futurs outils visuels sur l'ensemble du catalogue. Une colonne
+  « Section » (`_fondsLabel`/`section`) a été ajoutée à son tableau pour
+  rester lisible à cette échelle (auparavant tous les exemplaires étaient
+  des magasins, donc cette colonne n'apportait rien).
+
+Conséquence attendue de l'élargissement : sur l'export du 2026-09-09,
+195 965 des 291 015 exemplaires ont au moins un prêt sur les 4 dernières
+années (contre 70 sur 6 140 dans l'ancien export) — la collection complète
+inclut désormais les rayons en libre accès, activement empruntés, alors que
+l'ancien export dédié ne portait que sur une sélection déjà pré-filtrée de
+livres peu ou pas empruntés.
+
+**Piège rencontré au premier build sur ce nouvel export (2026-09-10) :**
+`node scripts/build-desherbage.mjs` plantait avec `FATAL ERROR: Reached
+heap limit … JavaScript heap out of memory` après quelques dizaines de
+milliers d'exemplaires lus, malgré un `--max-old-space-size` généreux (le
+tas continuait de grossir presque linéairement plutôt que de plafonner).
+Cause : une particularité de V8, pas une fuite applicative. Une valeur de
+quelques caractères extraite par regex (`parseGesmarcItem()` dans
+`scripts/lib/gesmarc.mjs`) d'un `<item>` de ~9 Ko (moyenne sur ce nouvel
+export, contre ~4 Ko avant — beaucoup plus de propriétés par exemplaire)
+reste une *SlicedString* : elle retient en mémoire tout le bloc XML source
+tant qu'elle existe, même minuscule. Accumulée sur ~291 000 exemplaires
+dans un tableau, chaque propriété capturée gardait donc en vie tout son
+`<item>` d'origine — plusieurs Go pour un résultat qui ne pèse réellement
+que quelques centaines de Mo. Corrigé dans `parseGesmarcItem()` en forçant
+une copie « à plat » de chaque nom/valeur capturé (idiome `(' '+s).slice(1)`
+— la concaténation force V8 à matérialiser une chaîne indépendante ; il
+n'existe pas de méthode dédiée en JS pour « détacher » une chaîne). Ce
+correctif vit dans le parseur GESMARC partagé, donc profite aussi à
+`build-magasins.mjs`/`build-cotes-numeriques.mjs` sans qu'ils aient jamais
+eu besoin d'un `--max-old-space-size` : leur volume par exemplaire extrait
+était resté trop faible jusqu'ici pour révéler le problème. Avec ce
+correctif, `build-desherbage.mjs` traite les ~291 000 exemplaires en
+~50 s, tas Node par défaut, sans dépasser ~900 Mo de RSS.
 
 Pipeline de build (`scripts/build-desherbage.mjs`, `npm run
 build:desherbage`) :
 
-- Entrée : `xml/desherbage/desherbage.xml` (R2, poussé par `npm run
-  upload:desherbage` — pas de repli local committé, comme les magasins/cotes
-  numériques). Format **GESMARC**, pas du MARC-XML comme le reste du
-  projet : `<items><item type="GESMARC"><property name="…" value="…"
-  /></item></items>`, un `<item>` par exemplaire, avec les statistiques de
-  prêt/réservation par année (`Nombre de prêts AN` = année en cours,
-  `AN-1`, `AN-2`, `AN-3`) plus un total `Nombre de prêts cumulés` depuis
-  l'acquisition. Aucune info notice (titre/auteur/date de parution) dans ce
-  fichier — uniquement l'exemplaire. Parsé par le parseur GESMARC partagé
-  (`iterateGesmarcItems`/`parseGesmarcItem` dans `scripts/lib/gesmarc.mjs` —
-  aussi utilisé par `build-magasins.mjs`/`build-cotes-numeriques.mjs` pour
-  `bib.xml`, voir « Magasins 2e/5e/6e étage » ; regex sur `<property
-  name="…" value="…">`), pas par `scripts/lib/marc-xml.mjs` (réservé au vrai
-  MARC-XML).
-- Jointure : vérifié sur l'export du 2026-08-26 (6140 exemplaires) que
-  100% des codes-barres de cet export se retrouvent dans
-  `xml/magasin/notices.xml.xml` — le désherbage porte sur des collections
-  des magasins d'étage. Ce fichier reste téléchargé spécifiquement par
-  `build-desherbage.mjs` pour cette jointure (via `indexNotices()` de
-  `scripts/lib/marc-xml.mjs`) même si `build-magasins.mjs` ne l'utilise
-  plus depuis son passage à `bib.xml` (2026-08-26, voir plus haut) — les
-  deux scripts sont désormais indépendants l'un de l'autre pour cette
-  entrée. Pas besoin de retélécharger `xml/magasin/exemplaires.xml.xml` :
-  les champs exemplaire utiles (cote, section, état, statistiques) sont
-  déjà dans `desherbage.xml` lui-même.
+- Entrée : `xml/bib.xml` (R2, voir « Magasins 2e/5e/6e étage » — même
+  fichier local `data/xml/bib.xml` que `build-magasins.mjs`/
+  `build-cotes-numeriques.mjs`, un seul téléchargement suffit aux trois
+  scripts lancés à la suite). Format **GESMARC**, pas du MARC-XML —
+  `<items><item type="GESMARC"><property name="…" value="…" /></item>
+  </items>`, un `<item>` par exemplaire. Parsé par le parseur GESMARC
+  partagé (`iterateGesmarcItemsFromFile`/`parseGesmarcItem` dans
+  `scripts/lib/gesmarc.mjs`), en flux comme `build-magasins.mjs` — `bib.xml`
+  (2,5 Go sur l'export du 2026-09-09) dépasse largement la limite de
+  longueur d'une string V8.
+- Filtre : `Bibliothèque (Libellé)` commençant par "Douai" — identique à
+  `build-magasins.mjs`/`build-cotes-numeriques.mjs`, aucun filtre de
+  section (voir « Portée » ci-dessus).
 - Champs de prêt/réservation vides dans l'export : Syracuse omet la valeur
   plutôt que d'écrire "0" pour les 4 compteurs annuels — vérifié que la
   somme des 4 années (vide = 0) ne dépasse jamais `Nombre de prêts
@@ -1367,46 +1433,47 @@ build:desherbage`) :
   `cumulés` peut être strictement supérieur à cette somme quand
   l'exemplaire a des prêts plus anciens que les 4 dernières années. Une
   case vide sur les 4 compteurs annuels signifie donc bien "0 prêt cette
-  année-là" (`parseCount()`), pas une donnée manquante — sur l'export de
-  référence, seuls 70 des 6140 exemplaires ont au moins une valeur non
-  vide sur ces 4 champs, ce qui est cohérent avec le principe même de
-  l'outil : ce sont majoritairement des livres peu ou pas empruntés
-  récemment.
+  année-là" (`parseCount()`), pas une donnée manquante.
 - Année de référence de "AN" : absente de l'export (pas de date
   d'extraction fournie par Syracuse dans ce format). Prise par défaut comme
   l'année en cours au moment du `npm run build:desherbage`
   (`new Date().getFullYear()`), réglable via la variable d'environnement
   `DESHERBAGE_REFERENCE_YEAR` si le build est lancé longtemps après
   l'export réel. Stockée dans `data/desherbage-build-report.json`
-  (`stats.referenceYear`), lue par `rotobib.html` pour étiqueter les
-  barres de l'histogramme avec de vraies années plutôt que "AN"/"AN-1"/etc.
-- Sortie : `data/desherbage.json` (un enregistrement par exemplaire,
-  champs notice dénormalisés `200$a`/`210$d`/`700$a`/… comme
-  `data/magasins.json`, plus `prets`/`reservations` — objets `{an, an1,
-  an2, an3, cumules}` — et les champs propres à l'export désherbage :
-  `coteAffichee`, `bibliotheque`, `section`, `etat`, `exclusionPret`,
-  `imagette`…) + `data/desherbage-build-report.json` (même mécanique
-  d'archivage `-previous.json` que les autres builds).
+  (`stats.referenceYear`), lue par `rotobib.html`/`desherbage-stats.html`
+  pour étiqueter les barres des histogrammes avec de vraies années plutôt
+  que "AN"/"AN-1"/etc.
+- Sortie : `data/desherbage.json` (un enregistrement par exemplaire, mêmes
+  champs de base que `data/magasins.json` — `200$a`/`700$a`/`210$c`/
+  `210$d`/`930$g-i`/`915$b`/`isbn`/`issn`/`bibliotheque`/`section`/`etat`/
+  `exclusionPret`/`coteAffichee`/`_coteDigitRun`/`_isMagasin`/
+  `_fondsLabel` — plus `imagette` (utilisée par `rotobib.html` pour la
+  couverture) et `prets`/`reservations` — objets `{an, an1, an2, an3,
+  cumules}` — internés comme n'importe quelle valeur de colonne dans le
+  conteneur colonnaire (voir « Format des données et performances » en
+  tête de fichier), donc restent compacts malgré leur nature composite : la
+  quasi-totalité des lignes partagent le même objet tout-à-zéro) +
+  `data/desherbage-build-report.json` (même mécanique d'archivage
+  `-previous.json` que les autres builds).
 
 Côté `rotobib.html` : un champ de scan (comme `recolement.html` — une
 scannette USB suffit, pas de lecture caméra) affiche, dès qu'un code-barre
-de l'export est reconnu, la fiche de l'exemplaire (titre, auteur, éditeur,
-cote, description) et met en avant deux informations utiles à la décision :
-la **date de parution** (`210$d`, dans un encadré, affichée telle quelle —
-volontairement non re-parsée en année numérique pour ne pas perdre une
-mention imprécise du type "18e siècle" ou "s.d.") et un **histogramme des
-prêts sur les 4 dernières années** (`prets.an3`→`prets.an`, étiquetées avec
-les vraies années déduites de `referenceYear`), avec le total cumulé
-affiché à part en dessous (pas comme une 5e barre : il peut inclure des
-prêts antérieurs aux 4 années représentées, donc pas comparable terme à
-terme). Quatre boutons **Conserver / Pilon / Braderie / Relocalisation**
-enregistrent la décision ; « Relocalisation » reste une simple étiquette de
-traitement (pas de saisie d'emplacement dans cet outil — si un jour
-nécessaire, voir le sélecteur travée/colonne/étage de
-`exemplarisation.html`/`transfert-magasins.html` comme modèle). Après un
-choix, le panneau se referme et le champ de scan reprend le focus, prêt
-pour l'exemplaire suivant — même logique d'enchaînement que le scan de
-`recolement.html`.
+de magasin est reconnu, la fiche de l'exemplaire (titre, auteur, éditeur,
+cote) et met en avant deux informations utiles à la décision : la **date de
+parution** (`210$d`, dans un encadré, affichée telle quelle — volontairement
+non re-parsée en année numérique pour ne pas perdre une mention imprécise
+du type "18e siècle" ou "s.d.") et un **histogramme des prêts sur les 4
+dernières années** (`prets.an3`→`prets.an`, étiquetées avec les vraies
+années déduites de `referenceYear`), avec le total cumulé affiché à part en
+dessous (pas comme une 5e barre : il peut inclure des prêts antérieurs aux
+4 années représentées, donc pas comparable terme à terme). Quatre boutons
+**Conserver / Pilon / Braderie / Relocalisation** enregistrent la décision ;
+« Relocalisation » reste une simple étiquette de traitement (pas de saisie
+d'emplacement dans cet outil — si un jour nécessaire, voir le sélecteur
+travée/colonne/étage de `exemplarisation.html`/`transfert-magasins.html`
+comme modèle). Après un choix, le panneau se referme et le champ de scan
+reprend le focus, prêt pour l'exemplaire suivant — même logique
+d'enchaînement que le scan de `recolement.html`.
 
 Décisions stockées dans R2 sous la clé `desherbage-traitements.json`
 (`api/desherbage.mjs`, forme `{ [barcode]: {barcode, statut, ts} }`, même
@@ -1417,42 +1484,40 @@ partagées entre collègues comme le reste de l'outillage (plusieurs postes
 peuvent désherber en parallèle). `rotobib.html` reprend le patron habituel
 de synchronisation (localStorage `rp_desherbage_traitements` comme source
 de vérité locale, file d'attente `rp_desherbage_pending_sync` rejouée à la
-reconnexion). Un bandeau de statistiques (total de l'export, compte par
-traitement, non traités) et un journal des traitements récents (recherche,
-bouton « annuler » par ligne) donnent une vue d'ensemble de l'avancement
-de la campagne. Quatre boutons d'export `.txt` (un code-barre par ligne,
-même convention que les autres exports du projet) — un par traitement, y
-compris « Conserver » — pour ajout panier dans le SIGB.
+reconnexion). Un bandeau de statistiques (total de l'export **magasins**,
+compte par traitement, non traités) et un journal des traitements récents
+(recherche, bouton « annuler » par ligne) donnent une vue d'ensemble de
+l'avancement de la campagne. Quatre boutons d'export `.txt` (un code-barre
+par ligne, même convention que les autres exports du projet) — un par
+traitement, y compris « Conserver » — pour ajout panier dans le SIGB.
 
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni
 stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
-`data/desherbage.json` pour une vue d'ensemble de la campagne. Trois blocs :
+`data/desherbage.json`, **sans filtre `_isMagasin`** (voir « Portée »
+ci-dessus), pour une vue d'ensemble sur tout le catalogue de Douai. Trois
+blocs :
 
 - Un bandeau de chiffres clés (exemplaires de l'export, part jamais
   empruntée, total de prêts sur les 4 dernières années avec la moyenne par
   exemplaire, total cumulé depuis l'acquisition, exemplaire le plus
-  emprunté). Sur l'export du 2026-08-26 : 71,6% des 6140 exemplaires n'ont
-  **jamais** été empruntés (`prets.cumules === 0`), et les 4 dernières
-  années cumulées (98 prêts) pèsent très peu face au total historique
-  (3982) — cohérent avec le principe même de l'outil : cette sélection
-  porte sur des documents à circulation faible ou nulle.
+  emprunté).
 - Deux histogrammes en barres (barres simples, une seule teinte, comme
   `rotobib.html` — magnitude d'une seule série, pas besoin de palette
   catégorielle) : les **prêts totaux par année** (somme sur tous les
   exemplaires, mêmes 4 années réelles que l'histogramme par livre de
   Rotobib, déduites de `referenceYear` dans le rapport de build) et la
   **répartition des exemplaires par prêts cumulés** (paliers 0, 1, 2, 3, 4,
-  5–9, 10+ — choisis d'après la distribution réelle : la traîne au-delà de
-  9 ne représente qu'une quarantaine d'exemplaires, un seul palier « 10+ »
-  suffit à la représenter sans la diluer en paliers vides). Survol/focus
-  clavier sur chaque barre affiche une infobulle (`#chart-tooltip`, un seul
-  élément repositionné en JS) avec le détail et la part en %.
+  5–9, 10+). Survol/focus clavier sur chaque barre affiche une infobulle
+  (`#chart-tooltip`, un seul élément repositionné en JS) avec le détail et
+  la part en %.
 - Une liste triable/filtrable de tous les exemplaires (titre, auteur, cote,
-  prêts AN-3/AN-2/AN-1/AN, cumulés, réservations cumulées, code-barre) —
-  même patron recherche + tri par colonne + pagination que `magasins.html`,
-  triée par défaut sur les prêts cumulés décroissants : le livre le plus
-  emprunté de l'export apparaît donc en première ligne sans manipulation.
+  **section**, prêts AN-3/AN-2/AN-1/AN, cumulés, réservations cumulées,
+  code-barre) — même patron recherche + tri par colonne + pagination que
+  `magasins.html` (déjà éprouvé à cette échelle, ~200 000 lignes, sans
+  souci de réactivité constaté), triée par défaut sur les prêts cumulés
+  décroissants : le livre le plus emprunté du catalogue apparaît donc en
+  première ligne sans manipulation.
 
 ## Base "inventaire des collections" (Postgres/Neon, 2026-09-09)
 
@@ -1593,17 +1658,17 @@ pour plusieurs choses indépendantes :
   (dev local sans `.env`), comportement d'origine inchangé — lecture des
   fichiers locaux, échec strict s'ils manquent.
 - **`xml/bib.xml`** : export complet de la bibliothèque (format GESMARC,
-  plusieurs centaines de Mo), poussé par `npm run upload:bib`. Source de
-  `build-magasins.mjs` et `build-cotes-numeriques.mjs` (voir « Magasins
-  2e/5e/6e étage » et « Cotes numériques » plus haut) — trop volumineux
-  pour tenir dans une seule string JS (`r2Get(key, {raw:true})` renvoie un
-  Buffer plutôt qu'une string décodée, écrit tel quel sur disque ; les deux
-  scripts le relisent ensuite en flux via `iterateGesmarcItemsFromFile()`
-  dans `scripts/lib/gesmarc.mjs`). `xml/magasin/exemplaires.xml.xml` et
-  `xml/all/catalogue.xml` (anciennes sources de ces deux scripts avant
-  2026-08-26) restent dans R2 mais ne sont plus lus par aucun script —
-  `xml/magasin/notices.xml.xml` reste en revanche utilisé par
-  `build-desherbage.mjs` (Rotobib).
+  plusieurs Go), poussé par `npm run upload:bib`. Source de
+  `build-magasins.mjs`, `build-cotes-numeriques.mjs` et, depuis 2026-09-10,
+  `build-desherbage.mjs` (voir « Magasins 2e/5e/6e étage » et « Rotobib »
+  plus haut) — trop volumineux pour tenir dans une seule string JS
+  (`r2Get(key, {raw:true})` renvoie un Buffer plutôt qu'une string décodée,
+  écrit tel quel sur disque ; les trois scripts le relisent ensuite en flux
+  via `iterateGesmarcItemsFromFile()` dans `scripts/lib/gesmarc.mjs`).
+  `xml/magasin/exemplaires.xml.xml`, `xml/magasin/notices.xml.xml`,
+  `xml/all/catalogue.xml` et `xml/desherbage/desherbage.xml` (anciennes
+  sources de ces trois scripts) restent dans R2 mais ne sont plus lus par
+  aucun script.
 - **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`,
   `reliures-manuelles.json`, `transferts-magasins.json`, `desherbage-traitements.json`** :
   état partagé canonique de `recolement.html` / `livres-spolies.html` /
