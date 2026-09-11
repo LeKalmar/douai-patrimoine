@@ -25,9 +25,39 @@
    dans une quinzaine de pages, les renommer aurait touché tout le projet sans
    rien changer au rendu. --warm porte donc désormais le carmin, et --accent le
    bleu Patrimoine. Les tokens explicites ci-dessous (--carmin, --corail…) sont
-   là pour le code neuf, qui n'a plus à deviner ce que « warm » veut dire. */
+   là pour le code neuf, qui n'a plus à deviner ce que « warm » veut dire.
+
+   Fusion encre → bleu (2026-09-11, demande explicite) : --ink/--encre valent
+   désormais #2A3CD4, la même couleur que --accent/--bleu, au lieu du bleu
+   marine sombre #141B4F d'origine — l'« encre » ne joue donc plus un rôle
+   distinct du bleu Patrimoine nulle part sur le site, un seul bleu partout.
+   Ce changement se propage automatiquement à toutes les pages qui consomment
+   --ink/--encre (index.html, admin.html, inventaire.html, magasins.html,
+   cotes-numeriques.html, livres-spolies.html, analyse-cotes.html,
+   scan-docs.html, inventaire-thumbnail.css). Sept pages outils
+   (recolement.html, reserve.html, reliures.html, rotobib.html,
+   exemplarisation.html, transfert-magasins.html, desherbage-stats.html)
+   n'utilisaient pas cette variable : elles codaient en dur une encre
+   légèrement différente, #12157A (bandeaux, pieds de page, titres, boutons,
+   bordures de focus, dégradés de barres…) — remplacée littéralement par
+   #2A3CD4 dans ces sept fichiers pour rester cohérente, y compris dans les
+   deux endroits où elle sert de couleur de tracé canvas
+   (exemplarisation.html, recadrage photo) où une variable CSS n'aurait pas
+   été résolue. --ink-soft n'est PAS concerné (rôle distinct : texte
+   secondaire atténué, alias de --text).
+
+   Conséquence sur le seul emploi lisible du corail (paragraphe précédent,
+   4,7:1 avec l'ancienne encre sombre) : avec le bleu vif, ce même texte ne
+   tient plus que 2,3:1, illisible. Les emplacements vivants où de l'encre/du
+   bleu ou du corail servaient de texte sur l'autre (.rp-expo-cta et
+   .rp-expo-eyebrow ici, .ad-hero-icon et .ad-hero-open dans admin.html,
+   .inv-fcard--on ... strong dans inventaire.html) passent donc à --rose (déjà
+   documenté ci-dessous pour « surtitres et italiques sur bleu », qui couvre
+   directement le sens texte-clair-sur-bleu ; sur corail son 2,4:1 reste
+   sous le seuil de lecture, accepté tel quel sur demande explicite pour ces
+   emplacements précis — pas un texte de lecture longue). */
 :root {
-  --ink: #141B4F;
+  --ink: #2A3CD4;
   --ink-soft: #3E3E52;
   --paper: #F7F5F0;
   --cream: #EFEBE2;
@@ -45,7 +75,7 @@
   /* Tokens nommés de la planche 1d — à préférer dans tout code nouveau. */
   --papier: #F7F5F0;         /* fond de toutes les pages */
   --papier-ombre: #EFEBE2;   /* sections alternées, barres latérales */
-  --encre: #141B4F;          /* texte, bandeaux, boutons pleins */
+  --encre: #2A3CD4;          /* texte, bandeaux, boutons pleins — fusionné avec --bleu le 2026-09-11 */
   --bleu: #2A3CD4;           /* titres de données, chiffres, bandeaux */
   --carmin: #B4213C;         /* emphase, liens, surtitres — 6,1:1 sur papier */
   --corail: #F44E62;         /* APLATS et très gros titres sur bleu, jamais en texte */
@@ -2393,18 +2423,18 @@ ul { list-style: none; }
 }
 .rp-expo-eyebrow {
   font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--corail);
+  color: var(--rose);
 }
 .rp-expo-title {
   font-family: var(--font-display); font-weight: 400; font-size: 1.6rem;
   flex: 1; min-width: 17.5rem; line-height: 1.2;
 }
 .rp-expo-cta {
-  background: var(--corail); color: var(--encre);
+  background: var(--corail); color: var(--rose);
   font-size: 0.82rem; font-weight: 700; padding: 0.7rem 1.25rem;
   transition: filter var(--transition);
 }
-.rp-expo-cta:hover { filter: brightness(1.08); color: var(--encre); }
+.rp-expo-cta:hover { filter: brightness(1.08); color: var(--rose); }
 
 /* ── Les fonds ───────────────────────────────────────────────────────────── */
 .rp-fonds { padding: clamp(2.25rem, 5vw, 2.875rem) var(--rp-gutter); background: var(--papier); }
