@@ -63,6 +63,13 @@
   .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#2A3CD4}
   .loc-readout{font-size:.85rem;color:#2A3CD4;font-weight:600;background:#F5F5FF;border:1px solid #ccc;border-radius:20px;padding:.45rem 1rem}
 
+  .numerise-toggle{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#333;margin:1rem 0 .75rem;padding-top:.9rem;border-top:1px dashed #e0e0e0}
+  #numerise-block{display:none}
+  #numerise-block.show{display:block}
+  #numerise-block .form-field input{font-family:monospace;font-size:.85rem}
+  .numerise-hint{font-size:.72rem;color:#888;margin:.35rem 0 0}
+  .numerise-hint code{font-family:monospace;background:#F5F5FF;padding:1px 4px;border-radius:4px}
+
   .photo-toggle{font-size:.85rem;color:#333;margin:1rem 0 .6rem;padding-top:.9rem;border-top:1px dashed #e0e0e0}
   .photo-dz{border:1.5px dashed #ccc;border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;font-size:.85rem;color:#777}
   .photo-dz:hover,.photo-dz.over{border-color:#2A3CD4;background:#F5F5FF}
@@ -111,6 +118,7 @@
   .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
   .log-cote{font-family:monospace;color:#2A3CD4}
   .log-bc{font-family:monospace;color:#888}
+  .log-numerise{margin-left:.35rem;cursor:help}
 
   footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
   footer a{color:#c9a96e;text-decoration:none}
@@ -208,6 +216,17 @@
               </div>
               <span class="loc-readout" id="loc-readout">—</span>
             </div>
+          </div>
+
+          <div class="numerise-toggle">
+            <label><input type="checkbox" id="f-numerise"> Document numérisé</label>
+          </div>
+          <div id="numerise-block">
+            <div class="form-field">
+              <label for="f-lien-numerise">Lien vers l'archive numérisée</label>
+              <input type="text" id="f-lien-numerise" autocomplete="off" placeholder="ex. num-robaut/Boîte 1/B591786101_RI_01_020r_033.jpg">
+            </div>
+            <p class="numerise-hint">Chemin du fichier tel qu'il apparaît dans le bucket R2 (le préfixe <code>https://pub-…r2.dev/</code> est retiré automatiquement si vous le collez par erreur). Vignette et bouton « Accéder au document numérisé » sont générés automatiquement sur l'inventaire public à partir de ce seul champ.</p>
           </div>
 
           <div class="photo-toggle">Photo de l'exemplaire (optionnel)</div>
@@ -492,7 +511,7 @@ function renderTable(){
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td class="log-bc">${esc(r.barcode)}</td>
-      <td>${esc(r.titre) || '<em style="color:#bbb">Sans titre</em>'}</td>
+      <td>${esc(r.titre) || '<em style="color:#bbb">Sans titre</em>'}${r.numerise && r.lienNumerise ? `<span class="log-numerise" title="Numérisé — ${esc(r.lienNumerise)}">🔗</span>` : ''}</td>
       <td>${esc(r.auteur) || '—'}</td>
       <td>${esc(r.date) || '—'}</td>
       <td class="log-cote">${esc(r.cote) || '—'}</td>
@@ -829,6 +848,28 @@ const fDate = document.getElementById('f-date');
 const fCote = document.getElementById('f-cote');
 const dupWarn = document.getElementById('dup-warn');
 
+/* ════ Document numérisé (optionnel) ════
+   Le lien attendu est le chemin R2 relatif tel qu'utilisé par le manifeste
+   de visionneuse.html (js/manifest.json) — voir js/exemplaires-manuels-shared.js
+   pour la suite du traitement (vignette + bouton "Accéder au document
+   numérisé" générés automatiquement sur l'inventaire public). */
+const NUMERISE_IMAGES_ROOT = 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/';
+const fNumerise = document.getElementById('f-numerise');
+const numeriseBlock = document.getElementById('numerise-block');
+const fLienNumerise = document.getElementById('f-lien-numerise');
+
+fNumerise.addEventListener('change', function(){
+  numeriseBlock.classList.toggle('show', fNumerise.checked);
+  if(fNumerise.checked) fLienNumerise.focus();
+});
+
+/* Tolère qu'on colle l'URL complète par erreur au lieu du seul chemin R2. */
+function normalizeLienNumerise(raw){
+  let v = (raw || '').trim();
+  if(v.startsWith(NUMERISE_IMAGES_ROOT)) v = v.slice(NUMERISE_IMAGES_ROOT.length);
+  return v.replace(/^\/+/, '');
+}
+
 fBarcode.addEventListener('input', function(){
   const bc = fBarcode.value.trim();
   const syr = bc ? SYRACUSE_BARCODES[bc] : null;
@@ -850,6 +891,8 @@ document.getElementById('add-form').addEventListener('submit', function(e){
   const titre = fTitre.value.trim();
   if(!barcode || !titre) return;
 
+  const lienNumerise = fNumerise.checked ? normalizeLienNumerise(fLienNumerise.value) : '';
+
   const record = {
     barcode,
     titre,
@@ -857,6 +900,11 @@ document.getElementById('add-form').addEventListener('submit', function(e){
     date: fDate.value.trim(),
     cote: fCote.value.trim(),
     location: locEnabled.checked ? { ...locFieldsOf(loc), locType: loc.locType } : null,
+    // numerise ne vaut true que si un lien a réellement été saisi : cocher
+    // la case sans rien coller ne doit pas faire apparaître le document
+    // comme numérisé sur l'inventaire public.
+    numerise: !!lienNumerise,
+    lienNumerise,
     ts: Date.now(),
   };
 
@@ -918,6 +966,7 @@ document.getElementById('add-form').addEventListener('submit', function(e){
     <div class="fb-meta">${esc(record.auteur)}${record.auteur && record.cote ? ' · ' : ''}${esc(record.cote)} · code-barre ${esc(barcode)}${locEnabled.checked ? ' · ' + esc(document.getElementById('loc-readout').textContent) : ' · emplacement non renseigné'}</div>`;
 
   fTitre.value = ''; fAuteur.value = ''; fDate.value = ''; fCote.value = ''; fBarcode.value = '';
+  fNumerise.checked = false; fLienNumerise.value = ''; numeriseBlock.classList.remove('show');
   dupWarn.classList.remove('show');
   fBarcode.focus();
 });

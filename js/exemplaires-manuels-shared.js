@@ -21,11 +21,26 @@
  *   absents des exemplaires créés directement par exemplarisation.html) :
  *   210$a → lieu d'édition, 210$c → maison d'édition, 215$a → importance
  *   matérielle, 215$d → dimensions.
+ *
+ * Numérisation (2026-09-11) : exemplarisation.html peut aussi poser
+ * `rec.numerise` (bool) et `rec.lienNumerise` (chemin R2 relatif, ex.
+ * `num-robaut/Boîte 1/B591786101_RI_01_020r_033.jpg` — même convention que
+ * les `path` de js/manifest.json, la visionneuse patrimoniale). Quand les
+ * deux sont posés, on en dérive `lien_num` (URL complète, réutilise tel
+ * quel le mécanisme de vignette existant — js/inventaire.js n'a besoin
+ * d'aucun changement pour l'afficher) et `_lienNumerise` (le chemin brut,
+ * pour que js/inventaire.js sache proposer un bouton « Accéder au document
+ * numérisé » vers visionneuse.html?image=… — voir buildExpandedContent()
+ * et buildThumbFrame()). IMAGES_ROOT est dupliqué depuis visionneuse.html /
+ * js/bibliotheque-virtuelle.js plutôt que partagé : c'est déjà la
+ * convention de ce projet pour cette constante (même valeur déclarée trois
+ * fois avant ce fichier), pas une régression.
  */
 const EXEMPLAIRES_MANUELS_SOUS_FONDS = '⚡ Exemplarisation rapide (à cataloguer)';
+const EXEMPLAIRES_MANUELS_IMAGES_ROOT = 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/';
 
 function exemplaireManuelToCatalogRecord(rec) {
-  return {
+  const out = {
     '200$a': rec.titre || '',
     '700$a': rec.auteur || '',
     '210$a': rec['210$a'] || '',
@@ -38,6 +53,11 @@ function exemplaireManuelToCatalogRecord(rec) {
     'Sous-fonds': EXEMPLAIRES_MANUELS_SOUS_FONDS,
     '_manuel': true,
   };
+  if (rec.numerise && rec.lienNumerise) {
+    out['lien_num'] = EXEMPLAIRES_MANUELS_IMAGES_ROOT + rec.lienNumerise;
+    out['_lienNumerise'] = rec.lienNumerise;
+  }
+  return out;
 }
 
 function fetchExemplairesManuelsAsCatalogRows() {

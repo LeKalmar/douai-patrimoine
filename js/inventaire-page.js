@@ -59,7 +59,7 @@
   /* Facettes actives : un Set de valeurs par axe. Plusieurs valeurs sur le même
      axe se lisent en OU (« Douaisien OU Imprimés »), deux axes différents en ET
      — la convention habituelle d'une recherche à facettes. */
-  var active = { fonds: new Set(), type: new Set(), lieu: new Set() };
+  var active = { fonds: new Set(), type: new Set(), lieu: new Set(), numerise: new Set() };
   var query = '';
   var dateStart = null;
   var dateEnd = null;
@@ -161,6 +161,12 @@
           r._fonds = getFondsFromCote(r);
           r._type = normType(r['200$b']);
           r._lieu = normLieu(r['210$a']);
+          /* Numérisé = un document réellement consultable dans la visionneuse
+             (dossier Syracuse "num", ou lien posé à la main via
+             exemplarisation.html — "_lienNumerise"), pas juste "a une
+             vignette" (lien_num existe pour la plupart des exemplaires, même
+             sans le moindre scan complet derrière). */
+          r._numerise = (r['num'] || r['_lienNumerise']) ? 'Numérisé' : 'Non numérisé';
           r._year = yearOf(r);
           r._hay = [r['200$a'], r['700$a'], r['701$a'], r['930$g'], r['610$a']]
             .join(' ').toLowerCase();
@@ -224,6 +230,7 @@
       active.fonds.clear();
       active.type.clear();
       active.lieu.clear();
+      active.numerise.clear();
       query = '';
       dateStart = dateEnd = null;
       search.value = '';
@@ -239,6 +246,7 @@
     if (skipAxis !== 'fonds' && active.fonds.size && !active.fonds.has(r._fonds)) return false;
     if (skipAxis !== 'type' && active.type.size && !active.type.has(r._type)) return false;
     if (skipAxis !== 'lieu' && active.lieu.size && !active.lieu.has(r._lieu)) return false;
+    if (skipAxis !== 'numerise' && active.numerise.size && !active.numerise.has(r._numerise)) return false;
     if (!dateMatchesFilter(r['210$d'], dateStart, dateEnd)) return false;
     if (query && r._hay.indexOf(query) === -1) return false;
     return true;
@@ -331,12 +339,18 @@
   var FACET_DEFS = [
     { axis: 'fonds', title: 'Fonds', field: '_fonds' },
     { axis: 'type', title: 'Type de document', field: '_type' },
-    { axis: 'lieu', title: 'Lieu d’édition', field: '_lieu' }
+    { axis: 'lieu', title: 'Lieu d’édition', field: '_lieu' },
+    /* host distinct : rendue après le bloc "Période" (statique, tout en bas
+       de la colonne Affiner), pas dans #inv-facets avec les trois autres —
+       demande explicite pour que ce filtre reste le dernier de la colonne. */
+    { axis: 'numerise', title: 'Numérisation', field: '_numerise', host: 'inv-facets-bottom' }
   ];
 
   function renderFacets() {
     var host = document.getElementById('inv-facets');
     host.innerHTML = '';
+    var bottomHost = document.getElementById('inv-facets-bottom');
+    if (bottomHost) bottomHost.innerHTML = '';
 
     FACET_DEFS.forEach(function (def) {
       /* Les comptes d'un axe sont calculés en ignorant ce même axe : sinon,
@@ -381,7 +395,8 @@
         block.appendChild(row);
       });
 
-      host.appendChild(block);
+      var targetHost = (def.host && document.getElementById(def.host)) || host;
+      targetHost.appendChild(block);
     });
   }
 
@@ -457,7 +472,7 @@
     // Vignette (js/inventaire.js) — repli automatique si l'image est absente.
     var thumb = document.createElement('div');
     thumb.className = 'inv-thumb';
-    thumb.appendChild(buildThumbFrame((rec['lien_num'] || '').trim()));
+    thumb.appendChild(buildThumbFrame((rec['lien_num'] || '').trim(), false, (rec['_lienNumerise'] || '').trim()));
     row.appendChild(thumb);
 
     var main = document.createElement('div');

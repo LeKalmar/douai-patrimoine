@@ -764,7 +764,7 @@ function renderTable(body, records, stateKey, state) {
       if (col.key === '_thumb') {
         const inner = document.createElement('div');
         inner.className = 'td-thumb-inner';
-        inner.appendChild(buildThumbFrame(lienNum, false));
+        inner.appendChild(buildThumbFrame(lienNum, false, (rec['_lienNumerise'] || '').trim()));
         td.appendChild(inner);
       } else if (col.key === '200$a') {
         td.innerHTML = `<span class="td-titre-text">${esc(val) || '<em style="color:var(--text-light)">Sans titre</em>'}</span>`;
@@ -844,7 +844,7 @@ function buildSousFondsBlock(sfName, records, fondsName, sfKey) {
 // ══════════════════════════════════════════
 //  Miniature — fabrique un cadre image réutilisable
 // ══════════════════════════════════════════
-function buildThumbFrame(lienNum, large = false) {
+function buildThumbFrame(lienNum, large = false, visionneuseImagePath = '') {
   const frame = document.createElement('div');
   frame.className = 'doc-thumb-frame' + (large ? ' doc-thumb-frame--large' : '');
 
@@ -870,7 +870,14 @@ function buildThumbFrame(lienNum, large = false) {
     if (!large) {
       img.addEventListener('click', (e) => {
         e.stopPropagation();
-        window.open(lienNum, '_blank', 'noopener');
+        // S'il existe un chemin d'image indexable par la visionneuse
+        // (exemplaire lié via exemplarisation.html — voir buildExpandedContent),
+        // la vignette y mène directement plutôt que d'ouvrir le fichier brut.
+        if (visionneuseImagePath) {
+          window.open(visionneuseSrc(visionneuseImagePath, 'image'), '_blank', 'noopener');
+        } else {
+          window.open(lienNum, '_blank', 'noopener');
+        }
       });
     }
     frame.appendChild(img);
@@ -980,18 +987,24 @@ function buildExpandedContent(rec, lienNum) {
     infoCol.appendChild(p);
   }
 
-  // Bouton visionneuse — conditionné par la colonne "num"
+  // Bouton visionneuse — conditionné par la colonne "num" (notices Syracuse
+  // avec un dossier dans le manifeste) ou par "_lienNumerise" (exemplaire
+  // lié manuellement depuis exemplarisation.html à une image R2 précise —
+  // voir js/exemplaires-manuels-shared.js). Un seul bouton, quelle que soit
+  // la source : dans les deux cas on arrive sur visionneuse.html.
   const numVal = (rec['num'] || '').trim();
-  if (numVal) {
+  const lienNumeriseVal = (rec['_lienNumerise'] || '').trim();
+  if (numVal || lienNumeriseVal) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'inv-expanded-link';
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Consulter le document numérisé`;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Accéder au document numérisé`;
     btn.addEventListener('click', e => {
       e.stopPropagation();
       // Le bouton sert d'ancre : en iframe, la visionneuse s'ouvre juste
       // sous cette notice plutôt qu'en surcouche (voir openVisionneuse).
-      openVisionneuse(numVal, rec['200$a'] || '', btn);
+      if (numVal) openVisionneuse(numVal, rec['200$a'] || '', btn);
+      else openVisionneuse(lienNumeriseVal, rec['200$a'] || '', btn, 'image');
     });
     infoCol.appendChild(btn);
   }
@@ -1225,15 +1238,17 @@ function notifyHeight() {
  *    l'écran — donc le plus souvent très au-dessus de ce que le visiteur a
  *    sous les yeux : le clic semblerait n'avoir aucun effet.
  *
- * @param {string}  dossier    – valeur de la colonne "num" (identifiant du dossier dans le manifeste)
+ * @param {string}  target     – valeur de la colonne "num" (identifiant du dossier dans le
+ *                               manifeste), ou chemin R2 exact d'une image si mode='image'
  * @param {string}  titre      – titre du document, pour l'aria-label
  * @param {Element} [anchorEl] – bouton d'où part l'ouverture ; sert, en mode
  *                               intégré, à insérer la visionneuse juste sous
  *                               la notice concernée.
+ * @param {string}  [mode]     – 'dossier' (défaut) ou 'image' — voir visionneuseSrc()
  */
-function openVisionneuse(dossier, titre, anchorEl) {
+function openVisionneuse(target, titre, anchorEl, mode) {
   if (isEmbedded()) {
-    openVisionneuseInline(dossier, titre, anchorEl);
+    openVisionneuseInline(target, titre, anchorEl, mode);
     return;
   }
 
@@ -1271,7 +1286,7 @@ function openVisionneuse(dossier, titre, anchorEl) {
   document.getElementById('visionneuse-modal-title').textContent = titre || 'Document numérisé';
   overlay.setAttribute('aria-label', `Visionneuse — ${titre || 'Document numérisé'}`);
 
-  document.getElementById('visionneuse-iframe').src = visionneuseSrc(dossier);
+  document.getElementById('visionneuse-iframe').src = visionneuseSrc(target, mode);
 
   overlay.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -1289,7 +1304,7 @@ function openVisionneuse(dossier, titre, anchorEl) {
  * dimensionnée d'après son contenu, vh dépend de ce contenu (voir le bloc
  * .rp-embedded de css/main.css).
  */
-function openVisionneuseInline(dossier, titre, anchorEl) {
+function openVisionneuseInline(target, titre, anchorEl, mode) {
   ensureVisionneuseStyle();
   closeVisionneuse();               // une seule visionneuse ouverte à la fois
 
@@ -1312,7 +1327,7 @@ function openVisionneuseInline(dossier, titre, anchorEl) {
 
   box.querySelector('.visionneuse-modal-title').textContent = label;
   box.querySelector('.visionneuse-close-btn').addEventListener('click', closeVisionneuse);
-  box.querySelector('iframe').src = visionneuseSrc(dossier);
+  box.querySelector('iframe').src = visionneuseSrc(target, mode);
   box._escHandler = e => { if (e.key === 'Escape') closeVisionneuse(); };
   document.addEventListener('keydown', box._escHandler);
   if (anchorEl) box._anchor = anchorEl;
@@ -1367,8 +1382,9 @@ function closeVisionneuse() {
   }
 }
 
-function visionneuseSrc(dossier) {
-  return `visionneuse.html?dossier=${encodeURIComponent(dossier)}`;
+function visionneuseSrc(target, mode) {
+  const param = mode === 'image' ? 'image' : 'dossier';
+  return `visionneuse.html?${param}=${encodeURIComponent(target)}`;
 }
 
 /** Injecte (une seule fois) le CSS des deux rendus de la visionneuse. */
