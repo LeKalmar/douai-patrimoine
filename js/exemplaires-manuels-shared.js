@@ -1,12 +1,16 @@
 /**
  * Exemplaires créés via exemplarisation.html (état partagé R2, voir
  * api/exemplaires-manuels.mjs) — chargé côté client par js/inventaire.js
- * (catalogue affiché sur index.html) et analyse-cotes.html, pour qu'un
- * exemplaire ainsi créé apparaisse au même titre qu'une notice Syracuse
- * sans dupliquer leur logique d'affichage/analyse. Regroupés sous un
- * sous-fonds dédié pour rester visuellement distincts tant qu'ils n'ont pas
- * été réellement catalogués dans Syracuse (voir SOUS_FONDS_KEY dans
- * js/inventaire.js, qui groupe déjà génériquement par ce champ).
+ * (catalogue affiché sur inventaire.html, la page publique) et
+ * analyse-cotes.html, pour qu'un exemplaire ainsi créé apparaisse au même
+ * titre qu'une notice Syracuse sans dupliquer leur logique
+ * d'affichage/analyse. Le champ Sous-fonds les marque toujours comme non
+ * catalogués, mais depuis 2026-09-11 (demande explicite) l'inventaire
+ * public ne l'affiche plus (ni badge de regroupement, ni pastille dans la
+ * fiche détaillée) : SOUS_FONDS_KEY vaut null dans js/inventaire.js, et
+ * js/inventaire-page.js ne rend plus de pastille pour ce champ — ces
+ * exemplaires restent cherchables/affichés, juste sans étiquette
+ * « à cataloguer » visible du public.
  *
  * Convention de champs (mêmes clés que data/inventaire.json) :
  *   200$a → titre, 700$a → auteur, 210$d → date, 930$g → cote,

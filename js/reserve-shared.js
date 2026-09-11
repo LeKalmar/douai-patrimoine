@@ -233,13 +233,14 @@ function compareCotes(a,b){
 
 /* ════════════ FONDS À PARTIR DU PRÉFIXE DE COTE (930$g) ════════════ */
 const FONDS_PREFIXES = [
-  { prefix: 'RD',   fonds: 'Réserve Douaisienne' },
-  { prefix: 'LIVA', fonds: "Livres d'Artiste" },
-  { prefix: 'MIN',  fonds: 'Mines' },
-  { prefix: 'D',    fonds: 'Douaisien' },
-  { prefix: 'I',    fonds: 'Imprimés' },
-  { prefix: 'L',    fonds: 'Littérature' },
-  { prefix: 'P',    fonds: 'Protestantisme' },
+  { prefix: 'RD',     fonds: 'Réserve Douaisienne' },
+  { prefix: 'ROBAUT', fonds: 'Robaut' },
+  { prefix: 'LIVA',   fonds: "Livres d'Artiste" },
+  { prefix: 'MIN',    fonds: 'Mines' },
+  { prefix: 'D',      fonds: 'Douaisien' },
+  { prefix: 'I',      fonds: 'Imprimés' },
+  { prefix: 'L',      fonds: 'Littérature' },
+  { prefix: 'P',      fonds: 'Protestantisme' },
 ];
 function getFondsFromCote(cote){
   const c=(cote||'').split(',')[0].trim().toUpperCase();

@@ -1203,17 +1203,32 @@ Ces exemplaires sont ensuite fusionnés côté client, via
 `js/exemplaires-manuels-shared.js` (`fetchExemplairesManuelsAsCatalogRows()`,
 qui convertit chaque enregistrement au même format de champs que
 `data/inventaire.json` — `200$a`/`700$a`/`210$d`/`930$g`/`995$f` — plus un
-`Sous-fonds` dédié `⚡ Exemplarisation rapide (à cataloguer)` pour rester
-visuellement distincts tant qu'ils n'ont pas été réellement catalogués),
-dans trois endroits qui lisaient jusqu'ici uniquement `data/inventaire.json` :
+`Sous-fonds` dédié `⚡ Exemplarisation rapide (à cataloguer)`), dans trois
+endroits qui lisaient jusqu'ici uniquement `data/inventaire.json` :
 
-- `js/inventaire.js` (`loadCSV()`) — recherche du catalogue sur `index.html`.
+- `js/inventaire.js` (`loadCSV()`) — recherche du catalogue sur
+  `inventaire.html`, la page publique (`index.html` ne fait que pointer vers
+  elle, il n'y a pas de recherche embarquée sur la page d'accueil).
 - `analyse-cotes.html` — détection de trous/doublons de cotes.
 - `recolement.html` (fetch du `catalog` en tout début de script) — pour
   qu'un code-barre créé ici, même **sans** emplacement renseigné, soit déjà
   reconnu comme « connu du catalogue » au moment où quelqu'un le scanne
   physiquement plus tard (sinon `handleScan()` le traiterait comme inconnu
   et n'enregistrerait rien — voir son statut `unknown`).
+
+Ce `Sous-fonds` servait jusqu'ici à regrouper ces exemplaires à part et à les
+étiqueter d'une pastille « ⚡ Exemplarisation rapide (à cataloguer) », pour
+rester visuellement distincts tant qu'ils n'ont pas été réellement
+catalogués. Depuis 2026-09-11 (demande explicite), ce regroupement/badge est
+désactivé sur l'inventaire **public** (`inventaire.html`) : `SOUS_FONDS_KEY`
+vaut `null` dans `js/inventaire.js` (le mécanisme de regroupement par
+sous-fonds reste générique et réutilisable, juste éteint — voir le
+commentaire à côté de la constante) et `js/inventaire-page.js` ne rend plus
+la pastille `.inv-tag-manuel` dans la fiche détaillée. Ces exemplaires
+restent cherchables/affichés dans l'inventaire public, simplement sans
+étiquette « à cataloguer » visible du public — le champ `Sous-fonds` lui-même
+reste posé sur chaque enregistrement (utile en interne, ex. si un besoin
+d'affichage similaire se présente ailleurs).
 
 Ces trois fusions échouent silencieusement (tableau vide) si l'API est
 indisponible, pour ne jamais bloquer l'affichage du reste du catalogue —

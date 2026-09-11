@@ -481,7 +481,6 @@
     var cote = (rec['930$g'] || '').trim();
     if (cote) tags.innerHTML += '<span class="inv-tag-cote">' + esc(cote) + '</span>';
     if (rec._type) tags.innerHTML += '<span class="inv-tag-type">' + esc(rec._type) + '</span>';
-    if (rec['Sous-fonds']) tags.innerHTML += '<span class="inv-tag-manuel">' + esc(rec['Sous-fonds']) + '</span>';
     main.appendChild(tags);
 
     row.appendChild(main);

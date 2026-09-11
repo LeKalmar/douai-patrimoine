@@ -4,10 +4,15 @@
 const JSON_PATH = 'data/inventaire.json';
 const PAGE_SIZE = 10;
 
-// Clé de la colonne "sous-fonds" dans le CSV.
-// Si la colonne "Sous-fonds" n'existe plus, indiquer ici le nom du champ de remplacement,
-// ou laisser null pour désactiver complètement le regroupement par sous-fonds.
-const SOUS_FONDS_KEY = 'Sous-fonds'; // ← changer ici si la colonne est renommée
+// Clé de la colonne "sous-fonds" dans le CSV. La seule valeur qui l'alimente
+// aujourd'hui est le sous-fonds « ⚡ Exemplarisation rapide (à cataloguer) »
+// posé par js/exemplaires-manuels-shared.js — désactivé (null) pour que
+// l'inventaire public ne fasse plus apparaître ce regroupement/badge interne
+// (demande explicite 2026-09-11) : les exemplaires créés via
+// exemplarisation.html restent cherchables/affichés, juste sans étiquette
+// distincte. Remettre 'Sous-fonds' ici si une vraie colonne de ce nom
+// apparaît un jour dans l'export Syracuse.
+const SOUS_FONDS_KEY = null;
 
 // Couleurs par fonds [couleur haut-gauche, couleur bas-droite]
 const FONDS_COLORS = {
@@ -59,13 +64,14 @@ const FONDS_INFO = {
 // plutôt que du champ 930$e (peu renseigné). Les préfixes les plus spécifiques
 // sont testés avant les préfixes courts qu'ils contiennent (ex. "LIVA" avant "L").
 const FONDS_PREFIXES = [
-  { prefix: 'RD',   fonds: 'Réserve Douaisienne' },
-  { prefix: 'LIVA', fonds: "Livres d'Artiste" },
-  { prefix: 'MIN',  fonds: 'Mines' },
-  { prefix: 'D',    fonds: 'Douaisien' },
-  { prefix: 'I',    fonds: 'Imprimés' },
-  { prefix: 'L',    fonds: 'Littérature' },
-  { prefix: 'P',    fonds: 'Protestantisme' },
+  { prefix: 'RD',     fonds: 'Réserve Douaisienne' },
+  { prefix: 'ROBAUT', fonds: 'Robaut' },
+  { prefix: 'LIVA',   fonds: "Livres d'Artiste" },
+  { prefix: 'MIN',    fonds: 'Mines' },
+  { prefix: 'D',      fonds: 'Douaisien' },
+  { prefix: 'I',      fonds: 'Imprimés' },
+  { prefix: 'L',      fonds: 'Littérature' },
+  { prefix: 'P',      fonds: 'Protestantisme' },
 ];
 
 function getFondsFromCote(record) {
