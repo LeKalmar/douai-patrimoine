@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-09-12T10:26:10.229Z",
+  "durationMs": 3095,
+  "stats": {
+    "totalRows": 25230,
+    "dejaCatalogues": 15140,
+    "sansCote": 0,
+    "kept": 10090,
+    "titreDeReplis": 4411,
+    "numerises": 822,
+    "parFonds": {
+      "Objets": 62,
+      "(sans fonds)": 46,
+      "Manuscrits": 9160,
+      "Robaut": 822
+    },
+    "parType": {
+      "Numismatique": 34,
+      "Image fixe": 4627,
+      "(sans type)": 46,
+      "Texte manuscrit": 5383
+    }
+  }
+}

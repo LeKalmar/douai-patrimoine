@@ -764,7 +764,12 @@ function renderTable(body, records, stateKey, state) {
       if (col.key === '_thumb') {
         const inner = document.createElement('div');
         inner.className = 'td-thumb-inner';
-        inner.appendChild(buildThumbFrame(lienNum, false, (rec['_lienNumerise'] || '').trim()));
+        const thumbNumVal = (rec['num'] || '').trim();
+        const thumbLienNumeriseVal = (rec['_lienNumerise'] || '').trim();
+        inner.appendChild(buildThumbFrame(
+          lienNum, false,
+          thumbNumVal || thumbLienNumeriseVal, thumbNumVal ? 'dossier' : 'image'
+        ));
         td.appendChild(inner);
       } else if (col.key === '200$a') {
         td.innerHTML = `<span class="td-titre-text">${esc(val) || '<em style="color:var(--text-light)">Sans titre</em>'}</span>`;
@@ -844,7 +849,14 @@ function buildSousFondsBlock(sfName, records, fondsName, sfKey) {
 // ══════════════════════════════════════════
 //  Miniature — fabrique un cadre image réutilisable
 // ══════════════════════════════════════════
-function buildThumbFrame(lienNum, large = false, visionneuseImagePath = '') {
+/**
+ * @param {string}  lienNum          – URL de la vignette (repli affiché si absent)
+ * @param {boolean} [large]          – true pour le grand cadre du panneau de détail
+ * @param {string}  [visionneuseTarget] – valeur "num" (dossier) ou chemin R2 ("_lienNumerise")
+ *                                        d'un document consultable dans la visionneuse
+ * @param {string}  [visionneuseMode]   – 'dossier' (défaut) ou 'image', voir visionneuseSrc()
+ */
+function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionneuseMode = 'dossier') {
   const frame = document.createElement('div');
   frame.className = 'doc-thumb-frame' + (large ? ' doc-thumb-frame--large' : '');
 
@@ -865,21 +877,25 @@ function buildThumbFrame(lienNum, large = false, visionneuseImagePath = '') {
     img.className = 'doc-thumbnail';
     img.loading = 'lazy';
     img.decoding = 'async';
-    img.title = 'Ouvrir le document numérisé';
+    img.title = visionneuseTarget ? 'Accéder au document numérisé' : 'Voir la photo';
     img.addEventListener('error', () => setPlaceholder());
-    if (!large) {
-      img.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // S'il existe un chemin d'image indexable par la visionneuse
-        // (exemplaire lié via exemplarisation.html — voir buildExpandedContent),
-        // la vignette y mène directement plutôt que d'ouvrir le fichier brut.
-        if (visionneuseImagePath) {
-          window.open(visionneuseSrc(visionneuseImagePath, 'image'), '_blank', 'noopener');
-        } else {
-          window.open(lienNum, '_blank', 'noopener');
-        }
-      });
-    }
+    // Petite ou grande vignette : même comportement. S'il existe un document
+    // consultable dans la visionneuse (colonne "num", ou lien posé via
+    // exemplarisation.html — voir buildExpandedContent), le clic y navigue
+    // directement, dans le même onglet (pas de nouvel onglet, pas de
+    // surcouche/modale) — pour rester dans l'iframe du site hôte comme
+    // n'importe quel lien du site (demande explicite, 2026-09-11). Sinon,
+    // repli sur l'ouverture du fichier brut (simple photo sans document
+    // numérisé associé).
+    img.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (visionneuseTarget) {
+        window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
+      } else {
+        window.open(lienNum, '_blank', 'noopener');
+      }
+    });
+    if (large) frame.style.cursor = 'zoom-in';
     frame.appendChild(img);
     img.src = lienNum;
   } else {
@@ -895,17 +911,20 @@ function buildExpandedContent(rec, lienNum) {
   const wrap = document.createElement('div');
   wrap.className = 'inv-expanded-wrap';
 
+  // Document consultable dans la visionneuse : colonne "num" (notice
+  // Syracuse avec un dossier dans le manifeste) ou "_lienNumerise"
+  // (exemplaire lié manuellement depuis exemplarisation.html — voir
+  // js/exemplaires-manuels-shared.js). Calculé une fois, réutilisé par la
+  // grande vignette et par le bouton plus bas.
+  const numVal = (rec['num'] || '').trim();
+  const lienNumeriseVal = (rec['_lienNumerise'] || '').trim();
+  const visionneuseTarget = numVal || lienNumeriseVal;
+  const visionneuseMode = numVal ? 'dossier' : 'image';
+
   // ── Colonne gauche : grande miniature ──
   const imgCol = document.createElement('div');
   imgCol.className = 'inv-expanded-img';
-  const largeFrame = buildThumbFrame(lienNum, true);
-  if (lienNum) {
-    largeFrame.addEventListener('click', (e) => {
-      e.stopPropagation();
-      window.open(lienNum, '_blank', 'noopener');
-    });
-    largeFrame.style.cursor = 'zoom-in';
-  }
+  const largeFrame = buildThumbFrame(lienNum, true, visionneuseTarget, visionneuseMode);
   imgCol.appendChild(largeFrame);
   wrap.appendChild(imgCol);
 
@@ -991,20 +1010,18 @@ function buildExpandedContent(rec, lienNum) {
   // avec un dossier dans le manifeste) ou par "_lienNumerise" (exemplaire
   // lié manuellement depuis exemplarisation.html à une image R2 précise —
   // voir js/exemplaires-manuels-shared.js). Un seul bouton, quelle que soit
-  // la source : dans les deux cas on arrive sur visionneuse.html.
-  const numVal = (rec['num'] || '').trim();
-  const lienNumeriseVal = (rec['_lienNumerise'] || '').trim();
-  if (numVal || lienNumeriseVal) {
+  // la source. Même comportement que la grande vignette juste au-dessus
+  // (voir imgCol) : navigation classique dans le même onglet, pas de
+  // nouvel onglet ni de surcouche — pour rester dans l'iframe du site hôte
+  // comme n'importe quel lien du site (demande explicite, 2026-09-11).
+  if (visionneuseTarget) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'inv-expanded-link';
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Accéder au document numérisé`;
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      // Le bouton sert d'ancre : en iframe, la visionneuse s'ouvre juste
-      // sous cette notice plutôt qu'en surcouche (voir openVisionneuse).
-      if (numVal) openVisionneuse(numVal, rec['200$a'] || '', btn);
-      else openVisionneuse(lienNumeriseVal, rec['200$a'] || '', btn, 'image');
+      window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
     });
     infoCol.appendChild(btn);
   }
@@ -1228,7 +1245,18 @@ function notifyHeight() {
 }
 
 /**
- * Ouvre la visionneuse patrimoniale.
+ * Ouvre la visionneuse patrimoniale en surcouche (modale hors iframe, bloc
+ * inséré dans le flux en iframe — voir openVisionneuseInline).
+ *
+ * Depuis 2026-09-11, plus AUCUN appel interne à cette page : la vignette
+ * (buildThumbFrame) et le bouton « Accéder au document numérisé »
+ * (buildExpandedContent) naviguent tous les deux en direct vers
+ * visionneuse.html (`window.location.href = visionneuseSrc(...)`), demande
+ * explicite pour rester dans l'iframe du site hôte comme n'importe quel
+ * lien du site plutôt que d'ouvrir un nouvel onglet, le fichier brut, ou
+ * cette surcouche. Fonction conservée (et exposée sur `window`, voir plus
+ * bas) comme utilitaire réutilisable, pas supprimée : rien ne garantit
+ * qu'aucun autre script ne s'y accroche.
  *
  * Deux rendus selon le contexte :
  *  - hors iframe : la surcouche plein écran habituelle ;

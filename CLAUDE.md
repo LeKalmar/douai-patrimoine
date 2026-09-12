@@ -1277,6 +1277,95 @@ demandé (ex. dans le tableau des exemplaires créés, ou dans le catalogue),
 il faudra soit un endpoint `GET` signé supplémentaire (le bucket n'est pas
 public), soit activer un accès public R2 sur ce préfixe précis.
 
+### Document numérisé (lien vers la visionneuse)
+
+`exemplarisation.html` (2026-09-11) permet aussi de rattacher un exemplaire à
+une image déjà déposée dans le bucket R2 qui alimente `visionneuse.html`
+(celui de `js/manifest.json`, distinct du bucket `douai-patrimoine` du reste
+du stockage partagé — voir `IMAGES_ROOT` dans `visionneuse.html`) : case
+« Document numérisé », qui fait apparaître un champ où coller le chemin R2
+du fichier (ex. `num-robaut/Boîte 1/B591786101_RI_01_020r_033.jpg` — même
+convention que les `path` de `js/manifest.json`, préfixe `https://pub-…r2.dev/`
+retiré automatiquement si collé par erreur, `normalizeLienNumerise()`). Ce
+seul champ suffit : vignette et ouverture dans la visionneuse sont dérivées
+automatiquement côté inventaire public, sans passer par `generer_manifest.html`.
+
+Stocké sur l'enregistrement (R2, `exemplaires-manuels.json`) sous
+`{numerise:true, lienNumerise:"<chemin R2>"}` — `numerise` ne vaut `true`
+que si un chemin a réellement été saisi (cocher la case sans rien coller ne
+marque pas le document comme numérisé). `js/exemplaires-manuels-shared.js`
+(`exemplaireManuelToCatalogRecord()`) en dérive, uniquement quand les deux
+sont posés : `lien_num` (URL complète, `IMAGES_ROOT + lienNumerise` —
+réutilise tel quel le mécanisme de vignette déjà en place pour tout
+exemplaire ayant un `lien_num`, aucun changement d'affichage nécessaire) et
+`_lienNumerise` (le chemin brut, pour la visionneuse).
+
+Côté `js/inventaire.js`, deux points d'entrée existaient déjà pour les
+documents numérisés Syracuse (colonne `num`, un identifiant de dossier dans
+`js/manifest.json`) : `buildThumbFrame()` (clic sur la vignette) et le
+bouton de `buildExpandedContent()` (rebaptisé « Accéder au document
+numérisé », auparavant « Consulter le document numérisé »). Les deux
+acceptent désormais aussi `_lienNumerise`, et — demande explicite du
+2026-09-11, après un premier essai jugé incohérent (petite vignette → nouvel
+onglet, grande vignette → fichier brut sans visionneuse, bouton → surcouche
+modale : trois comportements différents pour le même document) — les **trois**
+points de clic ont été unifiés sur une seule navigation classique, dans le
+même onglet (`window.location.href = visionneuseSrc(...)`), pour rester dans
+l'iframe du site hôte comme n'importe quel lien du site plutôt que d'ouvrir
+un nouvel onglet, le fichier brut, ou une surcouche :
+
+- `buildThumbFrame(lienNum, large, visionneuseTarget, visionneuseMode)` —
+  gagné deux paramètres optionnels, utilisés identiquement en petite vignette
+  (liste) et en grande vignette (panneau de détail, où le clic était
+  auparavant désactivé et géré à part par `buildExpandedContent()`) : s'ils
+  sont fournis, le clic navigue vers `visionneuseSrc(visionneuseTarget,
+  visionneuseMode)` ; sinon, repli sur l'ouverture du fichier brut
+  (`lien_num` seul, sans document numérisé associé — simple photo).
+- `buildExpandedContent()` calcule une fois `visionneuseTarget`
+  (`rec['num'] || rec['_lienNumerise']`) et `visionneuseMode` (`'dossier'`
+  si `num`, sinon `'image'`), réutilisés à la fois pour la grande vignette et
+  pour le bouton — plus besoin de dupliquer la logique num/`_lienNumerise` à
+  deux endroits.
+- `openVisionneuse()`/`openVisionneuseInline()`/`closeVisionneuse()`/
+  `ensureVisionneuseStyle()` (la surcouche modale/le bloc inséré dans le
+  flux, pour contourner `position:fixed` en iframe — voir plus bas
+  « Publication en iframe ») **ne sont plus appelées nulle part sur cette
+  page** depuis ce changement. Conservées telles quelles (et toujours
+  exposées sur `window.openVisionneuse`/`window.closeVisionneuse`) plutôt que
+  supprimées : rien ne garantit qu'aucun autre script ne s'y accroche, et le
+  risque d'un faux positif « code mort » l'emportait sur le gain d'un
+  nettoyage. `visionneuseSrc()` reste utilisée (par la navigation directe
+  ci-dessus) et a gagné son 4ᵉ paramètre `mode` (`'dossier'` par défaut, ou
+  `'image'`) à cette même occasion — tous les appels existants (positionnels,
+  sans ce paramètre) continuent de fonctionner à l'identique.
+
+`visionneuse.html` sait désormais ouvrir une image par son chemin R2 exact,
+pas seulement un dossier par son nom : nouveau paramètre `?image=<chemin>`
+(`openImageCible()`, à côté de `openDossierCible()`). Si le chemin est déjà
+indexé dans `js/manifest.json` (cas courant : le fichier a été intégré via
+`generer_manifest.html`), c'est cette entrée qui s'ouvre — arbre, fil
+d'Ariane et navigation préc/suiv fonctionnent normalement. Sinon (lien
+saisi dans `exemplarisation.html` avant tout passage par
+`generer_manifest.html`), l'image s'ouvre quand même : `openImageCible()`
+l'ajoute à la volée à `flatFiles` (même URL, `IMAGES_ROOT + chemin`), sans
+rien régénérer côté manifeste — c'est ce qui permet au lien collé dans
+`exemplarisation.html` de fonctionner tout de suite, sans étape
+supplémentaire.
+
+Sur `inventaire.html`, un filtre « Numérisation » (Numérisé / Non
+numérisé) a été ajouté au bas de la colonne « Affiner » (`#inv-facets-bottom`,
+après le bloc « Période », qui reste seul non généré par la boucle
+générique — demande explicite de position). Implémenté avec le même
+mécanisme de facettes générique que Fonds/Type/Lieu (`FACET_DEFS` dans
+`js/inventaire-page.js`), qui a gagné un champ `host` optionnel par entrée
+pour rendre ce bloc précis dans un conteneur séparé plutôt que dans
+`#inv-facets` avec les trois autres. La valeur vient de `r._numerise`,
+dérivée à `'Numérisé'`/`'Non numérisé'` selon `r['num'] || r['_lienNumerise']`
+— **pas** la simple présence de `lien_num` (une vignette existe pour la
+plupart des exemplaires, y compris ceux sans le moindre scan complet
+derrière ; seul un vrai document consultable dans la visionneuse compte
+comme « numérisé » ici).
+
 ## Transfert 2e étage → réserve patrimoniale
 
 `transfert-magasins.html` (2026-08-21) répond à un besoin distinct de

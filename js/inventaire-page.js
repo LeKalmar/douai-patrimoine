@@ -36,7 +36,7 @@
   /* Les fonds mis en avant en tête de page, dans cet ordre. Un fonds absent de
      l'export courant est simplement sauté — la rangée n'est pas figée à 5. */
   var FONDS_VEDETTE = [
-    'Imprimés', 'Douaisien', "Livres d'Artiste",
+    'Imprimés', 'Manuscrits', 'Douaisien', "Livres d'Artiste",
     'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme'
   ];
 
@@ -132,6 +132,14 @@
       typeof fetchExemplairesManuelsAsCatalogRows === 'function'
         ? fetchExemplairesManuelsAsCatalogRows().catch(function () { return []; })
         : Promise.resolve([]),
+      /* Pièces sans code-barre (jamais cataloguées dans Syracuse — fonds
+         Manuscrits notamment, voir scripts/build-non-catalogues.mjs), issues
+         de csv/inventaire.csv. Statique comme data/inventaire.json (pas
+         d'API à ménager) : un échec de fetch dégrade vers un tableau vide
+         plutôt que de bloquer le reste du catalogue. */
+      fetch('data/non-catalogues.json').then(function (r) {
+        return r.ok ? r.json() : [];
+      }).catch(function () { return []; }),
       /* Surcouche Syracuse (synchronisation incrémentale, voir
          js/syracuse-sync-shared.js) : corrige cote/titre/auteur/date sur les
          exemplaires touchés depuis le dernier rebuild XML — { } si l'API est
@@ -141,8 +149,8 @@
         : Promise.resolve({})
     ])
       .then(function (res) {
-        records = res[0].concat(res[1]);
-        var overlay = res[2] || {};
+        records = res[0].concat(res[1]).concat(res[2]);
+        var overlay = res[3] || {};
         records.forEach(function (r, i) {
           r._id = i;
           var barcode = (r['995$f'] || r['915$b'] || '').trim();
@@ -158,7 +166,15 @@
             if (fresh.auteur) r['700$a'] = fresh.auteur;
             if (fresh.cote) r['930$g'] = fresh.cote;
           }
-          r._fonds = getFondsFromCote(r);
+          /* _fondsLabel (data/non-catalogues.json, data/magasins.json) est
+             posé directement depuis une source fiable pour ce sous-ensemble
+             (930$e du registre papier) — préféré à getFondsFromCote() plutôt
+             que de deviner un fonds depuis une cote qui ne suit pas toujours
+             la même convention de préfixe (ex. fonds Robaut : cotes
+             "RI-01-…", pas "ROBAUT…"). Même patron que
+             `buildCatalogFromItems()` dans recolement.html (CLAUDE.md,
+             "Reconnaissance de code-barre par un second catalogue"). */
+          r._fonds = r._fondsLabel || getFondsFromCote(r);
           r._type = normType(r['200$b']);
           r._lieu = normLieu(r['210$a']);
           /* Numérisé = un document réellement consultable dans la visionneuse
@@ -171,6 +187,12 @@
           r._hay = [r['200$a'], r['700$a'], r['701$a'], r['930$g'], r['610$a']]
             .join(' ').toLowerCase();
         });
+        /* Un document sans cote (930$g) n'est pas localisable en réserve —
+           masqué de l'inventaire public plutôt qu'affiché avec une case vide
+           (demande explicite 2026-09-12). Après application de la surcouche
+           Syracuse : une cote corrigée à distance (fresh.cote ci-dessus) doit
+           pouvoir faire réapparaître un exemplaire qui en était dépourvu. */
+        records = records.filter(function (r) { return (r['930$g'] || '').trim(); });
         boot();
       })
       .catch(function (err) {
@@ -360,7 +382,10 @@
       var counts = {};
       pool.forEach(function (r) {
         var v = r[def.field];
-        if (v) counts[v] = (counts[v] || 0) + 1;
+        /* « (Sans fonds) » (repli de getFondsFromCote pour une cote au préfixe
+           non reconnu) n'est pas un fonds réel : pas de case à cocher pour ça
+           dans la colonne "Affiner" (demande explicite 2026-09-12). */
+        if (v && v !== '(Sans fonds)') counts[v] = (counts[v] || 0) + 1;
       });
 
       var entries = Object.keys(counts).map(function (k) {
@@ -472,7 +497,12 @@
     // Vignette (js/inventaire.js) — repli automatique si l'image est absente.
     var thumb = document.createElement('div');
     thumb.className = 'inv-thumb';
-    thumb.appendChild(buildThumbFrame((rec['lien_num'] || '').trim(), false, (rec['_lienNumerise'] || '').trim()));
+    var thumbNumVal = (rec['num'] || '').trim();
+    var thumbLienNumeriseVal = (rec['_lienNumerise'] || '').trim();
+    thumb.appendChild(buildThumbFrame(
+      (rec['lien_num'] || '').trim(), false,
+      thumbNumVal || thumbLienNumeriseVal, thumbNumVal ? 'dossier' : 'image'
+    ));
     row.appendChild(thumb);
 
     var main = document.createElement('div');

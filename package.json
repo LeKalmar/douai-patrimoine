@@ -13,6 +13,7 @@
     "build:magasins": "node scripts/build-magasins.mjs",
     "build:cotes-numeriques": "node scripts/build-cotes-numeriques.mjs",
     "build:desherbage": "node scripts/build-desherbage.mjs",
+    "build:non-catalogues": "node scripts/build-non-catalogues.mjs",
     "upload:xml": "node scripts/upload-xml-to-r2.mjs",
     "upload:desherbage": "node scripts/upload-desherbage-to-r2.mjs",
     "upload:bib": "node scripts/upload-bib-to-r2.mjs",
