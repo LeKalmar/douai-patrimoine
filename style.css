@@ -2447,7 +2447,7 @@ ul { list-style: none; }
 .rp-section-link { font-size: 0.78rem; font-weight: 600; color: var(--carmin); white-space: nowrap; }
 .rp-section-link:hover { color: var(--encre); }
 
-.rp-fonds-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.15rem; }
+.rp-fonds-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.15rem; }
 .rp-fonds-card {
   background: #fff; border: 1px solid #E3DED4;
   display: flex; flex-direction: column; color: inherit;
