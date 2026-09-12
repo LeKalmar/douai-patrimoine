@@ -31,16 +31,12 @@
       <p class="rp-hero-lead">Manuscrits enluminés, incunables et fonds historiques classés, conservés au premier étage de la bibliothèque Marceline Desbordes-Valmore.</p>
       <dl class="rp-hero-stats">
         <div class="rp-stat">
-          <dt class="rp-stat-value" id="stat-documents">15 518</dt>
+          <dt class="rp-stat-value" id="stat-documents">25 608</dt>
           <dd class="rp-stat-label">documents inventoriés</dd>
         </div>
         <div class="rp-stat">
           <dt class="rp-stat-value">7</dt>
           <dd class="rp-stat-label">fonds patrimoniaux</dd>
-        </div>
-        <div class="rp-stat">
-          <dt class="rp-stat-value">1543</dt>
-          <dd class="rp-stat-label">première presse douaisienne</dd>
         </div>
       </dl>
     </div>
@@ -167,16 +163,26 @@
 
 <!-- ===== CHIFFRE D'INVENTAIRE (rapport de build) ===== -->
 <script>
-/* Le seul chiffre de l'accueil qui bouge d'un export Syracuse à l'autre. Il
-   est lu dans data/build-report.json (quelques centaines d'octets) plutôt
-   qu'écrit en dur, pour qu'il ne se périme pas tout seul entre deux exports.
-   La valeur du HTML sert de repli si le rapport est indisponible. */
-fetch('data/build-report.json')
-  .then(function (r) { return r.ok ? r.json() : null; })
-  .then(function (report) {
-    var n = report && report.stats && report.stats.notices;
-    if (n != null) {
-      document.getElementById('stat-documents').textContent = n.toLocaleString('fr-FR');
+/* Le seul chiffre de l'accueil qui bouge d'un export Syracuse (ou d'un
+   rechargement du registre des pièces non cataloguées) à l'autre. Il est lu
+   dans data/build-report.json + data/non-catalogues-build-report.json
+   (quelques centaines d'octets à eux deux) plutôt qu'écrit en dur, pour
+   qu'il ne se périme pas tout seul. build-report.json ne compte que les
+   notices Syracuse ; non-catalogues-build-report.json ajoute les pièces des
+   fonds Manuscrits/Robaut/Objets sans code-barre (voir "Pièces non
+   cataloguées" dans CLAUDE.md), fusionnées côté client dans l'inventaire
+   public mais absentes de l'export Syracuse. La valeur du HTML sert de
+   repli si l'un des deux rapports est indisponible. */
+Promise.all([
+  fetch('data/build-report.json').then(function (r) { return r.ok ? r.json() : null; }),
+  fetch('data/non-catalogues-build-report.json').then(function (r) { return r.ok ? r.json() : null; })
+])
+  .then(function (reports) {
+    var notices = reports[0] && reports[0].stats && reports[0].stats.notices;
+    var nonCatalogues = reports[1] && reports[1].stats && reports[1].stats.kept;
+    if (notices != null) {
+      var total = notices + (nonCatalogues || 0);
+      document.getElementById('stat-documents').textContent = total.toLocaleString('fr-FR');
     }
   })
   .catch(function () { /* repli : la valeur déjà présente dans le HTML */ });
