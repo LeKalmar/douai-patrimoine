@@ -333,6 +333,38 @@ function parsePublicationDate(dateStr) {
   return null;
 }
 
+// [NN]xx] → siècle en chiffres romains (« [18xx] » → « XIXe siècle »,
+// même lecture que le commentaire ci-dessus dans parsePublicationDate :
+// NN=18 désigne le 19e siècle). Les autres formats (décennie, année
+// précise, texte libre) sont affichés tels quels — seule la notation par
+// siècle bénéficie d'une conversion, demande explicite de l'équipe.
+const ROMAN_NUMERALS = [
+  [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+  [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+  [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+];
+function toRomanNumeral(num) {
+  let result = '';
+  for (const [value, symbol] of ROMAN_NUMERALS) {
+    while (num >= value) {
+      result += symbol;
+      num -= value;
+    }
+  }
+  return result;
+}
+
+function formatPublicationDate(dateStr) {
+  const str = String(dateStr || '').trim();
+  if (!str) return str;
+  const centuryMatch = str.match(/^\[(\d{2})xx\]$/i);
+  if (centuryMatch) {
+    const siecle = parseInt(centuryMatch[1], 10) + 1;
+    return toRomanNumeral(siecle) + 'e siècle';
+  }
+  return str;
+}
+
 function dateMatchesFilter(recordDate, filterStart, filterEnd) {
   // Aucun filtre
   if (!filterStart && !filterEnd) return true;
@@ -983,7 +1015,7 @@ function buildExpandedContent(rec, lienNum) {
   if (annee) {
     const item = document.createElement('div');
     item.className = 'inv-expanded-item';
-    item.innerHTML = `<span class="detail-label">Année</span><span class="detail-value">${esc(annee)}</span>`;
+    item.innerHTML = `<span class="detail-label">Année</span><span class="detail-value">${esc(formatPublicationDate(annee))}</span>`;
     grid.appendChild(item);
   }
 

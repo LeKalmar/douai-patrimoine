@@ -13,6 +13,7 @@
      FONDS_IMAGES            la vignette illustrant chaque fonds
      dateMatchesFilter()     le filtre de période, qui sait lire « [17xx] »
      parsePublicationDate()  et « [154x] » aussi bien qu'une année pleine
+     formatPublicationDate() « [18xx] » affiché « XIXe siècle »
      buildThumbFrame()       le cadre de vignette, avec repli si l'image manque
      buildExpandedContent()  le panneau de détail complet (métadonnées, pills,
                              bouton visionneuse) — c'est le gros morceau réutilisé
@@ -616,7 +617,7 @@
 
     var side = document.createElement('div');
     side.className = 'inv-side';
-    var dateTxt = (rec['210$d'] || '').trim();
+    var dateTxt = formatPublicationDate((rec['210$d'] || '').trim());
     side.innerHTML =
       '<span class="inv-date">' + esc(dateTxt || '—') + '</span>' +
       '<span class="inv-more">' + (openDetailId === rec._id ? 'Fermer ↑' : 'Voir la notice →') + '</span>';
