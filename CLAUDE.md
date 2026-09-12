@@ -1366,6 +1366,109 @@ plupart des exemplaires, y compris ceux sans le moindre scan complet
 derrière ; seul un vrai document consultable dans la visionneuse compte
 comme « numérisé » ici).
 
+## Pièces non cataloguées (fonds Manuscrits, Robaut, Objets — 2026-09-12)
+
+`csv/inventaire.csv` (24,5 Mo, ~25 200 lignes, colonnes taguées UNIMARC comme
+`data/inventaire.json` — `200$a`, `700$a`, `210$d`, `930$g`…) est un registre
+plus large que ce que couvre Syracuse : `995$f` (code-barre) y est renseigné
+pour 15 140 lignes, dont 15 134 correspondent à un code-barre déjà présent
+dans `data/inventaire.json` (quasi-totalité — c'est le même fonds réserve,
+vu depuis le registre d'origine plutôt que depuis l'export Syracuse) ; les
+10 090 lignes restantes n'ont **jamais** eu de code-barre, faute de
+catalogage. `scripts/build-non-catalogues.mjs` (`npm run
+build:non-catalogues`) n'en garde que cette seconde catégorie (`995$f` vide
+ET `930$g` non vide — une ligne sans cote serait de toute façon masquée côté
+page publique, voir plus haut) → `data/non-catalogues.json` +
+`data/non-catalogues-build-report.json` (même archivage `-previous.json` que
+les autres builds). Répartition sur l'export courant (champ `930$e`, fiable
+sur ce registre — voir plus bas) : **Manuscrits** (9 160, le plus gros
+contingent, entièrement absent de `data/inventaire.json` aujourd'hui : 0
+exemplaire de cote commençant par "MS" avant cet ajout), **Robaut** (822,
+planches iconographiques déjà numérisées, voir plus bas), **Objets** (62,
+numismatique), et 46 lignes sans `930$e` (cote "D 12-…", déjà reconnues
+Douaisien par `getFondsFromCote()`).
+
+Ce script est indépendant du pipeline `npm run build` (Syracuse MARC-XML) :
+`data/inventaire.json` n'est pas touché, `csv/inventaire.csv` n'entre nulle
+part dans `build-inventory.mjs`. `data/non-catalogues.json` est fusionné
+côté client **uniquement dans l'inventaire public**
+(`js/inventaire-page.js`, `load()` — un `fetch()` de plus dans le
+`Promise.all`, même dégradation silencieuse que les autres sources si le
+fichier est absent/erreur réseau) : ces pièces n'ont pas de code-barre, donc
+rien à scanner — pas de fusion côté `recolement.html`/`reserve.html`,
+contrairement aux exemplaires manuels d'`exemplarisation.html`.
+
+Champs retenus par ligne, et pourquoi (voir l'en-tête de
+`scripts/build-non-catalogues.mjs` pour le détail complet) :
+- **Titre** (`200$a`) : replié sur la cote quand absent — ~46 % des
+  Manuscrits n'ont jamais eu de titre individuel (seulement un numéro de
+  registre, ex. « Ms 295 »), une pièce en attente de catalogage complet plutôt
+  qu'une erreur de saisie.
+- **Auteur** (`700$a` nom / `700$b` prénom) : gardés séparés, vérifié que ce
+  registre suit la même convention que Syracuse (ex. « Desbordes-Valmore » /
+  « Marceline ») — `buildRow()` n'affiche que le nom, `buildExpandedContent()`
+  recompose « NOM Prénom » à partir des deux, sans changement nécessaire dans
+  ces deux fonctions.
+- **Type** (`200$b`) : arrive en code court (`MANU`/`ICO`/`NUMI`/`LIVA`),
+  traduit vers le même texte qu'un export Syracuse (`TYPE_LABELS` dans le
+  script) pour que `normType()` (`js/inventaire-page.js`) le regroupe avec
+  les vrais exemplaires plutôt que d'ouvrir une entrée de facette dupliquée
+  (« Manu » à côté de « Manuscrit »).
+- **Date** (`210$d`) : recopiée telle quelle — le format « [11xx] »/« [12xx] »
+  (siècle approximatif), déjà présent sur une bonne partie des manuscrits,
+  est nativement comprise par `parsePublicationDate()`/`dateMatchesFilter()`,
+  aucune conversion nécessaire.
+- **Sujets** (`610$a`) : dérivé de `930$e_11` + `930$e_12` (sous-catégories du
+  registre, ex. « Religion », « Cartographie », parfois un nom de personne
+  comme « Théophile Bra »), en écartant les artefacts de tableur rencontrés
+  dans ces deux colonnes (`#CHAMP!`, `#REF!`…) — `610$a` est déjà un
+  `DETAIL_COLS` existant (`js/inventaire.js`), rien à ajouter côté affichage.
+- **Fonds** (`_fondsLabel`) : posé directement depuis `930$e`, fiable sur ce
+  registre — contrairement aux exports Syracuse où `getFondsFromCote()`
+  commente que ce même champ est « peu renseigné ». Même convention que
+  `_fondsLabel` dans `data/magasins.json` (voir « Reconnaissance de
+  code-barre par un second catalogue ») : `js/inventaire-page.js` a été
+  modifié pour préférer `r._fondsLabel` à `getFondsFromCote(r)` quand il est
+  présent (`r._fonds = r._fondsLabel || getFondsFromCote(r)`) — nécessaire
+  ici puisque les cotes Robaut (`RI-01-…`) ne correspondent pas au préfixe
+  `ROBAUT` déjà présent dans `FONDS_PREFIXES` (ajouté par avance dans un
+  commit précédent, resté sans effet faute de données : 0 cote `ROBAUT…`
+  dans `data/inventaire.json`). **`Manuscrits` a été ajouté à
+  `FONDS_VEDETTE`** (`js/inventaire-page.js`) pour apparaître dans la rangée
+  de fonds mis en avant sur `inventaire.html`, vu son volume ; `Robaut` et
+  `Objets` restent filtrables via la facette « Fonds » sans carte dédiée
+  (demande explicite portait sur les Manuscrits, pas sur ces deux-là).
+- **Vignette/document numérisé** (`lien_num`) : pour le fonds Robaut,
+  `lien_num` est déjà une URL R2 complète et valide dans ce registre
+  (vérifié : les 822 lignes matchent le domaine servant `js/manifest.json`,
+  ex. `num-robaut/Boîte 1/B591786101_RI_01_020r_033.jpg` y figure tel quel) —
+  le script en dérive `_lienNumerise` (chemin décodé, sans le domaine, même
+  convention que le champ posé par `exemplarisation.html`) pour que la
+  vignette ET le bouton « Accéder au document numérisé » fonctionnent
+  immédiatement, sans rien coder de plus côté page (mécanisme générique
+  depuis le 2026-09-11, voir « Document numérisé » plus haut). Les 3 lignes
+  Manuscrits portant un `lien_num` du type `num_ms/Ms1721` sont
+  volontairement ignorées : ce chemin n'apparaît nulle part dans
+  `js/manifest.json` et n'a pas d'extension de fichier — probablement un
+  dossier à constituer plus tard, pas un fichier existant à lier maintenant.
+
+Pas de code-barre ⇒ pas de `995$f`/`915$b` posés sur ces enregistrements :
+volontaire, pour qu'aucun autre outil ne les prenne un jour pour un
+exemplaire scannable. Chaque enregistrement porte aussi `_nonCatalogue:true`
+(actuellement non lu par aucun script — traçabilité si un traitement dédié
+devient nécessaire plus tard). Aucun badge visuel distinct sur la fiche
+publique (contrairement à l'ancien badge « ⚡ Exemplarisation rapide », déjà
+retiré du public le 2026-09-11) : ces pièces restent cherchables/affichées
+au même titre qu'un exemplaire catalogué, sans étiquette « à cataloguer ».
+
+`scripts/lib/csv.mjs` (parseur RFC4180 écrit à la main — guillemets doublés,
+retours à la ligne et point-virgule autorisés dans un champ cité) a été
+ajouté pour ce script : c'est la première lecture de CSV côté Node du
+projet (`generer_manifest.html`/`js/main.js` ne le font que côté navigateur,
+via PapaParse). `csv/inventaire.csv` (24,5 Mo) reste très en-deçà de la
+limite de longueur d'une string V8 (contrairement à `xml/bib.xml`,
+plusieurs Go) : lu entièrement en mémoire, pas en flux.
+
 ## Transfert 2e étage → réserve patrimoniale
 
 `transfert-magasins.html` (2026-08-21) répond à un besoin distinct de

@@ -68,6 +68,21 @@
       padding: 0.875rem 1.5rem; border: none; cursor: pointer;
     }
 
+    /* Bouton de retour à l'accueil, en haut à droite du bandeau d'en-tête. */
+    .inv-hero-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+    }
+    .inv-home-link {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.78rem; font-weight: 600; color: var(--encre);
+      background: #fff; border: 1px solid var(--trait-fort); border-radius: 999px;
+      padding: 0.4rem 0.85rem; text-decoration: none; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .inv-home-link:hover { border-color: var(--encre); color: var(--carmin); }
+    .inv-home-link svg { flex-shrink: 0; }
+
     /* ── Cartes de fonds ─────────────────────────────────────────────── */
     .inv-fonds { padding: 1.6rem var(--rp-gutter, 2.5rem) 0; background: var(--papier); }
     .inv-fonds-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 0.9rem; }
@@ -272,7 +287,13 @@
 
 <!-- ============ HERO ============ -->
 <section class="inv-hero">
-  <p class="rp-eyebrow">Inventaire en ligne</p>
+  <div class="inv-hero-topbar">
+    <p class="rp-eyebrow">Inventaire en ligne</p>
+    <a href="index.html" class="inv-home-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour à l'accueil
+    </a>
+  </div>
   <div class="inv-hero-top">
     <h1>Feuilleter les <span>collections</span></h1>
     <p class="inv-hero-lead">Manuscrits, incunables, fonds Douaisien, livres d'artiste et périodiques locaux. Cliquez une notice pour la fiche complète et, quand elle existe, la version numérisée.</p>
