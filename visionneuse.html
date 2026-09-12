@@ -31,14 +31,25 @@
       font-family: 'DM Sans', sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
+      /* vh puis dvh (surchargé si supporté) : sur mobile, vh est calculé sans
+         les barres d'interface du navigateur, plus grand que ce qui est
+         réellement visible à l'écran — dvh s'ajuste à la hauteur réellement
+         affichée. */
+      min-height: 95vh;
+      min-height: 95dvh;
     }
 
     /* ── Layout ── */
     .viewer-layout {
       display: grid;
       grid-template-columns: 320px 1fr;
-      height: calc(100vh);
+      /* Volontairement un peu moins que 100vh/100dvh : cette page est toujours
+         affichée dans un cadre à hauteur fixe (modale interne, ou iframe du
+         site hôte/Syracuse) — la marge de 5% absorbe le chrome que l'injection
+         côté Syracuse ne redimensionne pas, pour éviter qu'elle ne coupe le
+         bas de la visionneuse. */
+      height: 95vh;
+      height: 95dvh;
     }
 
     /* ── Sidebar ── */
@@ -63,6 +74,24 @@
       font-size: .75rem;
       color: var(--text-muted);
     }
+    .back-to-inventaire {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      margin-bottom: .6rem;
+      padding: .35rem .65rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: .78rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+    .back-to-inventaire:hover { background: var(--accent-light); border-color: var(--accent); }
+    .back-to-inventaire svg { flex-shrink: 0; }
     .sidebar-search {
       padding: .75rem 1.25rem;
       border-bottom: 1px solid var(--border);
@@ -481,6 +510,10 @@
       <nav class="breadcrumb" id="visionneuseBreadcrumb" aria-label="Fil d'Ariane">
         <a href="index.html">Patrimoine</a> / Visionneuse
       </nav>
+      <a href="inventaire.html" class="back-to-inventaire" id="backToInventaire">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Retour à l'inventaire
+      </a>
       <h2>Documents numérisés</h2>
       <p>Parcourez les fonds par boîte</p>
     </div>

@@ -119,6 +119,77 @@
       || 'images/documents.jpg';
   }
 
+  // ── État persisté (retour depuis la visionneuse) ───────────────────────
+  /* « Accéder au document numérisé » (js/inventaire.js) navigue en direct
+     vers visionneuse.html (window.location.href, pas un onglet/une modale —
+     voir CLAUDE.md « Document numérisé »), et son bouton « Retour à
+     l'inventaire » revient ici par une navigation tout aussi classique :
+     rien ne garantit que le navigateur restaure la page depuis le
+     back-forward cache plutôt que de relancer ce script à zéro. On
+     sauvegarde donc recherche/filtres/tri/page/notice dépliée/défilement
+     dans le sessionStorage (borné à l'onglet, comme le reste du projet) à
+     chaque rendu, pour les restaurer si présents au chargement — sans quoi
+     ce retour atterrirait sur une page blanche, perdant tout ce qui avait
+     été affiné. Volontairement PAS restauré si l'URL porte un `?fonds=`
+     explicite (cartes de l'accueil) : ce lien direct doit toujours ouvrir
+     une vue neuve sur ce fonds, pas un vieil état de session. */
+  var STATE_KEY = 'rp_inventaire_state';
+  var pendingOpenId = null;
+  var pendingScrollY = null;
+
+  function saveState() {
+    try {
+      var searchEl = document.getElementById('inv-search');
+      var d1El = document.getElementById('inv-date-start');
+      var d2El = document.getElementById('inv-date-end');
+      sessionStorage.setItem(STATE_KEY, JSON.stringify({
+        query: searchEl ? searchEl.value : '',
+        dateStart: d1El ? d1El.value : '',
+        dateEnd: d2El ? d2El.value : '',
+        sortKey: sortKey,
+        page: page,
+        active: {
+          fonds: Array.from(active.fonds),
+          type: Array.from(active.type),
+          lieu: Array.from(active.lieu),
+          numerise: Array.from(active.numerise)
+        },
+        openDetailId: openDetailId,
+        scrollY: window.scrollY
+      }));
+    } catch (e) { /* stockage indisponible : tant pis, pas de restauration */ }
+  }
+
+  function restoreState() {
+    var raw, st;
+    try { raw = sessionStorage.getItem(STATE_KEY); } catch (e) { return; }
+    if (!raw) return;
+    try { st = JSON.parse(raw); } catch (e) { return; }
+    if (!st) return;
+
+    query = String(st.query || '').trim().toLowerCase();
+    document.getElementById('inv-search').value = st.query || '';
+
+    var d1 = document.getElementById('inv-date-start');
+    var d2 = document.getElementById('inv-date-end');
+    d1.value = st.dateStart || '';
+    d2.value = st.dateEnd || '';
+    dateStart = parseInt(st.dateStart, 10) || null;
+    dateEnd = parseInt(st.dateEnd, 10) || null;
+
+    sortKey = st.sortKey || 'cote';
+    document.getElementById('inv-sort').value = sortKey;
+
+    page = st.page || 1;
+
+    ['fonds', 'type', 'lieu', 'numerise'].forEach(function (axis) {
+      ((st.active && st.active[axis]) || []).forEach(function (v) { active[axis].add(v); });
+    });
+
+    pendingOpenId = (typeof st.openDetailId === 'number') ? st.openDetailId : null;
+    pendingScrollY = (typeof st.scrollY === 'number') ? st.scrollY : null;
+  }
+
   // ── Chargement ──────────────────────────────────────────────────────────
   function load() {
     Promise.all([
@@ -204,10 +275,14 @@
 
   function boot() {
     /* Fonds passé en URL (« inventaire.html?fonds=Douaisien »), utilisé par les
-       cartes de l'accueil. */
+       cartes de l'accueil — prime sur un éventuel état restauré (voir
+       restoreState() ci-dessus) : ce lien direct est une visite neuve, pas un
+       retour depuis la visionneuse. */
     var target = new URLSearchParams(window.location.search).get('fonds');
     if (target && records.some(function (r) { return r._fonds === target; })) {
       active.fonds.add(target);
+    } else {
+      restoreState();
     }
 
     document.getElementById('inv-loader').style.display = 'none';
@@ -215,7 +290,17 @@
 
     bindControls();
     renderFondsCards();
+    if (pendingOpenId != null && records[pendingOpenId]) openDetailId = pendingOpenId;
     apply();
+
+    if (pendingScrollY != null) {
+      var y = pendingScrollY;
+      // Double rAF : laisse le temps aux vignettes/à la mise en page de se
+      // stabiliser après le rendu synchrone ci-dessus avant de défiler.
+      requestAnimationFrame(function () { requestAnimationFrame(function () { window.scrollTo(0, y); }); });
+    }
+    pendingOpenId = null;
+    pendingScrollY = null;
   }
 
   // ── Contrôles ───────────────────────────────────────────────────────────
@@ -482,6 +567,7 @@
     });
 
     renderPagination(total, start);
+    saveState();
   }
 
   function buildRow(rec) {
@@ -625,6 +711,14 @@
     pages.push(total);
     return pages;
   }
+
+  /* Rafraîchit l'état juste avant de quitter la page (clic sur « Accéder au
+     document numérisé », fermeture d'onglet…) : renderResults() a déjà
+     sauvegardé l'état à chaque rendu, mais le défilement, lui, peut avoir
+     bougé depuis sans déclencher de rendu (l'utilisateur·rice fait défiler
+     jusqu'au bouton avant de cliquer). `pagehide` capture cette position
+     finale sans gêner le back-forward cache (contrairement à `unload`). */
+  window.addEventListener('pagehide', saveState);
 
   // ── Démarrage ───────────────────────────────────────────────────────────
   if (document.readyState === 'loading') {
