@@ -35,21 +35,21 @@
          les barres d'interface du navigateur, plus grand que ce qui est
          réellement visible à l'écran — dvh s'ajuste à la hauteur réellement
          affichée. */
-      min-height: 95vh;
-      min-height: 95dvh;
+      min-height: 100vh;
+      min-height: 100dvh;
     }
 
     /* ── Layout ── */
     .viewer-layout {
       display: grid;
       grid-template-columns: 320px 1fr;
-      /* Volontairement un peu moins que 100vh/100dvh : cette page est toujours
-         affichée dans un cadre à hauteur fixe (modale interne, ou iframe du
-         site hôte/Syracuse) — la marge de 5% absorbe le chrome que l'injection
-         côté Syracuse ne redimensionne pas, pour éviter qu'elle ne coupe le
-         bas de la visionneuse. */
-      height: 95vh;
-      height: 95dvh;
+      /* Cette page est toujours affichée dans un cadre à hauteur fixe
+         (modale interne, ou iframe du site hôte/Syracuse) et ne mesure
+         jamais son propre contenu (contrairement au reste du site, voir
+         js/parent-page-height.js) — le cadre EST son écran, 100vh/100dvh
+         est donc correct tel quel. */
+      height: 100vh;
+      height: 100dvh;
     }
 
     /* ── Sidebar ── */
