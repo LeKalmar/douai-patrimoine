@@ -40,6 +40,7 @@ const FONDS_IMAGES = {
   'Manuscrits':                  'images/manuscrits.jpg',
   'Littérature':                 'images/litterature.jpg',
   'Robaut':                      'images/robaut.jpg',
+  "Livres d'Artiste":            "images/livre-d-artiste.jpg",
 };
 
 // Descriptions et métadonnées des fonds

@@ -37,15 +37,13 @@
      l'export courant est simplement sauté — la rangée n'est pas figée à 5. */
   var FONDS_VEDETTE = [
     'Imprimés', 'Manuscrits', 'Douaisien', "Livres d'Artiste",
-    'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme'
+    'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme', 'Robaut'
   ];
 
   /* Repli d'illustration pour les fonds que FONDS_IMAGES (js/inventaire.js) ne
-     couvre pas : il n'existe pas de photo dédiée pour « Imprimés » ni pour les
-     « Livres d'Artiste ». */
+     couvre pas : il n'existe pas de photo dédiée pour « Imprimés ». */
   var FONDS_IMAGES_EXTRA = {
     'Imprimés': 'images/documents.jpg',
-    "Livres d'Artiste": 'images/patrimoine-3.jpg',
     'Réserve Douaisienne': 'images/hospice.jpg'
   };
 
@@ -665,6 +663,15 @@
 
     if (totalPages <= 1) return;
 
+    function goToPage(target) {
+      target = Math.max(1, Math.min(totalPages, target));
+      if (target === page) return;
+      page = target;
+      openDetailId = null;
+      renderResults();
+      document.getElementById('inv-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     var btns = document.createElement('div');
     btns.className = 'inv-page-btns';
 
@@ -675,12 +682,7 @@
       b.textContent = label;
       if (opts.current) b.className = 'is-current';
       if (opts.disabled) b.disabled = true;
-      else b.addEventListener('click', function () {
-        page = target;
-        openDetailId = null;
-        renderResults();
-        document.getElementById('inv-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+      else b.addEventListener('click', function () { goToPage(target); });
       btns.appendChild(b);
     }
 
@@ -698,6 +700,36 @@
     pageBtn('Suivant ›', page + 1, { disabled: page === totalPages });
 
     host.appendChild(btns);
+
+    var jump = document.createElement('form');
+    jump.className = 'inv-page-jump';
+    jump.setAttribute('aria-label', 'Aller à la page');
+    var jumpLabel = document.createElement('label');
+    jumpLabel.textContent = 'Page';
+    jumpLabel.setAttribute('for', 'inv-page-jump-input');
+    var jumpInput = document.createElement('input');
+    jumpInput.type = 'number';
+    jumpInput.id = 'inv-page-jump-input';
+    jumpInput.min = '1';
+    jumpInput.max = String(totalPages);
+    jumpInput.value = String(page);
+    jumpInput.inputMode = 'numeric';
+    var jumpSuffix = document.createElement('span');
+    jumpSuffix.textContent = 'sur ' + totalPages.toLocaleString('fr-FR');
+    var jumpBtn = document.createElement('button');
+    jumpBtn.type = 'submit';
+    jumpBtn.textContent = 'Aller';
+    jump.appendChild(jumpLabel);
+    jump.appendChild(jumpInput);
+    jump.appendChild(jumpSuffix);
+    jump.appendChild(jumpBtn);
+    jump.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = parseInt(jumpInput.value, 10);
+      if (!isNaN(v)) goToPage(v);
+      else jumpInput.value = String(page);
+    });
+    host.appendChild(jump);
   }
 
   function pageRange(current, total) {
