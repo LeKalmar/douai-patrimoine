@@ -51,8 +51,11 @@
     .inv-hero-lead {
       font-size: 0.95rem; line-height: 1.7; color: var(--ink-soft); max-width: 42ch;
     }
+    .inv-searchbar-wrap {
+      padding: 1.6rem var(--rp-gutter, 2.5rem) 0; background: var(--papier);
+    }
     .inv-searchbar {
-      margin-top: 1.5rem; display: flex; background: #fff;
+      display: flex; background: #fff;
       border: 2px solid var(--encre); max-width: 38.75rem;
     }
     .inv-searchbar-field {
@@ -298,14 +301,6 @@
     <h1>Feuilleter les <span>collections</span></h1>
     <p class="inv-hero-lead">Manuscrits, incunables, fonds Douaisien, livres d'artiste et périodiques locaux. Cliquez une notice pour la fiche complète et, quand elle existe, la version numérisée.</p>
   </div>
-  <form class="inv-searchbar" id="inv-form" role="search">
-    <div class="inv-searchbar-field">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#8A8A99" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
-      <label class="inv-sr" for="inv-search">Rechercher dans l'inventaire</label>
-      <input type="search" id="inv-search" placeholder="Un titre, un auteur, une cote…" autocomplete="off">
-    </div>
-    <button type="submit">Rechercher</button>
-  </form>
 </section>
 
 <div id="inv-loader">Chargement du catalogue…</div>
@@ -320,6 +315,21 @@
       <span class="inv-fonds-summary" id="inv-fonds-summary"></span>
     </div>
     <div class="inv-fonds-cards" id="inv-fonds-cards"></div>
+  </section>
+
+  <!-- ============ RECHERCHE ============
+       Placée ici (entre les fonds et les résultats) plutôt qu'en haut de page :
+       en bas de liste, changer la recherche ne demande plus de remonter tout
+       en haut. -->
+  <section class="inv-searchbar-wrap">
+    <form class="inv-searchbar" id="inv-form" role="search">
+      <div class="inv-searchbar-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#8A8A99" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+        <label class="inv-sr" for="inv-search">Rechercher dans l'inventaire</label>
+        <input type="search" id="inv-search" placeholder="Un titre, un auteur, une cote…" autocomplete="off">
+      </div>
+      <button type="submit">Rechercher</button>
+    </form>
   </section>
 
   <!-- ============ FACETTES + RÉSULTATS ============ -->
