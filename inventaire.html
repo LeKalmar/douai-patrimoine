@@ -268,24 +268,18 @@
       background: #fff; border: 1px solid var(--trait-fort); color: var(--encre);
       font-family: inherit; font-size: 0.78rem; padding: 0.5rem 0.85rem; cursor: pointer;
     }
-    .inv-page-btns button:hover:not(:disabled):not(.is-current) { border-color: var(--bleu); color: var(--bleu); }
-    .inv-page-btns button.is-current { background: var(--encre); color: #fff; border-color: var(--encre); cursor: default; }
+    .inv-page-btns button:hover:not(:disabled) { border-color: var(--bleu); color: var(--bleu); }
     .inv-page-btns button:disabled { color: #B0AEBB; cursor: default; }
     .inv-page-gap { color: #B0AEBB; font-size: 0.78rem; padding: 0 0.15rem; }
-    .inv-page-jump {
-      display: flex; align-items: center; gap: 0.5rem;
-      font-size: 0.78rem; color: var(--text-light);
+    .inv-page-current-input {
+      background: var(--encre); color: #fff; border: 1px solid var(--encre);
+      font-family: inherit; font-size: 0.78rem; text-align: center;
+      padding: 0.5rem 0.3rem;
     }
-    .inv-page-jump input {
-      width: 3.6rem; font-family: inherit; font-size: 0.78rem; text-align: center;
-      border: 1px solid var(--trait-fort); padding: 0.45rem 0.3rem; color: var(--encre);
-    }
-    .inv-page-jump input:focus { outline: none; border-color: var(--bleu); }
-    .inv-page-jump button {
-      background: #fff; border: 1px solid var(--trait-fort); color: var(--encre);
-      font-family: inherit; font-size: 0.78rem; padding: 0.46rem 0.75rem; cursor: pointer;
-    }
-    .inv-page-jump button:hover { border-color: var(--bleu); color: var(--bleu); }
+    .inv-page-current-input:focus { outline: none; border-color: var(--bleu); }
+    .inv-page-current-input::-webkit-outer-spin-button,
+    .inv-page-current-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .inv-page-current-input { -moz-appearance: textfield; }
 
     @media (max-width: 60rem) {
       .inv-body { grid-template-columns: 1fr; }

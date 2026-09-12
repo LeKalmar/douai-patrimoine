@@ -681,10 +681,36 @@
       var b = document.createElement('button');
       b.type = 'button';
       b.textContent = label;
-      if (opts.current) b.className = 'is-current';
       if (opts.disabled) b.disabled = true;
       else b.addEventListener('click', function () { goToPage(target); });
       btns.appendChild(b);
+    }
+
+    /* Remplace la case qui montrerait la page courante par un champ
+       directement éditable (au lieu d'un bouton "is-current" inerte à côté
+       d'un formulaire "Page … sur … Aller" séparé) : on tape le numéro de
+       page voulu à la place, moins de largeur prise et un seul geste. */
+    function currentPageInput() {
+      var input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'inv-page-current-input';
+      input.min = '1';
+      input.max = String(totalPages);
+      input.inputMode = 'numeric';
+      input.value = String(page);
+      input.style.width = (String(totalPages).length + 1.5) + 'ch';
+      input.setAttribute('aria-label', 'Aller à la page (sur ' + totalPages.toLocaleString('fr-FR') + ')');
+      function commit() {
+        var v = parseInt(input.value, 10);
+        var target = isNaN(v) ? page : Math.max(1, Math.min(totalPages, v));
+        if (target === page) input.value = String(page);
+        else goToPage(target);
+      }
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      });
+      input.addEventListener('blur', commit);
+      btns.appendChild(input);
     }
 
     pageBtn('‹ Précédent', page - 1, { disabled: page === 1 });
@@ -694,43 +720,15 @@
         s.className = 'inv-page-gap';
         s.textContent = '…';
         btns.appendChild(s);
+      } else if (p === page) {
+        currentPageInput();
       } else {
-        pageBtn(String(p), p, { current: p === page });
+        pageBtn(String(p), p);
       }
     });
     pageBtn('Suivant ›', page + 1, { disabled: page === totalPages });
 
     host.appendChild(btns);
-
-    var jump = document.createElement('form');
-    jump.className = 'inv-page-jump';
-    jump.setAttribute('aria-label', 'Aller à la page');
-    var jumpLabel = document.createElement('label');
-    jumpLabel.textContent = 'Page';
-    jumpLabel.setAttribute('for', 'inv-page-jump-input');
-    var jumpInput = document.createElement('input');
-    jumpInput.type = 'number';
-    jumpInput.id = 'inv-page-jump-input';
-    jumpInput.min = '1';
-    jumpInput.max = String(totalPages);
-    jumpInput.value = String(page);
-    jumpInput.inputMode = 'numeric';
-    var jumpSuffix = document.createElement('span');
-    jumpSuffix.textContent = 'sur ' + totalPages.toLocaleString('fr-FR');
-    var jumpBtn = document.createElement('button');
-    jumpBtn.type = 'submit';
-    jumpBtn.textContent = 'Aller';
-    jump.appendChild(jumpLabel);
-    jump.appendChild(jumpInput);
-    jump.appendChild(jumpSuffix);
-    jump.appendChild(jumpBtn);
-    jump.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var v = parseInt(jumpInput.value, 10);
-      if (!isNaN(v)) goToPage(v);
-      else jumpInput.value = String(page);
-    });
-    host.appendChild(jump);
   }
 
   function pageRange(current, total) {
