@@ -25,6 +25,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadDotEnv } from './lib/dotenv.mjs';
 import { getCached } from '../lib/data-json-cache.mjs';
 import { exportInventaire } from './lib/export-inventaire.mjs';
+import { exportMagasins } from './lib/export-magasins.mjs';
+import { exportCotesNumeriques } from './lib/export-cotes-numeriques.mjs';
 
 loadDotEnv();
 
@@ -38,6 +40,8 @@ loadDotEnv();
    qu'à ajouter une entrée ici. */
 const DATA_EXPORTERS = {
   '/data/inventaire.json': exportInventaire,
+  '/data/magasins.json': exportMagasins,
+  '/data/cotes-numeriques.json': exportCotesNumeriques,
 };
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

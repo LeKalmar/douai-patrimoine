@@ -2,55 +2,85 @@
 /**
  * verify-json-parity.mjs
  * ────────────────────────────────────────────────────────────────────────────
- * Compare, ligne à ligne et clé à clé, le fichier `data/inventaire.json`
- * committé et la réponse générée à la volée depuis Postgres par
- * scripts/dev-server.mjs (voir scripts/lib/export-inventaire.mjs) — doit être
- * à 0 écart avant de faire confiance à l'endpoint (voir phase 1 du plan
- * postgres-local).
- *
- * Les lignes sont appariées par code-barre (`995$f`), pas par position — le
- * fichier statique et la requête SQL n'ont aucune raison de produire le même
- * ordre. `_itemId`/`_joinType` sont explicitement exclus de la comparaison
- * (voir le commentaire en tête de scripts/lib/export-inventaire.mjs :
- * présents dans le fichier committé mais jamais lus par aucune page, et non
- * reconstructibles depuis les colonnes Postgres actuelles).
+ * Compare, ligne à ligne et clé à clé, un fichier `data/*.json` committé et
+ * la réponse générée à la volée depuis Postgres par scripts/dev-server.mjs —
+ * doit être à 0 écart (hors écarts connus et documentés, listés
+ * explicitement par jeu de données) avant de faire confiance à l'endpoint.
  *
  * Usage : node scripts/dev-server.mjs &            (serveur déjà lancé)
- *         node scripts/verify-json-parity.mjs
+ *         node scripts/verify-json-parity.mjs inventaire
+ *         node scripts/verify-json-parity.mjs magasins
+ *         node scripts/verify-json-parity.mjs cotes-numeriques
  */
 import { readFileSync } from 'node:fs';
+import { loadColumnar } from './lib/load-columnar.mjs';
+import { getPool, closeAllPools } from './lib/pg.mjs';
 
-const IGNORED_KEYS = new Set(['_itemId', '_joinType']);
 const PORT = process.env.PORT || 3000;
-const URL_LIVE = `http://localhost:${PORT}/data/inventaire.json`;
-const STATIC_PATH = 'data/inventaire.json';
 
-function byBarcode(rows) {
+// codes-barres déjà présents comme source='reserve_marc' : db-migrate-bib.mjs
+// n'insère jamais de ligne bib_xml pour eux (la réserve reste seule
+// autorité), donc leur forme GESMARC d'origine (Section/Bibliothèque/Pièges
+// telles que vues depuis bib.xml) n'est conservée nulle part en base — voir
+// scripts/lib/export-magasins.mjs et export-cotes-numeriques.mjs. Écart
+// connu et documenté, exclu explicitement plutôt que compté à tort.
+async function reserveBarcodes() {
+  const { rows } = await getPool({ unpooled: true }).query(
+    `SELECT barcode FROM exemplaires WHERE source = 'reserve_marc' AND barcode IS NOT NULL`
+  );
+  return new Set(rows.map(r => r.barcode));
+}
+
+const DATASETS = {
+  inventaire: {
+    path: 'data/inventaire.json',
+    url: `http://localhost:${PORT}/data/inventaire.json`,
+    keyField: '995$f',
+    columnar: false,
+    ignoredKeys: new Set(['_itemId', '_joinType']),
+    setKeys: new Set(['_relies']),
+    excludeKnownGap: null,
+  },
+  magasins: {
+    path: 'data/magasins.json',
+    url: `http://localhost:${PORT}/data/magasins.json`,
+    keyField: '915$b',
+    columnar: true,
+    ignoredKeys: new Set(),
+    setKeys: new Set(),
+    excludeKnownGap: reserveBarcodes,
+  },
+  'cotes-numeriques': {
+    path: 'data/cotes-numeriques.json',
+    url: `http://localhost:${PORT}/data/cotes-numeriques.json`,
+    keyField: '915$b',
+    columnar: true,
+    ignoredKeys: new Set(),
+    setKeys: new Set(),
+    excludeKnownGap: reserveBarcodes,
+  },
+};
+
+function byKey(rows, keyField) {
   const m = new Map();
   for (const r of rows) {
-    const bc = r['995$f'];
-    if (bc) m.set(bc, r);
+    const k = r[keyField];
+    if (k) m.set(k, r);
   }
   return m;
 }
 
-// _relies (autres codes-barres du même groupe de reliure) : l'ordre vient de
-// l'itération d'un Union-Find côté build XML, sans signification (le seul
-// usage, la cascade de recolement.html, boucle sur la liste sans se soucier
-// de l'ordre) — comparé comme un ensemble, pas un tableau ordonné.
-const SET_KEYS = new Set(['_relies']);
-
-function normalize(key, value) {
-  if (SET_KEYS.has(key) && Array.isArray(value)) return [...value].sort();
+function normalize(key, value, setKeys) {
+  if (setKeys.has(key) && Array.isArray(value)) return [...value].sort();
   return value;
 }
 
-function diffRow(a, b) {
+function diffRow(a, b, ignoredKeys, setKeys) {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   const diffs = [];
   for (const k of keys) {
-    if (IGNORED_KEYS.has(k)) continue;
-    const av = normalize(k, a[k]), bv = normalize(k, b[k]);
+    if (ignoredKeys.has(k)) continue;
+    const av = normalize(k, a[k], setKeys), bv = normalize(k, b[k], setKeys);
     if (JSON.stringify(av) !== JSON.stringify(bv)) {
       diffs.push(`${k}: statique=${JSON.stringify(av)} live=${JSON.stringify(bv)}`);
     }
@@ -58,57 +88,75 @@ function diffRow(a, b) {
   return diffs;
 }
 
-async function main() {
-  console.log('▶ verify-json-parity: démarrage');
-  console.log(`  · lecture ${STATIC_PATH}`);
-  const staticRows = JSON.parse(readFileSync(STATIC_PATH, 'utf8'));
-  console.log(`  · fetch ${URL_LIVE}`);
-  const liveRes = await fetch(URL_LIVE);
-  if (!liveRes.ok) throw new Error(`Réponse live non-OK : ${liveRes.status}`);
-  const liveRows = await liveRes.json();
+async function loadRows(source, path, url, columnar) {
+  const raw = source === 'static'
+    ? JSON.parse(readFileSync(path, 'utf8'))
+    : await (await fetch(url)).json();
+  if (!columnar) return raw;
+  return loadColumnar().decode(raw);
+}
 
+async function main() {
+  const name = process.argv[2];
+  const cfg = DATASETS[name];
+  if (!cfg) {
+    console.error(`Usage: node scripts/verify-json-parity.mjs <${Object.keys(DATASETS).join('|')}>`);
+    process.exit(1);
+  }
+
+  console.log(`▶ verify-json-parity (${name}): démarrage`);
+  console.log(`  · lecture ${cfg.path}`);
+  const staticRows = await loadRows('static', cfg.path, cfg.url, cfg.columnar);
+  console.log(`  · fetch ${cfg.url}`);
+  const liveRows = await loadRows('live', cfg.path, cfg.url, cfg.columnar);
   console.log(`  · ${staticRows.length} lignes statiques, ${liveRows.length} lignes live`);
 
-  const staticByBc = byBarcode(staticRows);
-  const liveByBc = byBarcode(liveRows);
+  let excluded = new Set();
+  if (cfg.excludeKnownGap) {
+    excluded = await cfg.excludeKnownGap();
+    console.log(`  · ${excluded.size} code(s)-barres exclus de la comparaison (écart connu, voir en-tête du fichier)`);
+  }
 
-  const onlyStatic = [...staticByBc.keys()].filter(bc => !liveByBc.has(bc));
-  const onlyLive = [...liveByBc.keys()].filter(bc => !staticByBc.has(bc));
+  const staticByKey = byKey(staticRows.filter(r => !excluded.has(r[cfg.keyField])), cfg.keyField);
+  const liveByKey = byKey(liveRows.filter(r => !excluded.has(r[cfg.keyField])), cfg.keyField);
+
+  const onlyStatic = [...staticByKey.keys()].filter(k => !liveByKey.has(k));
+  const onlyLive = [...liveByKey.keys()].filter(k => !staticByKey.has(k));
 
   let rowsWithDiffs = 0;
   let totalFieldDiffs = 0;
   const samples = [];
-  for (const [bc, staticRow] of staticByBc) {
-    const liveRow = liveByBc.get(bc);
+  for (const [k, staticRow] of staticByKey) {
+    const liveRow = liveByKey.get(k);
     if (!liveRow) continue;
-    const diffs = diffRow(staticRow, liveRow);
+    const diffs = diffRow(staticRow, liveRow, cfg.ignoredKeys, cfg.setKeys);
     if (diffs.length) {
       rowsWithDiffs++;
       totalFieldDiffs += diffs.length;
-      if (samples.length < 10) samples.push({ barcode: bc, diffs });
+      if (samples.length < 10) samples.push({ key: k, diffs });
     }
   }
 
-  console.log(`\n  Codes-barres seulement dans le fichier statique : ${onlyStatic.length}`);
+  console.log(`\n  Clés seulement dans le fichier statique : ${onlyStatic.length}`);
   if (onlyStatic.length) console.log('    ' + onlyStatic.slice(0, 10).join(', '));
-  console.log(`  Codes-barres seulement dans la réponse live      : ${onlyLive.length}`);
+  console.log(`  Clés seulement dans la réponse live      : ${onlyLive.length}`);
   if (onlyLive.length) console.log('    ' + onlyLive.slice(0, 10).join(', '));
-  console.log(`  Lignes avec au moins un écart de champ           : ${rowsWithDiffs}`);
-  console.log(`  Écarts de champ au total                         : ${totalFieldDiffs}`);
+  console.log(`  Lignes avec au moins un écart de champ   : ${rowsWithDiffs}`);
+  console.log(`  Écarts de champ au total                 : ${totalFieldDiffs}`);
 
   if (samples.length) {
     console.log('\n  Exemples :');
-    for (const s of samples) {
-      console.log(`   - ${s.barcode}: ${s.diffs.join(' | ')}`);
-    }
+    for (const s of samples) console.log(`   - ${s.key}: ${s.diffs.join(' | ')}`);
   }
 
   const ok = onlyStatic.length === 0 && onlyLive.length === 0 && rowsWithDiffs === 0;
-  console.log(ok ? '\n✓ verify-json-parity: 0 écart' : '\n✖ verify-json-parity: écarts détectés');
+  console.log(ok ? `\n✓ verify-json-parity (${name}): 0 écart` : `\n✖ verify-json-parity (${name}): écarts détectés`);
+  await closeAllPools();
   process.exit(ok ? 0 : 1);
 }
 
-main().catch(err => {
+main().catch(async err => {
   console.error('✖ verify-json-parity:', err.message);
+  await closeAllPools();
   process.exit(1);
 });
