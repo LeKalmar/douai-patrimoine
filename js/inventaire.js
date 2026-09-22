@@ -164,7 +164,11 @@ const DETAIL_COLS = [
   { key: '215$a',                     label: 'Pagination' },
   { key: '215$b',                     label: 'Volumes' },
   { key: '215$d',                     label: 'Dimensions' },
-  { key: '101$a',                     label: 'Langue' },
+  // Champ dérivé (pas une clé MARC brute) : traduction du/des code(s) langue
+  // UNIMARC 101$a ("fre" → "Français"…) faite au build, voir
+  // scripts/lib/langue-labels.mjs (LANGUE_LABELS/langueLabelOf) — le code
+  // brut 101$a reste disponible sur `rec` mais n'est plus affiché tel quel.
+  { key: '_langue',                   label: 'Langue' },
   { key: '610$a',                     label: 'Sujets' },
   { key: '300$a',                     label: 'Note générale' },
 ];

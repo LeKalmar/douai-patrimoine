@@ -54,9 +54,10 @@
     .inv-searchbar-wrap {
       padding: 1.6rem var(--rp-gutter, 2.5rem) 0; background: var(--papier);
     }
+    .inv-searchbar-row { display: flex; flex-wrap: wrap; }
     .inv-searchbar {
       display: flex; background: #fff;
-      border: 2px solid var(--encre); max-width: 38.75rem;
+      border: 2px solid var(--encre); max-width: 38.75rem; flex: 1; min-width: 16rem;
     }
     .inv-searchbar-field {
       flex: 1; display: flex; align-items: center; gap: 0.7rem; padding: 0 1rem; min-width: 0;
@@ -70,6 +71,80 @@
       background: var(--carmin); color: #fff; font-size: 0.85rem; font-weight: 700;
       padding: 0.875rem 1.5rem; border: none; cursor: pointer;
     }
+
+    /* ── Recherche avancée ───────────────────────────────────────────── */
+    /* Bouton "à côté du gros bouton Rechercher" (demande explicite) : même
+       hauteur que .inv-searchbar grâce au padding vertical identique. */
+    .inv-adv-toggle {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: #fff; border: 2px solid var(--trait-fort); color: var(--encre);
+      font-family: inherit; font-size: 0.85rem; font-weight: 700;
+      padding: 0.875rem 1.15rem; cursor: pointer; white-space: nowrap;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .inv-adv-toggle:hover { border-color: var(--bleu); color: var(--bleu); }
+    .inv-adv-toggle svg { width: 12px; height: 12px; flex-shrink: 0; transition: transform var(--transition); }
+    .inv-adv-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+    .inv-adv-toggle[aria-expanded="true"] { border-color: var(--encre); }
+
+    .inv-adv {
+      max-width: 50.65rem; margin-top: 0.75rem; background: #fff;
+      border: 1px solid var(--trait-fort); padding: 1.1rem 1.25rem 1.25rem;
+    }
+    /* Une ligne = un critère (catégorie + valeur), avec ses deux boutons +/−
+       SUR la même ligne (demande explicite) : catégorie, champ de valeur,
+       "+" (ajoute une ligne), "−" (retire celle-ci et défait le filtre
+       qu'elle portait). `flex-wrap: nowrap` + minima réduits pour que les
+       quatre tiennent sur une seule ligne dans .inv-adv (50.65rem). Toujours
+       au moins une ligne présente : la retirer la réinitialise au lieu de la
+       supprimer (voir removeAdvRow() dans js/inventaire-page.js), pour ne
+       jamais se retrouver sans le moindre "+" cliquable. */
+    .inv-adv-rows { display: flex; flex-direction: column; gap: 0.6rem; }
+    .inv-adv-row { display: flex; gap: 0.45rem; align-items: flex-start; flex-wrap: nowrap; }
+    .inv-adv select, .inv-adv input[type="text"] {
+      border: 1px solid var(--trait-fort); background: #fff;
+      padding: 0.6rem 0.7rem; font-family: inherit; font-size: 0.82rem;
+      color: var(--encre); outline: none;
+    }
+    .inv-adv select:focus, .inv-adv input[type="text"]:focus { border-color: var(--bleu); }
+    /* `width: 100%` réservé à la boîte de VALEUR (toujours un champ texte à
+       suggestions désormais, voir js/inventaire-page.js — plus de <select>
+       de valeurs, certaines catégories comme "Lieu d'édition" en avaient
+       trop pour qu'un menu déroulant reste pratique) — la donner aussi à
+       .inv-adv-cat (comme avant, via un sélecteur générique `.inv-adv
+       select`) fixait son flex-basis à 100% de toute la ligne : la
+       catégorie prenait la ligne entière et poussait le reste hors du
+       cadre. .inv-adv-cat garde une largeur naturelle (min-width). */
+    .inv-adv-value-wrap input[type="text"] { width: 100%; }
+    .inv-adv-cat { flex: 0 0 auto; width: auto; min-width: 9.5rem; }
+    .inv-adv-value-wrap { flex: 1; min-width: 8rem; position: relative; }
+    .inv-adv-hint { font-size: 0.78rem; color: var(--text-light); margin: 0; padding: 0.6rem 0.1rem; }
+    .inv-adv-autocomplete { position: relative; }
+    .inv-adv-suggestions {
+      position: absolute; z-index: 5; top: calc(100% + 0.2rem); left: 0; right: 0;
+      background: #fff; border: 1px solid var(--trait-fort);
+      box-shadow: 0 6px 18px rgba(20,24,63,0.12);
+      list-style: none; margin: 0; padding: 0.3rem 0; max-height: 14rem; overflow-y: auto;
+    }
+    .inv-adv-suggestions li { display: block; }
+    .inv-adv-suggestions button {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;
+      background: none; border: none; font-family: inherit; font-size: 0.8rem;
+      color: var(--text); padding: 0.45rem 0.75rem; cursor: pointer; text-align: left;
+    }
+    .inv-adv-suggestions button:hover { background: #F1EDE4; color: var(--carmin); }
+    .inv-adv-suggestion-n { font-size: 0.7rem; color: #9A9AA8; flex-shrink: 0; }
+    /* + et − : même bouton carré compact, seule la couleur au survol change
+       (bleu = ajoute, carmin = retire) pour rester lisible sans texte. */
+    .inv-adv-row-btn {
+      flex-shrink: 0; width: 2.35rem; height: 2.35rem;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff; border: 1px solid var(--trait-fort); color: var(--encre);
+      font-size: 1.15rem; line-height: 1; font-weight: 600; cursor: pointer; padding: 0;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .inv-adv-row-add:hover { border-color: var(--bleu); color: var(--bleu); }
+    .inv-adv-row-remove:hover { border-color: var(--carmin); color: var(--carmin); }
 
     /* Bouton de retour à l'accueil, en haut à droite du bandeau d'en-tête. */
     .inv-hero-topbar {
@@ -329,14 +404,36 @@
        en bas de liste, changer la recherche ne demande plus de remonter tout
        en haut. -->
   <section class="inv-searchbar-wrap">
-    <form class="inv-searchbar" id="inv-form" role="search">
-      <div class="inv-searchbar-field">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#8A8A99" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
-        <label class="inv-sr" for="inv-search">Rechercher dans l'inventaire</label>
-        <input type="search" id="inv-search" placeholder="Un titre, un auteur, une cote…" autocomplete="off">
-      </div>
-      <button type="submit">Rechercher</button>
-    </form>
+    <div class="inv-searchbar-row">
+      <form class="inv-searchbar" id="inv-form" role="search">
+        <div class="inv-searchbar-field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#8A8A99" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+          <label class="inv-sr" for="inv-search">Rechercher dans l'inventaire</label>
+          <input type="search" id="inv-search" placeholder="Un titre, un auteur, une cote…" autocomplete="off">
+        </div>
+        <button type="submit">Rechercher</button>
+      </form>
+      <button type="button" class="inv-adv-toggle" id="inv-adv-toggle" aria-expanded="false" aria-controls="inv-adv">
+        Recherche avancée
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <!-- Ajoute des critères exacts (auteur, type de document…) en plus de la
+         recherche libre ci-dessus — voir js/inventaire-page.js
+         (ADV_CATEGORIES/bindAdvancedSearch). Une ligne = une catégorie + une
+         valeur + ses boutons « + »/« − », tous sur la même ligne (demande
+         explicite) : « + » ajoute une nouvelle ligne, « − » retire celle-ci.
+         Une catégorie à faible cardinalité (type, lieu, langue) propose un
+         menu déroulant de ses valeurs ; une catégorie à forte cardinalité
+         (auteur) propose un champ avec suggestions au fil de la frappe, pour
+         choisir UNE personne précise parmi d'éventuels homonymes plutôt que
+         de retomber sur une simple recherche texte. Les lignes sont
+         entièrement construites par addAdvRow() — rien de statique ici
+         au-delà du conteneur. -->
+    <div class="inv-adv" id="inv-adv" hidden>
+      <div class="inv-adv-rows" id="inv-adv-rows"></div>
+    </div>
   </section>
 
   <!-- ============ FACETTES + RÉSULTATS ============ -->

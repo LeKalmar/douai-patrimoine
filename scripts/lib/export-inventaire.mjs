@@ -5,8 +5,8 @@
  * `data/inventaire.json` (voir scripts/lib/reserve-index.mjs `buildItems()`) —
  * un objet par exemplaire réserve, clés `<tag>$<code>` filtrées aux mêmes
  * listes blanches que `build-inventory.mjs`/`db-migrate-reserve.mjs`, plus
- * les champs dérivés `_noticeId`, `_leader`, `_piege`, `lien_num`, `995$f`,
- * `_relies`.
+ * les champs dérivés `_noticeId`, `_leader`, `_piege`, `_langue`, `lien_num`,
+ * `995$f`, `_relies`.
  *
  * `db-migrate-reserve.mjs` a stocké, pour chaque notice/exemplaire, un
  * flatten COMPLET (sans liste blanche) dans la colonne `raw jsonb` — on
@@ -33,6 +33,7 @@
  * pas une divergence de données réelle.
  */
 import { getPool } from './pg.mjs';
+import { langueLabelOf } from './langue-labels.mjs';
 
 const VIGNETTE_BASE_URL = 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/vignette/';
 
@@ -86,6 +87,7 @@ export async function exportInventaire() {
     // toujours présente dans data/inventaire.json (valeur null possible),
     // jamais absente. Reproduire cette présence, pas seulement la valeur.
     merged._piege = row.piege_label ?? null;
+    merged._langue = langueLabelOf(merged['101$a']);
 
     if (row.barcode) {
       merged.lien_num = `${VIGNETTE_BASE_URL}${row.barcode}.jpg`;

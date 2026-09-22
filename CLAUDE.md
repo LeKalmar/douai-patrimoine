@@ -1768,7 +1768,15 @@ de jonction, pour permettre « tous les documents d'un même auteur ») ;
 codes-barres du groupe triés, stable d'un run à l'autre malgré l'`id`
 bigserial, pour qu'un réimport retombe sur le même groupe) ; `pieges`
 (référentiel des codes 921$a/921$b, réflète `PIEGE_A_LABELS`/
-`PIEGE_B_LABELS`) ; `exemplaires` (une ligne par exemplaire physique, clé
+`PIEGE_B_LABELS`) ; `langues` (référentiel des codes de langue UNIMARC
+101$a — `fre`→« Français », `lat`→« Latin »…, réflète `LANGUE_LABELS` de
+`scripts/lib/langue-labels.mjs`, 2026-09-22 ; comme pour `pieges`, cette
+table SQL n'est qu'un miroir consultable en base, le libellé affiché dans la
+modale de détail d'`inventaire.html` — champ dérivé `_langue`, un ou
+plusieurs codes 101$a joints par `§` traduits et dédoublonnés par
+`langueLabelOf()` — vient de la table JS, calculée au build dans
+`scripts/lib/reserve-index.mjs`/`scripts/lib/export-inventaire.mjs`) ;
+`exemplaires` (une ligne par exemplaire physique, clé
 `barcode`, **22 colonnes booléennes `GENERATED ALWAYS AS (piege_a_code =
 '…') STORED`** — une par code piège connu, nommées par CODE et non par
 libellé : `piege_b_code='3'` et `piege_b_code='PER'` valent tous deux

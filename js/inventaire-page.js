@@ -58,7 +58,7 @@
   /* Facettes actives : un Set de valeurs par axe. Plusieurs valeurs sur le même
      axe se lisent en OU (« Douaisien OU Imprimés »), deux axes différents en ET
      — la convention habituelle d'une recherche à facettes. */
-  var active = { fonds: new Set(), type: new Set(), lieu: new Set(), numerise: new Set() };
+  var active = { fonds: new Set(), type: new Set(), lieu: new Set(), langue: new Set(), auteur: new Set(), numerise: new Set() };
   var query = '';
   var dateStart = null;
   var dateEnd = null;
@@ -112,6 +112,18 @@
     return p ? p.start : null;
   }
 
+  /* "NOM Prénom" par auteur, un par entrée du tableau (pas de valeur vide
+     pour un document sans auteur). Même reconstruction que
+     buildExpandedContent() dans js/inventaire.js (700$a/700$b, occurrences
+     répétées jointes par §), voir le commentaire sur r._auteurListe. */
+  function authorNamesOf(rec) {
+    var prenoms = (rec['700$b'] || '').split('§').map(function (s) { return s.trim(); });
+    var noms = (rec['700$a'] || '').split('§').map(function (s) { return s.trim(); }).filter(Boolean);
+    return noms.map(function (n, i) {
+      return (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim();
+    });
+  }
+
   function fondsImage(name) {
     return (typeof FONDS_IMAGES !== 'undefined' && FONDS_IMAGES[name])
       || FONDS_IMAGES_EXTRA[name]
@@ -151,6 +163,8 @@
           fonds: Array.from(active.fonds),
           type: Array.from(active.type),
           lieu: Array.from(active.lieu),
+          langue: Array.from(active.langue),
+          auteur: Array.from(active.auteur),
           numerise: Array.from(active.numerise)
         },
         openDetailId: openDetailId,
@@ -181,7 +195,7 @@
 
     page = st.page || 1;
 
-    ['fonds', 'type', 'lieu', 'numerise'].forEach(function (axis) {
+    ['fonds', 'type', 'lieu', 'langue', 'auteur', 'numerise'].forEach(function (axis) {
       ((st.active && st.active[axis]) || []).forEach(function (v) { active[axis].add(v); });
     });
 
@@ -253,6 +267,14 @@
              vignette" (lien_num existe pour la plupart des exemplaires, même
              sans le moindre scan complet derrière). */
           r._numerise = (r['num'] || r['_lienNumerise']) ? 'Numérisé' : 'Non numérisé';
+          /* Un auteur par entrée (pas une chaîne "NOM Prénom, NOM Prénom"
+             jointe) — nécessaire pour filtrer par UN auteur précis quand un
+             document en a plusieurs. Même reconstruction "NOM Prénom" que
+             buildExpandedContent() dans js/inventaire.js (700$a/700$b joints
+             par §), dupliquée ici plutôt que factorisée : l'un rend une
+             chaîne d'affichage, l'autre une liste de valeurs de facette —
+             voir authorNamesOf() ci-dessous. */
+          r._auteurListe = authorNamesOf(r);
           r._year = yearOf(r);
           r._hay = [r['200$a'], r['700$a'], r['701$a'], r['930$g'], r['610$a']]
             .join(' ').toLowerCase();
@@ -288,6 +310,7 @@
     document.getElementById('inv-app').hidden = false;
 
     bindControls();
+    bindAdvancedSearch();
     renderFondsCards();
     if (pendingOpenId != null && records[pendingOpenId]) openDetailId = pendingOpenId;
     apply();
@@ -341,6 +364,8 @@
       active.fonds.clear();
       active.type.clear();
       active.lieu.clear();
+      active.langue.clear();
+      active.auteur.clear();
       active.numerise.clear();
       query = '';
       dateStart = dateEnd = null;
@@ -357,6 +382,13 @@
     if (skipAxis !== 'fonds' && active.fonds.size && !active.fonds.has(r._fonds)) return false;
     if (skipAxis !== 'type' && active.type.size && !active.type.has(r._type)) return false;
     if (skipAxis !== 'lieu' && active.lieu.size && !active.lieu.has(r._lieu)) return false;
+    if (skipAxis !== 'langue' && active.langue.size && !active.langue.has(r._langue)) return false;
+    /* Axe multi-valeur (un document peut avoir plusieurs auteurs) : match dès
+       qu'AU MOINS un des auteurs du document est dans l'ensemble actif —
+       même lecture "OU" que les autres axes, appliquée ici valeur par valeur
+       plutôt que document par document. */
+    if (skipAxis !== 'auteur' && active.auteur.size &&
+        !(r._auteurListe && r._auteurListe.some(function (a) { return active.auteur.has(a); }))) return false;
     if (skipAxis !== 'numerise' && active.numerise.size && !active.numerise.has(r._numerise)) return false;
     if (!dateMatchesFilter(r['210$d'], dateStart, dateEnd)) return false;
     if (query && r._hay.indexOf(query) === -1) return false;
@@ -447,14 +479,33 @@
   }
 
   // ── Facettes ────────────────────────────────────────────────────────────
+  // Pas d'entrée 'fonds' ici : ce filtre reste piloté par les cartes de fonds
+  // en haut de page (renderFondsCards()/toggleFacet('fonds', …)), qui
+  // couvrent déjà la sélection — une case à cocher redondante dans la
+  // colonne "Affiner" ci-dessous ferait doublon (demande explicite). `active.
+  // fonds`/`matches()` restent inchangés : le filtrage par fonds fonctionne
+  // toujours, seul son rendu dans cette colonne est retiré.
   var FACET_DEFS = [
-    { axis: 'fonds', title: 'Fonds', field: '_fonds' },
     { axis: 'type', title: 'Type de document', field: '_type' },
     { axis: 'lieu', title: 'Lieu d’édition', field: '_lieu' },
+    /* _langue (voir scripts/lib/langue-labels.mjs) n'existe que sur les
+       exemplaires issus de data/inventaire.json — absent sur les fusions
+       exemplaires-manuels/non-catalogues, qui n'ont pas de code UNIMARC
+       101$a à traduire. Ignorés de cette facette comme n'importe quelle
+       valeur vide (voir le filtre `if (v && …)` dans renderFacets()), pas
+       une exclusion spécifique à coder ici. */
+    { axis: 'langue', title: 'Langue', field: '_langue' },
     /* host distinct : rendue après le bloc "Période" (statique, tout en bas
        de la colonne Affiner), pas dans #inv-facets avec les trois autres —
        demande explicite pour que ce filtre reste le dernier de la colonne. */
-    { axis: 'numerise', title: 'Numérisation', field: '_numerise', host: 'inv-facets-bottom' }
+    { axis: 'numerise', title: 'Numérisation', field: '_numerise', host: 'inv-facets-bottom' },
+    /* manualOnly : pas de bloc de cases à cocher dans la colonne "Affiner"
+       (des milliers de noms distincts — une liste à cocher serait inutilisable,
+       voir la recherche avancée / ADV_CATEGORIES qui pilote cet axe via une
+       saisie à suggestions). Présent dans FACET_DEFS uniquement pour que
+       renderChips()/le scope de renderResults()/le bouton "Effacer" (qui les
+       parcourent déjà tous les trois) couvrent aussi les auteurs choisis. */
+    { axis: 'auteur', title: 'Auteur', field: '_auteurListe', manualOnly: true }
   ];
 
   function renderFacets() {
@@ -464,6 +515,7 @@
     if (bottomHost) bottomHost.innerHTML = '';
 
     FACET_DEFS.forEach(function (def) {
+      if (def.manualOnly) return;
       /* Les comptes d'un axe sont calculés en ignorant ce même axe : sinon,
          dès qu'on coche « Douaisien », tous les autres fonds tomberaient à 0 et
          il deviendrait impossible d'en ajouter un second. */
@@ -521,6 +573,16 @@
     apply();
   }
 
+  function buildChip(axis, value) {
+    var chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'inv-chip';
+    chip.innerHTML = esc(value) + ' <span aria-hidden="true">✕</span>';
+    chip.setAttribute('aria-label', 'Retirer le filtre ' + value);
+    chip.addEventListener('click', function () { toggleFacet(axis, value); });
+    return chip;
+  }
+
   function renderChips() {
     var host = document.getElementById('inv-chips');
     host.innerHTML = '';
@@ -529,18 +591,228 @@
     FACET_DEFS.forEach(function (def) {
       active[def.axis].forEach(function (v) {
         any = true;
-        var chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'inv-chip';
-        chip.innerHTML = esc(v) + ' <span aria-hidden="true">✕</span>';
-        chip.setAttribute('aria-label', 'Retirer le filtre ' + v);
-        chip.addEventListener('click', function () { toggleFacet(def.axis, v); });
-        host.appendChild(chip);
+        host.appendChild(buildChip(def.axis, v));
       });
     });
 
     host.hidden = !any;
     document.getElementById('inv-clear').hidden = !any && !query && !dateStart && !dateEnd;
+  }
+
+  // ── Recherche avancée (panneau à côté du bouton "Rechercher") ──────────
+  /* Ajoute des critères EXACTS, en plus de la recherche libre de #inv-search
+     — un même axe (type/lieu/langue/auteur) coché ici équivaut à le cocher
+     dans la colonne "Affiner" (toggleFacet() est réutilisée telle quelle).
+     Une LIGNE = un critère (catégorie + valeur) : le bouton "+" en ajoute
+     une, le "−" de chaque ligne la retire — et défait au passage le filtre
+     qu'elle portait, pour qu'une ligne supprimée ou reconfigurée ne laisse
+     jamais un filtre actif orphelin (voir clearAdvRowValue()).
+
+     Une seule famille de rendu pour toutes les catégories : champ texte +
+     suggestions qui s'affinent à la frappe (renderAdvAutocomplete). Un menu
+     déroulant natif a d'abord été essayé pour type/lieu/langue (peu de
+     valeurs distinctes, pensait-on) mais "Lieu d'édition" en particulier
+     s'est révélé avoir des centaines de variantes orthographiques
+     (« Parisiis », « A Paris »…) — un <select> "interminable" plutôt que
+     pratique (demande explicite, 2026-09-22). Choisir une personne précise
+     parmi des homonymes (voir l'exemple "moreau" pour Auteur) reste la même
+     idée pour toutes les catégories : suggérer plutôt que dérouler. */
+  var ADV_CATEGORIES = [
+    { value: 'type', label: 'Type de document', axis: 'type', field: '_type' },
+    { value: 'lieu', label: 'Lieu d’édition', axis: 'lieu', field: '_lieu' },
+    { value: 'langue', label: 'Langue', axis: 'langue', field: '_langue' },
+    { value: 'auteur', label: 'Auteur', axis: 'auteur', field: '_auteurListe', multi: true }
+  ];
+
+  /* Valeurs d'un enregistrement pour une catégorie donnée, toujours en
+     tableau — `multi` (ex. _auteurListe) est déjà un tableau, les autres
+     champs (_type/_lieu/_langue) sont de simples chaînes qu'on enveloppe
+     pour que renderAdvAutocomplete ait un seul code à écrire pour les deux. */
+  function advValuesOf(r, cat) {
+    var v = r[cat.field];
+    if (cat.multi) return v || [];
+    return v ? [v] : [];
+  }
+
+  function advCategoryByValue(value) {
+    for (var i = 0; i < ADV_CATEGORIES.length; i++) {
+      if (ADV_CATEGORIES[i].value === value) return ADV_CATEGORIES[i];
+    }
+    return null;
+  }
+
+  var advRows = []; // { id, axis, value, el, valueWrap }
+  var advRowSeq = 0;
+
+  function bindAdvancedSearch() {
+    var toggle = document.getElementById('inv-adv-toggle');
+    var panel = document.getElementById('inv-adv');
+    toggle.addEventListener('click', function () {
+      panel.hidden = !panel.hidden;
+      toggle.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+    });
+
+    addAdvRow(); // une ligne dès l'ouverture plutôt qu'un panneau vide au premier coup d'œil
+  }
+
+  /* + et − vivent sur CHAQUE ligne (demande explicite), pas un unique bouton
+     "Ajouter" séparé en bas du panneau : "+" ajoute une nouvelle ligne à la
+     suite, "−" retire celle-ci. Toujours au moins une ligne à l'écran — voir
+     removeAdvRow(), qui réinitialise plutôt que supprime la dernière. */
+  function addAdvRow() {
+    var row = { id: ++advRowSeq, axis: null, value: null };
+    advRows.push(row);
+
+    var el = document.createElement('div');
+    el.className = 'inv-adv-row';
+
+    var catSelect = document.createElement('select');
+    catSelect.className = 'inv-adv-cat';
+    catSelect.setAttribute('aria-label', 'Catégorie du critère');
+    var optionsHtml = '<option value="">Choisir une catégorie…</option>';
+    ADV_CATEGORIES.forEach(function (cat) {
+      optionsHtml += '<option value="' + esc(cat.value) + '">' + esc(cat.label) + '</option>';
+    });
+    catSelect.innerHTML = optionsHtml;
+
+    var valueWrap = document.createElement('div');
+    valueWrap.className = 'inv-adv-value-wrap';
+    valueWrap.innerHTML = '<p class="inv-adv-hint">Choisissez d’abord une catégorie.</p>';
+
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'inv-adv-row-btn inv-adv-row-add';
+    addBtn.setAttribute('aria-label', 'Ajouter un autre critère');
+    addBtn.textContent = '+';
+    addBtn.addEventListener('click', addAdvRow);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'inv-adv-row-btn inv-adv-row-remove';
+    removeBtn.setAttribute('aria-label', 'Retirer ce critère');
+    removeBtn.textContent = '−';
+    removeBtn.addEventListener('click', function () { removeAdvRow(row); });
+
+    catSelect.addEventListener('change', function () {
+      clearAdvRowValue(row); // l'ancien critère de cette ligne, le cas échéant, ne doit pas survivre au changement de catégorie
+      row.axis = catSelect.value || null;
+      renderAdvRowValue(row);
+    });
+
+    el.appendChild(catSelect);
+    el.appendChild(valueWrap);
+    el.appendChild(addBtn);
+    el.appendChild(removeBtn);
+    row.el = el;
+    row.catSelect = catSelect;
+    row.valueWrap = valueWrap;
+
+    document.getElementById('inv-adv-rows').appendChild(el);
+  }
+
+  function removeAdvRow(row) {
+    clearAdvRowValue(row);
+    if (advRows.length <= 1) {
+      // Jamais zéro ligne à l'écran (sinon plus aucun "+" cliquable pour en
+      // recréer une) : on réinitialise la dernière au lieu de la retirer.
+      row.axis = null;
+      row.catSelect.value = '';
+      renderAdvRowValue(row);
+      return;
+    }
+    advRows = advRows.filter(function (r) { return r.id !== row.id; });
+    if (row.el && row.el.parentNode) row.el.parentNode.removeChild(row.el);
+  }
+
+  /* Défait le critère actif porté par cette ligne (s'il y en a un). Appelée
+     avant de changer de catégorie et à la suppression de la ligne — jamais
+     à la simple frappe dans le champ auteur (voir renderAdvAutocomplete). */
+  function clearAdvRowValue(row) {
+    if (row.axis && row.value != null) toggleFacet(row.axis, row.value);
+    row.value = null;
+  }
+
+  /* Une ligne ne porte qu'UN critère à la fois : choisir une nouvelle valeur
+     remplace la précédente au lieu de s'accumuler avec elle — pour ajouter
+     "Auteur = X OU Y", on ajoute une seconde LIGNE (bouton "+"), plutôt que
+     de cocher deux valeurs dans la même. */
+  function setAdvRowValue(row, value) {
+    if (row.value != null) toggleFacet(row.axis, row.value);
+    row.value = value;
+    toggleFacet(row.axis, value);
+  }
+
+  function renderAdvRowValue(row) {
+    var wrap = row.valueWrap;
+    wrap.innerHTML = '';
+    var cat = advCategoryByValue(row.axis);
+    if (!cat) {
+      wrap.innerHTML = '<p class="inv-adv-hint">Choisissez d’abord une catégorie.</p>';
+      return;
+    }
+    renderAdvAutocomplete(row, wrap, cat);
+  }
+
+  /* Champ texte + liste de suggestions, recalculées à chaque frappe
+     (debounce 200 ms, comme la recherche libre) plutôt qu'un index construit
+     une fois pour toutes — largement assez rapide sur ce volume (quelques
+     dizaines de milliers de documents, filtre de sous-chaîne) et toujours
+     cohérent avec les autres filtres actifs sans code de mise en cache
+     séparé à maintenir. Comptes sur le même pool "scopé par les autres axes
+     actifs" que renderFacets() (skipAxis évite qu'un critère s'auto-exclue). */
+  function renderAdvAutocomplete(row, wrap, cat) {
+    wrap.innerHTML =
+      '<div class="inv-adv-autocomplete">' +
+        '<input type="text" aria-label="' + esc(cat.label) + '" placeholder="Taper : ' + esc(cat.label.toLowerCase()) + '…" autocomplete="off">' +
+        '<ul class="inv-adv-suggestions" hidden></ul>' +
+      '</div>';
+
+    var input = wrap.querySelector('input');
+    var list = wrap.querySelector('.inv-adv-suggestions');
+    if (row.value) input.value = row.value; // ligne déjà configurée (ex. après un changement ailleurs sur la page)
+
+    function closeList() { list.hidden = true; list.innerHTML = ''; }
+
+    input.addEventListener('input', debounce(function () {
+      // Retaper après avoir déjà choisi une valeur désengage ce choix : la
+      // ligne ne représente plus ce critère tant qu'une nouvelle suggestion
+      // n'est pas cliquée.
+      if (row.value != null && input.value !== row.value) clearAdvRowValue(row);
+
+      var q = input.value.trim().toLowerCase();
+      if (q.length < 2) { closeList(); return; }
+
+      var pool = records.filter(function (r) { return matches(r, cat.axis); });
+      var counts = {};
+      pool.forEach(function (r) {
+        advValuesOf(r, cat).forEach(function (v) {
+          if (v && v.toLowerCase().indexOf(q) !== -1) counts[v] = (counts[v] || 0) + 1;
+        });
+      });
+      var entries = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 8);
+
+      if (!entries.length) { closeList(); return; }
+      list.innerHTML = '';
+      entries.forEach(function (v) {
+        var li = document.createElement('li');
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerHTML = '<span>' + esc(v) + '</span><span class="inv-adv-suggestion-n">' + counts[v].toLocaleString('fr-FR') + '</span>';
+        btn.addEventListener('click', function () {
+          setAdvRowValue(row, v);
+          input.value = v;
+          closeList();
+        });
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+      list.hidden = false;
+    }, 200));
+
+    // Referme la liste au clic ailleurs sur la page (pas à l'intérieur du champ/de la liste).
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) closeList();
+    });
   }
 
   // ── Résultats ───────────────────────────────────────────────────────────
