@@ -28,11 +28,33 @@
          Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
          rendu. Voir js/parent-page-height.js. -->
     <script src="js/parent-page-height.js"></script>
+
+    <style>
+      /* Bouton de retour à l'accueil, ajouté en haut à droite du bandeau
+         d'en-tête — même patron visuel que .hero-actions des pages de
+         l'espace pro (pastille blanche translucide sur fond dégradé). */
+      .page-hero .container {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 1rem; flex-wrap: wrap;
+      }
+      .hdl-home-link {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        font-size: 0.82rem; color: rgba(255,255,255,0.85);
+        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);
+        padding: 0.5rem 1rem; border-radius: 999px; text-decoration: none;
+        white-space: nowrap; transition: all 0.15s;
+      }
+      .hdl-home-link:hover { background: rgba(255,255,255,0.2); color: #fff; }
+    </style>
 </head>
 <body>
     <section class="page-hero">
   <div class="container">
     <h1 class="page-title">La Réserve <em>patrimoniale</em></h1>
+    <a href="index.html" class="hdl-home-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour à l'accueil
+    </a>
   </div>
           <h1><i class="fa-solid fa-book-open"></i> 500 ans d'Histoire du Livre à Douai (1550 - 2026)</h1>
         <div class="search-wrapper">

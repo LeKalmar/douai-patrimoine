@@ -13,7 +13,6 @@
   :root {
     --bg:var(--papier); --surface:#ffffff; --surface2:var(--papier-ombre);
     --border2:var(--trait-fort);
-    --accent2:var(--encre);
     --warn:#e65100; --danger:#c62828;
     --muted:var(--text-light);
     --r:10px; --rl:16px;
@@ -49,7 +48,7 @@
   .qid{width:6px;height:6px;border-radius:50%;flex-shrink:0}
   .qid.p{background:var(--border2)}
   .qid.a{background:var(--accent);box-shadow:0 0 6px var(--accent)}
-  .qid.d{background:var(--accent2)}
+  .qid.d{background:var(--ink-soft)}
   .qid.s{background:var(--warn)}
   .noq{padding:.9rem;font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);text-align:center}
   .rp{display:flex;flex-direction:column;overflow:hidden;height:100%}
@@ -87,7 +86,7 @@
   .btn:hover{background:#E3DED4}
   .btn:active{transform:scale(.97)}
   .btn-a{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
-  .btn-a:hover{background:var(--accent2);border-color:var(--accent2)}
+  .btn-a:hover{filter:brightness(0.88)}
   .mla{margin-left:auto}
   .sbar{flex-shrink:0;border-top:1px solid var(--border);padding:.28rem .85rem;display:flex;align-items:center;gap:.65rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}
   #sm{color:var(--text)}

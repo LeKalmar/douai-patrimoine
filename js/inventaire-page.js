@@ -13,6 +13,7 @@
      FONDS_IMAGES            la vignette illustrant chaque fonds
      dateMatchesFilter()     le filtre de période, qui sait lire « [17xx] »
      parsePublicationDate()  et « [154x] » aussi bien qu'une année pleine
+     formatPublicationDate() « [18xx] » affiché « XIXe siècle »
      buildThumbFrame()       le cadre de vignette, avec repli si l'image manque
      buildExpandedContent()  le panneau de détail complet (métadonnées, pills,
                              bouton visionneuse) — c'est le gros morceau réutilisé
@@ -36,16 +37,14 @@
   /* Les fonds mis en avant en tête de page, dans cet ordre. Un fonds absent de
      l'export courant est simplement sauté — la rangée n'est pas figée à 5. */
   var FONDS_VEDETTE = [
-    'Imprimés', 'Douaisien', "Livres d'Artiste",
-    'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme'
+    'Imprimés', 'Manuscrits', 'Douaisien', "Livres d'Artiste",
+    'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme', 'Robaut'
   ];
 
   /* Repli d'illustration pour les fonds que FONDS_IMAGES (js/inventaire.js) ne
-     couvre pas : il n'existe pas de photo dédiée pour « Imprimés » ni pour les
-     « Livres d'Artiste ». */
+     couvre pas : il n'existe pas de photo dédiée pour « Imprimés ». */
   var FONDS_IMAGES_EXTRA = {
     'Imprimés': 'images/documents.jpg',
-    "Livres d'Artiste": 'images/patrimoine-3.jpg',
     'Réserve Douaisienne': 'images/hospice.jpg'
   };
 
@@ -59,7 +58,7 @@
   /* Facettes actives : un Set de valeurs par axe. Plusieurs valeurs sur le même
      axe se lisent en OU (« Douaisien OU Imprimés »), deux axes différents en ET
      — la convention habituelle d'une recherche à facettes. */
-  var active = { fonds: new Set(), type: new Set(), lieu: new Set() };
+  var active = { fonds: new Set(), type: new Set(), lieu: new Set(), numerise: new Set() };
   var query = '';
   var dateStart = null;
   var dateEnd = null;
@@ -119,6 +118,77 @@
       || 'images/documents.jpg';
   }
 
+  // ── État persisté (retour depuis la visionneuse) ───────────────────────
+  /* « Accéder au document numérisé » (js/inventaire.js) navigue en direct
+     vers visionneuse.html (window.location.href, pas un onglet/une modale —
+     voir CLAUDE.md « Document numérisé »), et son bouton « Retour à
+     l'inventaire » revient ici par une navigation tout aussi classique :
+     rien ne garantit que le navigateur restaure la page depuis le
+     back-forward cache plutôt que de relancer ce script à zéro. On
+     sauvegarde donc recherche/filtres/tri/page/notice dépliée/défilement
+     dans le sessionStorage (borné à l'onglet, comme le reste du projet) à
+     chaque rendu, pour les restaurer si présents au chargement — sans quoi
+     ce retour atterrirait sur une page blanche, perdant tout ce qui avait
+     été affiné. Volontairement PAS restauré si l'URL porte un `?fonds=`
+     explicite (cartes de l'accueil) : ce lien direct doit toujours ouvrir
+     une vue neuve sur ce fonds, pas un vieil état de session. */
+  var STATE_KEY = 'rp_inventaire_state';
+  var pendingOpenId = null;
+  var pendingScrollY = null;
+
+  function saveState() {
+    try {
+      var searchEl = document.getElementById('inv-search');
+      var d1El = document.getElementById('inv-date-start');
+      var d2El = document.getElementById('inv-date-end');
+      sessionStorage.setItem(STATE_KEY, JSON.stringify({
+        query: searchEl ? searchEl.value : '',
+        dateStart: d1El ? d1El.value : '',
+        dateEnd: d2El ? d2El.value : '',
+        sortKey: sortKey,
+        page: page,
+        active: {
+          fonds: Array.from(active.fonds),
+          type: Array.from(active.type),
+          lieu: Array.from(active.lieu),
+          numerise: Array.from(active.numerise)
+        },
+        openDetailId: openDetailId,
+        scrollY: window.scrollY
+      }));
+    } catch (e) { /* stockage indisponible : tant pis, pas de restauration */ }
+  }
+
+  function restoreState() {
+    var raw, st;
+    try { raw = sessionStorage.getItem(STATE_KEY); } catch (e) { return; }
+    if (!raw) return;
+    try { st = JSON.parse(raw); } catch (e) { return; }
+    if (!st) return;
+
+    query = String(st.query || '').trim().toLowerCase();
+    document.getElementById('inv-search').value = st.query || '';
+
+    var d1 = document.getElementById('inv-date-start');
+    var d2 = document.getElementById('inv-date-end');
+    d1.value = st.dateStart || '';
+    d2.value = st.dateEnd || '';
+    dateStart = parseInt(st.dateStart, 10) || null;
+    dateEnd = parseInt(st.dateEnd, 10) || null;
+
+    sortKey = st.sortKey || 'cote';
+    document.getElementById('inv-sort').value = sortKey;
+
+    page = st.page || 1;
+
+    ['fonds', 'type', 'lieu', 'numerise'].forEach(function (axis) {
+      ((st.active && st.active[axis]) || []).forEach(function (v) { active[axis].add(v); });
+    });
+
+    pendingOpenId = (typeof st.openDetailId === 'number') ? st.openDetailId : null;
+    pendingScrollY = (typeof st.scrollY === 'number') ? st.scrollY : null;
+  }
+
   // ── Chargement ──────────────────────────────────────────────────────────
   function load() {
     Promise.all([
@@ -132,6 +202,14 @@
       typeof fetchExemplairesManuelsAsCatalogRows === 'function'
         ? fetchExemplairesManuelsAsCatalogRows().catch(function () { return []; })
         : Promise.resolve([]),
+      /* Pièces sans code-barre (jamais cataloguées dans Syracuse — fonds
+         Manuscrits notamment, voir scripts/build-non-catalogues.mjs), issues
+         de csv/inventaire.csv. Statique comme data/inventaire.json (pas
+         d'API à ménager) : un échec de fetch dégrade vers un tableau vide
+         plutôt que de bloquer le reste du catalogue. */
+      fetch('data/non-catalogues.json').then(function (r) {
+        return r.ok ? r.json() : [];
+      }).catch(function () { return []; }),
       /* Surcouche Syracuse (synchronisation incrémentale, voir
          js/syracuse-sync-shared.js) : corrige cote/titre/auteur/date sur les
          exemplaires touchés depuis le dernier rebuild XML — { } si l'API est
@@ -141,8 +219,8 @@
         : Promise.resolve({})
     ])
       .then(function (res) {
-        records = res[0].concat(res[1]);
-        var overlay = res[2] || {};
+        records = res[0].concat(res[1]).concat(res[2]);
+        var overlay = res[3] || {};
         records.forEach(function (r, i) {
           r._id = i;
           var barcode = (r['995$f'] || r['915$b'] || '').trim();
@@ -158,13 +236,33 @@
             if (fresh.auteur) r['700$a'] = fresh.auteur;
             if (fresh.cote) r['930$g'] = fresh.cote;
           }
-          r._fonds = getFondsFromCote(r);
+          /* _fondsLabel (data/non-catalogues.json, data/magasins.json) est
+             posé directement depuis une source fiable pour ce sous-ensemble
+             (930$e du registre papier) — préféré à getFondsFromCote() plutôt
+             que de deviner un fonds depuis une cote qui ne suit pas toujours
+             la même convention de préfixe (ex. fonds Robaut : cotes
+             "RI-01-…", pas "ROBAUT…"). Même patron que
+             `buildCatalogFromItems()` dans recolement.html (CLAUDE.md,
+             "Reconnaissance de code-barre par un second catalogue"). */
+          r._fonds = r._fondsLabel || getFondsFromCote(r);
           r._type = normType(r['200$b']);
           r._lieu = normLieu(r['210$a']);
+          /* Numérisé = un document réellement consultable dans la visionneuse
+             (dossier Syracuse "num", ou lien posé à la main via
+             exemplarisation.html — "_lienNumerise"), pas juste "a une
+             vignette" (lien_num existe pour la plupart des exemplaires, même
+             sans le moindre scan complet derrière). */
+          r._numerise = (r['num'] || r['_lienNumerise']) ? 'Numérisé' : 'Non numérisé';
           r._year = yearOf(r);
           r._hay = [r['200$a'], r['700$a'], r['701$a'], r['930$g'], r['610$a']]
             .join(' ').toLowerCase();
         });
+        /* Un document sans cote (930$g) n'est pas localisable en réserve —
+           masqué de l'inventaire public plutôt qu'affiché avec une case vide
+           (demande explicite 2026-09-12). Après application de la surcouche
+           Syracuse : une cote corrigée à distance (fresh.cote ci-dessus) doit
+           pouvoir faire réapparaître un exemplaire qui en était dépourvu. */
+        records = records.filter(function (r) { return (r['930$g'] || '').trim(); });
         boot();
       })
       .catch(function (err) {
@@ -176,10 +274,14 @@
 
   function boot() {
     /* Fonds passé en URL (« inventaire.html?fonds=Douaisien »), utilisé par les
-       cartes de l'accueil. */
+       cartes de l'accueil — prime sur un éventuel état restauré (voir
+       restoreState() ci-dessus) : ce lien direct est une visite neuve, pas un
+       retour depuis la visionneuse. */
     var target = new URLSearchParams(window.location.search).get('fonds');
     if (target && records.some(function (r) { return r._fonds === target; })) {
       active.fonds.add(target);
+    } else {
+      restoreState();
     }
 
     document.getElementById('inv-loader').style.display = 'none';
@@ -187,7 +289,17 @@
 
     bindControls();
     renderFondsCards();
+    if (pendingOpenId != null && records[pendingOpenId]) openDetailId = pendingOpenId;
     apply();
+
+    if (pendingScrollY != null) {
+      var y = pendingScrollY;
+      // Double rAF : laisse le temps aux vignettes/à la mise en page de se
+      // stabiliser après le rendu synchrone ci-dessus avant de défiler.
+      requestAnimationFrame(function () { requestAnimationFrame(function () { window.scrollTo(0, y); }); });
+    }
+    pendingOpenId = null;
+    pendingScrollY = null;
   }
 
   // ── Contrôles ───────────────────────────────────────────────────────────
@@ -224,6 +336,7 @@
       active.fonds.clear();
       active.type.clear();
       active.lieu.clear();
+      active.numerise.clear();
       query = '';
       dateStart = dateEnd = null;
       search.value = '';
@@ -239,6 +352,7 @@
     if (skipAxis !== 'fonds' && active.fonds.size && !active.fonds.has(r._fonds)) return false;
     if (skipAxis !== 'type' && active.type.size && !active.type.has(r._type)) return false;
     if (skipAxis !== 'lieu' && active.lieu.size && !active.lieu.has(r._lieu)) return false;
+    if (skipAxis !== 'numerise' && active.numerise.size && !active.numerise.has(r._numerise)) return false;
     if (!dateMatchesFilter(r['210$d'], dateStart, dateEnd)) return false;
     if (query && r._hay.indexOf(query) === -1) return false;
     return true;
@@ -331,12 +445,18 @@
   var FACET_DEFS = [
     { axis: 'fonds', title: 'Fonds', field: '_fonds' },
     { axis: 'type', title: 'Type de document', field: '_type' },
-    { axis: 'lieu', title: 'Lieu d’édition', field: '_lieu' }
+    { axis: 'lieu', title: 'Lieu d’édition', field: '_lieu' },
+    /* host distinct : rendue après le bloc "Période" (statique, tout en bas
+       de la colonne Affiner), pas dans #inv-facets avec les trois autres —
+       demande explicite pour que ce filtre reste le dernier de la colonne. */
+    { axis: 'numerise', title: 'Numérisation', field: '_numerise', host: 'inv-facets-bottom' }
   ];
 
   function renderFacets() {
     var host = document.getElementById('inv-facets');
     host.innerHTML = '';
+    var bottomHost = document.getElementById('inv-facets-bottom');
+    if (bottomHost) bottomHost.innerHTML = '';
 
     FACET_DEFS.forEach(function (def) {
       /* Les comptes d'un axe sont calculés en ignorant ce même axe : sinon,
@@ -346,7 +466,10 @@
       var counts = {};
       pool.forEach(function (r) {
         var v = r[def.field];
-        if (v) counts[v] = (counts[v] || 0) + 1;
+        /* « (Sans fonds) » (repli de getFondsFromCote pour une cote au préfixe
+           non reconnu) n'est pas un fonds réel : pas de case à cocher pour ça
+           dans la colonne "Affiner" (demande explicite 2026-09-12). */
+        if (v && v !== '(Sans fonds)') counts[v] = (counts[v] || 0) + 1;
       });
 
       var entries = Object.keys(counts).map(function (k) {
@@ -381,7 +504,8 @@
         block.appendChild(row);
       });
 
-      host.appendChild(block);
+      var targetHost = (def.host && document.getElementById(def.host)) || host;
+      targetHost.appendChild(block);
     });
   }
 
@@ -442,6 +566,7 @@
     });
 
     renderPagination(total, start);
+    saveState();
   }
 
   function buildRow(rec) {
@@ -457,7 +582,12 @@
     // Vignette (js/inventaire.js) — repli automatique si l'image est absente.
     var thumb = document.createElement('div');
     thumb.className = 'inv-thumb';
-    thumb.appendChild(buildThumbFrame((rec['lien_num'] || '').trim()));
+    var thumbNumVal = (rec['num'] || '').trim();
+    var thumbLienNumeriseVal = (rec['_lienNumerise'] || '').trim();
+    thumb.appendChild(buildThumbFrame(
+      (rec['lien_num'] || '').trim(), false,
+      thumbNumVal || thumbLienNumeriseVal, thumbNumVal ? 'dossier' : 'image'
+    ));
     row.appendChild(thumb);
 
     var main = document.createElement('div');
@@ -481,14 +611,13 @@
     var cote = (rec['930$g'] || '').trim();
     if (cote) tags.innerHTML += '<span class="inv-tag-cote">' + esc(cote) + '</span>';
     if (rec._type) tags.innerHTML += '<span class="inv-tag-type">' + esc(rec._type) + '</span>';
-    if (rec['Sous-fonds']) tags.innerHTML += '<span class="inv-tag-manuel">' + esc(rec['Sous-fonds']) + '</span>';
     main.appendChild(tags);
 
     row.appendChild(main);
 
     var side = document.createElement('div');
     side.className = 'inv-side';
-    var dateTxt = (rec['210$d'] || '').trim();
+    var dateTxt = formatPublicationDate((rec['210$d'] || '').trim());
     side.innerHTML =
       '<span class="inv-date">' + esc(dateTxt || '—') + '</span>' +
       '<span class="inv-more">' + (openDetailId === rec._id ? 'Fermer ↑' : 'Voir la notice →') + '</span>';
@@ -535,6 +664,15 @@
 
     if (totalPages <= 1) return;
 
+    function goToPage(target) {
+      target = Math.max(1, Math.min(totalPages, target));
+      if (target === page) return;
+      page = target;
+      openDetailId = null;
+      renderResults();
+      document.getElementById('inv-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     var btns = document.createElement('div');
     btns.className = 'inv-page-btns';
 
@@ -543,15 +681,36 @@
       var b = document.createElement('button');
       b.type = 'button';
       b.textContent = label;
-      if (opts.current) b.className = 'is-current';
       if (opts.disabled) b.disabled = true;
-      else b.addEventListener('click', function () {
-        page = target;
-        openDetailId = null;
-        renderResults();
-        document.getElementById('inv-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+      else b.addEventListener('click', function () { goToPage(target); });
       btns.appendChild(b);
+    }
+
+    /* Remplace la case qui montrerait la page courante par un champ
+       directement éditable (au lieu d'un bouton "is-current" inerte à côté
+       d'un formulaire "Page … sur … Aller" séparé) : on tape le numéro de
+       page voulu à la place, moins de largeur prise et un seul geste. */
+    function currentPageInput() {
+      var input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'inv-page-current-input';
+      input.min = '1';
+      input.max = String(totalPages);
+      input.inputMode = 'numeric';
+      input.value = String(page);
+      input.style.width = (String(totalPages).length + 1.5) + 'ch';
+      input.setAttribute('aria-label', 'Aller à la page (sur ' + totalPages.toLocaleString('fr-FR') + ')');
+      function commit() {
+        var v = parseInt(input.value, 10);
+        var target = isNaN(v) ? page : Math.max(1, Math.min(totalPages, v));
+        if (target === page) input.value = String(page);
+        else goToPage(target);
+      }
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      });
+      input.addEventListener('blur', commit);
+      btns.appendChild(input);
     }
 
     pageBtn('‹ Précédent', page - 1, { disabled: page === 1 });
@@ -561,8 +720,10 @@
         s.className = 'inv-page-gap';
         s.textContent = '…';
         btns.appendChild(s);
+      } else if (p === page) {
+        currentPageInput();
       } else {
-        pageBtn(String(p), p, { current: p === page });
+        pageBtn(String(p), p);
       }
     });
     pageBtn('Suivant ›', page + 1, { disabled: page === totalPages });
@@ -581,6 +742,14 @@
     pages.push(total);
     return pages;
   }
+
+  /* Rafraîchit l'état juste avant de quitter la page (clic sur « Accéder au
+     document numérisé », fermeture d'onglet…) : renderResults() a déjà
+     sauvegardé l'état à chaque rendu, mais le défilement, lui, peut avoir
+     bougé depuis sans déclencher de rendu (l'utilisateur·rice fait défiler
+     jusqu'au bouton avant de cliquer). `pagehide` capture cette position
+     finale sans gêner le back-forward cache (contrairement à `unload`). */
+  window.addEventListener('pagehide', saveState);
 
   // ── Démarrage ───────────────────────────────────────────────────────────
   if (document.readyState === 'loading') {

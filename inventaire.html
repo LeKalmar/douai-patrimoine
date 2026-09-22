@@ -51,8 +51,11 @@
     .inv-hero-lead {
       font-size: 0.95rem; line-height: 1.7; color: var(--ink-soft); max-width: 42ch;
     }
+    .inv-searchbar-wrap {
+      padding: 1.6rem var(--rp-gutter, 2.5rem) 0; background: var(--papier);
+    }
     .inv-searchbar {
-      margin-top: 1.5rem; display: flex; background: #fff;
+      display: flex; background: #fff;
       border: 2px solid var(--encre); max-width: 38.75rem;
     }
     .inv-searchbar-field {
@@ -67,6 +70,21 @@
       background: var(--carmin); color: #fff; font-size: 0.85rem; font-weight: 700;
       padding: 0.875rem 1.5rem; border: none; cursor: pointer;
     }
+
+    /* Bouton de retour à l'accueil, en haut à droite du bandeau d'en-tête. */
+    .inv-hero-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+    }
+    .inv-home-link {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.78rem; font-weight: 600; color: var(--encre);
+      background: #fff; border: 1px solid var(--trait-fort); border-radius: 999px;
+      padding: 0.4rem 0.85rem; text-decoration: none; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .inv-home-link:hover { border-color: var(--encre); color: var(--carmin); }
+    .inv-home-link svg { flex-shrink: 0; }
 
     /* ── Cartes de fonds ─────────────────────────────────────────────── */
     .inv-fonds { padding: 1.6rem var(--rp-gutter, 2.5rem) 0; background: var(--papier); }
@@ -116,7 +134,7 @@
       color: var(--bleu); display: block; line-height: 1;
     }
     .inv-fcard--on .inv-fcard-count { color: rgba(255,255,255,0.62); }
-    .inv-fcard--on .inv-fcard-count strong { color: var(--corail); }
+    .inv-fcard--on .inv-fcard-count strong { color: var(--rose); }
 
     /* ── Corps : facettes + résultats ────────────────────────────────── */
     .inv-body {
@@ -223,10 +241,6 @@
       font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
       color: var(--carmin);
     }
-    .inv-tag-manuel {
-      font-size: 0.66rem; font-weight: 600; color: #8A6A12;
-      background: #FAF3E0; border: 1px solid #EBD9AE; padding: 0.18rem 0.5rem;
-    }
     .inv-side {
       display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
       gap: 0.5rem; flex-shrink: 0; text-align: right;
@@ -254,10 +268,18 @@
       background: #fff; border: 1px solid var(--trait-fort); color: var(--encre);
       font-family: inherit; font-size: 0.78rem; padding: 0.5rem 0.85rem; cursor: pointer;
     }
-    .inv-page-btns button:hover:not(:disabled):not(.is-current) { border-color: var(--bleu); color: var(--bleu); }
-    .inv-page-btns button.is-current { background: var(--encre); color: #fff; border-color: var(--encre); cursor: default; }
+    .inv-page-btns button:hover:not(:disabled) { border-color: var(--bleu); color: var(--bleu); }
     .inv-page-btns button:disabled { color: #B0AEBB; cursor: default; }
     .inv-page-gap { color: #B0AEBB; font-size: 0.78rem; padding: 0 0.15rem; }
+    .inv-page-current-input {
+      background: var(--encre); color: #fff; border: 1px solid var(--encre);
+      font-family: inherit; font-size: 0.78rem; text-align: center;
+      padding: 0.5rem 0.3rem;
+    }
+    .inv-page-current-input:focus { outline: none; border-color: var(--bleu); }
+    .inv-page-current-input::-webkit-outer-spin-button,
+    .inv-page-current-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .inv-page-current-input { -moz-appearance: textfield; }
 
     @media (max-width: 60rem) {
       .inv-body { grid-template-columns: 1fr; }
@@ -276,19 +298,17 @@
 
 <!-- ============ HERO ============ -->
 <section class="inv-hero">
-  <p class="rp-eyebrow">Inventaire en ligne</p>
+  <div class="inv-hero-topbar">
+    <p class="rp-eyebrow">Inventaire en ligne</p>
+    <a href="index.html" class="inv-home-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour à l'accueil
+    </a>
+  </div>
   <div class="inv-hero-top">
     <h1>Feuilleter les <span>collections</span></h1>
     <p class="inv-hero-lead">Manuscrits, incunables, fonds Douaisien, livres d'artiste et périodiques locaux. Cliquez une notice pour la fiche complète et, quand elle existe, la version numérisée.</p>
   </div>
-  <form class="inv-searchbar" id="inv-form" role="search">
-    <div class="inv-searchbar-field">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#8A8A99" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
-      <label class="inv-sr" for="inv-search">Rechercher dans l'inventaire</label>
-      <input type="search" id="inv-search" placeholder="Un titre, un auteur, une cote…" autocomplete="off">
-    </div>
-    <button type="submit">Rechercher</button>
-  </form>
 </section>
 
 <div id="inv-loader">Chargement du catalogue…</div>
@@ -303,6 +323,21 @@
       <span class="inv-fonds-summary" id="inv-fonds-summary"></span>
     </div>
     <div class="inv-fonds-cards" id="inv-fonds-cards"></div>
+  </section>
+
+  <!-- ============ RECHERCHE ============
+       Placée ici (entre les fonds et les résultats) plutôt qu'en haut de page :
+       en bas de liste, changer la recherche ne demande plus de remonter tout
+       en haut. -->
+  <section class="inv-searchbar-wrap">
+    <form class="inv-searchbar" id="inv-form" role="search">
+      <div class="inv-searchbar-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#8A8A99" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+        <label class="inv-sr" for="inv-search">Rechercher dans l'inventaire</label>
+        <input type="search" id="inv-search" placeholder="Un titre, un auteur, une cote…" autocomplete="off">
+      </div>
+      <button type="submit">Rechercher</button>
+    </form>
   </section>
 
   <!-- ============ FACETTES + RÉSULTATS ============ -->
@@ -324,6 +359,7 @@
           <input type="number" id="inv-date-end" placeholder="1958" min="0" max="2100">
         </div>
       </div>
+      <div id="inv-facets-bottom"></div>
     </aside>
 
     <main class="inv-main-col" id="inv-main" tabindex="-1">

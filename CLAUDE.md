@@ -110,20 +110,24 @@ partagé »).
   son rapport, également depuis `xml/bib.xml` (toute la bibliothèque, pas
   seulement les magasins). Voir « Cotes numériques » plus bas.
 - `npm run upload:bib` — pousse `data/xml/bib.xml` (export complet de la
-  bibliothèque, format GESMARC, plusieurs centaines de Mo) vers R2
-  (`xml/bib.xml`). À relancer après chaque nouvel export ; les deux scripts
-  ci-dessus le rapatrient alors automatiquement. Le parseur GESMARC est
-  partagé entre `build-magasins.mjs`, `build-cotes-numeriques.mjs` et
-  `build-desherbage.mjs` via `scripts/lib/gesmarc.mjs` (le parseur MARC-XML,
-  pour `data/xml/notices.xml`/`exemplaires.xml`, reste dans
+  bibliothèque, format GESMARC, plusieurs Go) vers R2 (`xml/bib.xml`). À
+  relancer après chaque nouvel export ; les trois scripts ci-dessus le
+  rapatrient alors automatiquement (un seul téléchargement suffit aux trois
+  s'ils sont lancés à la suite, le fichier local `data/xml/bib.xml` étant
+  partagé). Le parseur GESMARC est partagé entre `build-magasins.mjs`,
+  `build-cotes-numeriques.mjs` et `build-desherbage.mjs` via
+  `scripts/lib/gesmarc.mjs` (le parseur MARC-XML, pour
+  `data/xml/notices.xml`/`exemplaires.xml`, reste dans
   `scripts/lib/marc-xml.mjs`) — `bib.xml` étant trop volumineux pour tenir
-  dans une seule string JS, ces deux scripts le lisent en flux
+  dans une seule string JS, les trois scripts le lisent en flux
   (`iterateGesmarcItemsFromFile()`) plutôt qu'avec un `readFileSync()`
   classique.
 - `npm run build:desherbage` — régénère `data/desherbage.json` et
-  `data/desherbage-build-report.json` à partir de l'export Syracuse
-  « statistiques de prêt » utilisé par Rotobib (`rotobib.html`), indépendant
-  de `bib.xml` (voir « Rotobib » plus bas).
+  `data/desherbage-build-report.json`, les statistiques de prêt utilisées
+  par Rotobib (`rotobib.html`) et par `desherbage-stats.html`, désormais
+  depuis `xml/bib.xml` également (migré le 2026-09-10, ce script lisait
+  auparavant un export Syracuse dédié, distinct de `bib.xml` — voir
+  « Rotobib » plus bas pour le détail de cette migration).
 - Avant d'écraser `data/build-report.json`, `data/magasins-build-report.json`,
   `data/cotes-numeriques-build-report.json` ou `data/desherbage-build-report.json`,
   chaque script archive la version précédente dans un fichier `-previous.json`
@@ -583,9 +587,9 @@ séparément après un nouvel export + `npm run upload:bib`.
 Avant 2026-08-26, ce catalogue venait d'un export Syracuse dédié
 (`xml/magasin/notices.xml.xml` + `exemplaires.xml.xml`, MARC-XML classique)
 qui ne couvrait que le 2e/5e étage et excluait volontairement le 6e (motif
-historique : ces deux fichiers restent dans R2 et sont toujours utilisés
-par `build-desherbage.mjs`/Rotobib — voir plus bas — mais `build-magasins.mjs`
-ne les lit plus). `bib.xml` est un export "GESMARC" à plat (voir
+historique : ces deux fichiers restent dans R2, mais depuis 2026-09-10 plus
+aucun script ne les lit — `build-desherbage.mjs`/Rotobib est lui aussi passé
+à `bib.xml`, voir plus bas). `bib.xml` est un export "GESMARC" à plat (voir
 `scripts/lib/gesmarc.mjs`), pas du MARC-XML : chaque exemplaire porte
 directement `Titre`/`Auteur`/`Editeur`/`Publié le` (pas de jointure
 notice/exemplaire nécessaire), une `Bibliothèque (Libellé)` (le réseau
@@ -672,10 +676,10 @@ colonne "Entrée" (date d'entrée) de l'ancien `magasins.html` a été retirée 
 `bib.xml` ne porte pas d'équivalent au `920$d` de l'ancien export MARC-XML.
 
 `data/xml/magasin/` et `data/xml/all/` (anciens exports, gitignorés comme
-tout `data/xml/`) ne sont plus lus par `build-magasins.mjs`/
-`build-cotes-numeriques.mjs` — `xml/magasin/notices.xml.xml` reste
-cependant utilisé par `build-desherbage.mjs` (Rotobib, voir plus bas), donc
-pas retiré de R2.
+tout `data/xml/`) ne sont plus lus par aucun script depuis 2026-09-10
+(`build-desherbage.mjs`/Rotobib est passé à `bib.xml` ce jour-là, voir plus
+bas) — pas retirés de R2 pour autant, comme les autres exports devenus
+obsolètes.
 
 ## Cotes numériques (repérage dans le catalogue complet)
 
@@ -1064,17 +1068,31 @@ vois pas mon changement » sans redemander une vérification manuelle.
   la synchro elle-même (voir `js/syracuse-sync-trigger.js` plus haut) — sans
   ça, une notice ne progresserait jamais tant que personne n'a ouvert
   `recolement.html`/`magasins.html` entretemps, ce qui s'est produit en
-  conditions réelles avant ce correctif. `noticeRows()` (fenêtre
-  modale au clic sur une étagère) affiche, pour chaque notice dont le
-  code-barre a une entrée dans la surcouche, un badge bleu `.notice-live`
-  (« 🔄 Section · Site ») à côté du `.notice-fonds` figé au moment du scan
-  — sans jamais reconstruire ce dernier : `reserve.html` n'a aucun accès à
-  `data/magasins.json` (son plan vient entièrement de `/api/recolement`,
-  voir plus haut), donc pas moyen d'y recalculer un `_fondsLabel` propre ;
-  la surcouche est affichée telle quelle, distinguée visuellement plutôt
-  que fusionnée dans le libellé existant. Absent pour l'immense majorité
-  des notices (celles non retouchées depuis le dernier rebuild) — le badge
-  n'apparaît que sur ce qui a effectivement changé.
+  conditions réelles avant ce correctif. `noticeRows()` (fenêtre modale au
+  clic sur une étagère, 2026-09-10) remplace `cote`/`titre`/`auteur` par la
+  valeur de la surcouche pour chaque notice dont le code-barre y a une
+  entrée (`fresh.cote||n.c`, etc.) — même principe que
+  `applySyracuseOverlayToCatalog()` de `recolement.html`, appliqué ici
+  directement sur les notices déjà chargées en mémoire (pas de catalogue
+  complet côté `reserve.html`) plutôt que sur un catalogue. Le tri
+  (`sort==='cote'`/`'titre'`/`'auteur'`) porte sur ces valeurs déjà
+  fusionnées, pas sur celles figées au moment du scan — une notice
+  corrigée se retrie donc à sa place à jour. Seul le **fonds**
+  (`.notice-fonds`) reste figé et non reconstruit : lui recalculer un
+  `_fondsLabel` propre demanderait `data/magasins.json`, dont
+  `reserve.html` n'a aucune copie (son plan vient entièrement de
+  `/api/recolement`, voir plus haut) — un badge bleu `.notice-live`
+  (« 🔄 Section · Site ») s'affiche à côté à la place, distinguée
+  visuellement plutôt que fusionnée dans le libellé existant. Ce badge, et
+  la fusion cote/titre/auteur qui l'accompagne, sont absents pour l'immense
+  majorité des notices (celles non retouchées depuis le dernier rebuild) —
+  n'apparaissent que sur ce qui a effectivement changé. Avant ce correctif,
+  la cote/titre/auteur affichés restaient figés au moment du scan même
+  après une correction Syracuse détectée par la synchro — seul un rescan
+  physique dans `recolement.html`, ou le prochain rebuild XML complet,
+  les mettait à jour ; un signalement concret (exemplaire 607603, cote
+  corrigée « L 61 » → « L61 » toujours affichée avec l'espace) a motivé ce
+  changement.
 
 `analyse-cotes.html` et les autres pages qui chargent `data/inventaire.json`
 indépendamment (`exemplarisation.html`, `reliures.html`,
@@ -1185,17 +1203,32 @@ Ces exemplaires sont ensuite fusionnés côté client, via
 `js/exemplaires-manuels-shared.js` (`fetchExemplairesManuelsAsCatalogRows()`,
 qui convertit chaque enregistrement au même format de champs que
 `data/inventaire.json` — `200$a`/`700$a`/`210$d`/`930$g`/`995$f` — plus un
-`Sous-fonds` dédié `⚡ Exemplarisation rapide (à cataloguer)` pour rester
-visuellement distincts tant qu'ils n'ont pas été réellement catalogués),
-dans trois endroits qui lisaient jusqu'ici uniquement `data/inventaire.json` :
+`Sous-fonds` dédié `⚡ Exemplarisation rapide (à cataloguer)`), dans trois
+endroits qui lisaient jusqu'ici uniquement `data/inventaire.json` :
 
-- `js/inventaire.js` (`loadCSV()`) — recherche du catalogue sur `index.html`.
+- `js/inventaire.js` (`loadCSV()`) — recherche du catalogue sur
+  `inventaire.html`, la page publique (`index.html` ne fait que pointer vers
+  elle, il n'y a pas de recherche embarquée sur la page d'accueil).
 - `analyse-cotes.html` — détection de trous/doublons de cotes.
 - `recolement.html` (fetch du `catalog` en tout début de script) — pour
   qu'un code-barre créé ici, même **sans** emplacement renseigné, soit déjà
   reconnu comme « connu du catalogue » au moment où quelqu'un le scanne
   physiquement plus tard (sinon `handleScan()` le traiterait comme inconnu
   et n'enregistrerait rien — voir son statut `unknown`).
+
+Ce `Sous-fonds` servait jusqu'ici à regrouper ces exemplaires à part et à les
+étiqueter d'une pastille « ⚡ Exemplarisation rapide (à cataloguer) », pour
+rester visuellement distincts tant qu'ils n'ont pas été réellement
+catalogués. Depuis 2026-09-11 (demande explicite), ce regroupement/badge est
+désactivé sur l'inventaire **public** (`inventaire.html`) : `SOUS_FONDS_KEY`
+vaut `null` dans `js/inventaire.js` (le mécanisme de regroupement par
+sous-fonds reste générique et réutilisable, juste éteint — voir le
+commentaire à côté de la constante) et `js/inventaire-page.js` ne rend plus
+la pastille `.inv-tag-manuel` dans la fiche détaillée. Ces exemplaires
+restent cherchables/affichés dans l'inventaire public, simplement sans
+étiquette « à cataloguer » visible du public — le champ `Sous-fonds` lui-même
+reste posé sur chaque enregistrement (utile en interne, ex. si un besoin
+d'affichage similaire se présente ailleurs).
 
 Ces trois fusions échouent silencieusement (tableau vide) si l'API est
 indisponible, pour ne jamais bloquer l'affichage du reste du catalogue —
@@ -1243,6 +1276,198 @@ usage en écriture seule. Si un affichage de ces vignettes est un jour
 demandé (ex. dans le tableau des exemplaires créés, ou dans le catalogue),
 il faudra soit un endpoint `GET` signé supplémentaire (le bucket n'est pas
 public), soit activer un accès public R2 sur ce préfixe précis.
+
+### Document numérisé (lien vers la visionneuse)
+
+`exemplarisation.html` (2026-09-11) permet aussi de rattacher un exemplaire à
+une image déjà déposée dans le bucket R2 qui alimente `visionneuse.html`
+(celui de `js/manifest.json`, distinct du bucket `douai-patrimoine` du reste
+du stockage partagé — voir `IMAGES_ROOT` dans `visionneuse.html`) : case
+« Document numérisé », qui fait apparaître un champ où coller le chemin R2
+du fichier (ex. `num-robaut/Boîte 1/B591786101_RI_01_020r_033.jpg` — même
+convention que les `path` de `js/manifest.json`, préfixe `https://pub-…r2.dev/`
+retiré automatiquement si collé par erreur, `normalizeLienNumerise()`). Ce
+seul champ suffit : vignette et ouverture dans la visionneuse sont dérivées
+automatiquement côté inventaire public, sans passer par `generer_manifest.html`.
+
+Stocké sur l'enregistrement (R2, `exemplaires-manuels.json`) sous
+`{numerise:true, lienNumerise:"<chemin R2>"}` — `numerise` ne vaut `true`
+que si un chemin a réellement été saisi (cocher la case sans rien coller ne
+marque pas le document comme numérisé). `js/exemplaires-manuels-shared.js`
+(`exemplaireManuelToCatalogRecord()`) en dérive, uniquement quand les deux
+sont posés : `lien_num` (URL complète, `IMAGES_ROOT + lienNumerise` —
+réutilise tel quel le mécanisme de vignette déjà en place pour tout
+exemplaire ayant un `lien_num`, aucun changement d'affichage nécessaire) et
+`_lienNumerise` (le chemin brut, pour la visionneuse).
+
+Côté `js/inventaire.js`, deux points d'entrée existaient déjà pour les
+documents numérisés Syracuse (colonne `num`, un identifiant de dossier dans
+`js/manifest.json`) : `buildThumbFrame()` (clic sur la vignette) et le
+bouton de `buildExpandedContent()` (rebaptisé « Accéder au document
+numérisé », auparavant « Consulter le document numérisé »). Les deux
+acceptent désormais aussi `_lienNumerise`, et — demande explicite du
+2026-09-11, après un premier essai jugé incohérent (petite vignette → nouvel
+onglet, grande vignette → fichier brut sans visionneuse, bouton → surcouche
+modale : trois comportements différents pour le même document) — les **trois**
+points de clic ont été unifiés sur une seule navigation classique, dans le
+même onglet (`window.location.href = visionneuseSrc(...)`), pour rester dans
+l'iframe du site hôte comme n'importe quel lien du site plutôt que d'ouvrir
+un nouvel onglet, le fichier brut, ou une surcouche :
+
+- `buildThumbFrame(lienNum, large, visionneuseTarget, visionneuseMode)` —
+  gagné deux paramètres optionnels, utilisés identiquement en petite vignette
+  (liste) et en grande vignette (panneau de détail, où le clic était
+  auparavant désactivé et géré à part par `buildExpandedContent()`) : s'ils
+  sont fournis, le clic navigue vers `visionneuseSrc(visionneuseTarget,
+  visionneuseMode)` ; sinon, repli sur l'ouverture du fichier brut
+  (`lien_num` seul, sans document numérisé associé — simple photo).
+- `buildExpandedContent()` calcule une fois `visionneuseTarget`
+  (`rec['num'] || rec['_lienNumerise']`) et `visionneuseMode` (`'dossier'`
+  si `num`, sinon `'image'`), réutilisés à la fois pour la grande vignette et
+  pour le bouton — plus besoin de dupliquer la logique num/`_lienNumerise` à
+  deux endroits.
+- `openVisionneuse()`/`openVisionneuseInline()`/`closeVisionneuse()`/
+  `ensureVisionneuseStyle()` (la surcouche modale/le bloc inséré dans le
+  flux, pour contourner `position:fixed` en iframe — voir plus bas
+  « Publication en iframe ») **ne sont plus appelées nulle part sur cette
+  page** depuis ce changement. Conservées telles quelles (et toujours
+  exposées sur `window.openVisionneuse`/`window.closeVisionneuse`) plutôt que
+  supprimées : rien ne garantit qu'aucun autre script ne s'y accroche, et le
+  risque d'un faux positif « code mort » l'emportait sur le gain d'un
+  nettoyage. `visionneuseSrc()` reste utilisée (par la navigation directe
+  ci-dessus) et a gagné son 4ᵉ paramètre `mode` (`'dossier'` par défaut, ou
+  `'image'`) à cette même occasion — tous les appels existants (positionnels,
+  sans ce paramètre) continuent de fonctionner à l'identique.
+
+`visionneuse.html` sait désormais ouvrir une image par son chemin R2 exact,
+pas seulement un dossier par son nom : nouveau paramètre `?image=<chemin>`
+(`openImageCible()`, à côté de `openDossierCible()`). Si le chemin est déjà
+indexé dans `js/manifest.json` (cas courant : le fichier a été intégré via
+`generer_manifest.html`), c'est cette entrée qui s'ouvre — arbre, fil
+d'Ariane et navigation préc/suiv fonctionnent normalement. Sinon (lien
+saisi dans `exemplarisation.html` avant tout passage par
+`generer_manifest.html`), l'image s'ouvre quand même : `openImageCible()`
+l'ajoute à la volée à `flatFiles` (même URL, `IMAGES_ROOT + chemin`), sans
+rien régénérer côté manifeste — c'est ce qui permet au lien collé dans
+`exemplarisation.html` de fonctionner tout de suite, sans étape
+supplémentaire.
+
+Sur `inventaire.html`, un filtre « Numérisation » (Numérisé / Non
+numérisé) a été ajouté au bas de la colonne « Affiner » (`#inv-facets-bottom`,
+après le bloc « Période », qui reste seul non généré par la boucle
+générique — demande explicite de position). Implémenté avec le même
+mécanisme de facettes générique que Fonds/Type/Lieu (`FACET_DEFS` dans
+`js/inventaire-page.js`), qui a gagné un champ `host` optionnel par entrée
+pour rendre ce bloc précis dans un conteneur séparé plutôt que dans
+`#inv-facets` avec les trois autres. La valeur vient de `r._numerise`,
+dérivée à `'Numérisé'`/`'Non numérisé'` selon `r['num'] || r['_lienNumerise']`
+— **pas** la simple présence de `lien_num` (une vignette existe pour la
+plupart des exemplaires, y compris ceux sans le moindre scan complet
+derrière ; seul un vrai document consultable dans la visionneuse compte
+comme « numérisé » ici).
+
+## Pièces non cataloguées (fonds Manuscrits, Robaut, Objets — 2026-09-12)
+
+`csv/inventaire.csv` (24,5 Mo, ~25 200 lignes, colonnes taguées UNIMARC comme
+`data/inventaire.json` — `200$a`, `700$a`, `210$d`, `930$g`…) est un registre
+plus large que ce que couvre Syracuse : `995$f` (code-barre) y est renseigné
+pour 15 140 lignes, dont 15 134 correspondent à un code-barre déjà présent
+dans `data/inventaire.json` (quasi-totalité — c'est le même fonds réserve,
+vu depuis le registre d'origine plutôt que depuis l'export Syracuse) ; les
+10 090 lignes restantes n'ont **jamais** eu de code-barre, faute de
+catalogage. `scripts/build-non-catalogues.mjs` (`npm run
+build:non-catalogues`) n'en garde que cette seconde catégorie (`995$f` vide
+ET `930$g` non vide — une ligne sans cote serait de toute façon masquée côté
+page publique, voir plus haut) → `data/non-catalogues.json` +
+`data/non-catalogues-build-report.json` (même archivage `-previous.json` que
+les autres builds). Répartition sur l'export courant (champ `930$e`, fiable
+sur ce registre — voir plus bas) : **Manuscrits** (9 160, le plus gros
+contingent, entièrement absent de `data/inventaire.json` aujourd'hui : 0
+exemplaire de cote commençant par "MS" avant cet ajout), **Robaut** (822,
+planches iconographiques déjà numérisées, voir plus bas), **Objets** (62,
+numismatique), et 46 lignes sans `930$e` (cote "D 12-…", déjà reconnues
+Douaisien par `getFondsFromCote()`).
+
+Ce script est indépendant du pipeline `npm run build` (Syracuse MARC-XML) :
+`data/inventaire.json` n'est pas touché, `csv/inventaire.csv` n'entre nulle
+part dans `build-inventory.mjs`. `data/non-catalogues.json` est fusionné
+côté client **uniquement dans l'inventaire public**
+(`js/inventaire-page.js`, `load()` — un `fetch()` de plus dans le
+`Promise.all`, même dégradation silencieuse que les autres sources si le
+fichier est absent/erreur réseau) : ces pièces n'ont pas de code-barre, donc
+rien à scanner — pas de fusion côté `recolement.html`/`reserve.html`,
+contrairement aux exemplaires manuels d'`exemplarisation.html`.
+
+Champs retenus par ligne, et pourquoi (voir l'en-tête de
+`scripts/build-non-catalogues.mjs` pour le détail complet) :
+- **Titre** (`200$a`) : replié sur la cote quand absent — ~46 % des
+  Manuscrits n'ont jamais eu de titre individuel (seulement un numéro de
+  registre, ex. « Ms 295 »), une pièce en attente de catalogage complet plutôt
+  qu'une erreur de saisie.
+- **Auteur** (`700$a` nom / `700$b` prénom) : gardés séparés, vérifié que ce
+  registre suit la même convention que Syracuse (ex. « Desbordes-Valmore » /
+  « Marceline ») — `buildRow()` n'affiche que le nom, `buildExpandedContent()`
+  recompose « NOM Prénom » à partir des deux, sans changement nécessaire dans
+  ces deux fonctions.
+- **Type** (`200$b`) : arrive en code court (`MANU`/`ICO`/`NUMI`/`LIVA`),
+  traduit vers le même texte qu'un export Syracuse (`TYPE_LABELS` dans le
+  script) pour que `normType()` (`js/inventaire-page.js`) le regroupe avec
+  les vrais exemplaires plutôt que d'ouvrir une entrée de facette dupliquée
+  (« Manu » à côté de « Manuscrit »).
+- **Date** (`210$d`) : recopiée telle quelle — le format « [11xx] »/« [12xx] »
+  (siècle approximatif), déjà présent sur une bonne partie des manuscrits,
+  est nativement comprise par `parsePublicationDate()`/`dateMatchesFilter()`,
+  aucune conversion nécessaire.
+- **Sujets** (`610$a`) : dérivé de `930$e_11` + `930$e_12` (sous-catégories du
+  registre, ex. « Religion », « Cartographie », parfois un nom de personne
+  comme « Théophile Bra »), en écartant les artefacts de tableur rencontrés
+  dans ces deux colonnes (`#CHAMP!`, `#REF!`…) — `610$a` est déjà un
+  `DETAIL_COLS` existant (`js/inventaire.js`), rien à ajouter côté affichage.
+- **Fonds** (`_fondsLabel`) : posé directement depuis `930$e`, fiable sur ce
+  registre — contrairement aux exports Syracuse où `getFondsFromCote()`
+  commente que ce même champ est « peu renseigné ». Même convention que
+  `_fondsLabel` dans `data/magasins.json` (voir « Reconnaissance de
+  code-barre par un second catalogue ») : `js/inventaire-page.js` a été
+  modifié pour préférer `r._fondsLabel` à `getFondsFromCote(r)` quand il est
+  présent (`r._fonds = r._fondsLabel || getFondsFromCote(r)`) — nécessaire
+  ici puisque les cotes Robaut (`RI-01-…`) ne correspondent pas au préfixe
+  `ROBAUT` déjà présent dans `FONDS_PREFIXES` (ajouté par avance dans un
+  commit précédent, resté sans effet faute de données : 0 cote `ROBAUT…`
+  dans `data/inventaire.json`). **`Manuscrits` a été ajouté à
+  `FONDS_VEDETTE`** (`js/inventaire-page.js`) pour apparaître dans la rangée
+  de fonds mis en avant sur `inventaire.html`, vu son volume ; `Robaut` et
+  `Objets` restent filtrables via la facette « Fonds » sans carte dédiée
+  (demande explicite portait sur les Manuscrits, pas sur ces deux-là).
+- **Vignette/document numérisé** (`lien_num`) : pour le fonds Robaut,
+  `lien_num` est déjà une URL R2 complète et valide dans ce registre
+  (vérifié : les 822 lignes matchent le domaine servant `js/manifest.json`,
+  ex. `num-robaut/Boîte 1/B591786101_RI_01_020r_033.jpg` y figure tel quel) —
+  le script en dérive `_lienNumerise` (chemin décodé, sans le domaine, même
+  convention que le champ posé par `exemplarisation.html`) pour que la
+  vignette ET le bouton « Accéder au document numérisé » fonctionnent
+  immédiatement, sans rien coder de plus côté page (mécanisme générique
+  depuis le 2026-09-11, voir « Document numérisé » plus haut). Les 3 lignes
+  Manuscrits portant un `lien_num` du type `num_ms/Ms1721` sont
+  volontairement ignorées : ce chemin n'apparaît nulle part dans
+  `js/manifest.json` et n'a pas d'extension de fichier — probablement un
+  dossier à constituer plus tard, pas un fichier existant à lier maintenant.
+
+Pas de code-barre ⇒ pas de `995$f`/`915$b` posés sur ces enregistrements :
+volontaire, pour qu'aucun autre outil ne les prenne un jour pour un
+exemplaire scannable. Chaque enregistrement porte aussi `_nonCatalogue:true`
+(actuellement non lu par aucun script — traçabilité si un traitement dédié
+devient nécessaire plus tard). Aucun badge visuel distinct sur la fiche
+publique (contrairement à l'ancien badge « ⚡ Exemplarisation rapide », déjà
+retiré du public le 2026-09-11) : ces pièces restent cherchables/affichées
+au même titre qu'un exemplaire catalogué, sans étiquette « à cataloguer ».
+
+`scripts/lib/csv.mjs` (parseur RFC4180 écrit à la main — guillemets doublés,
+retours à la ligne et point-virgule autorisés dans un champ cité) a été
+ajouté pour ce script : c'est la première lecture de CSV côté Node du
+projet (`generer_manifest.html`/`js/main.js` ne le font que côté navigateur,
+via PapaParse). `csv/inventaire.csv` (24,5 Mo) reste très en-deçà de la
+limite de longueur d'une string V8 (contrairement à `xml/bib.xml`,
+plusieurs Go) : lu entièrement en mémoire, pas en flux.
 
 ## Transfert 2e étage → réserve patrimoniale
 
@@ -1309,43 +1534,105 @@ importance matérielle et dimensions apparaissent sans changement côté
 `rotobib.html` (2026-08-26) aide à décider, exemplaire par exemplaire, s'il
 faut le conserver, le mettre au pilon, le mettre en braderie ou le
 relocaliser — en s'appuyant sur ses statistiques de prêt plutôt que sur une
-inspection à l'œil. Porte sur un export Syracuse **ponctuel et distinct** de
-`data/magasins.json` : mêmes exemplaires (des magasins 2e/5e étage), mais
-avec un profil d'export différent donnant accès aux statistiques de prêt/
-réservation par année — informations absentes de l'export magasins habituel.
-**Cet export ne doit jamais être fusionné dans `data/magasins.json` comme
-s'il s'agissait de nouveaux exemplaires** : c'est la même collection, vue
-sous un autre angle, en parallèle, uniquement pour les besoins du
-désherbage.
+inspection à l'œil.
+
+**Migration de source (2026-09-10) :** jusqu'à cette date, les statistiques
+de prêt venaient d'un export Syracuse ponctuel et distinct de
+`data/magasins.json` (`xml/desherbage/desherbage.xml`, format GESMARC,
+~6 140 exemplaires des seuls magasins d'étage, joints à
+`xml/magasin/notices.xml.xml` pour le titre/auteur). Le 2026-09-09, le
+profil d'export Syracuse de `xml/bib.xml` a changé : chaque `<item>` porte
+désormais directement ses statistiques de prêt/réservation par année
+(`Nombre de prêts AN/AN-1/AN-2/AN-3/cumulés`, `Nombre de réservations
+AN/…/cumulées`), en plus des champs déjà lus par `build-magasins.mjs`
+(titre, auteur, éditeur, cote, section…) et de `Publié le` (qui manquait
+jusque-là, voir « Magasins 2e/5e/6e étage » plus haut) — pour les
+~291 000 exemplaires de toute la bibliothèque de Douai, pas seulement les
+magasins. L'export dédié devient donc inutile : `build-desherbage.mjs` lit
+désormais `bib.xml` exactement comme `build-magasins.mjs` (même fichier
+local `data/xml/bib.xml`, même filtre `Bibliothèque (Libellé)` commençant
+par "Douai"), sans plus jamais avoir besoin d'un export séparé ni d'une
+jointure notice/exemplaire. `xml/desherbage/desherbage.xml` et
+`npm run upload:desherbage` restent dans le projet (R2 garde l'ancien
+objet, comme `xml/magasin/exemplaires.xml.xml`/`xml/all/catalogue.xml`
+avant eux) mais ne sont plus lus par aucun script.
+
+Champs perdus dans ce nouveau format par rapport à l'ancien export dédié :
+`686$a` (Dewey), `215$a`/`215$d` (description/dimensions) — `bib.xml`/
+GESMARC ne porte pas ces informations, même perte déjà acceptée lors du
+passage de `magasins.html`/`cotes-numeriques.html` à `bib.xml` le
+2026-08-26.
+
+**Portée : deux usages volontairement séparés (demande explicite de
+l'équipe, 2026-09-10).** `data/desherbage.json` couvre désormais TOUTE la
+bibliothèque Douai (291 015 exemplaires gardés sur 291 022 lus), chaque
+exemplaire portant un flag `_isMagasin` — même sémantique que
+`data/magasins.json`, calculée par le même module partagé
+`scripts/lib/magasin-classify.mjs` (`MAGASIN_SECTIONS`, `isPiegeEnReserve`,
+`magasinDigitRun`, `fondsLabel`, `isMagasin` — extrait de
+`build-magasins.mjs` à cette occasion, pour que les deux scripts, qui
+lisent le même `bib.xml`, ne puissent jamais diverger sur ce qui compte
+comme « magasin » ; 88 808 exemplaires sur l'export du 2026-09-09) :
+
+- `rotobib.html` filtre côté client sur `_isMagasin` (même patron que
+  `magasins.html` avec son propre flag) : l'outil de décision
+  pilon/braderie reste volontairement borné aux magasins d'étage, pour ne
+  pas exposer ces boutons sur un document patrimonial ou en circulation
+  active dans les rayons.
+- `desherbage-stats.html`, purement statistique (aucune décision prise ni
+  stockée), affiche `data/desherbage.json` SANS filtre — sert de base à de
+  futurs outils visuels sur l'ensemble du catalogue. Une colonne
+  « Section » (`_fondsLabel`/`section`) a été ajoutée à son tableau pour
+  rester lisible à cette échelle (auparavant tous les exemplaires étaient
+  des magasins, donc cette colonne n'apportait rien).
+
+Conséquence attendue de l'élargissement : sur l'export du 2026-09-09,
+195 965 des 291 015 exemplaires ont au moins un prêt sur les 4 dernières
+années (contre 70 sur 6 140 dans l'ancien export) — la collection complète
+inclut désormais les rayons en libre accès, activement empruntés, alors que
+l'ancien export dédié ne portait que sur une sélection déjà pré-filtrée de
+livres peu ou pas empruntés.
+
+**Piège rencontré au premier build sur ce nouvel export (2026-09-10) :**
+`node scripts/build-desherbage.mjs` plantait avec `FATAL ERROR: Reached
+heap limit … JavaScript heap out of memory` après quelques dizaines de
+milliers d'exemplaires lus, malgré un `--max-old-space-size` généreux (le
+tas continuait de grossir presque linéairement plutôt que de plafonner).
+Cause : une particularité de V8, pas une fuite applicative. Une valeur de
+quelques caractères extraite par regex (`parseGesmarcItem()` dans
+`scripts/lib/gesmarc.mjs`) d'un `<item>` de ~9 Ko (moyenne sur ce nouvel
+export, contre ~4 Ko avant — beaucoup plus de propriétés par exemplaire)
+reste une *SlicedString* : elle retient en mémoire tout le bloc XML source
+tant qu'elle existe, même minuscule. Accumulée sur ~291 000 exemplaires
+dans un tableau, chaque propriété capturée gardait donc en vie tout son
+`<item>` d'origine — plusieurs Go pour un résultat qui ne pèse réellement
+que quelques centaines de Mo. Corrigé dans `parseGesmarcItem()` en forçant
+une copie « à plat » de chaque nom/valeur capturé (idiome `(' '+s).slice(1)`
+— la concaténation force V8 à matérialiser une chaîne indépendante ; il
+n'existe pas de méthode dédiée en JS pour « détacher » une chaîne). Ce
+correctif vit dans le parseur GESMARC partagé, donc profite aussi à
+`build-magasins.mjs`/`build-cotes-numeriques.mjs` sans qu'ils aient jamais
+eu besoin d'un `--max-old-space-size` : leur volume par exemplaire extrait
+était resté trop faible jusqu'ici pour révéler le problème. Avec ce
+correctif, `build-desherbage.mjs` traite les ~291 000 exemplaires en
+~50 s, tas Node par défaut, sans dépasser ~900 Mo de RSS.
 
 Pipeline de build (`scripts/build-desherbage.mjs`, `npm run
 build:desherbage`) :
 
-- Entrée : `xml/desherbage/desherbage.xml` (R2, poussé par `npm run
-  upload:desherbage` — pas de repli local committé, comme les magasins/cotes
-  numériques). Format **GESMARC**, pas du MARC-XML comme le reste du
-  projet : `<items><item type="GESMARC"><property name="…" value="…"
-  /></item></items>`, un `<item>` par exemplaire, avec les statistiques de
-  prêt/réservation par année (`Nombre de prêts AN` = année en cours,
-  `AN-1`, `AN-2`, `AN-3`) plus un total `Nombre de prêts cumulés` depuis
-  l'acquisition. Aucune info notice (titre/auteur/date de parution) dans ce
-  fichier — uniquement l'exemplaire. Parsé par le parseur GESMARC partagé
-  (`iterateGesmarcItems`/`parseGesmarcItem` dans `scripts/lib/gesmarc.mjs` —
-  aussi utilisé par `build-magasins.mjs`/`build-cotes-numeriques.mjs` pour
-  `bib.xml`, voir « Magasins 2e/5e/6e étage » ; regex sur `<property
-  name="…" value="…">`), pas par `scripts/lib/marc-xml.mjs` (réservé au vrai
-  MARC-XML).
-- Jointure : vérifié sur l'export du 2026-08-26 (6140 exemplaires) que
-  100% des codes-barres de cet export se retrouvent dans
-  `xml/magasin/notices.xml.xml` — le désherbage porte sur des collections
-  des magasins d'étage. Ce fichier reste téléchargé spécifiquement par
-  `build-desherbage.mjs` pour cette jointure (via `indexNotices()` de
-  `scripts/lib/marc-xml.mjs`) même si `build-magasins.mjs` ne l'utilise
-  plus depuis son passage à `bib.xml` (2026-08-26, voir plus haut) — les
-  deux scripts sont désormais indépendants l'un de l'autre pour cette
-  entrée. Pas besoin de retélécharger `xml/magasin/exemplaires.xml.xml` :
-  les champs exemplaire utiles (cote, section, état, statistiques) sont
-  déjà dans `desherbage.xml` lui-même.
+- Entrée : `xml/bib.xml` (R2, voir « Magasins 2e/5e/6e étage » — même
+  fichier local `data/xml/bib.xml` que `build-magasins.mjs`/
+  `build-cotes-numeriques.mjs`, un seul téléchargement suffit aux trois
+  scripts lancés à la suite). Format **GESMARC**, pas du MARC-XML —
+  `<items><item type="GESMARC"><property name="…" value="…" /></item>
+  </items>`, un `<item>` par exemplaire. Parsé par le parseur GESMARC
+  partagé (`iterateGesmarcItemsFromFile`/`parseGesmarcItem` dans
+  `scripts/lib/gesmarc.mjs`), en flux comme `build-magasins.mjs` — `bib.xml`
+  (2,5 Go sur l'export du 2026-09-09) dépasse largement la limite de
+  longueur d'une string V8.
+- Filtre : `Bibliothèque (Libellé)` commençant par "Douai" — identique à
+  `build-magasins.mjs`/`build-cotes-numeriques.mjs`, aucun filtre de
+  section (voir « Portée » ci-dessus).
 - Champs de prêt/réservation vides dans l'export : Syracuse omet la valeur
   plutôt que d'écrire "0" pour les 4 compteurs annuels — vérifié que la
   somme des 4 années (vide = 0) ne dépasse jamais `Nombre de prêts
@@ -1353,46 +1640,47 @@ build:desherbage`) :
   `cumulés` peut être strictement supérieur à cette somme quand
   l'exemplaire a des prêts plus anciens que les 4 dernières années. Une
   case vide sur les 4 compteurs annuels signifie donc bien "0 prêt cette
-  année-là" (`parseCount()`), pas une donnée manquante — sur l'export de
-  référence, seuls 70 des 6140 exemplaires ont au moins une valeur non
-  vide sur ces 4 champs, ce qui est cohérent avec le principe même de
-  l'outil : ce sont majoritairement des livres peu ou pas empruntés
-  récemment.
+  année-là" (`parseCount()`), pas une donnée manquante.
 - Année de référence de "AN" : absente de l'export (pas de date
   d'extraction fournie par Syracuse dans ce format). Prise par défaut comme
   l'année en cours au moment du `npm run build:desherbage`
   (`new Date().getFullYear()`), réglable via la variable d'environnement
   `DESHERBAGE_REFERENCE_YEAR` si le build est lancé longtemps après
   l'export réel. Stockée dans `data/desherbage-build-report.json`
-  (`stats.referenceYear`), lue par `rotobib.html` pour étiqueter les
-  barres de l'histogramme avec de vraies années plutôt que "AN"/"AN-1"/etc.
-- Sortie : `data/desherbage.json` (un enregistrement par exemplaire,
-  champs notice dénormalisés `200$a`/`210$d`/`700$a`/… comme
-  `data/magasins.json`, plus `prets`/`reservations` — objets `{an, an1,
-  an2, an3, cumules}` — et les champs propres à l'export désherbage :
-  `coteAffichee`, `bibliotheque`, `section`, `etat`, `exclusionPret`,
-  `imagette`…) + `data/desherbage-build-report.json` (même mécanique
-  d'archivage `-previous.json` que les autres builds).
+  (`stats.referenceYear`), lue par `rotobib.html`/`desherbage-stats.html`
+  pour étiqueter les barres des histogrammes avec de vraies années plutôt
+  que "AN"/"AN-1"/etc.
+- Sortie : `data/desherbage.json` (un enregistrement par exemplaire, mêmes
+  champs de base que `data/magasins.json` — `200$a`/`700$a`/`210$c`/
+  `210$d`/`930$g-i`/`915$b`/`isbn`/`issn`/`bibliotheque`/`section`/`etat`/
+  `exclusionPret`/`coteAffichee`/`_coteDigitRun`/`_isMagasin`/
+  `_fondsLabel` — plus `imagette` (utilisée par `rotobib.html` pour la
+  couverture) et `prets`/`reservations` — objets `{an, an1, an2, an3,
+  cumules}` — internés comme n'importe quelle valeur de colonne dans le
+  conteneur colonnaire (voir « Format des données et performances » en
+  tête de fichier), donc restent compacts malgré leur nature composite : la
+  quasi-totalité des lignes partagent le même objet tout-à-zéro) +
+  `data/desherbage-build-report.json` (même mécanique d'archivage
+  `-previous.json` que les autres builds).
 
 Côté `rotobib.html` : un champ de scan (comme `recolement.html` — une
 scannette USB suffit, pas de lecture caméra) affiche, dès qu'un code-barre
-de l'export est reconnu, la fiche de l'exemplaire (titre, auteur, éditeur,
-cote, description) et met en avant deux informations utiles à la décision :
-la **date de parution** (`210$d`, dans un encadré, affichée telle quelle —
-volontairement non re-parsée en année numérique pour ne pas perdre une
-mention imprécise du type "18e siècle" ou "s.d.") et un **histogramme des
-prêts sur les 4 dernières années** (`prets.an3`→`prets.an`, étiquetées avec
-les vraies années déduites de `referenceYear`), avec le total cumulé
-affiché à part en dessous (pas comme une 5e barre : il peut inclure des
-prêts antérieurs aux 4 années représentées, donc pas comparable terme à
-terme). Quatre boutons **Conserver / Pilon / Braderie / Relocalisation**
-enregistrent la décision ; « Relocalisation » reste une simple étiquette de
-traitement (pas de saisie d'emplacement dans cet outil — si un jour
-nécessaire, voir le sélecteur travée/colonne/étage de
-`exemplarisation.html`/`transfert-magasins.html` comme modèle). Après un
-choix, le panneau se referme et le champ de scan reprend le focus, prêt
-pour l'exemplaire suivant — même logique d'enchaînement que le scan de
-`recolement.html`.
+de magasin est reconnu, la fiche de l'exemplaire (titre, auteur, éditeur,
+cote) et met en avant deux informations utiles à la décision : la **date de
+parution** (`210$d`, dans un encadré, affichée telle quelle — volontairement
+non re-parsée en année numérique pour ne pas perdre une mention imprécise
+du type "18e siècle" ou "s.d.") et un **histogramme des prêts sur les 4
+dernières années** (`prets.an3`→`prets.an`, étiquetées avec les vraies
+années déduites de `referenceYear`), avec le total cumulé affiché à part en
+dessous (pas comme une 5e barre : il peut inclure des prêts antérieurs aux
+4 années représentées, donc pas comparable terme à terme). Quatre boutons
+**Conserver / Pilon / Braderie / Relocalisation** enregistrent la décision ;
+« Relocalisation » reste une simple étiquette de traitement (pas de saisie
+d'emplacement dans cet outil — si un jour nécessaire, voir le sélecteur
+travée/colonne/étage de `exemplarisation.html`/`transfert-magasins.html`
+comme modèle). Après un choix, le panneau se referme et le champ de scan
+reprend le focus, prêt pour l'exemplaire suivant — même logique
+d'enchaînement que le scan de `recolement.html`.
 
 Décisions stockées dans R2 sous la clé `desherbage-traitements.json`
 (`api/desherbage.mjs`, forme `{ [barcode]: {barcode, statut, ts} }`, même
@@ -1403,42 +1691,40 @@ partagées entre collègues comme le reste de l'outillage (plusieurs postes
 peuvent désherber en parallèle). `rotobib.html` reprend le patron habituel
 de synchronisation (localStorage `rp_desherbage_traitements` comme source
 de vérité locale, file d'attente `rp_desherbage_pending_sync` rejouée à la
-reconnexion). Un bandeau de statistiques (total de l'export, compte par
-traitement, non traités) et un journal des traitements récents (recherche,
-bouton « annuler » par ligne) donnent une vue d'ensemble de l'avancement
-de la campagne. Quatre boutons d'export `.txt` (un code-barre par ligne,
-même convention que les autres exports du projet) — un par traitement, y
-compris « Conserver » — pour ajout panier dans le SIGB.
+reconnexion). Un bandeau de statistiques (total de l'export **magasins**,
+compte par traitement, non traités) et un journal des traitements récents
+(recherche, bouton « annuler » par ligne) donnent une vue d'ensemble de
+l'avancement de la campagne. Quatre boutons d'export `.txt` (un code-barre
+par ligne, même convention que les autres exports du projet) — un par
+traitement, y compris « Conserver » — pour ajout panier dans le SIGB.
 
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni
 stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
-`data/desherbage.json` pour une vue d'ensemble de la campagne. Trois blocs :
+`data/desherbage.json`, **sans filtre `_isMagasin`** (voir « Portée »
+ci-dessus), pour une vue d'ensemble sur tout le catalogue de Douai. Trois
+blocs :
 
 - Un bandeau de chiffres clés (exemplaires de l'export, part jamais
   empruntée, total de prêts sur les 4 dernières années avec la moyenne par
   exemplaire, total cumulé depuis l'acquisition, exemplaire le plus
-  emprunté). Sur l'export du 2026-08-26 : 71,6% des 6140 exemplaires n'ont
-  **jamais** été empruntés (`prets.cumules === 0`), et les 4 dernières
-  années cumulées (98 prêts) pèsent très peu face au total historique
-  (3982) — cohérent avec le principe même de l'outil : cette sélection
-  porte sur des documents à circulation faible ou nulle.
+  emprunté).
 - Deux histogrammes en barres (barres simples, une seule teinte, comme
   `rotobib.html` — magnitude d'une seule série, pas besoin de palette
   catégorielle) : les **prêts totaux par année** (somme sur tous les
   exemplaires, mêmes 4 années réelles que l'histogramme par livre de
   Rotobib, déduites de `referenceYear` dans le rapport de build) et la
   **répartition des exemplaires par prêts cumulés** (paliers 0, 1, 2, 3, 4,
-  5–9, 10+ — choisis d'après la distribution réelle : la traîne au-delà de
-  9 ne représente qu'une quarantaine d'exemplaires, un seul palier « 10+ »
-  suffit à la représenter sans la diluer en paliers vides). Survol/focus
-  clavier sur chaque barre affiche une infobulle (`#chart-tooltip`, un seul
-  élément repositionné en JS) avec le détail et la part en %.
+  5–9, 10+). Survol/focus clavier sur chaque barre affiche une infobulle
+  (`#chart-tooltip`, un seul élément repositionné en JS) avec le détail et
+  la part en %.
 - Une liste triable/filtrable de tous les exemplaires (titre, auteur, cote,
-  prêts AN-3/AN-2/AN-1/AN, cumulés, réservations cumulées, code-barre) —
-  même patron recherche + tri par colonne + pagination que `magasins.html`,
-  triée par défaut sur les prêts cumulés décroissants : le livre le plus
-  emprunté de l'export apparaît donc en première ligne sans manipulation.
+  **section**, prêts AN-3/AN-2/AN-1/AN, cumulés, réservations cumulées,
+  code-barre) — même patron recherche + tri par colonne + pagination que
+  `magasins.html` (déjà éprouvé à cette échelle, ~200 000 lignes, sans
+  souci de réactivité constaté), triée par défaut sur les prêts cumulés
+  décroissants : le livre le plus emprunté du catalogue apparaît donc en
+  première ligne sans manipulation.
 
 ## Base "inventaire des collections" (Postgres/Neon, 2026-09-09)
 
@@ -1579,17 +1865,17 @@ pour plusieurs choses indépendantes :
   (dev local sans `.env`), comportement d'origine inchangé — lecture des
   fichiers locaux, échec strict s'ils manquent.
 - **`xml/bib.xml`** : export complet de la bibliothèque (format GESMARC,
-  plusieurs centaines de Mo), poussé par `npm run upload:bib`. Source de
-  `build-magasins.mjs` et `build-cotes-numeriques.mjs` (voir « Magasins
-  2e/5e/6e étage » et « Cotes numériques » plus haut) — trop volumineux
-  pour tenir dans une seule string JS (`r2Get(key, {raw:true})` renvoie un
-  Buffer plutôt qu'une string décodée, écrit tel quel sur disque ; les deux
-  scripts le relisent ensuite en flux via `iterateGesmarcItemsFromFile()`
-  dans `scripts/lib/gesmarc.mjs`). `xml/magasin/exemplaires.xml.xml` et
-  `xml/all/catalogue.xml` (anciennes sources de ces deux scripts avant
-  2026-08-26) restent dans R2 mais ne sont plus lus par aucun script —
-  `xml/magasin/notices.xml.xml` reste en revanche utilisé par
-  `build-desherbage.mjs` (Rotobib).
+  plusieurs Go), poussé par `npm run upload:bib`. Source de
+  `build-magasins.mjs`, `build-cotes-numeriques.mjs` et, depuis 2026-09-10,
+  `build-desherbage.mjs` (voir « Magasins 2e/5e/6e étage » et « Rotobib »
+  plus haut) — trop volumineux pour tenir dans une seule string JS
+  (`r2Get(key, {raw:true})` renvoie un Buffer plutôt qu'une string décodée,
+  écrit tel quel sur disque ; les trois scripts le relisent ensuite en flux
+  via `iterateGesmarcItemsFromFile()` dans `scripts/lib/gesmarc.mjs`).
+  `xml/magasin/exemplaires.xml.xml`, `xml/magasin/notices.xml.xml`,
+  `xml/all/catalogue.xml` et `xml/desherbage/desherbage.xml` (anciennes
+  sources de ces trois scripts) restent dans R2 mais ne sont plus lus par
+  aucun script.
 - **`recolement.json`, `livres-spolies-overrides.json`, `exemplaires-manuels.json`,
   `reliures-manuelles.json`, `transferts-magasins.json`, `desherbage-traitements.json`** :
   état partagé canonique de `recolement.html` / `livres-spolies.html` /

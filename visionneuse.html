@@ -31,14 +31,25 @@
       font-family: 'DM Sans', sans-serif;
       background: var(--bg);
       color: var(--text);
+      /* vh puis dvh (surchargé si supporté) : sur mobile, vh est calculé sans
+         les barres d'interface du navigateur, plus grand que ce qui est
+         réellement visible à l'écran — dvh s'ajuste à la hauteur réellement
+         affichée. */
       min-height: 100vh;
+      min-height: 100dvh;
     }
 
     /* ── Layout ── */
     .viewer-layout {
       display: grid;
       grid-template-columns: 320px 1fr;
-      height: calc(100vh);
+      /* Cette page est toujours affichée dans un cadre à hauteur fixe
+         (modale interne, ou iframe du site hôte/Syracuse) et ne mesure
+         jamais son propre contenu (contrairement au reste du site, voir
+         js/parent-page-height.js) — le cadre EST son écran, 100vh/100dvh
+         est donc correct tel quel. */
+      height: 100vh;
+      height: 100dvh;
     }
 
     /* ── Sidebar ── */
@@ -63,6 +74,24 @@
       font-size: .75rem;
       color: var(--text-muted);
     }
+    .back-to-inventaire {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      margin-bottom: .6rem;
+      padding: .35rem .65rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: .78rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+    .back-to-inventaire:hover { background: var(--accent-light); border-color: var(--accent); }
+    .back-to-inventaire svg { flex-shrink: 0; }
     .sidebar-search {
       padding: .75rem 1.25rem;
       border-bottom: 1px solid var(--border);
@@ -481,6 +510,10 @@
       <nav class="breadcrumb" id="visionneuseBreadcrumb" aria-label="Fil d'Ariane">
         <a href="index.html">Patrimoine</a> / Visionneuse
       </nav>
+      <a href="inventaire.html" class="back-to-inventaire" id="backToInventaire">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Retour à l'inventaire
+      </a>
       <h2>Documents numérisés</h2>
       <p>Parcourez les fonds par boîte</p>
     </div>
@@ -613,8 +646,11 @@
       buildFlatList();
       renderTree();
       updateFooter();
-      // Ouvrir automatiquement le dossier cible si fourni en paramètre URL
+      // Ouvrir automatiquement le dossier ou l'image cible si fourni en
+      // paramètre URL (dossierCible a priorité si les deux sont fournis,
+      // ce qui n'arrive pas en usage normal).
       if (dossierCible) openDossierCible(dossierCible);
+      else if (imageCible) openImageCible(imageCible);
     } catch (err) {
       tree.innerHTML = `
         <div class="tree-error">
@@ -690,6 +726,49 @@
       const activeEl = tree.querySelector('.tree-item.active, .tree-book.active');
       if (activeEl) {
         // Remonter les ancêtres .tree-node et les déplier
+        let parent = activeEl.parentElement;
+        while (parent && parent !== tree) {
+          if (parent.classList.contains('tree-node')) parent.classList.add('expanded');
+          if (parent.classList.contains('tree-book-wrapper')) parent.classList.add('expanded');
+          parent = parent.parentElement;
+        }
+        activeEl.scrollIntoView({ block: 'center' });
+      }
+    });
+  }
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  OUVERTURE AUTOMATIQUE D'UNE IMAGE CIBLE (?image=)               ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  /**
+   * Ouvre directement l'image dont le chemin R2 exact est `path`. Si elle
+   * est déjà indexée dans le manifeste (le cas courant : le fichier a été
+   * intégré via generer_manifest.html), on retombe sur l'entrée existante
+   * — arbre, fil d'Ariane et navigation préc/suiv fonctionnent normalement.
+   * Sinon (lien saisi à la main dans exemplarisation.html avant tout
+   * passage par generer_manifest.html), on l'ouvre quand même en l'ajoutant
+   * à la volée à la liste de navigation : rien à régénérer côté manifeste
+   * pour qu'un lien fraîchement collé s'ouvre.
+   */
+  function openImageCible(path) {
+    if (!path || !manifest) return;
+
+    let idx = flatFiles.findIndex(f => f.path === path);
+    if (idx < 0) {
+      flatFiles.push({
+        kind: 'image',
+        name: path.split('/').pop(),
+        path,
+        url: IMAGES_ROOT + path,
+        breadcrumb: ''
+      });
+      idx = flatFiles.length - 1;
+    }
+    openFile(idx, 0);
+
+    requestAnimationFrame(() => {
+      const activeEl = tree.querySelector('.tree-item.active, .tree-book.active');
+      if (activeEl) {
         let parent = activeEl.parentElement;
         while (parent && parent !== tree) {
           if (parent.classList.contains('tree-node')) parent.classList.add('expanded');
@@ -1202,6 +1281,11 @@
   // Paramètre ?dossier= : identifiant du dossier à ouvrir automatiquement
   const urlParams   = new URLSearchParams(window.location.search);
   const dossierCible = (urlParams.get('dossier') || '').trim();
+  // Paramètre ?image= : chemin R2 exact d'une image à ouvrir directement
+  // (voir openImageCible plus bas) — utilisé pour les exemplaires liés
+  // manuellement depuis exemplarisation.html, où l'on connaît le fichier
+  // précis mais pas forcément un nom de dossier du manifeste.
+  const imageCible   = (urlParams.get('image') || '').trim();
 
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  DÉMARRAGE                                                       ║
