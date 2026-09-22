@@ -59,6 +59,42 @@ const DATASETS = {
     setKeys: new Set(),
     excludeKnownGap: reserveBarcodes,
   },
+  desherbage: {
+    path: 'data/desherbage.json',
+    url: `http://localhost:${PORT}/data/desherbage.json`,
+    keyField: '_barcode',
+    columnar: true,
+    ignoredKeys: new Set(),
+    setKeys: new Set(),
+    excludeKnownGap: reserveBarcodes,
+  },
+  'non-catalogues': {
+    path: 'data/non-catalogues.json',
+    url: `http://localhost:${PORT}/data/non-catalogues.json`,
+    // Pas de clé naturelle unique : la cote (930$g) se répète ~2000 fois sur
+    // les 10 090 lignes retenues (plusieurs pièces d'un même carton/registre
+    // partagent parfois la même cote). Comparé comme un multi-ensemble de
+    // lignes complètes plutôt que ligne-à-ligne par clé — voir `multiset`.
+    multiset: true,
+    columnar: false,
+  },
+  // Écart ATTENDU sur ce jeu de données : data/livres-spolies.json (base
+  // .ods) n'a jamais contenu les overrides (elles ne vivaient que sur R2,
+  // livres-spolies-overrides.json, fusionnées côté client par
+  // livres-spolies.html) — la version live les fusionne déjà (voir
+  // db-migrate-spolies.mjs), donc "statique vide / live rempli" sur
+  // coteBM/trouve/exLibris/possesseur est normal, pas un défaut de parité.
+  // Vérifié manuellement (2026-09-22) : live == base+overrides fusionnées en
+  // JS, 0 écart sur les 506 lignes.
+  'livres-spolies': {
+    path: 'data/livres-spolies.json',
+    url: `http://localhost:${PORT}/data/livres-spolies.json`,
+    keyField: 'id',
+    columnar: false,
+    ignoredKeys: new Set(),
+    setKeys: new Set(),
+    excludeKnownGap: null,
+  },
 };
 
 function byKey(rows, keyField) {
@@ -110,6 +146,30 @@ async function main() {
   console.log(`  · fetch ${cfg.url}`);
   const liveRows = await loadRows('live', cfg.path, cfg.url, cfg.columnar);
   console.log(`  · ${staticRows.length} lignes statiques, ${liveRows.length} lignes live`);
+
+  if (cfg.multiset) {
+    // Pas de clé naturelle : trie chaque ligne (clés triées) puis l'ensemble,
+    // pour que seul le CONTENU compte, jamais l'ordre des lignes ni celui de
+    // leurs clés.
+    const sortRow = r => JSON.stringify(Object.fromEntries(Object.keys(r).sort().map(k => [k, r[k]])));
+    const staticSorted = staticRows.map(sortRow).sort();
+    const liveSorted = liveRows.map(sortRow).sort();
+    const ok = staticRows.length === liveRows.length && staticSorted.every((v, i) => v === liveSorted[i]);
+    if (!ok) {
+      console.log(`\n  Comparaison en multi-ensemble : ${ok ? 'identique' : 'DIFFÉRENT'}`);
+      for (let i = 0; i < Math.min(staticSorted.length, liveSorted.length); i++) {
+        if (staticSorted[i] !== liveSorted[i]) {
+          console.log(`   - première ligne différente (rang ${i}) :`);
+          console.log(`     statique=${staticSorted[i]}`);
+          console.log(`     live=${liveSorted[i]}`);
+          break;
+        }
+      }
+    }
+    console.log(ok ? `\n✓ verify-json-parity (${name}): 0 écart` : `\n✖ verify-json-parity (${name}): écarts détectés`);
+    await closeAllPools();
+    process.exit(ok ? 0 : 1);
+  }
 
   let excluded = new Set();
   if (cfg.excludeKnownGap) {

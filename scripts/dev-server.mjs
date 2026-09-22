@@ -27,6 +27,9 @@ import { getCached } from '../lib/data-json-cache.mjs';
 import { exportInventaire } from './lib/export-inventaire.mjs';
 import { exportMagasins } from './lib/export-magasins.mjs';
 import { exportCotesNumeriques } from './lib/export-cotes-numeriques.mjs';
+import { exportDesherbage } from './lib/export-desherbage.mjs';
+import { exportNonCatalogues } from './lib/export-non-catalogues.mjs';
+import { exportLivresSpolies } from './lib/export-livres-spolies.mjs';
 
 loadDotEnv();
 
@@ -42,6 +45,9 @@ const DATA_EXPORTERS = {
   '/data/inventaire.json': exportInventaire,
   '/data/magasins.json': exportMagasins,
   '/data/cotes-numeriques.json': exportCotesNumeriques,
+  '/data/desherbage.json': exportDesherbage,
+  '/data/non-catalogues.json': exportNonCatalogues,
+  '/data/livres-spolies.json': exportLivresSpolies,
 };
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
