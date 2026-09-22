@@ -23,8 +23,22 @@ import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadDotEnv } from './lib/dotenv.mjs';
+import { getCached } from '../lib/data-json-cache.mjs';
+import { exportInventaire } from './lib/export-inventaire.mjs';
 
 loadDotEnv();
+
+/* Chantier postgres-local (voir le plan) : ces chemins /data/*.json ne sont
+   plus lus depuis le fichier committé mais générés à la volée depuis
+   Postgres, avec le même contrat HTTP (même URL, même forme de réponse) —
+   aucune page HTML n'a besoin de changer. Le fichier committé reste sur
+   disque en repli/référence tant que la parité n'est pas validée pour
+   chaque phase (voir scripts/verify-json-parity.mjs). Registre volontairement
+   un objet plutôt qu'un switch : les phases suivantes du chantier n'auront
+   qu'à ajouter une entrée ici. */
+const DATA_EXPORTERS = {
+  '/data/inventaire.json': exportInventaire,
+};
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const API_DIR = path.join(ROOT, 'api');
@@ -149,11 +163,28 @@ async function handleStatic(req, res, url) {
   }
 }
 
+async function handleDataExport(req, res, exporter) {
+  try {
+    const body = await getCached(req.url, async () => JSON.stringify(await exporter()));
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.end(body);
+  } catch (err) {
+    console.error('[data-export]', err);
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: err.message || 'Erreur serveur.' }));
+  }
+}
+
 // ─── Serveur ─────────────────────────────────────────────────────────────
 
 const server = createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
-  if (url.pathname.startsWith('/api/')) {
+  const exporter = req.method === 'GET' ? DATA_EXPORTERS[url.pathname] : null;
+  if (exporter) {
+    handleDataExport(req, res, exporter);
+  } else if (url.pathname.startsWith('/api/')) {
     handleApi(req, res, url);
   } else {
     handleStatic(req, res, url);
