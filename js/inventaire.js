@@ -877,8 +877,10 @@ function buildSousFondsBlock(sfName, records, fondsName, sfKey) {
  * @param {string}  [visionneuseTarget] – valeur "num" (dossier) ou chemin R2 ("_lienNumerise")
  *                                        d'un document consultable dans la visionneuse
  * @param {string}  [visionneuseMode]   – 'dossier' (défaut) ou 'image', voir visionneuseSrc()
+ * @param {string}  [titre]             – titre du document, pour le bandeau au-dessus de la
+ *                                        visionneuse intégrée (openViewerInModal, `large` uniquement)
  */
-function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionneuseMode = 'dossier') {
+function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionneuseMode = 'dossier', titre = '') {
   const frame = document.createElement('div');
   frame.className = 'doc-thumb-frame' + (large ? ' doc-thumb-frame--large' : '');
 
@@ -899,25 +901,32 @@ function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionn
     img.className = 'doc-thumbnail';
     img.loading = 'lazy';
     img.decoding = 'async';
-    img.title = visionneuseTarget ? 'Accéder au document numérisé' : 'Voir la photo';
     img.addEventListener('error', () => setPlaceholder());
-    // Petite ou grande vignette : même comportement. S'il existe un document
-    // consultable dans la visionneuse (colonne "num", ou lien posé via
-    // exemplarisation.html — voir buildExpandedContent), le clic y navigue
-    // directement, dans le même onglet (pas de nouvel onglet, pas de
-    // surcouche/modale) — pour rester dans l'iframe du site hôte comme
-    // n'importe quel lien du site (demande explicite, 2026-09-11). Sinon,
-    // repli sur l'ouverture du fichier brut (simple photo sans document
-    // numérisé associé).
-    img.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (visionneuseTarget) {
-        window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
-      } else {
-        window.open(lienNum, '_blank', 'noopener');
-      }
-    });
-    if (large) frame.style.cursor = 'zoom-in';
+    // Vignette cliquable UNIQUEMENT s'il existe un document consultable
+    // dans la visionneuse (colonne "num", ou lien posé via
+    // exemplarisation.html — voir buildExpandedContent) : grande vignette
+    // (panneau de détail, `large`) → ouvre la visionneuse DANS la même
+    // modale (openViewerInModal(), 2026-09-22) ; petite vignette (ligne
+    // repliée de la liste) → navigation classique dans le même onglet
+    // (comportement inchangé depuis 2026-09-11). Une simple photo sans
+    // document numérisé associé n'a nulle part où mener (2026-09-22,
+    // demande explicite) : ni clic, ni curseur "cliquable"
+    // (.doc-thumb-frame--static, voir inventaire-thumbnail.css) — elle
+    // renvoyait auparavant vers le fichier brut dans un nouvel onglet.
+    if (visionneuseTarget) {
+      img.title = 'Accéder au document numérisé';
+      img.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (large) {
+          openViewerInModal(visionneuseTarget, visionneuseMode, titre);
+        } else {
+          window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
+        }
+      });
+      if (large) frame.style.cursor = 'zoom-in';
+    } else {
+      frame.classList.add('doc-thumb-frame--static');
+    }
     frame.appendChild(img);
     img.src = lienNum;
   } else {
@@ -942,11 +951,16 @@ function buildExpandedContent(rec, lienNum) {
   const lienNumeriseVal = (rec['_lienNumerise'] || '').trim();
   const visionneuseTarget = numVal || lienNumeriseVal;
   const visionneuseMode = numVal ? 'dossier' : 'image';
+  // Titre complet — calculé ici (avant la vignette) pour pouvoir être
+  // transmis à openViewerInModal() (bandeau de titre au-dessus de la
+  // visionneuse intégrée, voir buildThumbFrame ci-dessous et le bouton
+  // plus bas), en plus de son usage habituel dans titreEl juste après.
+  const titre = rec['200$a'] || '';
 
   // ── Colonne gauche : grande miniature ──
   const imgCol = document.createElement('div');
   imgCol.className = 'inv-expanded-img';
-  const largeFrame = buildThumbFrame(lienNum, true, visionneuseTarget, visionneuseMode);
+  const largeFrame = buildThumbFrame(lienNum, true, visionneuseTarget, visionneuseMode, titre);
   imgCol.appendChild(largeFrame);
   wrap.appendChild(imgCol);
 
@@ -954,8 +968,6 @@ function buildExpandedContent(rec, lienNum) {
   const infoCol = document.createElement('div');
   infoCol.className = 'inv-expanded-info';
 
-  // Titre complet
-  const titre = rec['200$a'] || '';
   const titreEl = document.createElement('h3');
   titreEl.className = 'inv-expanded-title';
   titreEl.textContent = titre || '(Sans titre)';
@@ -1033,9 +1045,8 @@ function buildExpandedContent(rec, lienNum) {
   // lié manuellement depuis exemplarisation.html à une image R2 précise —
   // voir js/exemplaires-manuels-shared.js). Un seul bouton, quelle que soit
   // la source. Même comportement que la grande vignette juste au-dessus
-  // (voir imgCol) : navigation classique dans le même onglet, pas de
-  // nouvel onglet ni de surcouche — pour rester dans l'iframe du site hôte
-  // comme n'importe quel lien du site (demande explicite, 2026-09-11).
+  // (voir imgCol) : ouvre la visionneuse DANS cette même modale
+  // (openViewerInModal(), 2026-09-22), à la place de la fiche.
   if (visionneuseTarget) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1043,7 +1054,7 @@ function buildExpandedContent(rec, lienNum) {
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Accéder au document numérisé`;
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
+      openViewerInModal(visionneuseTarget, visionneuseMode, titre);
     });
     infoCol.appendChild(btn);
   }
@@ -1088,6 +1099,15 @@ function buildExpandedContent(rec, lienNum) {
  */
 function openDetailModal(rec, lienNum, onClose) {
   const overlay = ensureDetailModal();
+  // Mémorisés pour que closeViewerInModal() puisse reconstruire la fiche
+  // après un aller-retour par la visionneuse intégrée, sans avoir besoin
+  // de rappeler openDetailModal() depuis l'extérieur.
+  overlay._currentRec = rec;
+  overlay._currentLienNum = lienNum;
+  overlay._viewerActive = false;
+  overlay.querySelector('.inv-detail-box').classList.remove('inv-detail-box--viewer');
+  overlay.querySelector('.inv-detail-close').setAttribute('aria-label', 'Fermer');
+
   const content = document.getElementById('inv-detail-content');
   content.innerHTML = '';
   content.appendChild(buildExpandedContent(rec, lienNum));
@@ -1117,8 +1137,12 @@ function closeDetailModal() {
   if (onClose) onClose();
 }
 
+// Le bouton ✕/Échap/clic hors modale reviennent d'abord à la fiche si la
+// visionneuse intégrée est ouverte (closeViewerInModal() renvoie true dans
+// ce cas), et ne ferment toute la modale que sinon — voir
+// openViewerInModal() ci-dessous.
 function detailModalEscHandler(e) {
-  if (e.key === 'Escape') closeDetailModal();
+  if (e.key === 'Escape' && !closeViewerInModal()) closeDetailModal();
 }
 
 /** Crée (une seule fois) la modale de détail et ses écouteurs, la renvoie. */
@@ -1138,11 +1162,81 @@ function ensureDetailModal() {
       <div id="inv-detail-content"></div>
     </div>`;
   overlay.addEventListener('click', e => {
-    if (e.target === overlay) closeDetailModal();
+    if (e.target === overlay && !closeViewerInModal()) closeDetailModal();
   });
-  overlay.querySelector('.inv-detail-close').addEventListener('click', closeDetailModal);
+  overlay.querySelector('.inv-detail-close').addEventListener('click', () => {
+    if (!closeViewerInModal()) closeDetailModal();
+  });
   document.body.appendChild(overlay);
   return overlay;
+}
+
+/**
+ * Bascule le contenu de la modale de détail vers la visionneuse intégrée —
+ * un iframe visionneuse.html?...&modal=1, sans sa barre latérale ni son
+ * arborescence de dossiers (voir .viewer-layout--modal dans
+ * visionneuse.html) — à la place de la fiche. Le bouton ✕ de la modale
+ * (inv-detail-close) revient alors à la fiche au lieu de fermer toute la
+ * modale, voir closeViewerInModal() et detailModalEscHandler() ci-dessus.
+ *
+ * @param {string} target – valeur "num" (dossier) ou chemin R2
+ *                           (_lienNumerise), voir buildExpandedContent()
+ * @param {string} mode   – 'dossier' (défaut) ou 'image', voir visionneuseSrc()
+ * @param {string} [titre] – titre du document, affiché dans le bandeau
+ *                           au-dessus de la visionneuse (la visionneuse
+ *                           elle-même n'a pas accès à la notice)
+ */
+function openViewerInModal(target, mode, titre) {
+  const overlay = document.getElementById('inv-detail-overlay');
+  const content = document.getElementById('inv-detail-content');
+  if (!overlay || !content) return;
+
+  overlay._viewerActive = true;
+  overlay.querySelector('.inv-detail-box').classList.add('inv-detail-box--viewer');
+  overlay.querySelector('.inv-detail-close').setAttribute('aria-label', 'Revenir à la notice');
+
+  content.innerHTML = '';
+  const titleBar = document.createElement('div');
+  titleBar.className = 'inv-detail-viewer-title';
+  titleBar.textContent = titre || '';
+  content.appendChild(titleBar);
+
+  const frame = document.createElement('iframe');
+  frame.className = 'inv-detail-viewer-frame';
+  frame.title = titre || 'Document numérisé';
+  // allow="fullscreen"/allowfullscreen : sans ça, le bouton plein écran de
+  // la visionneuse (Fullscreen API appelée depuis l'intérieur de l'iframe)
+  // est refusé par le navigateur — même same-origin, la Fullscreen API
+  // exige que l'iframe délègue explicitement cette permission.
+  frame.setAttribute('allow', 'fullscreen');
+  frame.setAttribute('allowfullscreen', '');
+  frame.src = visionneuseSrc(target, mode) + '&modal=1';
+  content.appendChild(frame);
+  notifyHeight();
+}
+
+/**
+ * Referme la visionneuse intégrée et reconstruit la fiche depuis
+ * overlay._currentRec/_currentLienNum (posés par openDetailModal()).
+ * Renvoie false si la visionneuse n'était pas active — pour que les
+ * appelants (✕, clic hors modale, Échap) sachent s'ils doivent fermer
+ * toute la modale à la place.
+ */
+function closeViewerInModal() {
+  const overlay = document.getElementById('inv-detail-overlay');
+  if (!overlay || !overlay._viewerActive) return false;
+
+  overlay._viewerActive = false;
+  overlay.querySelector('.inv-detail-box').classList.remove('inv-detail-box--viewer');
+  overlay.querySelector('.inv-detail-close').setAttribute('aria-label', 'Fermer');
+
+  const content = document.getElementById('inv-detail-content');
+  if (content && overlay._currentRec) {
+    content.innerHTML = '';
+    content.appendChild(buildExpandedContent(overlay._currentRec, overlay._currentLienNum));
+  }
+  notifyHeight();
+  return true;
 }
 
 // ══════════════════════════════════════════

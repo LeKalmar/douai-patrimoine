@@ -61,17 +61,32 @@ td.td-thumb {
   width: 68px;
   height: 76px;
   margin: 0 auto;
+}
+/* Curseur/survol "cliquable" réservés aux vignettes qui mènent réellement
+   quelque part (document consultable dans la visionneuse — voir
+   buildThumbFrame() dans js/inventaire.js). Une simple photo sans document
+   numérisé associé (ex. exemplarisation.html) pose
+   .doc-thumb-frame--static : pas de clic, donc pas d'affordance visuelle
+   de clic non plus. */
+.doc-thumb-frame:not(.doc-thumb-frame--large):not(.doc-thumb-frame--static) {
   cursor: zoom-in;
 }
-.doc-thumb-frame:not(.doc-thumb-frame--large):has(.doc-thumbnail):hover {
+.doc-thumb-frame:not(.doc-thumb-frame--large):not(.doc-thumb-frame--static):has(.doc-thumbnail):hover {
   border-color: var(--accent, #c0622e);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
 }
 
-/* Grande image dans la ligne expansée */
+/* Grande image dans la ligne expansée : le cadre se resserre sur les
+   dimensions réelles de la vignette (min/max en garde-fous) plutôt que
+   d'imposer une taille fixe identique quelle que soit l'image — voir
+   .doc-thumb-frame--large .doc-thumbnail ci-dessous. */
 .doc-thumb-frame--large {
-  width: 180px;
-  height: 220px;
+  width: auto;
+  height: auto;
+  min-width: 120px;
+  min-height: 150px;
+  max-width: 220px;
+  max-height: 300px;
   border-radius: 6px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.18);
 }
@@ -85,8 +100,24 @@ td.td-thumb {
   object-position: center center;
   transition: transform 0.15s ease;
 }
-.doc-thumb-frame:not(.doc-thumb-frame--large):hover .doc-thumbnail {
+.doc-thumb-frame:not(.doc-thumb-frame--large):not(.doc-thumb-frame--static):hover .doc-thumbnail {
   transform: scale(1.06);
+}
+
+/* Dans le grand cadre, ne jamais agrandir la vignette au-delà de sa
+   taille réelle : c'est le cadre (min/max ci-dessus) qui s'adapte à
+   l'image, pas l'inverse. */
+.doc-thumb-frame--large .doc-thumbnail {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Vignette non cliquable (simple photo, sans document consultable dans la
+   visionneuse) — voir buildThumbFrame() dans js/inventaire.js. */
+.doc-thumb-frame--static {
+  cursor: default;
 }
 
 /* ── Placeholder (cadre vide ou erreur) ── */
@@ -113,7 +144,7 @@ td.td-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: 1rem;
   animation: inv-detail-fadein 0.15s ease;
 }
 .inv-detail-overlay[hidden] { display: none; }
@@ -125,10 +156,50 @@ td.td-thumb {
   border: 2px solid var(--warm, #c9a96e);
   width: 100%;
   max-width: 820px;
-  max-height: 85vh;
+  /* Hauteur fixe (pas seulement un plafond) : le gabarit de la boîte est
+     identique d'une fiche à l'autre, quelle que soit la quantité de
+     métadonnées — le contenu défile en interne (overflow-y ci-dessous)
+     plutôt que de faire varier la hauteur visible. min() la borne à la
+     hauteur d'écran disponible (moins la marge de l'overlay) pour ne
+     jamais dépasser le viewport sur un petit écran. */
+  height: min(550px, calc(100vh - 2rem));
   overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
   position: relative;
+}
+
+/* À partir de 701px (mise en page image/infos côte à côte, voir
+   .inv-expanded-wrap plus bas), le défilement se fait dans la colonne
+   infos plutôt que sur toute la boîte : .inv-expanded-wrap peut alors
+   occuper exactement les 100% de hauteur de la boîte fixe, et la colonne
+   image + la barre verticale s'étirent avec elle sur toute cette hauteur
+   au lieu de s'arrêter à la hauteur du contenu. En dessous de 701px
+   (mise en page empilée, .doc-thumb-frame--large au-dessus du texte),
+   comportement inchangé : la boîte défile dans son ensemble. */
+@media (min-width: 701px) {
+  /* .inv-expanded-wrap n'est pas un enfant direct de .inv-detail-box : il
+     y a #inv-detail-content entre les deux (voir openDetailModal() dans
+     js/inventaire.js). Un simple height:100% sur .inv-expanded-wrap se
+     serait résolu contre la hauteur "auto" de ce conteneur intermédiaire
+     (donc lui-même "auto", sans effet) — d'où le display:flex/flex:1
+     ci-dessous, qui donne à #inv-detail-content une hauteur définie que
+     .inv-expanded-wrap peut ensuite reprendre à 100%. */
+  .inv-detail-box {
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  #inv-detail-content {
+    flex: 1;
+    min-height: 0;
+  }
+  .inv-expanded-wrap {
+    height: 100%;
+  }
+  .inv-expanded-info {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 .inv-detail-close {
@@ -155,27 +226,106 @@ td.td-thumb {
    openDetailModal() amène la page hôte dessus (scrollIntoView traverse la
    frontière d'iframe) — même traitement que la modale de reserve.html. */
 html.rp-embedded .inv-detail-overlay { position: absolute; }
-html.rp-embedded .inv-detail-box { max-height: 640px; }
+/* Pixels et non vh (CLAUDE.md, « Pas d'unité vh dans une mise en page
+   d'intégration ») : la hauteur de l'iframe dépend elle-même de celle du
+   document, un vh y grandirait à chaque mesure. Hauteur fixe (même valeur
+   que le min() hors iframe) plutôt qu'un simple plafond, pour le même
+   gabarit constant d'une fiche à l'autre ; la boîte défile en interne
+   (overflow-y:auto) au-delà de cette hauteur, comme hors iframe. */
+html.rp-embedded .inv-detail-box { height: 550px; }
+
+/* ═══════════════════════════════════════
+   VISIONNEUSE INTÉGRÉE (remplace la fiche dans la même modale — voir
+   openViewerInModal()/closeViewerInModal() dans js/inventaire.js)
+   ═══════════════════════════════════════ */
+
+/* Basculé par openViewerInModal() : même agencement flex que le bloc
+   @media(min-width:701px) plus haut, mais ICI sans condition de largeur —
+   l'iframe a besoin d'une hauteur définie sur #inv-detail-content à
+   toutes les tailles d'écran, contrairement au texte de la fiche qui
+   s'accommode très bien d'une boîte à hauteur "auto" + overflow-y:auto en
+   dessous de 701px. overflow:hidden (pas seulement overflow-y) plutôt que
+   overflow-y:auto : l'iframe est un rectangle plein bord à bord, sans la
+   marge/le padding qui gardait jusqu'ici le contenu de la fiche à
+   distance des coins arrondis de la boîte — sans ce recadrage, ses coins
+   bas carrés déborderaient visuellement du cadre arrondi. */
+.inv-detail-box--viewer {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* #inv-detail-content devient lui-même une colonne flex (bandeau de titre
+   + iframe empilés), au lieu du simple bloc qu'il est pour la fiche. */
+.inv-detail-box--viewer #inv-detail-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bandeau de titre au-dessus de la visionneuse — occupe l'espace
+   auparavant laissé vide sous le bouton ✕ (qui reste utilisable par
+   dessus : il bascule vers "revenir à la fiche" en mode visionneuse, voir
+   closeViewerInModal()). padding-right assez large pour que le titre ne
+   passe jamais sous ce bouton, même long (text-overflow:ellipsis). */
+.inv-detail-viewer-title {
+  flex-shrink: 0;
+  padding: 0.7rem 2.75rem 0.7rem 1.25rem;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.9rem;
+  color: var(--ink, #1a1a2e);
+  background: #fdf8f2;
+  border-bottom: 1px solid var(--border, #e4dfd6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inv-detail-viewer-frame {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border: none;
+}
 
 /* Marge supplémentaire en haut à droite du contenu, pour que le titre (en
    tête de .inv-expanded-info) ne passe jamais sous le bouton fermer, qui
-   flotte en position absolute au-dessus de tout le contenu. */
+   flotte en position absolute au-dessus de tout le contenu. Marge en bas
+   de la colonne infos, symétrique, pour que le résumé ou tout futur bloc
+   ajouté en fin de fiche ne passe pas sous les pills cote/code-barre, qui
+   flottent elles aussi en absolute (bas droite du wrap). */
 .inv-detail-box .inv-expanded-wrap {
   padding-top: 2.25rem;
   padding-right: 2.75rem;
 }
-
-/* Layout interne : image à gauche, infos à droite */
-.inv-expanded-wrap {
-  display: flex;
-  gap: 1.75rem;
-  padding: 1.25rem 1.5rem 1.25rem 1rem;
-  align-items: flex-start;
+.inv-detail-box .inv-expanded-info {
+  padding-bottom: 2.25rem;
 }
 
-/* Colonne image */
+/* Layout interne : image à gauche, infos à droite, séparées par une
+   barre verticale (align-items:stretch pour qu'elle coure sur toute la
+   hauteur de la fiche, pas seulement celle de la vignette). */
+.inv-expanded-wrap {
+  display: flex;
+  gap: 0;
+  padding: 1.25rem 1.5rem 1.25rem 1rem;
+  align-items: stretch;
+}
+
+/* Colonne image : largeur fixe réservée à gauche de la barre, dans
+   laquelle la vignette se centre et se dimensionne selon ses propres
+   proportions (voir .doc-thumb-frame--large) — la position de la barre
+   ne bouge donc pas d'une fiche à l'autre même si l'image change de
+   forme. */
 .inv-expanded-img {
   flex-shrink: 0;
+  width: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border, #e4dfd6);
+  padding-right: 1.25rem;
 }
 
 /* Colonne infos */
@@ -185,6 +335,7 @@ html.rp-embedded .inv-detail-box { max-height: 640px; }
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  padding-left: 1.25rem;
 }
 
 .inv-expanded-title {
@@ -274,9 +425,22 @@ html.rp-embedded .inv-detail-box { max-height: 640px; }
     flex-direction: column;
     gap: 1rem;
   }
+  /* Colonne empilée : la barre verticale devient horizontale, la largeur
+     réservée (220px) n'a plus lieu d'être. */
+  .inv-expanded-img {
+    width: auto;
+    max-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border, #e4dfd6);
+    padding-right: 0;
+    padding-bottom: 1rem;
+  }
+  .inv-expanded-info {
+    padding-left: 0;
+  }
   .doc-thumb-frame--large {
-    width: 120px;
-    height: 150px;
+    max-width: 150px;
+    max-height: 190px;
   }
   .inv-expanded-grid {
     grid-template-columns: 1fr 1fr;

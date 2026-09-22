@@ -52,6 +52,19 @@
       height: 100dvh;
     }
 
+    /* Mode "intégré dans la modale de fiche" (?modal=1, voir
+       openViewerInModal() dans js/inventaire.js) : ni barre latérale
+       (arborescence des dossiers) ni fil d'Ariane — seule la visionneuse
+       elle-même (barre d'outils zoom/rotation + image) reste visible,
+       la modale d'inventaire.html fournissant son propre bouton de
+       fermeture/retour. */
+    .viewer-layout--modal {
+      grid-template-columns: 1fr;
+    }
+    .viewer-layout--modal .sidebar {
+      display: none;
+    }
+
     /* ── Sidebar ── */
     .sidebar {
       background: var(--surface);
@@ -477,22 +490,6 @@
     }
     .viewer-loading.active { display: block; }
 
-    /* Breadcrumb dans le viewer */
-    .viewer-path {
-      position: absolute;
-      top: .75rem;
-      left: .75rem;
-      background: rgba(0,0,0,.5);
-      color: rgba(255,255,255,.85);
-      font-size: .72rem;
-      padding: .3rem .65rem;
-      border-radius: 20px;
-      max-width: calc(100% - 1.5rem);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
     /* ── Responsive ── */
     @media (max-width: 700px) {
       .viewer-layout { grid-template-columns: 1fr; }
@@ -559,6 +556,12 @@
         </button>
         <button class="tb-btn" id="btnRotReset" title="Réinitialiser la rotation">↺ Reset</button>
       </div>
+
+      <div class="toolbar-group">
+        <button class="tb-btn" id="btnFullscreen" title="Plein écran" aria-label="Plein écran">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18-5h-3a2 2 0 00-2 2v3M3 16v3a2 2 0 002 2h3m11-5v3a2 2 0 01-2 2h-3"/></svg>
+        </button>
+      </div>
       <span class="viewer-filename" id="viewerFilename"></span>
     </div>
 
@@ -569,8 +572,6 @@
       <button class="nav-arrow next" id="arrowNext" disabled aria-label="Image suivante">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-
-      <div class="viewer-path" id="viewerPath" style="display:none"></div>
 
       <div class="viewer-img-wrap" id="imgWrap" style="display:none">
         <img id="viewerImg" class="viewer-img" alt="Feuillet numérisé" draggable="false">
@@ -622,7 +623,6 @@
   const viewerCanvas   = document.getElementById('viewerCanvas');
   const viewerFilename = document.getElementById('viewerFilename');
   const viewerCounter  = document.getElementById('viewerCounter');
-  const viewerPath     = document.getElementById('viewerPath');
   const viewerLoading  = document.getElementById('viewerLoading');
   const zoomVal        = document.getElementById('zoomVal');
   const btnZoomIn      = document.getElementById('btnZoomIn');
@@ -634,6 +634,7 @@
   const btnRotReset    = document.getElementById('btnRotReset');
   const arrowPrev      = document.getElementById('arrowPrev');
   const arrowNext      = document.getElementById('arrowNext');
+  const btnFullscreen  = document.getElementById('btnFullscreen');
 
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  CHARGEMENT DU MANIFESTE                                         ║
@@ -1091,11 +1092,11 @@
     viewerImg.onload = null;
     viewerImg.src = '';
     viewerFilename.textContent = f.name;
-    viewerPath.textContent = f.breadcrumb ? f.breadcrumb + ' / ' + (f.kind === 'book' ? f.pages[currentPageIdx].name : f.name) : f.name;
-    viewerPath.style.display = 'block';
     imgWrap.style.display = 'inline-block';
     viewerEmpty.style.display = 'none';
-    viewerCounter.style.display = 'block';
+    // Affichage du compteur laissé à applyTransform() (via fitToView(), plus
+    // bas) : il ne doit apparaître que pour un livre à plusieurs pages, voir
+    // updateNav()/applyTransform().
     viewerLoading.classList.add('active');
 
     viewerImg.onload = () => {
@@ -1147,23 +1148,37 @@
     imgWrap.style.transform = `translate(${panX}px, ${panY}px) rotate(${rotation}deg) scale(${zoom})`;
     zoomVal.textContent = Math.round(zoom * 100) + ' %';
     const f = flatFiles[currentIdx];
-    if (f && f.kind === 'book') {
+    // Le compteur ne veut dire quelque chose que pour un livre à plusieurs
+    // pages ("p. X / Y", pages du MÊME document) — pour un document seul,
+    // il affichait sa position dans tout le manifeste (ex. "3788/4415"),
+    // sans rapport avec le document ouvert et déroutant (demande explicite,
+    // 2026-09-22) : masqué dans ce cas, comme les flèches (voir updateNav()).
+    if (f && f.kind === 'book' && f.pages.length > 1) {
       viewerCounter.textContent = `p. ${currentPageIdx + 1} / ${f.pages.length}`;
       viewerCounter.classList.add('book-mode');
+      viewerCounter.style.display = 'block';
     } else {
-      viewerCounter.textContent = `${currentIdx + 1} / ${flatFiles.length}`;
+      viewerCounter.style.display = 'none';
       viewerCounter.classList.remove('book-mode');
     }
   }
 
   function updateNav() {
     const f = flatFiles[currentIdx];
-    if (f && f.kind === 'book') {
+    // Flèches réservées à la navigation ENTRE LES PAGES d'un même livre —
+    // retirées (pas seulement désactivées) pour un document à page unique :
+    // elles servaient jusqu'ici à sauter vers un autre document du
+    // manifeste entier, sans rapport avec celui qu'on vient d'ouvrir
+    // (demande explicite, 2026-09-22 ; voir aussi goTo() qui retire la
+    // capacité elle-même, pas seulement les boutons).
+    if (f && f.kind === 'book' && f.pages.length > 1) {
+      arrowPrev.hidden = false;
+      arrowNext.hidden = false;
       arrowPrev.disabled = currentPageIdx <= 0;
       arrowNext.disabled = currentPageIdx >= f.pages.length - 1;
     } else {
-      arrowPrev.disabled = currentIdx <= 0;
-      arrowNext.disabled = currentIdx >= flatFiles.length - 1;
+      arrowPrev.hidden = true;
+      arrowNext.hidden = true;
     }
   }
 
@@ -1198,17 +1213,41 @@
   btnRotRight.addEventListener('click', () => { rotation += 90; applyTransform(); });
   btnRotReset.addEventListener('click', () => { rotation = 0; applyTransform(); });
 
+  // Plein écran — sur .viewer-layout plutôt que <html> : dans la modale
+  // d'inventaire.html, cette page tourne dans un iframe (voir
+  // openViewerInModal() dans js/inventaire.js, qui pose déjà
+  // allow="fullscreen"/allowfullscreen sur cet iframe) et la Fullscreen
+  // API y étend l'ÉLÉMENT iframe lui-même à tout l'écran ; hors iframe
+  // (page ouverte directement), ça revient au même pour tout le document.
+  const ICON_ENTER_FS = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18-5h-3a2 2 0 00-2 2v3M3 16v3a2 2 0 002 2h3m11-5v3a2 2 0 01-2 2h-3"/></svg>';
+  const ICON_EXIT_FS  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3m11-5v3a2 2 0 01-2 2h-3"/></svg>';
+  const fsTarget = document.querySelector('.viewer-layout');
+  btnFullscreen.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      (fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen)?.call(fsTarget);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    const active = document.fullscreenElement === fsTarget;
+    btnFullscreen.innerHTML = active ? ICON_EXIT_FS : ICON_ENTER_FS;
+    btnFullscreen.title = active ? 'Quitter le plein écran' : 'Plein écran';
+    btnFullscreen.setAttribute('aria-label', btnFullscreen.title);
+  });
+
   function goTo(delta) {
     const f = flatFiles[currentIdx];
-    if (f && f.kind === 'book') {
-      // Navigation entre pages du livre
+    if (f && f.kind === 'book' && f.pages.length > 1) {
+      // Navigation entre pages du livre — seul cas géré : voir updateNav(),
+      // qui masque les flèches (et le raccourci clavier ← → tombe ici sans
+      // rien faire) pour un document à page unique plutôt que de sauter
+      // vers un autre document du manifeste entier (demande explicite,
+      // 2026-09-22).
       const newPage = currentPageIdx + delta;
       if (newPage >= 0 && newPage < f.pages.length) {
         openFile(currentIdx, newPage);
       }
-    } else {
-      // Navigation entre documents
-      openFile(currentIdx + delta, 0);
     }
   }
   arrowPrev.addEventListener('click', () => goTo(-1));
@@ -1278,8 +1317,21 @@
     if (breadcrumb) breadcrumb.style.display = 'none';
   }
 
-  // Paramètre ?dossier= : identifiant du dossier à ouvrir automatiquement
+  // Paramètre ?modal=1 : la visionneuse est chargée dans l'iframe interne
+  // de la modale de fiche d'inventaire.html (voir openViewerInModal() dans
+  // js/inventaire.js) — à distinguer d'`isEmbedded` ci-dessus, vrai aussi
+  // quand tout le SITE est affiché dans l'iframe du portail bm-douai.fr et
+  // qu'on navigue directement vers cette page : dans ce cas-là, on veut
+  // garder la barre latérale complète. Ici on la masque entièrement (pas
+  // seulement le fil d'Ariane) : ni arborescence de dossiers, ni lien
+  // "Retour à l'inventaire" — la modale fournit son propre bouton retour.
   const urlParams   = new URLSearchParams(window.location.search);
+  const modalMode = urlParams.get('modal') === '1';
+  if (modalMode) {
+    document.querySelector('.viewer-layout').classList.add('viewer-layout--modal');
+  }
+
+  // Paramètre ?dossier= : identifiant du dossier à ouvrir automatiquement
   const dossierCible = (urlParams.get('dossier') || '').trim();
   // Paramètre ?image= : chemin R2 exact d'une image à ouvrir directement
   // (voir openImageCible plus bas) — utilisé pour les exemplaires liés
