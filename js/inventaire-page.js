@@ -292,6 +292,11 @@
     if (pendingOpenId != null && records[pendingOpenId]) openDetailId = pendingOpenId;
     apply();
 
+    /* Notice rouverte au retour de la visionneuse (voir « État persisté »
+       ci-dessus) : plus une ligne dépliée dans la liste, mais la même
+       modale que celle ouverte par un clic normal sur une notice. */
+    if (openDetailId != null && records[openDetailId]) showDetail(records[openDetailId]);
+
     if (pendingScrollY != null) {
       var y = pendingScrollY;
       // Double rAF : laisse le temps aux vignettes/à la mise en page de se
@@ -569,6 +574,20 @@
     saveState();
   }
 
+  /* Ouvre la notice dans la modale centrée (js/inventaire.js —
+     openDetailModal/buildExpandedContent), en gardant openDetailId à jour
+     pour que le retour de la visionneuse (voir « État persisté ») rouvre la
+     même notice. Le rappel de fermeture efface cet état : un rechargement
+     après avoir simplement refermé la modale ne doit pas la rouvrir. */
+  function showDetail(rec) {
+    openDetailId = rec._id;
+    saveState();
+    openDetailModal(rec, (rec['lien_num'] || '').trim(), function () {
+      openDetailId = null;
+      saveState();
+    });
+  }
+
   function buildRow(rec) {
     var wrap = document.createElement('article');
     wrap.className = 'inv-item';
@@ -577,7 +596,7 @@
     row.className = 'inv-row';
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
-    row.setAttribute('aria-expanded', openDetailId === rec._id ? 'true' : 'false');
+    row.setAttribute('aria-haspopup', 'dialog');
 
     // Vignette (js/inventaire.js) — repli automatique si l'image est absente.
     var thumb = document.createElement('div');
@@ -620,31 +639,15 @@
     var dateTxt = formatPublicationDate((rec['210$d'] || '').trim());
     side.innerHTML =
       '<span class="inv-date">' + esc(dateTxt || '—') + '</span>' +
-      '<span class="inv-more">' + (openDetailId === rec._id ? 'Fermer ↑' : 'Voir la notice →') + '</span>';
+      '<span class="inv-more">Voir la notice →</span>';
     row.appendChild(side);
 
     wrap.appendChild(row);
 
-    var detail = document.createElement('div');
-    detail.className = 'inv-detail';
-    detail.hidden = openDetailId !== rec._id;
-    if (openDetailId === rec._id) {
-      detail.appendChild(buildExpandedContent(rec, (rec['lien_num'] || '').trim()));
-    }
-    wrap.appendChild(detail);
-
-    function toggle() {
-      var opening = openDetailId !== rec._id;
-      openDetailId = opening ? rec._id : null;
-      renderResults();
-      if (opening) {
-        var el = document.querySelector('.inv-item .inv-detail:not([hidden])');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-    row.addEventListener('click', toggle);
+    function openThis() { showDetail(rec); }
+    row.addEventListener('click', openThis);
     row.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openThis(); }
     });
 
     return wrap;

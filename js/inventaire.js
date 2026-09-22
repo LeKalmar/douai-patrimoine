@@ -787,7 +787,7 @@ function renderTable(body, records, stateKey, state) {
     tr.dataset.rowId = rowId;
     tr.dataset.lienNum = lienNum;
     tr.style.cursor = 'pointer';
-    tr.addEventListener('click', () => toggleDetail(rowId, rec));
+    tr.addEventListener('click', () => openDetailModal(rec, lienNum));
 
     COLS.forEach(col => {
       const td = document.createElement('td');
@@ -826,17 +826,6 @@ function renderTable(body, records, stateKey, state) {
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
-
-    // ── Ligne expansée (état ouvert) ──────────────────────────
-    const dtr = document.createElement('tr');
-    dtr.className = 'inv-row-expanded';
-    dtr.id = `detail-${rowId}`;
-    const dtd = document.createElement('td');
-    dtd.className = 'inv-expanded-cell';
-    dtd.colSpan = COLS.length;
-    dtd.appendChild(buildExpandedContent(rec, lienNum));
-    dtr.appendChild(dtd);
-    tbody.appendChild(dtr);
   });
   table.appendChild(tbody);
   wrap.appendChild(table);
@@ -1083,29 +1072,77 @@ function buildExpandedContent(rec, lienNum) {
   return wrap;
 }
 
-function toggleDetail(rowId, rec) {
-  const dtr = document.getElementById(`detail-${rowId}`);
-  if (!dtr) return;
+/**
+ * Ouvre le détail d'une notice dans une modale centrée, plutôt que dans une
+ * ligne dépliée sous la ligne cliquée (ancien comportement) — reprend le
+ * contenu de buildExpandedContent() tel quel, juste déplacé dans une boîte
+ * de dialogue.
+ *
+ * @param {Object}   rec       – enregistrement du catalogue
+ * @param {string}   lienNum   – URL de la vignette (voir buildExpandedContent)
+ * @param {Function} [onClose] – rappel exécuté à la fermeture (bouton ✕, clic
+ *                               hors modale ou Échap) — pas sur un remplacement
+ *                               du contenu par un nouvel appel à openDetailModal.
+ *                               Sert par ex. à effacer un état "notice ouverte"
+ *                               persisté (js/inventaire-page.js).
+ */
+function openDetailModal(rec, lienNum, onClose) {
+  const overlay = ensureDetailModal();
+  const content = document.getElementById('inv-detail-content');
+  content.innerHTML = '';
+  content.appendChild(buildExpandedContent(rec, lienNum));
 
-  const isOpen = dtr.classList.contains('visible');
+  overlay.hidden = false;
+  overlay._onClose = typeof onClose === 'function' ? onClose : null;
+  document.addEventListener('keydown', detailModalEscHandler);
 
-  // Fermer toutes les autres lignes expansées
-  document.querySelectorAll('.inv-row-expanded.visible').forEach(el => {
-    if (el.id !== `detail-${rowId}`) {
-      el.classList.remove('visible');
-      const sibling = document.querySelector(`[data-row-id="${el.id.replace('detail-', '')}"]`);
-      if (sibling) sibling.classList.remove('expanded');
-    }
-  });
-
-  dtr.classList.toggle('visible', !isOpen);
-  const tr = document.querySelector(`[data-row-id="${rowId}"]`);
-  if (tr) tr.classList.toggle('expanded', !isOpen);
-
-  // Scroll doux vers la ligne si on l'ouvre
-  if (!isOpen) {
-    setTimeout(() => dtr.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  // En iframe, la modale est posée dans le document (voir le CSS
+  // .rp-embedded dans inventaire-thumbnail.css) : on amène la page hôte
+  // dessus, sinon elle s'ouvrirait à un endroit que le visiteur ne
+  // regarde pas. scrollIntoView traverse la frontière d'iframe.
+  if (isEmbedded()) {
+    overlay.querySelector('.inv-detail-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  notifyHeight();
+}
+
+function closeDetailModal() {
+  const overlay = document.getElementById('inv-detail-overlay');
+  if (!overlay || overlay.hidden) return;
+  overlay.hidden = true;
+  document.removeEventListener('keydown', detailModalEscHandler);
+  const onClose = overlay._onClose;
+  overlay._onClose = null;
+  notifyHeight();
+  if (onClose) onClose();
+}
+
+function detailModalEscHandler(e) {
+  if (e.key === 'Escape') closeDetailModal();
+}
+
+/** Crée (une seule fois) la modale de détail et ses écouteurs, la renvoie. */
+function ensureDetailModal() {
+  let overlay = document.getElementById('inv-detail-overlay');
+  if (overlay) return overlay;
+
+  overlay = document.createElement('div');
+  overlay.id = 'inv-detail-overlay';
+  overlay.className = 'inv-detail-overlay';
+  overlay.hidden = true;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `
+    <div class="inv-detail-box">
+      <button type="button" class="inv-detail-close" aria-label="Fermer">✕</button>
+      <div id="inv-detail-content"></div>
+    </div>`;
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeDetailModal();
+  });
+  overlay.querySelector('.inv-detail-close').addEventListener('click', closeDetailModal);
+  document.body.appendChild(overlay);
+  return overlay;
 }
 
 // ══════════════════════════════════════════

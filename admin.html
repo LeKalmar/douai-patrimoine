@@ -330,9 +330,11 @@
     fetchJsonOrNull('data/build-report-previous.json'),
     fetchJsonOrNull('data/magasins-build-report.json'),
     fetchJsonOrNull('data/magasins-build-report-previous.json'),
+    fetchJsonOrNull('data/db-status.json'),
   ]).then(function(results) {
     var current = results[0], previous = results[1];
     var magCurrent = results[2], magPrevious = results[3];
+    var dbStatus = results[4];
 
     if (!current && !magCurrent) {
       document.getElementById('ad-inventory').innerHTML =
@@ -377,6 +379,7 @@
     html += '<div class="ad-export-cards">';
     html += exportCard('Réserve (patrimoniale + Douaisienne)', current, previous);
     html += exportCard('Magasins 2e/5e/6e étage', magCurrent, magPrevious);
+    html += dbStatusCard(dbStatus);
     html += '</div>';
 
     if (s.joinRate != null || (ms.byEtage && ms.byEtage['6e'] != null)) {
@@ -408,6 +411,34 @@
       '<div class="ad-export-row"><span>Export Syracuse actuel</span><strong>' + formatDate(current && current.generatedAt) + '</strong></div>' +
       '<div class="ad-export-row"><span>Export précédent</span><strong>' + formatDate(previous && previous.generatedAt) + '</strong></div>' +
       '</div>';
+  }
+
+  /* Base "inventaire des collections" (Postgres, chantier postgres-local) —
+     data/db-status.json vient de scripts/lib/export-db-status.mjs, servi
+     uniquement par scripts/dev-server.mjs (outil réseau local, pas encore
+     déployé sur Vercel). `dbStatus` vaut null en production (404 sur ce
+     chemin, aucun fichier statique de ce nom n'est committé) : la carte
+     l'indique alors plutôt que d'afficher une erreur. */
+  function dbStatusCard(dbStatus) {
+    var reserve = dbStatus && dbStatus.sources && dbStatus.sources.reserve_marc;
+    if (!reserve) {
+      return '<div class="ad-export-card">' +
+        '<h3>Base de données (réserve)</h3>' +
+        '<p class="ad-tech">Indisponible depuis cette instance — accessible via le serveur de dev local (scripts/dev-server.mjs).</p>' +
+        '</div>';
+    }
+    var html = '<div class="ad-export-card">' +
+      '<h3>Base de données (réserve)</h3>' +
+      '<div class="ad-export-row"><span>Dernière actualisation</span><strong>' + formatDate(reserve.finishedAt || reserve.startedAt) + '</strong></div>' +
+      '<div class="ad-export-row"><span>Notices / exemplaires mis à jour</span><strong>' + nf(reserve.noticesUpserted) + ' / ' + nf(reserve.exemplairesUpserted) + '</strong></div>';
+    if (reserve.status !== 'ok') {
+      html += '<p class="ad-tech">⚠ Le dernier rafraîchissement a échoué' +
+        (reserve.errorMessage ? ' : ' + reserve.errorMessage : '') + '.</p>';
+    }
+    html += '<p class="ad-tech">Prochain export Syracuse : sélectionner les notices modifiées après le ' +
+      '<strong>' + formatDate(reserve.startedAt) + '</strong>.</p>' +
+      '</div>';
+    return html;
   }
 
   // ══ Avancement du récolement ══════════════════════════════════════════
