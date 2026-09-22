@@ -160,12 +160,24 @@ const server = createServer((req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+// Écoute sur toutes les interfaces par défaut (pas seulement 127.0.0.1) :
+// nécessaire au test d'écriture concurrente multi-postes du chantier
+// postgres-local (voir plan) — d'autres postes du réseau local doivent
+// pouvoir ouvrir ce serveur. HOST=127.0.0.1 pour revenir au comportement
+// précédent (dev solo, pas d'exposition réseau).
+const HOST = process.env.HOST || '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
   const r2 = !!(process.env.R2_ACCOUNT_ID && process.env.R2_BUCKET && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY);
   const admin = !!(process.env.ADMIN_USER && process.env.ADMIN_PASS);
   console.log(`\n  Réserve patrimoniale — serveur de dev local`);
   console.log(`  ────────────────────────────────────────────`);
   console.log(`  http://localhost:${PORT}`);
+  if (HOST === '0.0.0.0') {
+    console.log(`  Accessible aussi depuis le réseau local sur le port ${PORT}`);
+    console.log(`  (voir l'IP de ce poste : ipconfig / Get-NetIPAddress) — nécessite`);
+    console.log(`  une règle de pare-feu entrante sur ce port (privée, pas publique).`);
+  }
   console.log(`  R2 (stockage partagé) : ${r2 ? 'configuré (.env)' : 'absent — GET renverra un état vide, POST échouera'}`);
   console.log(`  ADMIN_USER/ADMIN_PASS : ${admin ? 'configurés (.env)' : 'absents — /api/login refusera toute connexion'}`);
   console.log(`  Espace pro : ouvrez index.html, connectez-vous, puis les pages protégées.`);
