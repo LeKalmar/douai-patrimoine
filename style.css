@@ -2297,6 +2297,7 @@ ul { list-style: none; }
 .rp-header,
 .rp-hero,
 .rp-expo,
+.rp-themes,
 .rp-fonds,
 .rp-pratique { --rp-gutter: clamp(1.25rem, 4vw, 2.5rem); }
 
@@ -2439,6 +2440,18 @@ ul { list-style: none; }
   transition: filter var(--transition);
 }
 .rp-expo-cta:hover { filter: brightness(1.08); color: var(--rose); }
+
+/* ── Les thématiques ──────────────────────────────────────────────────────
+   Cartes réutilisant le style .rp-fonds-* ci-dessous (mêmes proportions,
+   même grille). Modificateur .rp-fonds-card--soon pour les pages
+   thématiques encore vides (voir thematiques/README ou CLAUDE.md « Les
+   thématiques ») : rendues en <div>, pas en <a>, puisqu'il n'y a rien à
+   ouvrir tant que leur contenu n'est pas rédigé. */
+.rp-themes { padding: clamp(2.25rem, 5vw, 2.875rem) var(--rp-gutter) 0; background: var(--papier); }
+.rp-fonds-card--soon { cursor: default; }
+.rp-fonds-card--soon:hover { border-color: #E3DED4; box-shadow: none; transform: none; }
+.rp-fonds-card--soon .rp-fonds-cover { filter: grayscale(0.6); opacity: 0.8; }
+.rp-fonds-soon { font-size: 0.78rem; font-weight: 600; color: var(--text-light); margin-top: 0.25rem; }
 
 /* ── Les fonds ───────────────────────────────────────────────────────────── */
 .rp-fonds { padding: clamp(2.25rem, 5vw, 2.875rem) var(--rp-gutter); background: var(--papier); }

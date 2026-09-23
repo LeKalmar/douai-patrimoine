@@ -1269,13 +1269,34 @@ dans ce même message et relance l'envoi avec l'instantané déjà capturé.
 
 Ce préfixe `vignette/` est un troisième usage indépendant du bucket R2, en
 plus de `xml/` et de la famille `recolement.json`/`livres-spolies-overrides.json`/
-`exemplaires-manuels.json` (voir « Stockage partagé » ci-dessous). Il n'existe
-actuellement **aucune lecture** de ces images ailleurs dans le site (ni
-proxy `GET` signé, ni URL publique R2 connue) : c'est pour l'instant un
-usage en écriture seule. Si un affichage de ces vignettes est un jour
-demandé (ex. dans le tableau des exemplaires créés, ou dans le catalogue),
-il faudra soit un endpoint `GET` signé supplémentaire (le bucket n'est pas
-public), soit activer un accès public R2 sur ce préfixe précis.
+`exemplaires-manuels.json` (voir « Stockage partagé » ci-dessous).
+
+**Vignette basse résolution (2026-09-23).** `api/vignette.mjs` écrit
+désormais aussi une seconde image sous `vignette-thumb/<code-barre>.jpg`
+(400 px max sur le plus grand côté, JPEG qualité 0.8) — envoyée par
+`exemplarisation.html` dans le même appel `POST` que la photo pleine
+taille (`thumbBase64`, en plus d'`imageBase64`), à partir du même recadrage
+(`photoCropToBlob()`, généralisée à partir de l'ancienne
+`photoCropToUploadBlob()` pour accepter une taille/qualité en paramètre).
+Champ optionnel côté serveur : un appel sans `thumbBase64` reste valide,
+seule la vignette pleine taille est alors écrite. Raison de la basse
+résolution : les 1600 px de la photo pleine taille étaient lents à charger
+partout où plusieurs vignettes s'affichent à la fois (liste, catalogue) —
+demande explicite de l'équipe.
+
+Le bucket R2 lui-même n'est **toujours pas public** : `api/vignette.mjs`
+expose maintenant un `GET` (public, sans authentification — même niveau
+d'exposition que les six autres endpoints d'état partagé) —
+`/api/vignette?barcode=<code-barre>[&size=thumb|full]`, `size=thumb` par
+défaut — qui lit la clé correspondante via `r2Get` et répond l'image
+binaire directement (`Content-Type: image/jpeg`), avec ETag/304 et le même
+`Cache-Control` que les six endpoints proxy (`public, max-age=0,
+must-revalidate, s-maxage=20, stale-while-revalidate=60` — une vignette
+reprise doit cesser d'être servie depuis un cache dès que la nouvelle photo
+est écrite). Il n'existe encore **aucun affichage** de ces vignettes dans
+le site (ni dans le tableau des exemplaires créés, ni dans le catalogue) :
+l'endpoint de lecture est prêt, mais brancher un `<img>` dessus reste à
+faire au moment où ce besoin se présentera.
 
 ### Document numérisé (lien vers la visionneuse)
 

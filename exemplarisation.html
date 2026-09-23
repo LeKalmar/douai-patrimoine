@@ -792,16 +792,21 @@ photoOrigbox.addEventListener('mouseleave', () => { photoLoupe.style.display = '
    reste correct même si l'utilisateur·rice a déjà chargé la photo de
    l'exemplaire suivant pendant que l'envoi précédent est encore en cours. */
 const PHOTO_UPLOAD_MAX_DIM = 1600, PHOTO_UPLOAD_QUALITY = 0.85;
-function photoCropToUploadBlob(img, cropR, margin){
+// Vignette basse résolution (2026-09-23) : envoyée en plus de la photo pleine
+// taille, stockée à part sous "vignette-thumb/<code-barre>.jpg" (voir
+// api/vignette.mjs), pour tout affichage en liste — inutile d'y télécharger
+// la version 1600px si un jour on affiche ces photos dans un tableau.
+const PHOTO_THUMB_MAX_DIM = 400, PHOTO_THUMB_QUALITY = 0.8;
+function photoCropToBlob(img, cropR, margin, maxDim, quality){
   const x = Math.max(0, cropR.x - margin);
   const y = Math.max(0, cropR.y - margin);
   const w = Math.min(img.width - x, cropR.w + margin*2);
   const h = Math.min(img.height - y, cropR.h + margin*2);
-  const sc = Math.min(PHOTO_UPLOAD_MAX_DIM/w, PHOTO_UPLOAD_MAX_DIM/h, 1);
+  const sc = Math.min(maxDim/w, maxDim/h, 1);
   const out = document.createElement('canvas');
   out.width = Math.round(w*sc); out.height = Math.round(h*sc);
   out.getContext('2d').drawImage(img, x, y, w, h, 0, 0, out.width, out.height);
-  return new Promise(res => out.toBlob(res, 'image/jpeg', PHOTO_UPLOAD_QUALITY));
+  return new Promise(res => out.toBlob(res, 'image/jpeg', quality));
 }
 function blobToBase64(blob){
   return new Promise((res, rej) => {
@@ -812,9 +817,12 @@ function blobToBase64(blob){
   });
 }
 async function uploadPhoto(barcode, img, cropR, margin){
-  const blob = await photoCropToUploadBlob(img, cropR, margin);
-  const imageBase64 = await blobToBase64(blob);
-  const res = await fetch('/api/vignette', { method:'POST', headers: authHeaders(), body: JSON.stringify({ barcode, imageBase64 }) });
+  const [blob, thumbBlob] = await Promise.all([
+    photoCropToBlob(img, cropR, margin, PHOTO_UPLOAD_MAX_DIM, PHOTO_UPLOAD_QUALITY),
+    photoCropToBlob(img, cropR, margin, PHOTO_THUMB_MAX_DIM, PHOTO_THUMB_QUALITY),
+  ]);
+  const [imageBase64, thumbBase64] = await Promise.all([blobToBase64(blob), blobToBase64(thumbBlob)]);
+  const res = await fetch('/api/vignette', { method:'POST', headers: authHeaders(), body: JSON.stringify({ barcode, imageBase64, thumbBase64 }) });
   if(!res.ok){
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Erreur serveur (${res.status})`);
