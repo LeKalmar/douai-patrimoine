@@ -5,8 +5,8 @@
  * `data/inventaire.json` (voir scripts/lib/reserve-index.mjs `buildItems()`) —
  * un objet par exemplaire réserve, clés `<tag>$<code>` filtrées aux mêmes
  * listes blanches que `build-inventory.mjs`/`db-migrate-reserve.mjs`, plus
- * les champs dérivés `_noticeId`, `_leader`, `_piege`, `_langue`, `lien_num`,
- * `995$f`, `_relies`.
+ * les champs dérivés `_noticeId`, `_leader`, `_piege`, `_langue`,
+ * `_typeDocument`, `lien_num`, `995$f`, `_relies`.
  *
  * `db-migrate-reserve.mjs` a stocké, pour chaque notice/exemplaire, un
  * flatten COMPLET (sans liste blanche) dans la colonne `raw jsonb` — on
@@ -31,9 +31,30 @@
  * scripts/verify-json-parity.mjs qui les comparerait échouerait donc à tort
  * sur ces deux clés précises — à exclure explicitement de la comparaison,
  * pas une divergence de données réelle.
+ *
+ * Depuis 2026-09-23, le tableau retourné inclut aussi le fonds Cartes
+ * géographiques (425 documents `source='excel_import'`, absents de
+ * Syracuse — voir scripts/db-migrate-fonds-car.mjs), transformés via
+ * buildFondsCarRecord() (scripts/lib/fonds-car-record.mjs), et le fonds
+ * Périodiques (registre au niveau titre, voir scripts/db-migrate-fonds-
+ * periodiques.mjs), transformés via buildFondsPeriodiqueRecord()
+ * (scripts/lib/fonds-periodiques-record.mjs — seules les lignes avec une
+ * cote renseignée y survivent, comme pour les autres fonds non catalogués).
+ *
+ * Première fonction de ce fichier de la famille export-*.mjs à tourner dans
+ * une vraie fonction Vercel (api/inventaire.mjs) plutôt que seulement
+ * localement (dev-server.mjs, scripts/verify-json-parity.mjs) — d'où le
+ * passage à la connexion POOLÉE (pgbouncer) plutôt qu'unpooled : plusieurs
+ * invocations serverless concurrentes ouvriraient sinon chacune leur propre
+ * connexion directe à Neon (voir la distinction documentée dans
+ * scripts/lib/pg.mjs). Les autres export-*.mjs restent en unpooled tant
+ * qu'ils ne sont appelés que par un process Node local unique.
  */
 import { getPool } from './pg.mjs';
 import { langueLabelOf } from './langue-labels.mjs';
+import { typeDocumentLabelOf } from './type-document-labels.mjs';
+import { buildFondsCarRecord } from './fonds-car-record.mjs';
+import { buildFondsPeriodiqueRecord, buildFondsPeriodique2Record } from './fonds-periodiques-record.mjs';
 
 const VIGNETTE_BASE_URL = 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/vignette/';
 
@@ -57,14 +78,20 @@ function filterByWhitelist(raw, whitelist) {
 }
 
 export async function exportInventaire() {
-  const pool = getPool({ unpooled: true });
+  const pool = getPool();
 
+  // ORDER BY nécessaire : sans lui, Postgres ne garantit aucun ordre stable
+  // entre deux exécutions de la même requête — api/inventaire.mjs calcule un
+  // ETag (hash du corps sérialisé) pour permettre les 304, qui ne servirait
+  // jamais à rien si l'ordre des lignes (et donc le hash) changeait à chaque
+  // appel alors que les données, elles, n'ont pas bougé.
   const { rows } = await pool.query(`
     SELECT e.barcode, e.reliure_groupe_id, e.piege_label, e.raw AS item_raw,
            n.raw AS notice_raw, n.source_notice_id, n.leader
     FROM exemplaires e
     JOIN notices n ON n.id = e.notice_id
     WHERE e.source = 'reserve_marc'
+    ORDER BY e.id
   `);
 
   const { rows: groupRows } = await pool.query(`
@@ -88,6 +115,7 @@ export async function exportInventaire() {
     // jamais absente. Reproduire cette présence, pas seulement la valeur.
     merged._piege = row.piege_label ?? null;
     merged._langue = langueLabelOf(merged['101$a']);
+    merged._typeDocument = typeDocumentLabelOf(merged['920$t']);
 
     if (row.barcode) {
       merged.lien_num = `${VIGNETTE_BASE_URL}${row.barcode}.jpg`;
@@ -101,5 +129,26 @@ export async function exportInventaire() {
     return merged;
   });
 
-  return items;
+  const { rows: carRows } = await pool.query(
+    `SELECT raw FROM exemplaires WHERE source = 'excel_import' AND source_ref LIKE 'fonds-car-%' ORDER BY source_ref`
+  );
+  const carItems = carRows.map(r => buildFondsCarRecord(r.raw)).filter(Boolean);
+
+  const { rows: periodiqueRows } = await pool.query(
+    `SELECT raw FROM exemplaires WHERE source = 'excel_import' AND source_ref LIKE 'fonds-periodiques-%' ORDER BY source_ref`
+  );
+  const periodiqueItems = periodiqueRows.map(r => buildFondsPeriodiqueRecord(r.raw)).filter(Boolean);
+
+  // "fonds-periodiques2-%" : nouvelles entrées de csv/periodiques2.csv sans
+  // correspondance dans periodiques.csv (voir scripts/db-migrate-fonds-
+  // periodiques.mjs) — forme brute différente (Titre/Cote/Date de parution),
+  // transformée par buildFondsPeriodique2Record() plutôt que
+  // buildFondsPeriodiqueRecord(). Le motif "fonds-periodiques-%" ci-dessus ne
+  // les capture pas : "2" suit immédiatement "periodiques", jamais "-".
+  const { rows: periodique2Rows } = await pool.query(
+    `SELECT raw FROM exemplaires WHERE source = 'excel_import' AND source_ref LIKE 'fonds-periodiques2-%' ORDER BY source_ref`
+  );
+  const periodique2Items = periodique2Rows.map(r => buildFondsPeriodique2Record(r.raw)).filter(Boolean);
+
+  return items.concat(carItems).concat(periodiqueItems).concat(periodique2Items);
 }

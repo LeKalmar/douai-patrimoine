@@ -171,6 +171,13 @@ const DETAIL_COLS = [
   { key: '_langue',                   label: 'Langue' },
   { key: '610$a',                     label: 'Sujets' },
   { key: '300$a',                     label: 'Note générale' },
+  // Champs dérivés propres au fonds Périodiques (voir
+  // scripts/lib/fonds-periodiques-record.mjs) — absents (donc ignorés, voir
+  // le filtre `if (!val.trim()) return` plus bas) sur tous les autres fonds.
+  { key: '_frequence',                label: 'Périodicité' },
+  { key: '_parution',                 label: 'Dates de parution' },
+  { key: '_villeLabel',               label: 'Ville de publication' },
+  { key: '_imprimeurLabel',           label: 'Imprimeur' },
 ];
 
 // ══════════════════════════════════════════

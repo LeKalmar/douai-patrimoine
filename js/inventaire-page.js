@@ -38,7 +38,8 @@
      l'export courant est simplement sauté — la rangée n'est pas figée à 5. */
   var FONDS_VEDETTE = [
     'Imprimés', 'Manuscrits', 'Douaisien', "Livres d'Artiste",
-    'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme', 'Robaut'
+    'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme', 'Robaut',
+    'Cartes géographiques', 'Périodiques'
   ];
 
   /* Repli d'illustration pour les fonds que FONDS_IMAGES (js/inventaire.js) ne
@@ -206,10 +207,20 @@
   // ── Chargement ──────────────────────────────────────────────────────────
   function load() {
     Promise.all([
-      fetch('data/inventaire.json').then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }),
+      /* Priorité à /api/inventaire (généré en direct depuis Postgres — voir
+         scripts/lib/export-inventaire.mjs, inclut déjà réserve + fonds
+         Cartes) ; repli sur data/inventaire.json (snapshot committé, généré
+         par npm run build depuis les XML Syracuse, sans le fonds Cartes) si
+         l'API échoue — DB indisponible, page servie hors Vercel, etc. Même
+         patron que loadRecolement() dans reserve.html. */
+      fetch('/api/inventaire')
+        .then(function (r) { if (!r.ok) throw new Error('api-unavailable'); return r.json(); })
+        .catch(function () {
+          return fetch('data/inventaire.json').then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          });
+        }),
       /* Exemplaires créés via exemplarisation.html (état partagé R2). Échoue
          silencieusement — même dégradation que partout ailleurs : mieux vaut un
          catalogue amputé des créations récentes qu'une page vide. */
@@ -259,7 +270,16 @@
              `buildCatalogFromItems()` dans recolement.html (CLAUDE.md,
              "Reconnaissance de code-barre par un second catalogue"). */
           r._fonds = r._fondsLabel || getFondsFromCote(r);
-          r._type = normType(r['200$b']);
+          /* _typeDocument (scripts/lib/type-document-labels.mjs) vient du code
+             fermé 920$t (exemplaire), posé au build sur 100% des exemplaires
+             de la réserve — préféré à 200$b (champ notice en texte libre : vide
+             sur 43% des exemplaires au 2026-09-23, casse flottante, accents
+             cassés, coquilles). Absent sur les sources fusionnées qui n'ont
+             jamais eu de code Syracuse (exemplaires manuels
+             d'exemplarisation.html, pièces non cataloguées du fonds
+             Manuscrits/Robaut/Objets) : repli sur l'ancien normType(200$b)
+             pour elles uniquement. */
+          r._type = r._typeDocument || normType(r['200$b']);
           r._lieu = normLieu(r['210$a']);
           /* Numérisé = un document réellement consultable dans la visionneuse
              (dossier Syracuse "num", ou lien posé à la main via
@@ -276,8 +296,14 @@
              voir authorNamesOf() ci-dessous. */
           r._auteurListe = authorNamesOf(r);
           r._year = yearOf(r);
-          r._hay = [r['200$a'], r['700$a'], r['701$a'], r['930$g'], r['610$a']]
-            .join(' ').toLowerCase();
+          /* _frequence/_villeLabel/_imprimeurLabel (fonds Périodiques, voir
+             scripts/lib/fonds-periodiques-record.mjs) : absents sur tous les
+             autres fonds, donc sans effet sur leur recherche — rendent par
+             exemple "Crépin" ou "hebdomadaire" trouvables. */
+          r._hay = [
+            r['200$a'], r['700$a'], r['701$a'], r['930$g'], r['610$a'],
+            r._frequence, r._villeLabel, r._imprimeurLabel
+          ].join(' ').toLowerCase();
         });
         /* Un document sans cote (930$g) n'est pas localisable en réserve —
            masqué de l'inventaire public plutôt qu'affiché avec une case vide
