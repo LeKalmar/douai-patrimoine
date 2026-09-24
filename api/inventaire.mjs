@@ -18,11 +18,26 @@
  * `s-maxage` nettement plus long que les six endpoints d'état partagé
  * (20s, sondés toutes les 45s par des pages internes) : l'inventaire ne
  * change qu'au rythme d'un import/rebuild, pas d'un scan — un cache CDN de
- * quelques minutes évite de solliciter Neon à chaque visite du site public
+ * quelques minutes évite de solliciter la base à chaque visite du site public
  * sans rendre la page perceptiblement périmée pour autant.
+ *
+ * Cache mémoire (`lib/data-json-cache.mjs`, TTL 60 s) : mesuré en conditions
+ * réelles, la requête SQL + le filtrage par liste blanche de
+ * `exportInventaire()` + le `JSON.stringify` du résultat (21,2 Mo) coûtent
+ * ensemble ~2,3 s à froid, et l'ETag ne fait qu'éviter le TRANSFERT du corps,
+ * jamais son recalcul. Ce cache retient aussi les variantes compressées du
+ * corps (voir lib/http-compress.mjs), pour que les ~760 ms de brotli ne
+ * soient pas repayées non plus à chaque chargement de page.
+ *
+ * Compression (2026-09-23) : en hébergement local il n'y a plus de CDN pour
+ * la poser, et ces 21,2 Mo partaient donc tels quels à chaque chargement de
+ * inventaire.html. `sendCompressed()` les ramène à 2,4 Mo (brotli) ou 3,1 Mo
+ * (gzip) — de loin le premier poste du temps de chargement de cette page.
  */
 import { createHash } from 'node:crypto';
 import { exportInventaire } from '../scripts/lib/export-inventaire.mjs';
+import { getCached } from '../lib/data-json-cache.mjs';
+import { sendCompressed } from '../lib/http-compress.mjs';
 
 const CACHE_CONTROL = 'public, max-age=0, must-revalidate, s-maxage=120, stale-while-revalidate=600';
 
@@ -33,9 +48,8 @@ export default async function handler(req, res) {
     return;
   }
   try {
-    const items = await exportInventaire();
-    const body = JSON.stringify(items);
-    const etag = `"${createHash('sha256').update(body).digest('hex')}"`;
+    const body = await getCached('api/inventaire', async () => JSON.stringify(await exportInventaire()));
+    const etag = `"${createHash('sha256').update(body.raw).digest('hex')}"`;
 
     res.setHeader('Cache-Control', CACHE_CONTROL);
     res.setHeader('ETag', etag);
@@ -46,7 +60,7 @@ export default async function handler(req, res) {
     }
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.status(200).send(body);
+    sendCompressed(req, res, body);
   } catch (err) {
     console.error('[api/inventaire]', err);
     res.status(500).json({ error: err.message || 'Erreur serveur.' });

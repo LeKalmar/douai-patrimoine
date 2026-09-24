@@ -4,6 +4,12 @@
 const JSON_PATH = 'data/inventaire.json';
 const PAGE_SIZE = 10;
 
+// Calendrier de la presse numérisée (voir buildPresseCalendar() plus bas).
+const MOIS_LONGS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const MOIS_COURTS = ['Janv.', 'Fév.', 'Mars', 'Avr.', 'Mai', 'Juin',
+  'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
+
 // Clé de la colonne "sous-fonds" dans le CSV. La seule valeur qui l'alimente
 // aujourd'hui est le sous-fonds « ⚡ Exemplarisation rapide (à cataloguer) »
 // posé par js/exemplaires-manuels-shared.js — désactivé (null) pour que
@@ -41,6 +47,8 @@ const FONDS_IMAGES = {
   'Littérature':                 'images/litterature.jpg',
   'Robaut':                      'images/robaut.jpg',
   "Livres d'Artiste":            "images/livre-d-artiste.jpg",
+  'Cartes géographiques':        'images/cartographie.jpg',
+  'Périodiques':                 'images/periodiques.jpg',
 };
 
 // Descriptions et métadonnées des fonds
@@ -311,6 +319,27 @@ function parsePublicationDate(dateStr) {
 
   const str = String(dateStr).trim();
 
+  // Cas champ répété : « 64410§1989 » (cote D10809, fonds Douaisien) — le
+  // « § » est déjà la convention du projet pour joindre des occurrences
+  // répétées d'un même sous-champ MARC (700$a, 930$e_11…), utilisée ici
+  // aussi sur 210$d : un premier segment parfois inexploitable (garbage
+  // numérique, notation ancienne, note de pagination — cf. « 1986§non
+  // paginé », « M. DCC. XXXVIII§1738 ») suivi du millésime retenu par le
+  // catalogueur. On préfère donc le dernier segment s'il donne une date
+  // exploitable, avec repli sur le premier sinon (cas où c'est l'inverse,
+  // ex. « 1998§26 cm » : le premier segment est le millésime, le second une
+  // note de format).
+  if (str.indexOf('§') !== -1) {
+    const parts = str.split('§');
+    const last = parsePublicationDatePart(parts[parts.length - 1].trim());
+    if (last) return last;
+    return parsePublicationDatePart(parts[0].trim());
+  }
+
+  return parsePublicationDatePart(str);
+}
+
+function parsePublicationDatePart(str) {
   // Cas : [17xx] → XVIIIe siècle → 1701–1800
   const centuryMatch = str.match(/^\[(\d{2})xx\]$/i);
   if (centuryMatch) {
@@ -329,6 +358,32 @@ function parsePublicationDate(dateStr) {
       start: decade,
       end: decade + 9
     };
+  }
+
+  // Cas archaïque : « l'an 1000 800 50 (Valenciennes, impr. de A. Prignet,
+  // 1850) » — un seul exemplaire du fonds Imprimés (cote I-19-1850-1-3,
+  // confirmée par ce même millésime dans la cote), millésime décomposé en
+  // unités sur la page de titre (1000+800+50=1850) façon almanach des
+  // Rosati, le vrai millésime réapparaissant entre parenthèses à la fin.
+  // Sans ce cas, le premier groupe de 4 chiffres (« 1000 ») serait pris à
+  // tort pour l'année, antérieur de 4 siècles aux premiers incunables.
+  const archaicMatch = str.match(/^l['’]an\s+[\d\s]+\(.*?(\d{4})/i);
+  if (archaicMatch) {
+    const year = parseInt(archaicMatch[1], 10);
+    return { start: year, end: year };
+  }
+
+  // Cas calendrier hégirien : « l'an de l'Hégyre 1170 [1756] » — un seul
+  // exemplaire (ouvrage du monde musulman) porte son millésime dans le
+  // calendrier hégirien, non comparable à une année grégorienne (l'hégire
+  // ne s'incrémente pas de 1 par an solaire), suivi de sa conversion
+  // grégorienne entre crochets. Sans ce cas, le millésime hégirien
+  // (« 1170 ») serait pris à tort pour l'année, alors que la conversion
+  // donnée par le catalogueur (1756) est juste devant, entre crochets.
+  const hijriMatch = str.match(/l['’]an\s+de\s+l['’]h[ée]g[iy]re\s+\d+\s*\[(\d{4})\]/i);
+  if (hijriMatch) {
+    const year = parseInt(hijriMatch[1], 10);
+    return { start: year, end: year };
   }
 
   // Cas : année précise
@@ -947,6 +1002,131 @@ function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionn
 }
 
 // ══════════════════════════════════════════
+//  Presse numérisée — calendrier année → mois → jour
+// ══════════════════════════════════════════
+/**
+ * Construit le petit calendrier affiché sous une notice de périodique
+ * numérisé (rec._presseCalendar — année → mois "MM" → jour "J" → nom du
+ * "book" de ce numéro, posé dans js/inventaire-page.js depuis
+ * js/presse-index.json, voir scripts/build-manifest-presse.mjs). Trois
+ * niveaux dans la même boîte, un seul affiché à la fois (bouton « Retour »
+ * pour remonter) :
+ *   années → boîtes bleues, une par année numérisée
+ *   mois   → 12 boîtes, bleues (numérisé) ou grisées (rien cette année-là)
+ *   jours  → une boîte par jour du mois, bleue seulement si un numéro existe
+ * Cliquer un jour bascule la modale vers la visionneuse sur le "book" de ce
+ * numéro — qui ne contient QUE ses propres pages (un "book" par numéro,
+ * pas par année, voir scripts/build-manifest-presse.mjs) : les flèches
+ * gauche/droite n'y feuillettent donc que ce numéro-là, pas toute l'année
+ * (demande explicite du 2026-09-23).
+ *
+ * @returns {HTMLElement|null} null si la notice n'a pas de presse numérisée
+ */
+function buildPresseCalendar(rec, titre) {
+  const calendar = rec._presseCalendar;
+  const years = calendar ? Object.keys(calendar).sort() : [];
+  if (!years.length) return null;
+
+  const box = document.createElement('div');
+  box.className = 'inv-presse-cal';
+
+  const header = document.createElement('div');
+  header.className = 'inv-presse-cal-header';
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'inv-presse-cal-back';
+  backBtn.textContent = '‹ Retour';
+  backBtn.hidden = true;
+  const label = document.createElement('span');
+  label.className = 'inv-presse-cal-label';
+  header.appendChild(backBtn);
+  header.appendChild(label);
+
+  const grid = document.createElement('div');
+  box.appendChild(header);
+  box.appendChild(grid);
+
+  let onBack = null;
+
+  function cell(text, available, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'inv-presse-cal-cell' + (available ? ' inv-presse-cal-cell--available' : ' inv-presse-cal-cell--unavailable');
+    btn.textContent = text;
+    btn.disabled = !available;
+    if (available) btn.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+    return btn;
+  }
+
+  function renderYears() {
+    backBtn.hidden = true;
+    onBack = null;
+    label.textContent = 'Presse numérisée — années disponibles';
+    grid.className = 'inv-presse-cal-grid inv-presse-cal-grid--years';
+    grid.innerHTML = '';
+    years.forEach(year => grid.appendChild(cell(year, true, () => renderMonths(year))));
+  }
+
+  function renderMonths(year) {
+    backBtn.hidden = false;
+    onBack = renderYears;
+    label.textContent = `Presse numérisée — ${year}`;
+    grid.className = 'inv-presse-cal-grid inv-presse-cal-grid--months';
+    grid.innerHTML = '';
+    const monthsAvail = calendar[year] || {};
+    MOIS_COURTS.forEach((name, i) => {
+      const mm = String(i + 1).padStart(2, '0');
+      grid.appendChild(cell(name, !!monthsAvail[mm], () => renderDays(year, mm)));
+    });
+  }
+
+  function renderDays(year, month) {
+    backBtn.hidden = false;
+    onBack = () => renderMonths(year);
+    label.textContent = `Presse numérisée — ${MOIS_LONGS[parseInt(month, 10) - 1]} ${year}`;
+    grid.className = 'inv-presse-cal-grid inv-presse-cal-grid--days';
+    grid.innerHTML = '';
+    // En-tête jours de semaine (lundi en tête, convention française) —
+    // purement décoratif, sert juste à aligner la grille des jours en
+    // dessous comme un vrai calendrier.
+    ['L', 'M', 'M', 'J', 'V', 'S', 'D'].forEach(w => {
+      const wd = document.createElement('span');
+      wd.className = 'inv-presse-cal-weekday';
+      wd.textContent = w;
+      grid.appendChild(wd);
+    });
+    const daysAvail = (calendar[year] && calendar[year][month]) || {};
+    const daysInMonth = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+    // Décalage avant le 1er du mois pour aligner sur son vrai jour de
+    // semaine (getDay() : 0=dimanche…6=samedi → converti en 0=lundi…6=dimanche).
+    const firstWeekday = (new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1).getDay() + 6) % 7;
+    for (let i = 0; i < firstWeekday; i++) {
+      const filler = document.createElement('span');
+      filler.className = 'inv-presse-cal-cell inv-presse-cal-cell--filler';
+      grid.appendChild(filler);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const bookName = daysAvail[String(d)]; // ex. "D23_1873_01_05" — voir scripts/build-manifest-presse.mjs
+      grid.appendChild(cell(String(d), bookName !== undefined, () => {
+        const dateLabel = `${d} ${MOIS_LONGS[parseInt(month, 10) - 1]} ${year}`;
+        // Un "book" par numéro (pas par année) : la visionneuse n'y feuillette
+        // que les pages de CE numéro aux flèches gauche/droite (demande
+        // explicite du 2026-09-23).
+        openViewerInModal(bookName, 'dossier', `${titre} — ${dateLabel}`);
+      }));
+    }
+  }
+
+  backBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (onBack) onBack();
+  });
+
+  renderYears();
+  return box;
+}
+
+// ══════════════════════════════════════════
 //  Contenu de la ligne expansée
 // ══════════════════════════════════════════
 function buildExpandedContent(rec, lienNum) {
@@ -1050,6 +1230,11 @@ function buildExpandedContent(rec, lienNum) {
     p.innerHTML = `<em>Résumé —</em> ${esc(resume)}`;
     infoCol.appendChild(p);
   }
+
+  // Presse numérisée (fonds Périodiques) : calendrier année → mois → jour,
+  // voir buildPresseCalendar() ci-dessous.
+  const presseCalendar = buildPresseCalendar(rec, titre);
+  if (presseCalendar) infoCol.appendChild(presseCalendar);
 
   // Bouton visionneuse — conditionné par la colonne "num" (notices Syracuse
   // avec un dossier dans le manifeste) ou par "_lienNumerise" (exemplaire

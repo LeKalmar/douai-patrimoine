@@ -415,10 +415,10 @@
 
   /* Base "inventaire des collections" (Postgres, chantier postgres-local) —
      data/db-status.json vient de scripts/lib/export-db-status.mjs, servi
-     uniquement par scripts/dev-server.mjs (outil réseau local, pas encore
-     déployé sur Vercel). `dbStatus` vaut null en production (404 sur ce
-     chemin, aucun fichier statique de ce nom n'est committé) : la carte
-     l'indique alors plutôt que d'afficher une erreur. */
+     uniquement par scripts/dev-server.mjs. `dbStatus` vaut null si la page
+     est ouverte autrement que par `npm run dev` (404 sur ce chemin, aucun
+     fichier statique de ce nom n'est committé) : la carte l'indique alors
+     plutôt que d'afficher une erreur. */
   function dbStatusCard(dbStatus) {
     var reserve = dbStatus && dbStatus.sources && dbStatus.sources.reserve_marc;
     if (!reserve) {

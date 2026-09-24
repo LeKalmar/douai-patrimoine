@@ -12,14 +12,6 @@
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
   <script src="js/reserve-shared.js"></script>
-  <!-- Surcouche de fraîcheur Syracuse (voir js/syracuse-sync-shared.js et
-       CLAUDE.md, section « Synchronisation incrémentale Syracuse »). Outil
-       interne au même niveau de confiance que recolement.html/magasins.html
-       (protégé par le même gate localStorage) : déclenche aussi une
-       tranche en tâche de fond, pour que le plan progresse tout seul même
-       si personne n'a ouvert ces deux autres pages entretemps. -->
-  <script src="js/syracuse-sync-shared.js"></script>
-  <script src="js/syracuse-sync-trigger.js" defer></script>
   <style>
     :root {
       --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
@@ -112,7 +104,6 @@
     .notice-auteur{font-size:.7rem;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
     .notice-fonds{font-size:.62rem;padding:1px 5px;border-radius:3px;background:#f0f0f0;color:#666;white-space:nowrap;align-self:flex-start;margin-top:2px;flex-shrink:0}
     .notice-barcode{font-size:.66rem;color:#999;white-space:nowrap;flex-shrink:0;padding-top:2px;font-family:monospace}
-    .notice-live{font-size:.62rem;padding:1px 5px;border-radius:3px;background:#e3f2fd;color:#1565c0;white-space:nowrap;align-self:flex-start;margin-top:2px;flex-shrink:0}
     .notice-more{font-size:.75rem;color:rgba(255,255,255,0.5);text-align:center;padding:.5rem;font-style:italic}
     .placeholder-msg{font-size:.875rem;color:rgba(255,255,255,0.5);padding:.5rem 0;font-style:italic}
     .shelf-hover{position:fixed;z-index:80;background:#fff;border:1px solid #ddd;border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.6rem .75rem;font-size:.72rem;width:280px;pointer-events:none}
@@ -358,7 +349,7 @@ function applyRecolementData(data){
 
 /* Priorité à /api/recolement (état partagé R2, à jour en direct pour tous
    les collègues) ; repli sur data/recolement.json (snapshot committé) si
-   l'API échoue — R2 non configuré, page servie hors Vercel, etc. */
+   l'API échoue — R2 non configuré, page ouverte sans `npm run dev`, etc. */
 function loadRecolement(){
   fetch('/api/recolement')
     .then(r=>{ if(!r.ok) throw new Error('api-unavailable'); return r.json(); })
@@ -1001,20 +992,7 @@ function exportShelfBarcodes(key){
 
 /* ════════════ RENDU DES LIGNES DE NOTICES ════════════ */
 function noticeRows(notices,sort){
-  // Surcouche Syracuse : cote/titre/auteur sont remplacés par la valeur la
-  // plus récente si ce code-barre a une entrée dans la surcouche (touché
-  // depuis le dernier rebuild XML) — même principe que
-  // applySyracuseOverlayToCatalog() dans recolement.html, appliqué ici à la
-  // volée sur les notices déjà chargées plutôt qu'à un catalogue complet
-  // (reserve.html n'en a pas). Le fonds, lui, reste figé (voir liveBadge
-  // ci-dessous) : le recalculer proprement demanderait le même contexte que
-  // `_fondsLabel` (data/magasins.json), absent de cette page.
-  const withOverlay=notices.map(n=>{
-    const fresh=n.b&&SYRACUSE_OVERLAY[n.b];
-    if(!fresh) return n;
-    return {...n, c:fresh.cote||n.c, t:fresh.titre||n.t, a:fresh.auteur||n.a, _fresh:fresh};
-  });
-  const sorted=[...withOverlay].sort((a,b)=>{
+  const sorted=[...notices].sort((a,b)=>{
     if(sort==='cote')   return compareCotes(a.c,b.c);
     if(sort==='titre')  return (a.t||'').localeCompare(b.t||'','fr');
     if(sort==='auteur') return (a.a||'').localeCompare(b.a||'','fr');
@@ -1032,15 +1010,6 @@ function noticeRows(notices,sort){
     if(hit) visible=[...visible.slice(0,MAX-1),hit];
   }
   let html=visible.map(n=>{
-    // Présent seulement si ce code-barre a été touché depuis le dernier
-    // rebuild XML — la plupart des notices n'ont donc aucun badge
-    // supplémentaire (voir loadSyracuseOverlay()). cote/titre/auteur sont
-    // déjà fusionnés ci-dessus ; le badge ne porte plus que ce qui ne peut
-    // pas l'être (section/site, voir le commentaire au-dessus).
-    const fresh=n._fresh;
-    const liveBadge=fresh
-      ? `<span class="notice-live" title="Cote/titre/auteur déjà mis à jour par la synchronisation incrémentale Syracuse ; fonds ci-dessous toujours figé au moment du scan">🔄 ${esc(fresh.section||'')}${fresh.site?` · ${esc(fresh.site)}`:''}</span>`
-      : '';
     return `
     <div class="notice-row${n.b&&n.b===hlBarcode?' hl':''}">
       <span class="notice-cote">${esc(n.c)}</span>
@@ -1048,7 +1017,6 @@ function noticeRows(notices,sort){
       <span class="notice-auteur" title="${esc(n.a)}">${esc(n.a)}</span>
       <span class="notice-barcode">${esc(n.b)}</span>
       <span class="notice-fonds">${esc(n.f)}</span>
-      ${liveBadge}
     </div>`;
   }).join('');
   if(sorted.length>MAX) html+=`<div class="notice-more">… et ${sorted.length-MAX} notices supplémentaires</div>`;
@@ -1183,29 +1151,13 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#sq')&&!e.target.closest('#sres')) document.getElementById('sres').style.display='none';
 });
 
-/* Surcouche Syracuse (voir js/syracuse-sync-shared.js) : { barcode:
-   {cote,titre,auteur,dt,section,site,statut,rscId,ts} } pour les
-   exemplaires modifiés depuis le dernier rebuild XML. Utilisée par
-   noticeRows() pour afficher un badge « live » à côté du fonds figé au
-   moment du scan — voir CLAUDE.md, section « Synchronisation incrémentale
-   Syracuse ». Rafraîchie bien moins souvent que le récolement (45 s) : la
-   synchro elle-même ne peut pas avancer plus vite qu'une tranche toutes
-   les 5 min (voir api/syracuse-tick.mjs), interroger plus fréquemment
-   n'apporterait rien. */
-let SYRACUSE_OVERLAY={};
-function loadSyracuseOverlay(){
-  fetchSyracuseSyncOverlay().then(data=>{ SYRACUSE_OVERLAY=data||{}; });
-}
-
 /* ════════════ DÉMARRAGE ════════════ */
 loadRecolement();
-loadSyracuseOverlay();
 // Suspendu pendant que l'onglet est en arrière-plan (voir même logique côté
 // recolement.html/livres-spolies.html) — un rafraîchissement immédiat a lieu
 // au retour sur l'onglet.
 setInterval(()=>{ if(!document.hidden) loadRecolement(); }, 45000);
-setInterval(()=>{ if(!document.hidden) loadSyracuseOverlay(); }, 5*60*1000);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ loadRecolement(); loadSyracuseOverlay(); } });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadRecolement(); });
 
 </script>
 </body>

@@ -11,9 +11,12 @@
  *
  * Idempotent : chaque table est peuplée via `INSERT ... ON CONFLICT ...`
  * (jamais de TRUNCATE) — rejouable après un nouvel export Syracuse sans
- * dupliquer. Écrit avec `source='reserve_marc'`, qui reste TOUJOURS
- * prioritaire sur `source='bib_xml'` en cas de même code-barre (voir
- * db-migrate-bib.mjs) : à exécuter AVANT ce dernier.
+ * dupliquer. Écrit dans `notices_reserve`/`exemplaires_reserve` (tables
+ * dédiées depuis db/migrations/0007_split_reserve_tables.sql, séparées des
+ * tables partagées `notices`/`exemplaires` qui restent réservées à
+ * bib_xml/excel_import) — reste TOUJOURS prioritaire sur `source='bib_xml'`
+ * en cas de même code-barre (voir db-migrate-bib.mjs) : à exécuter AVANT ce
+ * dernier.
  *
  * Colonnes littérales par champ UNIMARC (2026-09-22) : en plus des quelques
  * colonnes renommées partagées avec les sources bib_xml/excel_import
@@ -152,15 +155,11 @@ async function main() {
     if (noticeRowsByKey.has(key)) continue;
     const raw = it._raw || {};
     const row = {
-      source: 'reserve_marc',
       source_notice_id: key,
       leader: it._leader || null,
       titre: it['200$a'] || null,
       editeur_nom: it['210$c'] || null,
       editeur_date: it['210$d'] || null,
-      isbn: null,
-      issn: null,
-      auteur_principal: null,
       raw: JSON.stringify(raw),
     };
     // Une colonne par champ UNIMARC significatif (scripts/lib/marc-columns.mjs),
@@ -169,32 +168,33 @@ async function main() {
     for (const field of NOTICE_LITERAL_FIELDS) row[quoteCol(field)] = raw[field] || null;
     noticeRowsByKey.set(key, row);
   }
-  console.log(`  · upsert notices (${noticeRowsByKey.size} lignes, ${NOTICE_LITERAL_FIELDS.length} champs littéraux)`);
+  console.log(`  · upsert notices_reserve (${noticeRowsByKey.size} lignes, ${NOTICE_LITERAL_FIELDS.length} champs littéraux)`);
   const notice_id_by_key = new Map();
+  // Pas de colonne `source` (une seule valeur possible dans cette table
+  // dédiée, voir db/migrations/0007_split_reserve_tables.sql) ni
+  // isbn/issn/auteur_principal (toujours NULL pour la réserve, retirées à la
+  // même migration — les valeurs réelles vivent dans les colonnes littérales
+  // "010$a"/"021$a"/"700$a" ci-dessous).
   const noticeCols = [
-    'source', 'source_notice_id', 'leader', 'titre', 'editeur_nom', 'editeur_date',
-    'isbn', 'issn', 'auteur_principal', 'raw',
+    'source_notice_id', 'leader', 'titre', 'editeur_nom', 'editeur_date', 'raw',
     ...NOTICE_LITERAL_FIELDS.map(quoteCol),
   ];
   const noticeSetClause = [
-    'leader=COALESCE(EXCLUDED.leader, notices.leader)',
-    'titre=COALESCE(EXCLUDED.titre, notices.titre)',
-    'editeur_nom=COALESCE(EXCLUDED.editeur_nom, notices.editeur_nom)',
-    'editeur_date=COALESCE(EXCLUDED.editeur_date, notices.editeur_date)',
-    'isbn=COALESCE(EXCLUDED.isbn, notices.isbn)',
-    'issn=COALESCE(EXCLUDED.issn, notices.issn)',
-    'auteur_principal=COALESCE(EXCLUDED.auteur_principal, notices.auteur_principal)',
-    ...NOTICE_LITERAL_FIELDS.map(f => `${quoteCol(f)}=COALESCE(EXCLUDED.${quoteCol(f)}, notices.${quoteCol(f)})`),
+    'leader=COALESCE(EXCLUDED.leader, notices_reserve.leader)',
+    'titre=COALESCE(EXCLUDED.titre, notices_reserve.titre)',
+    'editeur_nom=COALESCE(EXCLUDED.editeur_nom, notices_reserve.editeur_nom)',
+    'editeur_date=COALESCE(EXCLUDED.editeur_date, notices_reserve.editeur_date)',
+    ...NOTICE_LITERAL_FIELDS.map(f => `${quoteCol(f)}=COALESCE(EXCLUDED.${quoteCol(f)}, notices_reserve.${quoteCol(f)})`),
     // Fusion jsonb (pas un remplacement) : un champ capturé par un export
     // passé mais absent de celui-ci reste dans raw au lieu d'être perdu.
-    `raw=COALESCE(notices.raw, '{}'::jsonb) || EXCLUDED.raw`,
+    `raw=COALESCE(notices_reserve.raw, '{}'::jsonb) || EXCLUDED.raw`,
     'updated_at=now()',
     'synced_at=now()',
   ].join(',\n        ');
   for (const batch of batches([...noticeRowsByKey.entries()], CONFIG.batchSize)) {
     const rows = batch.map(([, row]) => row);
-    const { sql, values } = buildBatchInsert('notices', noticeCols, rows, {
-      onConflict: `ON CONFLICT (source, source_notice_id) DO UPDATE SET\n        ${noticeSetClause}`,
+    const { sql, values } = buildBatchInsert('notices_reserve', noticeCols, rows, {
+      onConflict: `ON CONFLICT (source_notice_id) DO UPDATE SET\n        ${noticeSetClause}`,
       returning: 'id, source_notice_id',
     });
     const { rows: returned } = await pool.query(sql, values);
@@ -228,28 +228,30 @@ async function main() {
   }
 
   // ── 3. Exemplaires ───────────────────────────────────────────────────────
-  console.log(`  · upsert exemplaires (${items.length} lignes, ${ITEM_LITERAL_FIELDS.length} champs littéraux)`);
+  console.log(`  · upsert exemplaires_reserve (${items.length} lignes, ${ITEM_LITERAL_FIELDS.length} champs littéraux)`);
+  // Pas de colonne `source` ici non plus (voir la remarque équivalente sur
+  // notices_reserve ci-dessus) ; etat_*/section_*/bibliotheque_* n'existent
+  // pas sur cette table (propres à bib_xml, jamais posés pour la réserve).
   const exemplaireCols = [
-    'barcode', 'source', 'notice_id', 'cote_1', 'cote_2', 'cote_3', 'cote_complete',
+    'barcode', 'notice_id', 'cote_1', 'cote_2', 'cote_3', 'cote_complete',
     'piege_a_code', 'piege_b_code', 'piege_c_texte', 'piege_label',
     'reliure_groupe_id', 'reserve_physique', 'raw',
     ...ITEM_LITERAL_FIELDS.map(quoteCol),
   ];
   const exemplaireSetClause = [
-    'source=EXCLUDED.source',
     'notice_id=EXCLUDED.notice_id',
-    'cote_1=COALESCE(EXCLUDED.cote_1, exemplaires.cote_1)',
-    'cote_2=COALESCE(EXCLUDED.cote_2, exemplaires.cote_2)',
-    'cote_3=COALESCE(EXCLUDED.cote_3, exemplaires.cote_3)',
-    'cote_complete=COALESCE(EXCLUDED.cote_complete, exemplaires.cote_complete)',
-    'piege_a_code=COALESCE(EXCLUDED.piege_a_code, exemplaires.piege_a_code)',
-    'piege_b_code=COALESCE(EXCLUDED.piege_b_code, exemplaires.piege_b_code)',
-    'piege_c_texte=COALESCE(EXCLUDED.piege_c_texte, exemplaires.piege_c_texte)',
-    'piege_label=COALESCE(EXCLUDED.piege_label, exemplaires.piege_label)',
-    'reliure_groupe_id=COALESCE(EXCLUDED.reliure_groupe_id, exemplaires.reliure_groupe_id)',
-    'reserve_physique=COALESCE(EXCLUDED.reserve_physique, exemplaires.reserve_physique)',
-    ...ITEM_LITERAL_FIELDS.map(f => `${quoteCol(f)}=COALESCE(EXCLUDED.${quoteCol(f)}, exemplaires.${quoteCol(f)})`),
-    `raw=COALESCE(exemplaires.raw, '{}'::jsonb) || EXCLUDED.raw`,
+    'cote_1=COALESCE(EXCLUDED.cote_1, exemplaires_reserve.cote_1)',
+    'cote_2=COALESCE(EXCLUDED.cote_2, exemplaires_reserve.cote_2)',
+    'cote_3=COALESCE(EXCLUDED.cote_3, exemplaires_reserve.cote_3)',
+    'cote_complete=COALESCE(EXCLUDED.cote_complete, exemplaires_reserve.cote_complete)',
+    'piege_a_code=COALESCE(EXCLUDED.piege_a_code, exemplaires_reserve.piege_a_code)',
+    'piege_b_code=COALESCE(EXCLUDED.piege_b_code, exemplaires_reserve.piege_b_code)',
+    'piege_c_texte=COALESCE(EXCLUDED.piege_c_texte, exemplaires_reserve.piege_c_texte)',
+    'piege_label=COALESCE(EXCLUDED.piege_label, exemplaires_reserve.piege_label)',
+    'reliure_groupe_id=COALESCE(EXCLUDED.reliure_groupe_id, exemplaires_reserve.reliure_groupe_id)',
+    'reserve_physique=COALESCE(EXCLUDED.reserve_physique, exemplaires_reserve.reserve_physique)',
+    ...ITEM_LITERAL_FIELDS.map(f => `${quoteCol(f)}=COALESCE(EXCLUDED.${quoteCol(f)}, exemplaires_reserve.${quoteCol(f)})`),
+    `raw=COALESCE(exemplaires_reserve.raw, '{}'::jsonb) || EXCLUDED.raw`,
     'updated_at=now()',
     'synced_at=now()',
   ].join(',\n        ');
@@ -261,7 +263,6 @@ async function main() {
       const itemRaw = it._itemRaw || {};
       const row = {
         barcode: it['995$f'] || null,
-        source: 'reserve_marc',
         notice_id: notice_id_by_key.get(key) || null,
         cote_1: cote1,
         cote_2: cote2,
@@ -279,7 +280,7 @@ async function main() {
       return row;
     }).filter(r => r.notice_id); // sécurité : notice_id NOT NULL en base
 
-    const { sql, values } = buildBatchInsert('exemplaires', exemplaireCols, rows, {
+    const { sql, values } = buildBatchInsert('exemplaires_reserve', exemplaireCols, rows, {
       onConflict: `ON CONFLICT (barcode) WHERE barcode IS NOT NULL DO UPDATE SET\n        ${exemplaireSetClause}`,
     });
     await pool.query(sql, values);

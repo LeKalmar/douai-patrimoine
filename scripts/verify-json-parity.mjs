@@ -18,7 +18,8 @@ import { getPool, closeAllPools } from './lib/pg.mjs';
 
 const PORT = process.env.PORT || 3000;
 
-// codes-barres déjà présents comme source='reserve_marc' : db-migrate-bib.mjs
+// codes-barres déjà présents dans exemplaires_reserve (table dédiée depuis
+// db/migrations/0007_split_reserve_tables.sql) : db-migrate-bib.mjs
 // n'insère jamais de ligne bib_xml pour eux (la réserve reste seule
 // autorité), donc leur forme GESMARC d'origine (Section/Bibliothèque/Pièges
 // telles que vues depuis bib.xml) n'est conservée nulle part en base — voir
@@ -26,7 +27,7 @@ const PORT = process.env.PORT || 3000;
 // connu et documenté, exclu explicitement plutôt que compté à tort.
 async function reserveBarcodes() {
   const { rows } = await getPool({ unpooled: true }).query(
-    `SELECT barcode FROM exemplaires WHERE source = 'reserve_marc' AND barcode IS NOT NULL`
+    `SELECT barcode FROM exemplaires_reserve WHERE barcode IS NOT NULL`
   );
   return new Set(rows.map(r => r.barcode));
 }
@@ -37,7 +38,10 @@ const DATASETS = {
     url: `http://localhost:${PORT}/data/inventaire.json`,
     keyField: '995$f',
     columnar: false,
-    ignoredKeys: new Set(['_itemId', '_joinType']),
+    // _leader/_nonCatalogue : retirés du corps servi le 2026-09-23 (aucun
+    // consommateur, voir l'en-tête de scripts/lib/export-inventaire.mjs) —
+    // présents dans le snapshot committé, donc écart attendu.
+    ignoredKeys: new Set(['_itemId', '_joinType', '_leader', '_nonCatalogue']),
     setKeys: new Set(['_relies']),
     excludeKnownGap: null,
   },

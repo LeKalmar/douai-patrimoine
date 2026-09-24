@@ -34,8 +34,11 @@
      Paris »…) qui allongent la colonne sans aider à trier. */
   var FACET_MAX = 12;
 
-  /* Les fonds mis en avant en tête de page, dans cet ordre. Un fonds absent de
-     l'export courant est simplement sauté — la rangée n'est pas figée à 5. */
+  /* Les fonds mis en avant en tête de page — cette liste ne fixe plus que
+     LESQUELS sont mis en avant, pas leur ordre : renderFondsCards() les
+     classe par nombre de notices décroissant (demande explicite,
+     2026-09-23). Un fonds absent de l'export courant est simplement sauté —
+     la rangée n'est pas figée à 5. */
   var FONDS_VEDETTE = [
     'Imprimés', 'Manuscrits', 'Douaisien', "Livres d'Artiste",
     'Littérature', 'Mines', 'Réserve Douaisienne', 'Protestantisme', 'Robaut',
@@ -53,13 +56,18 @@
   var records = [];
   var filtered = [];
   var page = 1;
-  var sortKey = 'cote';
+  var sortKey = 'date'; // tri par défaut : date croissante (demande explicite, 2026-09-23)
   var openDetailId = null;
+  /* Axes de la colonne "Affiner" dépliés au-delà de FACET_MAX (bouton "Voir
+     plus", demande explicite 2026-09-23) — survit aux re-rendus de
+     renderFacets() (un changement de filtre ne referme pas ce qui a été
+     déplié), remis à zéro seulement si la page est rechargée. */
+  var expandedFacets = {};
 
   /* Facettes actives : un Set de valeurs par axe. Plusieurs valeurs sur le même
      axe se lisent en OU (« Douaisien OU Imprimés »), deux axes différents en ET
      — la convention habituelle d'une recherche à facettes. */
-  var active = { fonds: new Set(), type: new Set(), lieu: new Set(), langue: new Set(), auteur: new Set(), numerise: new Set() };
+  var active = { fonds: new Set(), type: new Set(), lieu: new Set(), langue: new Set(), auteur: new Set(), numerise: new Set(), sansDate: new Set() };
   var query = '';
   var dateStart = null;
   var dateEnd = null;
@@ -94,16 +102,44 @@
   }
 
   /* 210$a : « Paris », « [Paris] » et « A Paris » sont le même lieu. En
-     revanche « Parisiis » (forme latine du titre) est laissé distinct : c'est
-     une information sur l'édition, pas une variante de saisie. */
+     revanche « Parisiis »/« Lutetiae Parisiorum » (formes latines du titre)
+     sont laissées distinctes : c'est une information sur l'édition, pas une
+     variante de saisie.
+
+     Beaucoup de notices anciennes portent l'adresse complète de l'éditeur
+     recopiée depuis la page de titre plutôt que le seul lieu (« Paris, chez
+     Briasson, rue Saint-Jacques… M.DCC.XXVII »), ce qui fragmentait
+     énormément la facette — Paris à lui seul apparaissait sous plusieurs
+     centaines de formes différentes (demande explicite, 2026-09-23). Sur ces
+     pages de titre, le lieu est presque toujours ce qui précède la première
+     virgule/deux-points/point-virgule ; on ne garde que ça. Compromis
+     précision/rappel assumé (même esprit que ailleurs sur le site, voir
+     reliures.html/CLAUDE.md) : une poignée de formulations anciennes sans
+     ponctuation (« On les vend à Paris… ») ne sont pas reconnues et restent
+     telles quelles, mais elles sont rares (occurrence unique la plupart du
+     temps) et ne polluent donc plus le haut de la liste. */
   function normLieu(raw) {
     var s = String(raw || '').trim();
     if (!s) return '';
+    // Occurrences répétées d'un même champ 210$a (« Amsterdam§Paris »,
+    // convention « § » du projet) : on ne garde que la première, le lieu
+    // principal de la page de titre — les suivantes sont des éditions/
+    // impressions alternatives mentionnées à la suite.
+    if (s.indexOf('§') !== -1) s = s.split('§')[0].trim();
     s = s.replace(/^\[|\]$/g, '').trim();
-    s = s.replace(/\s*\([^)]*\)\s*$/, '');   // « Bouvignies (Nord) » → « Bouvignies »
+    // Chaîne entièrement encadrée de parenthèses restantes (« (Lens) »,
+    // « (Lille) ») : déballer plutôt que supprimer par la suite — sinon la
+    // suppression de « ville (département) » ci-dessous effacerait tout,
+    // la ville elle-même étant entre parenthèses.
+    var wholeParen = s.match(/^\((.*)\)$/);
+    if (wholeParen) s = wholeParen[1].trim();
     s = s.replace(/^[àa]\s+/i, '');          // « A Paris » → « Paris »
+    var cut = s.search(/[,:;]/);
+    if (cut !== -1) s = s.slice(0, cut);     // « Paris, chez Briasson… » → « Paris »
+    s = s.replace(/\s*\([^)]*\)\s*$/, '');   // « Bouvignies (Nord) » → « Bouvignies »
     s = s.replace(/[.,;:]+$/, '').trim();
     s = s.replace(/\s+/g, ' ');
+    if (!s) return '';
     if (/^s\.?\s*l\.?$/i.test(s)) return 'Sans lieu';
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
@@ -111,6 +147,39 @@
   function yearOf(rec) {
     var p = parsePublicationDate(rec['210$d']);
     return p ? p.start : null;
+  }
+
+  /* « s.d. » (sans date), sous toutes ses graphies relevées dans l'export
+     courant (accents/casse/espaces/ponctuation/enrobage variables — « s.d. »,
+     « [sd] », « [s. d.] », « (s. d.) », « [S. d.] », « [s.d.?] », « [n.d.] »…) :
+     réduite à ses seules lettres, une notation "sans date" vaut toujours
+     "sd" ou "nd" (« n.d. », équivalent anglophone croisé une fois dans
+     l'export). Volontairement PAS étendu aux notations d'incertitude qui
+     portent quand même une information temporelle approximative
+     (« 19--- », « [16..] », « 177? »…) : ce ne sont pas des documents SANS
+     date, seulement des documents dont l'année précise est incertaine — même
+     distinction que le "s.l." de normLieu() ci-dessus, qui lui est un vrai
+     répertoire de lieu inconnu. */
+  function isSansDateNotation(str) {
+    var core = String(str || '').toLowerCase().replace(/[^a-z]/g, '');
+    return core === 'sd' || core === 'nd';
+  }
+
+  /* Sans date = champ 210$d vide, OU renseigné mais ne contenant qu'une
+     notation "sans date" reconnue ci-dessus — jamais un simple échec de
+     parsePublicationDate() (qui, lui, englobe aussi les notes de format
+     "26 cm", les lieux mal saisis dans ce champ, etc. : du texte non
+     exploitable, pas une absence de date confirmée par le catalogueur). Un
+     champ à plusieurs segments joints par « § » (voir parsePublicationDate)
+     n'est donc "sans date" que si RIEN d'autre n'y figure — « s.d.§26 cm »
+     ne matche plus une fois lettres concaténées ("sdcm" ≠ "sd"), ce qui est
+     le comportement voulu : il y a bien une info en plus du "s.d.". */
+  function isSansDate(rec) {
+    var raw = rec['210$d'];
+    if (parsePublicationDate(raw)) return false;
+    var str = String(raw || '').trim();
+    if (!str) return true;
+    return isSansDateNotation(str);
   }
 
   /* "NOM Prénom" par auteur, un par entrée du tableau (pas de valeur vide
@@ -166,7 +235,8 @@
           lieu: Array.from(active.lieu),
           langue: Array.from(active.langue),
           auteur: Array.from(active.auteur),
-          numerise: Array.from(active.numerise)
+          numerise: Array.from(active.numerise),
+          sansDate: Array.from(active.sansDate)
         },
         openDetailId: openDetailId,
         scrollY: window.scrollY
@@ -191,12 +261,12 @@
     dateStart = parseInt(st.dateStart, 10) || null;
     dateEnd = parseInt(st.dateEnd, 10) || null;
 
-    sortKey = st.sortKey || 'cote';
+    sortKey = st.sortKey || 'date';
     document.getElementById('inv-sort').value = sortKey;
 
     page = st.page || 1;
 
-    ['fonds', 'type', 'lieu', 'langue', 'auteur', 'numerise'].forEach(function (axis) {
+    ['fonds', 'type', 'lieu', 'langue', 'auteur', 'numerise', 'sansDate'].forEach(function (axis) {
       ((st.active && st.active[axis]) || []).forEach(function (v) { active[axis].add(v); });
     });
 
@@ -208,18 +278,29 @@
   function load() {
     Promise.all([
       /* Priorité à /api/inventaire (généré en direct depuis Postgres — voir
-         scripts/lib/export-inventaire.mjs, inclut déjà réserve + fonds
-         Cartes) ; repli sur data/inventaire.json (snapshot committé, généré
-         par npm run build depuis les XML Syracuse, sans le fonds Cartes) si
-         l'API échoue — DB indisponible, page servie hors Vercel, etc. Même
-         patron que loadRecolement() dans reserve.html. */
+         scripts/lib/export-inventaire.mjs, inclut déjà réserve + pièces non
+         cataloguées Manuscrits/Robaut/Objets + fonds Cartes/Périodiques,
+         voir db/migrations/0007_split_reserve_tables.sql et
+         0008_reserve_non_catalogues.sql) ; repli, SI l'API échoue (base
+         arrêtée, page ouverte sans `npm run dev`…), sur les DEUX fichiers
+         statiques committés recomposés côté client — data/inventaire.json
+         (réserve, généré par npm run build) et data/non-catalogues.json
+         (Manuscrits/Robaut/Objets, npm run build:non-catalogues) ne se
+         recouvrent pas, il faut les deux pour retrouver ce que /api/inventaire
+         donne en un seul appel. Même patron que loadRecolement() dans
+         reserve.html pour le principe API-d'abord/statique-en-repli. */
       fetch('/api/inventaire')
         .then(function (r) { if (!r.ok) throw new Error('api-unavailable'); return r.json(); })
         .catch(function () {
-          return fetch('data/inventaire.json').then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-          });
+          return Promise.all([
+            fetch('data/inventaire.json').then(function (r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            }),
+            fetch('data/non-catalogues.json').then(function (r) {
+              return r.ok ? r.json() : [];
+            }).catch(function () { return []; }),
+          ]).then(function (parts) { return parts[0].concat(parts[1]); });
         }),
       /* Exemplaires créés via exemplarisation.html (état partagé R2). Échoue
          silencieusement — même dégradation que partout ailleurs : mieux vaut un
@@ -227,40 +308,21 @@
       typeof fetchExemplairesManuelsAsCatalogRows === 'function'
         ? fetchExemplairesManuelsAsCatalogRows().catch(function () { return []; })
         : Promise.resolve([]),
-      /* Pièces sans code-barre (jamais cataloguées dans Syracuse — fonds
-         Manuscrits notamment, voir scripts/build-non-catalogues.mjs), issues
-         de csv/inventaire.csv. Statique comme data/inventaire.json (pas
-         d'API à ménager) : un échec de fetch dégrade vers un tableau vide
-         plutôt que de bloquer le reste du catalogue. */
-      fetch('data/non-catalogues.json').then(function (r) {
-        return r.ok ? r.json() : [];
-      }).catch(function () { return []; }),
-      /* Surcouche Syracuse (synchronisation incrémentale, voir
-         js/syracuse-sync-shared.js) : corrige cote/titre/auteur/date sur les
-         exemplaires touchés depuis le dernier rebuild XML — { } si l'API est
-         indisponible ou si rien n'a encore été synchronisé. */
-      typeof fetchSyracuseSyncOverlay === 'function'
-        ? fetchSyracuseSyncOverlay()
-        : Promise.resolve({})
+      /* Presse numérisée (fonds Périodiques, scripts/build-manifest-presse.mjs) :
+         { "D19": ["1895","1896",…], … } — quelles années sont consultables
+         dans la visionneuse pour un titre donné (cote 930$g = "D19"/"D23"/
+         "D24", voir scripts/lib/fonds-periodiques-record.mjs). Petit fichier
+         statique, jamais absent en usage normal, mais dégradation silencieuse
+         comme les autres sources si le fetch échoue. */
+      fetch('js/presse-index.json').then(function (r) {
+        return r.ok ? r.json() : {};
+      }).catch(function () { return {}; })
     ])
       .then(function (res) {
-        records = res[0].concat(res[1]).concat(res[2]);
-        var overlay = res[3] || {};
+        records = res[0].concat(res[1]);
+        var presseIndex = res[2] || {};
         records.forEach(function (r, i) {
           r._id = i;
-          var barcode = (r['995$f'] || r['915$b'] || '').trim();
-          var fresh = barcode ? overlay[barcode] : null;
-          if (fresh) {
-            // Appliqué AVANT _year/_hay pour que la correction alimente
-            // aussi le tri/la recherche/le filtre par date, pas seulement
-            // l'affichage — mêmes champs que ce que rend buildRow()/
-            // buildExpandedContent() (210$d, 200$a, 700$a, 930$g).
-            console.log('[syracuse-sync] correction appliquée sur', barcode, '—', fresh);
-            if (fresh.dt) r['210$d'] = fresh.dt;
-            if (fresh.titre) r['200$a'] = fresh.titre;
-            if (fresh.auteur) r['700$a'] = fresh.auteur;
-            if (fresh.cote) r['930$g'] = fresh.cote;
-          }
           /* _fondsLabel (data/non-catalogues.json, data/magasins.json) est
              posé directement depuis une source fiable pour ce sous-ensemble
              (930$e du registre papier) — préféré à getFondsFromCote() plutôt
@@ -281,12 +343,49 @@
              pour elles uniquement. */
           r._type = r._typeDocument || normType(r['200$b']);
           r._lieu = normLieu(r['210$a']);
+          /* Presse numérisée (fonds Périodiques) : la cote (930$g) d'un titre
+             numérisé est directement son code de collecte ("D19"/"D23"/"D24",
+             voir scripts/lib/fonds-periodiques-record.mjs) — on la cherche
+             telle quelle dans presseIndex plutôt que de filtrer par
+             _fondsLabel, pour rester correct même si ce fonds change de nom
+             un jour. _presseCalendar (année → mois → jour → nom du "book" de
+             CE numéro, voir scripts/build-manifest-presse.mjs) alimente le
+             calendrier année/mois/jour de buildExpandedContent()
+             (js/inventaire.js) — chaque "book" ne contient que les pages de
+             son propre numéro, pas toute l'année. */
+          var presseCote = (r['930$g'] || '').trim().toUpperCase();
+          var presseEntry = presseIndex[presseCote];
+          if (presseEntry && presseEntry.years) {
+            r._presseCalendar = presseEntry.years;
+            r._presseYears = Object.keys(presseEntry.years).sort();
+            /* Vignette de la notice : 1re page de la parution la plus
+               ancienne (posée par le script de build). Ces notices n'ont
+               sinon aucun lien_num (pas d'exemplaire physique associé). */
+            if (presseEntry.cover && !r['lien_num']) r['lien_num'] = presseEntry.cover;
+            /* Bornes réelles de la collection numérisée : affinent les dates
+               de première/dernière parution du registre papier (930$g,
+               scripts/lib/fonds-periodiques-record.mjs), parfois
+               approximatives (ex. "ap1896" pour Douai Républicain) — toute la
+               collection étant numérisée d'un coup, la première et la
+               dernière année réellement scannées (r._presseYears, déjà
+               triées) sont une source plus fiable que le registre papier.
+               Avant _year (calculé juste plus bas) pour que le tri/filtre
+               par date en profite aussi, pas seulement l'affichage. */
+            if (r._presseYears.length) {
+              var anneeDebut = r._presseYears[0];
+              var anneeFin = r._presseYears[r._presseYears.length - 1];
+              r['210$d'] = anneeDebut === anneeFin ? anneeDebut : (anneeDebut + ' – ' + anneeFin);
+              r._parution = r['210$d'];
+            }
+          }
           /* Numérisé = un document réellement consultable dans la visionneuse
-             (dossier Syracuse "num", ou lien posé à la main via
-             exemplarisation.html — "_lienNumerise"), pas juste "a une
-             vignette" (lien_num existe pour la plupart des exemplaires, même
-             sans le moindre scan complet derrière). */
-          r._numerise = (r['num'] || r['_lienNumerise']) ? 'Numérisé' : 'Non numérisé';
+             (dossier Syracuse "num", lien posé à la main via
+             exemplarisation.html — "_lienNumerise", ou presse numérisée par
+             année ci-dessus), pas juste "a une vignette" (lien_num existe
+             pour la plupart des exemplaires, même sans le moindre scan
+             complet derrière). */
+          r._numerise = (r['num'] || r['_lienNumerise'] || r._presseYears) ? 'Numérisé' : 'Non numérisé';
+          r._sansDate = isSansDate(r) ? 'Sans date connue' : 'Date connue';
           /* Un auteur par entrée (pas une chaîne "NOM Prénom, NOM Prénom"
              jointe) — nécessaire pour filtrer par UN auteur précis quand un
              document en a plusieurs. Même reconstruction "NOM Prénom" que
@@ -295,6 +394,19 @@
              chaîne d'affichage, l'autre une liste de valeurs de facette —
              voir authorNamesOf() ci-dessous. */
           r._auteurListe = authorNamesOf(r);
+          /* Une langue par entrée (pas une chaîne "Français, Russe" jointe) —
+             même raison que r._auteurListe juste au-dessus : un document
+             bilingue ne doit pas ouvrir une case "Français, Russe" à part
+             dans la colonne "Affiner" (qui fragmentait la facette d'autant
+             de combinaisons que de couples de langues), mais compter dans
+             les deux cases "Français" ET "Russe" (demande explicite,
+             2026-09-23). _langue (déjà traduit et dédoublonné par
+             langueLabelOf(), voir scripts/lib/langue-labels.mjs) reste la
+             chaîne affichée telle quelle dans le panneau de détail — aucun
+             libellé de langue ne contient de virgule, le séparateur ", "
+             qu'utilise langueLabelOf() est donc sans ambiguïté à re-découper
+             ici plutôt que de dupliquer la table de traduction côté client. */
+          r._langueListe = r._langue ? r._langue.split(', ') : [];
           r._year = yearOf(r);
           /* _frequence/_villeLabel/_imprimeurLabel (fonds Périodiques, voir
              scripts/lib/fonds-periodiques-record.mjs) : absents sur tous les
@@ -393,6 +505,7 @@
       active.langue.clear();
       active.auteur.clear();
       active.numerise.clear();
+      active.sansDate.clear();
       query = '';
       dateStart = dateEnd = null;
       search.value = '';
@@ -408,14 +521,16 @@
     if (skipAxis !== 'fonds' && active.fonds.size && !active.fonds.has(r._fonds)) return false;
     if (skipAxis !== 'type' && active.type.size && !active.type.has(r._type)) return false;
     if (skipAxis !== 'lieu' && active.lieu.size && !active.lieu.has(r._lieu)) return false;
-    if (skipAxis !== 'langue' && active.langue.size && !active.langue.has(r._langue)) return false;
-    /* Axe multi-valeur (un document peut avoir plusieurs auteurs) : match dès
-       qu'AU MOINS un des auteurs du document est dans l'ensemble actif —
-       même lecture "OU" que les autres axes, appliquée ici valeur par valeur
-       plutôt que document par document. */
+    /* Axes multi-valeurs (un document peut avoir plusieurs langues, plusieurs
+       auteurs) : match dès qu'AU MOINS une valeur du document est dans
+       l'ensemble actif — même lecture "OU" que les autres axes, appliquée
+       ici valeur par valeur plutôt que document par document. */
+    if (skipAxis !== 'langue' && active.langue.size &&
+        !(r._langueListe && r._langueListe.some(function (l) { return active.langue.has(l); }))) return false;
     if (skipAxis !== 'auteur' && active.auteur.size &&
         !(r._auteurListe && r._auteurListe.some(function (a) { return active.auteur.has(a); }))) return false;
     if (skipAxis !== 'numerise' && active.numerise.size && !active.numerise.has(r._numerise)) return false;
+    if (skipAxis !== 'sansDate' && active.sansDate.size && !active.sansDate.has(r._sansDate)) return false;
     if (!dateMatchesFilter(r['210$d'], dateStart, dateEnd)) return false;
     if (query && r._hay.indexOf(query) === -1) return false;
     return true;
@@ -451,6 +566,20 @@
     });
   }
 
+  /* Un « [10xx] » (siècle approximatif, voir parsePublicationDate() dans
+     js/inventaire.js) vaut 1001 en interne pour rester comparable à une
+     année pleine, mais afficher « 1001 » comme borne d'une période suggère
+     une précision à l'année qui n'existe pas dans la donnée d'origine —
+     demande explicite : cette borne s'affiche en siècle (« XIe siècle »)
+     plutôt qu'en chiffres quand elle vient de cette notation. Une année
+     pleine (« 1479 ») reste affichée telle quelle. */
+  function eraEndpointLabel(rec, yearFallback) {
+    var raw = rec && rec['210$d'];
+    var s = String(raw || '').trim();
+    if (/^\[\d{2}xx\]$/i.test(s)) return formatPublicationDate(s);
+    return String(yearFallback);
+  }
+
   // ── Cartes de fonds ─────────────────────────────────────────────────────
   function renderFondsCards() {
     var counts = {};
@@ -459,21 +588,26 @@
       var f = r._fonds;
       counts[f] = (counts[f] || 0) + 1;
       if (r._year != null) {
-        if (!spans[f]) spans[f] = { min: r._year, max: r._year };
+        if (!spans[f]) spans[f] = { min: r._year, max: r._year, minRec: r, maxRec: r };
         else {
-          if (r._year < spans[f].min) spans[f].min = r._year;
-          if (r._year > spans[f].max) spans[f].max = r._year;
+          if (r._year < spans[f].min) { spans[f].min = r._year; spans[f].minRec = r; }
+          if (r._year > spans[f].max) { spans[f].max = r._year; spans[f].maxRec = r; }
         }
       }
     });
 
     var list = FONDS_VEDETTE.filter(function (f) { return counts[f]; });
+    list.sort(function (a, b) { return counts[b] - counts[a]; });
     var host = document.getElementById('inv-fonds-cards');
     host.innerHTML = '';
 
     list.forEach(function (name) {
       var span = spans[name];
-      var era = span ? (span.min === span.max ? String(span.min) : span.min + ' – ' + span.max) : '';
+      var era = '';
+      if (span) {
+        var lo = eraEndpointLabel(span.minRec, span.min);
+        era = (span.min === span.max) ? lo : lo + ' – ' + eraEndpointLabel(span.maxRec, span.max);
+      }
       var card = document.createElement('button');
       card.type = 'button';
       card.className = 'inv-fcard';
@@ -514,17 +648,25 @@
   var FACET_DEFS = [
     { axis: 'type', title: 'Type de document', field: '_type' },
     { axis: 'lieu', title: 'Lieu d’édition', field: '_lieu' },
-    /* _langue (voir scripts/lib/langue-labels.mjs) n'existe que sur les
-       exemplaires issus de data/inventaire.json — absent sur les fusions
-       exemplaires-manuels/non-catalogues, qui n'ont pas de code UNIMARC
-       101$a à traduire. Ignorés de cette facette comme n'importe quelle
-       valeur vide (voir le filtre `if (v && …)` dans renderFacets()), pas
-       une exclusion spécifique à coder ici. */
-    { axis: 'langue', title: 'Langue', field: '_langue' },
+    /* _langueListe (voir r._langueListe/scripts/lib/langue-labels.mjs)
+       n'existe que sur les exemplaires issus de data/inventaire.json —
+       absent (tableau vide) sur les fusions exemplaires-manuels/
+       non-catalogues, qui n'ont pas de code UNIMARC 101$a à traduire.
+       Ignorés de cette facette comme n'importe quelle valeur vide (voir le
+       filtre `if (v && …)` dans renderFacets()), pas une exclusion
+       spécifique à coder ici. Champ multi-valeur (comme _auteurListe) :
+       un document en plusieurs langues compte dans chacune d'elles plutôt
+       que d'ouvrir une case "Français, Russe" à part. */
+    { axis: 'langue', title: 'Langue', field: '_langueListe' },
     /* host distinct : rendue après le bloc "Période" (statique, tout en bas
        de la colonne Affiner), pas dans #inv-facets avec les trois autres —
        demande explicite pour que ce filtre reste le dernier de la colonne. */
     { axis: 'numerise', title: 'Numérisation', field: '_numerise', host: 'inv-facets-bottom' },
+    /* Même hôte que Numérisation, même raison : filtre dérivé plutôt que
+       catégorie de catalogage, mieux à sa place en bas de la colonne
+       "Affiner" qu'avec type/lieu/langue. Voir isSansDate() ci-dessus pour
+       ce qui distingue "Sans date connue" d'un simple échec de parsing. */
+    { axis: 'sansDate', title: 'Date', field: '_sansDate', host: 'inv-facets-bottom' },
     /* manualOnly : pas de bloc de cases à cocher dans la colonne "Affiner"
        (des milliers de noms distincts — une liste à cocher serait inutilisable,
        voir la recherche avancée / ADV_CATEGORIES qui pilote cet axe via une
@@ -548,11 +690,21 @@
       var pool = records.filter(function (r) { return matches(r, def.axis); });
       var counts = {};
       pool.forEach(function (r) {
-        var v = r[def.field];
-        /* « (Sans fonds) » (repli de getFondsFromCote pour une cote au préfixe
-           non reconnu) n'est pas un fonds réel : pas de case à cocher pour ça
-           dans la colonne "Affiner" (demande explicite 2026-09-12). */
-        if (v && v !== '(Sans fonds)') counts[v] = (counts[v] || 0) + 1;
+        var raw = r[def.field];
+        /* Champ multi-valeur (ex. _langueListe, déjà un tableau) : chaque
+           valeur compte pour elle-même — un document en compte plusieurs à
+           la fois, plutôt qu'une case combinée par combinaison rencontrée
+           (voir le commentaire sur r._langueListe plus haut). Un champ
+           simple (_type/_lieu) est enveloppé en tableau à une entrée pour
+           partager la même boucle. */
+        var values = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        values.forEach(function (v) {
+          /* « (Sans fonds) » (repli de getFondsFromCote pour une cote au
+             préfixe non reconnu) n'est pas un fonds réel : pas de case à
+             cocher pour ça dans la colonne "Affiner" (demande explicite
+             2026-09-12). */
+          if (v && v !== '(Sans fonds)') counts[v] = (counts[v] || 0) + 1;
+        });
       });
 
       var entries = Object.keys(counts).map(function (k) {
@@ -566,14 +718,19 @@
         if (aOn !== bOn) return bOn - aOn;
         return b.n - a.n;
       });
-      entries = entries.slice(0, FACET_MAX);
       if (!entries.length) return;
+
+      // "Voir plus" : au-delà de FACET_MAX, replié par défaut — expandedFacets
+      // retient le dépliage d'un axe entre deux rendus (voir sa déclaration).
+      var expanded = !!expandedFacets[def.axis];
+      var hasMore = entries.length > FACET_MAX;
+      var visible = expanded ? entries : entries.slice(0, FACET_MAX);
 
       var block = document.createElement('div');
       block.className = 'inv-facet';
       block.innerHTML = '<div class="inv-facet-title">' + esc(def.title) + '</div>';
 
-      entries.forEach(function (e) {
+      visible.forEach(function (e) {
         var on = active[def.axis].has(e.label);
         var row = document.createElement('button');
         row.type = 'button';
@@ -586,6 +743,21 @@
         row.addEventListener('click', function () { toggleFacet(def.axis, e.label); });
         block.appendChild(row);
       });
+
+      if (hasMore) {
+        var more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'inv-facet-more' + (expanded ? ' inv-facet-more--open' : '');
+        more.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        more.innerHTML =
+          '<span>' + (expanded ? 'Voir moins' : 'Voir plus (' + (entries.length - FACET_MAX) + ')') + '</span>' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+        more.addEventListener('click', function () {
+          expandedFacets[def.axis] = !expanded;
+          renderFacets();
+        });
+        block.appendChild(more);
+      }
 
       var targetHost = (def.host && document.getElementById(def.host)) || host;
       targetHost.appendChild(block);
@@ -646,13 +818,13 @@
   var ADV_CATEGORIES = [
     { value: 'type', label: 'Type de document', axis: 'type', field: '_type' },
     { value: 'lieu', label: 'Lieu d’édition', axis: 'lieu', field: '_lieu' },
-    { value: 'langue', label: 'Langue', axis: 'langue', field: '_langue' },
+    { value: 'langue', label: 'Langue', axis: 'langue', field: '_langueListe', multi: true },
     { value: 'auteur', label: 'Auteur', axis: 'auteur', field: '_auteurListe', multi: true }
   ];
 
   /* Valeurs d'un enregistrement pour une catégorie donnée, toujours en
-     tableau — `multi` (ex. _auteurListe) est déjà un tableau, les autres
-     champs (_type/_lieu/_langue) sont de simples chaînes qu'on enveloppe
+     tableau — `multi` (ex. _auteurListe, _langueListe) est déjà un tableau,
+     les autres champs (_type/_lieu) sont de simples chaînes qu'on enveloppe
      pour que renderAdvAutocomplete ait un seul code à écrire pour les deux. */
   function advValuesOf(r, cat) {
     var v = r[cat.field];

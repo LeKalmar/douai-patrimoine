@@ -1,18 +1,24 @@
 # Réserve patrimoniale — Bibliothèques de Douai
 
-Site public (statique, déployé sur Vercel) de la Réserve patrimoniale du
-réseau des Bibliothèques de Douai-Cuincy, + quelques outils internes pour
-l'équipe (récolement, plan de la réserve, analyse des cotes, préparation de
-scans).
+Site de la Réserve patrimoniale du réseau des Bibliothèques de
+Douai-Cuincy, + les outils internes de l'équipe (récolement, plan de la
+réserve, analyse des cotes, préparation de scans).
 
-Aucun framework, aucune dépendance npm : HTML/CSS/JS servis tels quels
-(`vercel.json` : `outputDirectory: "."`, `framework: null`). Un script Node
-(`scripts/build-inventory.mjs`) tourne au build pour générer les données du
-catalogue, et quelques fonctions serverless Vercel sous `api/` (toujours
-zéro dépendance npm — signature R2/S3 écrite à la main, voir
-`lib/r2.mjs`) servent de proxy d'écriture vers Cloudflare R2 pour la
-synchronisation partagée du récolement et des livres spoliés (détails plus
-bas, section « Stockage partagé »).
+**Hébergement : entièrement local depuis 2026-09-23.** Il n'y a plus ni
+Vercel ni Neon. `npm run dev` (`scripts/dev-server.mjs`) EST le serveur du
+site : il sert les fichiers statiques, exécute les fonctions `api/*.mjs`
+dans son propre process et génère les jeux de données `/data/*.json` à la
+volée depuis un **PostgreSQL local** (`npm run db:local:start`, voir
+`scripts/db-local.mjs`). Il écoute sur `0.0.0.0` pour que les autres postes
+du réseau y accèdent. Voir « Démarrer / builder ».
+
+Aucun framework, une seule dépendance npm (`pg`) : HTML/CSS/JS servis tels
+quels. Les fonctions sous `api/` gardent la signature
+`(req, res)` d'origine — le serveur fournit la petite couche de
+compatibilité (`req.query`, `req.body`, `res.status().json()`) plutôt que de
+les réécrire. Elles servent de proxy d'écriture vers Cloudflare R2 pour la
+synchronisation partagée du récolement, des livres spoliés, etc. (R2 est le
+seul service distant encore utilisé — détails section « Stockage partagé »).
 
 ## Format des données et performances (2026-09-02)
 
@@ -58,24 +64,54 @@ compte (statistiques de progression, jamais scannés, probablement égarés,
 index cote, anomalies de classement). Ne pas réintroduire un second catalogue
 filtré : la distinction se lit sur l'entrée.
 
-**Les en-têtes `Cache-Control` des fichiers statiques sont dans
-`vercel.json`** (bloc `headers`). Rappel : le schéma Vercel refuse toute
-propriété supplémentaire dans une entrée de `headers` — pas de clé `"//"`
-en guise de commentaire, le déploiement échoue (« should NOT have
-additional property »). D'où le report ici des trois raisonnements :
-`/data/*.json` — jeux de données du catalogue, volumineux, qui ne changent
-qu'à un nouvel export Syracuse suivi d'un déploiement ; chaque déploiement
-Vercel sert depuis une URL d'origine distincte, donc un cache long ne peut
-pas retenir une version périmée après mise en ligne, et `must-revalidate`
-évite qu'un onglet resté ouvert plusieurs jours travaille sur un catalogue
-obsolète (1 h). `/font/*` — le nom de fichier porte la graisse et le style,
-une révision de la police changerait ce nom : immuable sur un an.
-`/images/*` — servies telles quelles, remplacées par un nouveau déploiement
-(1 semaine). Ces en-têtes ne concernent que les fichiers statiques ; les six
-endpoints d'état partagé posent le leur dans le code (voir « Stockage
+**Compression HTTP : c'est le serveur qui la pose** (`lib/http-compress.mjs`,
+2026-09-23), plus aucun CDN ne le fait. C'était le tout premier poste du
+temps de chargement après le passage en local : `/api/inventaire` partait en
+21,2 Mo bruts à chaque ouverture d'`inventaire.html`. Brotli q5 si le client
+l'accepte (2,4 Mo), gzip sinon (3,1 Mo), corps brut si ni l'un ni l'autre.
+Mesuré sur un lien Wi-Fi de 80 Mbit/s, un poste du réseau qui ouvre
+`inventaire.html` passe de **22,0 Mo / 18,7 s** à **3,5 Mo / 1,7 s** avant
+affichage des premiers résultats. Les variantes compressées sont mises en
+cache **à côté du corps brut** (`lib/data-json-cache.mjs`, TTL 60 s) : les
+~760 ms de brotli sur 21 Mo sont payées une fois par minute, pas une fois
+par requête — c'est ce qui rend la chose viable. Les binaires déjà
+compressés (JPEG, WOFF2…) sont exclus (`TEXT_EXT` dans
+`scripts/dev-server.mjs`).
+
+**Les anciens en-têtes `Cache-Control` de `vercel.json`** (fichier supprimé
+avec le reste de l'hébergement distant) n'ont plus d'équivalent : le serveur
+local pose `no-cache` sur les statiques, ce qui est le bon réglage quand on
+édite les fichiers en direct. Si un jour la latence des statiques redevient
+un sujet (police, images), c'est `handleStatic()` dans
+`scripts/dev-server.mjs` qu'il faut toucher, plus un fichier de
+configuration d'hébergeur. Les endpoints d'état partagé, eux, posent
+toujours leur propre `Cache-Control` dans le code (voir « Stockage
 partagé »).
 
 ## Démarrer / builder
+
+**Démarrer le site (l'ordre compte) :**
+
+```
+npm run db:local:start     # PostgreSQL local — NE démarre PAS tout seul à
+                           # l'ouverture de session (installation portable,
+                           # pas un service Windows). À relancer à chaque fois.
+npm run dev                # serveur du site : http://localhost:3000
+npm run db:local:stop      # en fin de session (optionnel)
+```
+
+Sans la base démarrée, `/api/inventaire` et les routes `/data/*.json`
+répondent 500 ; les pages retombent alors sur les fichiers `data/*.json`
+committés (repli volontaire, mais figés au dernier `npm run build`).
+`npm run db:test` vérifie la connexion, `npm run verify:parity <jeu>`
+compare la réponse live au fichier committé (serveur déjà lancé).
+
+Le serveur écoute sur `0.0.0.0` : les autres postes du réseau y accèdent via
+l'IP de cette machine (`ipconfig`), à condition d'une règle de pare-feu
+entrante sur le port (profil **privé**, jamais public). `HOST=127.0.0.1` pour
+revenir à un dev solo sans exposition réseau.
+
+**Builds (régénèrent les fichiers `data/*.json` de repli) :**
 
 - `npm run build` — régénère `data/inventaire.json` et
   `data/build-report.json` à partir des exports Syracuse MARC-XML
@@ -188,7 +224,7 @@ aujourd'hui — un navigateur ne télécharge que les faces réellement appelée
 
 ## Publication en iframe sur le site du réseau
 
-Le site n'est pas seulement servi par Vercel : il est affiché dans une
+Le site n'est pas seulement consulté en direct : il est affiché dans une
 **iframe** sur le site du réseau des bibliothèques. Une iframe garde la
 hauteur que lui donne la page hôte — dès que le contenu est plus haut, elle
 se dote de sa propre barre de défilement et le visiteur se retrouve avec deux
@@ -281,8 +317,8 @@ de la page (la barre d'emplacement `.locbar` de `recolement.html`) ne colle
 plus une fois intégré — il n'y a plus de défilement de page à l'intérieur de
 l'iframe, et le défilement du site hôte est hors de portée. Les en-têtes de
 tableaux collants, eux, sont dans des conteneurs à défilement interne et
-continuent de fonctionner. L'équipe utilise de toute façon l'URL Vercel
-directe pour les outils internes.
+continuent de fonctionner. L'équipe accède de toute façon aux outils
+internes directement par l'adresse du serveur local, jamais via l'iframe.
 
 ## Flux de données
 
@@ -771,386 +807,50 @@ décaler ces plages. Le panneau de stats affiche le compte par étage
 (calculé sur `ROWS`, indépendamment du rapport de build) et un menu
 déroulant permet de filtrer le tableau (et donc l'export .txt) par étage.
 
-## Synchronisation incrémentale Syracuse (2026-09-09)
+## Synchronisation incrémentale Syracuse — RETIRÉE (2026-09-23)
 
-`data/magasins.json` ne se met à jour qu'au rythme d'un export `bib.xml`
-(mensuel dans les faits). `API-SYRACUSE.MD` (non commité — document de
-travail sur l'API interne, non documentée, du portail public
-`bm-douai.fr`) a établi qu'un champ Solr interne, `timestamp`, permet de
-repérer les notices modifiées récemment, et que
-`ILSClient.svc/GetHoldings` expose le détail par exemplaire (cote,
-code-barre, section, statut) — voir ce document pour l'exploration complète
-(endpoints, formats de requête, mesures de coût). Un protocole de
-validation en conditions réelles (2026-09-09) a confirmé le meilleur cas :
-une cote modifiée dans Syracuse est détectable en moins d'une minute, avec
-la valeur à jour.
+Il a existé, du 2026-09-09 au 2026-09-23, une synchronisation incrémentale
+avec le portail public Syracuse (`bm-douai.fr`) : un moteur de delta
+(`api/syracuse-tick.mjs`) qui interrogeait `Search.svc`/`GetHoldings`
+toutes les minutes, un état accumulé dans R2 (`syracuse-sync.json`), et une
+« surcouche de fraîcheur » fusionnée côté client dans `inventaire.html`,
+`recolement.html` et `reserve.html` pour corriger cote/titre/auteur/date
+sans attendre le prochain export XML.
 
-Le moteur de synchronisation (déclenchement compris) a d'abord été construit
-seul, borné aux trois premières phases du plan — le temps d'observer en
-production que le rythme d'appel reste sage et que les données collectées
-sont justes, avant d'y raccrocher une première fusion dans l'affichage
-(voir plus bas).
+**Tout a été retiré** au passage à l'hébergement local : le déclencheur
+avait déjà été coupé sur cette branche, donc la surcouche ne pouvait plus
+qu'être vide — les pages continuaient malgré tout d'interroger
+`/api/syracuse-sync` toutes les 5 minutes pour un résultat garanti vide, et
+les tableaux des « Statistiques avancées » affichaient des colonnes
+« Syracuse »/« Prêt » perpétuellement à « — » avec une case « Exclure les
+corrigés » sans effet.
 
-- **`api/syracuse-tick.mjs`** — le moteur de delta. `POST
-  /api/syracuse-tick`, non authentifié (il n'écrit aucune donnée fournie
-  par l'appelant, il ne fait qu'avancer un job déjà entièrement défini côté
-  serveur), déclenché en tâche de fond par `js/syracuse-sync-trigger.js`.
-  Volontairement **pas** un proxy générique vers `Search.svc/Search` ou
-  `GetHoldings` : les exposer en passthrough public serait le vrai risque
-  de surcharge, pire que ce que la synchro cherche à éviter — n'importe qui
-  pourrait relayer des requêtes illimitées vers Syracuse à travers notre
-  propre domaine, sans la friction d'un navigateur. `search()`/
-  `getHoldings()` restent des fonctions internes (exportées uniquement pour
-  être testables isolément, jamais routées).
+Fichiers supprimés : `api/syracuse-tick.mjs`, `api/syracuse-sync.mjs`,
+`api/syracuse.js`, `lib/syracuse-sync-state.mjs`,
+`js/syracuse-sync-shared.js`, `js/syracuse-sync-trigger.js`,
+`scripts/run-syracuse-sync.mjs`, plus le script npm `sync:syracuse` et la
+clé `syracuse-sync.json` de `scripts/backup-r2-blobs.mjs`. Côté pages :
+`SYRACUSE_OVERLAY`, `applySyracuseOverlayToCatalog()`,
+`loadSyracuseOverlay()`, `syracuseCorrectionCell()`, `syracuseLoanBadge()`,
+`syracuseNotCorrectedFilter()`, `uncorrectedOnlyFilter()`, le badge
+`.notice-live` de `reserve.html` et les colonnes/cases correspondantes.
+`combineExportFilters()` est conservée (elle sert encore aux exports par
+tranche de travées). `api/syracuse.js` méritait de partir pour une raison
+supplémentaire : c'était un **proxy public non authentifié** vers
+`bm-douai.fr`, référencé nulle part — exactement ce que
+`api/syracuse-tick.mjs` s'interdisait explicitement d'être (« n'importe qui
+pourrait relayer des requêtes illimitées vers Syracuse à travers notre
+propre domaine »).
 
-  Garde-fous, tous vérifiés **avant** le moindre appel réseau vers
-  Syracuse, aucun reporté à une phase ultérieure :
-  - **Plancher de 5 min + verrou anti-concurrence** (`claimSlot()`) : posés
-    via une écriture `r2CasUpdate` sur `syracuse-sync.json` — le CAS
-    garantit qu'un seul appel concurrent « prend la main », un second appel
-    presque simultané relit l'état que le premier vient de poser et se
-    déclare `too-soon`/`in-progress` à son tour, sans structure de verrou
-    séparée. Un verrou resté posé plus de 2 min est considéré issu d'une
-    invocation plantée et peut être repris, plancher ignoré.
-  - **Jamais de `Promise.all` entre appels Syracuse** : boucle `for`
-    séquentielle, 300 ms d'attente entre deux appels quels qu'ils soient
-    (recherche comprise), au plus 10 `GetHoldings` par tranche
-    (`MAX_HOLDINGS_PER_TICK`) — budget mesuré ~6,5 s, confortable sous la
-    limite par défaut d'une fonction Vercel (aucun `maxDuration`
-    n'est configuré dans `vercel.json`).
-  - **Comparaison avant écriture** : une réindexation en masse bouge
-    `timestamp` sans changer le contenu (mesuré dans `API-SYRACUSE.MD`,
-    +16 222 notices en une journée sur un pic) — l'état ne grossit que sur
-    un vrai changement de cote/section/site/statut.
-  - **Filtre de site** (`TARGET_SITES`/`SITE_FILTER`, 2026-09-09, demande
-    explicite) : la requête `search()` du delta ajoute
-    `AND (LocationSite_exact:"Douai Marceline Desbordes-Valmore" OR
-    LocationSite_exact:"Douai Réserve Patrimoniale")` — les deux seuls sites
-    physiques que couvrent `recolement.html`/`reserve.html`/`magasins.html`.
-    Ce champ Search (facette §5/§7 d'`API-SYRACUSE.MD`) est le même axe que
-    `h.Site`/`h.SiteCode` de `GetHoldings` et que `Bibliothèque (Libellé)`
-    de `bib.xml` (§16-17) — déjà filtré ainsi, mais plus largement
-    (`bibliotheque.startsWith('Douai')`, donc « Douai La Micheline » y
-    compris), dans `build-magasins.mjs`. Ici volontairement plus étroit que
-    « tout Douai » : compromis accepté en connaissance de cause — un
-    exemplaire mal rattaché à un AUTRE site Syracuse ne fera plus remonter
-    de correction fraîche via cette surcouche. **Sans conséquence sur la
-    détection d'anomalies de classement elle-même** (`ADV_CATS.horssection`
-    dans `recolement.html`) : elle vient du rebuild XML complet mensuel, pas
-    de cette synchro incrémentale — seule la fraîcheur cote/titre/auteur
-    d'un tel exemplaire serait perdue, jamais le signal d'anomalie. Un
-    filtre par site n'ajoute ni appel ni latence (une clause en plus dans le
-    même `QueryString`, toujours un seul `search()`) ; il en économise
-    plutôt — le portail Syracuse dessert plus que le réseau de Douai (voir
-    « Médiathèque départementale », déjà exclue ailleurs), et une partie des
-    notices détectées avant ce filtre déclenchait un `GetHoldings` que la
-    page ignorait de toute façon ensuite (code-barre absent du catalogue).
-    Effet de bord accepté sur le coupe-circuit ci-dessous
-    (`SANITY_CHECK_QUIET_MS`) : un périmètre plus étroit peut rester
-    silencieux plus de 12 h en usage normal (week-end...), ce qui déclenche
-    plus souvent la requête de contrôle — sans risque, puisqu'elle reste
-    volontairement non filtrée et ne coupe la synchro que si le champ
-    `timestamp` a réellement disparu de tout le portail.
-  - **Tri `timestamp` décroissant** (`SortField:'timestamp', SortOrder:1`
-    dans `search()` — accepté bien qu'absent de `d.Sorts`, §19) : sans ce
-    tri, une modification toute fraîche se retrouve n'importe où dans une
-    fenêtre en retard de plusieurs jours (potentiellement des dizaines de
-    milliers d'entrées, voir l'amorçage ci-dessous) — des milliers de
-    tranches avant d'être atteinte au rythme d'une tous les 5 min. Avec le
-    tri, elle apparaît près du sommet dès la première tranche de cette
-    fenêtre (`windowEnd` fixe). Diagnostiqué le 2026-09-09 : une cote
-    modifiée à 09:39 n'apparaissait toujours pas sur le site après
-    rechargement — cause combinée de l'amorçage jamais déclenché (aucun
-    tick n'avait encore tourné en production, voir ci-dessous) et de
-    l'ordre non trié sur un retard initial de ~32 000 notices. Vérifié en
-    direct que le tri fonctionne (`Query.SortField`/`SortOrder` échoués
-    dans la réponse) mais que des réindexations en masse concurrentes
-    peuvent placer plus de 100 notices « plus récentes » qu'une
-    modification faite 15 min plus tôt (elles aussi timestampées
-    « maintenant » sans changement réel) — retarde de quelques tranches,
-    jamais indéfiniment (contrairement à un ordre arbitraire sur 32 000
-    entrées).
-  - **Amorçage sur la date du dernier rebuild XML, pas sur « maintenant »**
-    (`resolveBootstrapLastSync()`) : au tout premier passage (`lastSync`
-    jamais posé), la tranche ne fait aucun appel Syracuse — elle lit
-    `data/magasins-build-report.json` sur le déploiement lui-même
-    (`origin` dérivé des en-têtes `host`/`x-forwarded-proto` de la requête
-    entrante, pas un domaine supposé fixe) et prend son `generatedAt` comme
-    point de départ, avec repli sur `now` si cette lecture échoue. Bug
-    corrigé le jour même de la première implémentation (2026-09-09) :
-    partir de `lastSync = epoch` aurait fait chercher *tout l'historique*
-    depuis toujours ; partir de `now` aurait au contraire laissé un trou
-    permanent entre le dernier export `bib.xml` et le démarrage réel de la
-    synchro. Amorcer sur `generatedAt` ferme ce trou : le socle XML
-    (ponctuel) et la fraîcheur API (continue) se raccordent exactement,
-    sans intervalle non couvert. Conséquence acceptée sur ce premier
-    démarrage : l'écart avec le dernier rebuild peut représenter des
-    dizaines de milliers de notices (§19-20, ~32 000 sur une semaine de
-    retard mesurées). Sans risque de surcharge pour autant : le débit par
-    tranche est identique quel que soit le volume restant, seul le temps
-    total de rattrapage varie — voir « Cadence relevée » ci-dessous pour le
-    réglage de ce débit.
-    Après un futur rebuild, `{type:'reset'}` (voir `api/syracuse-sync.mjs`)
-    remet `lastSync` à zéro, et le prochain amorçage se recale
-    automatiquement sur le nouveau `generatedAt` — rien à retoucher dans ce
-    fichier à chaque rebuild.
-  - **Fenêtre glissante avec curseur** (`cursor: {windowEnd, page,
-    offsetInPage}`) : une fois `lastSync` posé, la fenêtre `[lastSync,
-    windowEnd]` reste fixe tant qu'il reste des pages à traiter, `lastSync`
-    n'avance que quand elle est intégralement épuisée — une notice n'est
-    donc ni sautée ni retraitée indéfiniment sur un pic. Limite connue et
-    documentée dans le fichier : la requête est reconstruite à chaque
-    tranche plutôt que de réinjecter le `Query` normalisé du serveur, donc
-    rien ne garantit l'ordre exact des résultats d'une page déjà
-    partiellement consommée si l'index bouge entre deux tranches — risque
-    étroit (une page ne s'étale que sur ~2-3 tranches) et auto-cicatrisant
-    (rattrapé à la prochaine modification de la notice concernée, ou par
-    le rebuild mensuel complet).
-  - **Interrupteur automatique** : 3 tranches en échec d'affilée →
-    `enabled:false` dans l'état. Seul un `POST` authentifié vers
-    `/api/syracuse-sync` (`{type:'setEnabled', enabled:true}`) peut le
-    relever — décision humaine requise, pas de redémarrage automatique.
-  - **Détection de la disparition du champ `timestamp`** : si aucune
-    notice n'est détectée depuis plus de 12 h alors que la baseline mesurée
-    est de ~200 à 800/jour, une requête de contrôle ponctuelle
-    `timestamp:[* TO *]` confirme — si elle aussi renvoie 0, coupure
-    automatique (le champ a probablement disparu d'une mise à jour
-    Syracuse). Ne coûte rien tant que le flux est normal.
-  - Titre/auteur/date (`dt`, depuis `Resource.Dt`) ne viennent **pas** de
-    `GetHoldings` (qui ne les expose pas, §16) mais de la réponse `Search`
-    déjà en main pour la même notice — pas d'appel supplémentaire. `dt`
-    sert notamment à corriger les dates de publication cassées côté
-    catalogue affiché (voir la fusion côté client à venir).
+L'objet R2 `syracuse-sync.json` n'a pas été supprimé du bucket ; il n'est
+simplement plus lu ni sauvegardé.
 
-**Cadence relevée (2026-09-09)** : la cadence d'origine (10 `GetHoldings`
-par tranche, plancher de 5 min) rendait le rattrapage du retard initial
-(~32 000 notices) interminable — aggravé par des sessions de correction en
-masse côté équipe (pièges corrigés sur de nombreux exemplaires d'un coup),
-diagnostiquées en conditions réelles le jour même : une notice modifiée
-n'apparaissait toujours pas sur le site après plusieurs rechargements.
-Resserrée ainsi :
+**Attention au vocabulaire** : « Syracuse » désigne toujours le SIGB et ses
+exports XML (`bib.xml`, `notices.xml`/`exemplaires.xml`), qui restent la
+source de toutes les données. Seule la synchro **API en direct** a disparu.
+`API-SYRACUSE.MD` (non commité) reste au dossier si ce chantier devait être
+repris.
 
-| Constante | Avant | Après |
-|---|---|---|
-| `FLOOR_MS` | 5 min | 1 min |
-| `MAX_HOLDINGS_PER_TICK` | 10 | 40 |
-| `RESULT_SIZE` | 25 | 50 (max autorisé, §11) |
-
-Soit ~20× de débit (5× la fréquence des tranches × 4× leur taille). **Le
-seul levier qui protège réellement Syracuse, `CALL_SPACING_MS` (300 ms
-entre deux appels quels qu'ils soient), n'a volontairement pas bougé** :
-FLOOR_MS et MAX_HOLDINGS_PER_TICK ne changent que la durée et la fréquence
-des rafales, jamais leur intensité crête. Une tranche de 40 `GetHoldings`
-prend ~33 s (mesuré), d'où `export const config = { maxDuration: 45 }`
-(`api/syracuse-tick.mjs`) — 45 s choisi pour rester sous `FLOOR_MS` (garder
-un vrai repos entre deux tranches, pas pousser jusqu'au plafond du plan) ;
-absent de tout le reste du projet jusqu'ici. `LOCK_STALE_MS` (2 min) reste
-très au-dessus de cette durée réelle, donc `claimSlot()` ne confond
-toujours pas une tranche normale avec une invocation plantée.
-
-**Historique du déploiement, pour ne pas reproduire les deux mêmes
-erreurs :**
-
-1. Premier essai (commit `2c6462a`, 2026-09-09) : `export const config = {
-   maxDuration: MAX_DURATION_S }`, où `MAX_DURATION_S` était une constante
-   déclarée plus haut dans le fichier. **Build Vercel en échec**, avec pour
-   seul message `Error: Unhandled type: "Identifier"` — visible seulement
-   en ouvrant les logs de déploiement détaillés (le résumé ne dit rien).
-   Diagnostiqué d'abord à tort comme un dépassement de la limite du plan
-   Hobby (l'équipe a dû recopier le message d'erreur exact pour trancher).
-   **Cause réelle** : l'analyse statique de Vercel qui extrait
-   `maxDuration` de ce `config` fait un simple parcours d'AST, sans
-   exécuter le module — elle sait lire un nombre écrit en dur, pas
-   résoudre une référence vers une autre constante. **Leçon : la valeur de
-   `maxDuration` DOIT être un littéral numérique écrit directement dans
-   l'objet `config`, jamais une variable, même triviale.**
-2. Le temps de comprendre la vraie cause, `MAX_HOLDINGS_PER_TICK` est
-   brièvement revenu à 10 et le `config` a été retiré (déploiement de
-   repli, sûr). Une fois l'hypothèse « limite de plan » posée (avant
-   d'avoir le message d'erreur exact), vérification faite dans la
-   documentation Vercel officielle : avec Fluid Compute (actif par défaut
-   aujourd'hui), le plan Hobby autorise par défaut jusqu'à 300 s de
-   `maxDuration` — largement au-dessus de 45 s. Utile à savoir si le
-   besoin de dépasser ~33 s par tranche se représente : la marge existe
-   réellement sur ce compte, ce n'est pas ce qui limite la cadence
-   aujourd'hui.
-3. `export const config = { maxDuration: 45 };` redéclaré en littéral pur
-   — c'est l'état actuel, qui a déployé sans erreur.
-
-**Leçon générale retenue : ne jamais poser une hypothèse invérifiable sur
-le comportement de Vercel (au déploiement comme à l'exécution) sans lire le
-message d'erreur exact d'abord** — le premier diagnostic (limite de plan)
-était plausible mais faux, et aurait pu rester non corrigé si l'équipe
-n'avait pas fourni le texte precis de l'erreur.
-
-Corollaire côté client : `js/syracuse-sync-trigger.js` ne se contentait que
-d'un appel au chargement de la page — insuffisant une fois le plancher
-resserré à 1 min, puisque laisser une page ouverte sans la recharger
-n'aurait fait avancer le rattrapage que d'une seule tranche. Il se rappelle
-désormais toutes les 65 s tant que la page reste visible (`setInterval` +
-`visibilitychange`, même patron que `loadRecolement()`/`loadSyracuseOverlay()`
-dans `reserve.html`) — pour qu'une session de correction en masse, page
-ouverte pendant que l'équipe travaille dans Syracuse, rattrape vraiment son
-retard au lieu de ne progresser qu'au prochain rechargement manuel.
-
-- **`api/syracuse-sync.mjs`** — accès à l'état stocké, sur le patron
-  `createPatchEndpoint()` des sept autres endpoints « proxy classique »
-  (voir « Stockage partagé » plus bas) : `GET` public avec ETag/304,
-  `POST` authentifié pour les deux seules actions humaines nécessaires à
-  ce stade — `{type:'setEnabled', enabled}` (couper/relever la synchro à
-  la main) et `{type:'reset'}` (repartir de zéro après un rebuild mensuel
-  complet de `data/magasins.json`, les deltas accumulés devenant obsolètes
-  face au nouvel export). La forme de l'état (`lastSync`, `cursor`,
-  `records: {barcode: {...}}`, `notices: {rscId: {barcodes, ts}}`,
-  `enabled`, `syncInProgress`, `lastSyncAttempt`, `consecutiveErrors`,
-  `lastError`) est centralisée dans `lib/syracuse-sync-state.mjs`
-  (`SYRACUSE_SYNC_KEY`, `emptySyracuseSyncState()`) — un seul point de
-  vérité partagé entre les deux fichiers `api/syracuse-*.mjs`, pour qu'ils
-  ne divergent jamais sur le schéma.
-
-- **`js/syracuse-sync-trigger.js`** — le déclenchement : un unique appel
-  `fetch('/api/syracuse-tick', {method:'POST', keepalive:true})` en
-  fire-and-forget, résultat ignoré pour le fonctionnement de la page (juste
-  tracé en console, voir plus bas). Fichier volontairement séparé et
-  minimal, inclus via `<script defer>` sur `recolement.html`, `magasins.html`
-  et `reserve.html` (à côté de `js/parent-page-height.js`) — aucune ligne du
-  script principal de ces trois pages n'est touchée. Raison de cette
-  précaution : `recolement.html` a déjà eu deux pannes de production par
-  *temporal dead zone* dans son script principal (voir « Pièges connus »
-  plus bas) ; ce nouveau code ne doit avoir strictement aucune chance
-  d'interagir avec cet ordre d'initialisation. `reserve.html` a reçu le
-  déclencheur après coup (2026-09-09, diagnostiqué en conditions réelles :
-  la page ne faisait que lire la surcouche sans jamais la faire avancer,
-  donc rien ne progressait tant que personne n'avait ouvert les deux autres
-  pages) — les trois pages sont des outils internes au même niveau de
-  confiance (même gate `localStorage`), contrairement à `inventaire.html`
-  qui reste volontairement lecture seule : ajouter le déclenchement sur une
-  page publique changerait le profil d'exposition, décision non prise sans
-  en reparler avec l'équipe.
-
-Le bloc `notices` de l'état est rempli à chaque tranche (permet de détecter
-qu'un code-barre a disparu des exemplaires d'une notice) mais rien ne
-l'exploite encore.
-
-**Fusion côté client (2026-09-09)** : `js/syracuse-sync-shared.js`
-(`fetchSyracuseSyncOverlay()`) expose la surcouche au même patron que
-`js/exemplaires-manuels-shared.js` — `fetch('/api/syracuse-sync')`, renvoie
-`data.records` (`{}` si l'API est indisponible ou si rien n'a encore été
-synchronisé, jamais d'exception). Deux pages la consomment à ce stade :
-
-Traçabilité volontaire dans la console navigateur (F12), pour vérifier sans
-requêter l'API à la main : `js/syracuse-sync-trigger.js` logue la réponse de
-chaque tick (`[syracuse-sync] tick : {...}` — `skipped`/`ok`), et
-`fetchSyracuseSyncOverlay()` logue la taille de la surcouche chargée
-(`[syracuse-sync] surcouche chargée : N code(s)-barres, lastSync = …`) ;
-`js/inventaire-page.js` logue en plus chaque correction effectivement
-appliquée (`[syracuse-sync] correction appliquée sur <code-barre>`). Sans
-effet sur le fonctionnement des pages (juste `console.log`), volontairement
-peu bavard — seulement ce qui est utile pour diagnostiquer « pourquoi je ne
-vois pas mon changement » sans redemander une vérification manuelle.
-
-- **`inventaire.html`** (via `js/inventaire-page.js`, fonction `load()`) :
-  une troisième promesse rejoint le `Promise.all` existant (à côté de
-  `data/inventaire.json` et `fetchExemplairesManuelsAsCatalogRows()`). Pour
-  chaque exemplaire dont le code-barre (`995$f`/`915$b`) a une entrée dans
-  la surcouche, `cote`/`titre`/`auteur`/`dt` remplacent `930$g`/`200$a`/
-  `700$a`/`210$d` **avant** que `_year`/`_hay` ne soient dérivés (mêmes
-  lignes que le calcul existant) — la correction alimente donc aussi bien
-  l'affichage (liste de résultats `js/inventaire-page.js`, fiche détaillée
-  `buildExpandedContent()` dans `js/inventaire.js` — un seul point de
-  fusion sert les deux, `rec` étant le même objet partagé) que le tri et le
-  filtre par date. Corrige notamment les dates de publication cassées
-  signalées par l'équipe, sans attendre le prochain export XML.
-- **`reserve.html`** : `SYRACUSE_OVERLAY` (variable de module), rafraîchie
-  par `loadSyracuseOverlay()` au chargement puis toutes les 5 min (inutile
-  plus souvent — la synchro elle-même ne peut pas avancer plus vite qu'une
-  tranche par tranche de 5 min, voir plus haut). Cette page déclenche aussi
-  la synchro elle-même (voir `js/syracuse-sync-trigger.js` plus haut) — sans
-  ça, une notice ne progresserait jamais tant que personne n'a ouvert
-  `recolement.html`/`magasins.html` entretemps, ce qui s'est produit en
-  conditions réelles avant ce correctif. `noticeRows()` (fenêtre modale au
-  clic sur une étagère, 2026-09-10) remplace `cote`/`titre`/`auteur` par la
-  valeur de la surcouche pour chaque notice dont le code-barre y a une
-  entrée (`fresh.cote||n.c`, etc.) — même principe que
-  `applySyracuseOverlayToCatalog()` de `recolement.html`, appliqué ici
-  directement sur les notices déjà chargées en mémoire (pas de catalogue
-  complet côté `reserve.html`) plutôt que sur un catalogue. Le tri
-  (`sort==='cote'`/`'titre'`/`'auteur'`) porte sur ces valeurs déjà
-  fusionnées, pas sur celles figées au moment du scan — une notice
-  corrigée se retrie donc à sa place à jour. Seul le **fonds**
-  (`.notice-fonds`) reste figé et non reconstruit : lui recalculer un
-  `_fondsLabel` propre demanderait `data/magasins.json`, dont
-  `reserve.html` n'a aucune copie (son plan vient entièrement de
-  `/api/recolement`, voir plus haut) — un badge bleu `.notice-live`
-  (« 🔄 Section · Site ») s'affiche à côté à la place, distinguée
-  visuellement plutôt que fusionnée dans le libellé existant. Ce badge, et
-  la fusion cote/titre/auteur qui l'accompagne, sont absents pour l'immense
-  majorité des notices (celles non retouchées depuis le dernier rebuild) —
-  n'apparaissent que sur ce qui a effectivement changé. Avant ce correctif,
-  la cote/titre/auteur affichés restaient figés au moment du scan même
-  après une correction Syracuse détectée par la synchro — seul un rescan
-  physique dans `recolement.html`, ou le prochain rebuild XML complet,
-  les mettait à jour ; un signalement concret (exemplaire 607603, cote
-  corrigée « L 61 » → « L61 » toujours affichée avec l'espace) a motivé ce
-  changement.
-
-`analyse-cotes.html` et les autres pages qui chargent `data/inventaire.json`
-indépendamment (`exemplarisation.html`, `reliures.html`,
-`livres-spolies.html`, `transfert-magasins.html`) n'ont pas cette fusion —
-à dupliquer au même patron si un besoin similaire s'y fait sentir.
-
-**`recolement.html`** (2026-09-09) a sa propre fusion, plus poussée que les
-deux ci-dessus : elle corrige directement `cote`/`titre`/`auteur` sur les
-entrées de `catalogByGroup.reserve`/`catalogByGroup.magasin`
-(`applySyracuseOverlayToCatalog()`), pas seulement l'affichage — les
-tableaux des « Statistiques avancées » qui lisent le catalogue en direct
-(« Jamais scannés », « Documents probablement perdus ») reflètent donc la
-correction sans attendre un nouveau `npm run build`/`build:magasins`. Sur
-demande explicite, la ligne concernée n'est jamais retirée de ces
-tableaux : chaque catégorie gagne une colonne dédiée à la fraîcheur
-Syracuse, à l'exception de « Mauvais numéro / code-barre absent » (exporte
-des cotes, pas des codes-barres) — mais son contenu diffère pour
-« Récolés » (`ADV_CATS.scanned`), seule catégorie sans notion d'anomalie à
-traiter (le document est déjà localisé physiquement, une correction de
-cote/titre/auteur n'y change rien) :
-
-- Les cinq autres catégories affichent une colonne « Syracuse » — badge
-  « 🔄 corrigé le JJ/MM/AAAA » (`syracuseCorrectionCell()`, date = `ts` de
-  la surcouche) si ce code-barre a une correction, `—` sinon — avec une
-  case à cocher « Exclure les corrigés (Syracuse) » à côté du bouton
-  d'export .txt, qui s'applique aussi aux boutons « tous les magasins »/
-  tranche de travées de la même catégorie (`syracuseNotCorrectedFilter()`,
-  `combineExportFilters()`, activés par `spec.showCorrectionFilter` dans
-  `ADV_CATS`).
-- « Récolés » affiche à la place (2026-09-09, demande explicite) une
-  colonne « Prêt » — badge « 📕 en prêt » (`syracuseLoanBadge()`) si le
-  champ `statut` de la surcouche contient "prêt" (insensible à la casse,
-  couvre "En prêt", "En prêt, en magasin"… — Syracuse combine parfois
-  plusieurs informations dans ce champ, formulation exacte non documentée
-  côté ILS), `—` sinon. Pas de case "Exclure les corrigés" pour cette
-  catégorie (`showCorrectionFilter` absent de son entrée `ADV_CATS`) :
-  savoir qu'un exemplaire vient d'être scanné en rayon alors qu'il est
-  enregistré "en prêt" est l'info utile ici, pas la fraîcheur
-  cote/titre/auteur.
-
-`loadSyracuseOverlay()` (appelée au chargement,
-toutes les 5 min et au retour d'onglet, même cadence que `reserve.html`)
-réapplique la correction et reconstruit l'index cote→code-barre
-(`catalogCoteIndexByGroup`) de chaque catalogue déjà chargé — peu importe
-lequel des deux finit de charger en premier, l'autre est couvert à son
-propre chargement (`applySyracuseOverlayToCatalog()` appelée aussi dans
-chaque site d'installation de catalogue) ou au prochain passage. Piège
-évité : le catalogue magasins est mis en cache dans IndexedDB (voir plus
-haut) et `built.catalog` est le MÊME objet que celui réinstallé dans
-`catalogByGroup.magasin` — le corriger avant l'encodage différé du cache
-(`loadMagasinCatalog()`, étape "4. Remplissage du cache") aurait figé une
-correction Syracuse ponctuelle dans un cache qui, lui, ne s'invalide qu'au
-prochain `build:magasins`. `applySyracuseOverlayToCatalog()` accepte donc
-un second paramètre `snapshotOut` qui capture les valeurs D'AVANT
-correction des seules entrées touchées (proportionnel à la taille de la
-surcouche, pas du catalogue) ; l'encodage pour le cache se fait sur une
-copie superficielle où ces quelques entrées sont temporairement restaurées,
-sans jamais toucher à `catalogByGroup.magasin` réellement affiché.
 
 ## Exemplarisation rapide (catalogage minimal)
 
@@ -1490,6 +1190,86 @@ via PapaParse). `csv/inventaire.csv` (24,5 Mo) reste très en-deçà de la
 limite de longueur d'une string V8 (contrairement à `xml/bib.xml`,
 plusieurs Go) : lu entièrement en mémoire, pas en flux.
 
+## Presse numérisée (fonds Périodiques, 2026-09-23)
+
+Le fonds Périodiques (voir « Base "inventaire des collections" » — titres
+`930$g` = "D19"/"D23"/"D24", issus de `csv/periodiques2.csv` via
+`buildFondsPeriodique2Record()`) a des scans page à page disponibles pour
+ces trois titres (Douai républicain, Le Triboulet, Le Douaisien) : 14 263
+images JPEG, classées sur disque `<titre>/<titre>_<année>/<titre>_<année>_
+<MM>_<JJ>/*.jpg` — un dossier par NUMÉRO (pas par page). Contrairement aux
+livres du reste du manifeste (une notice = un document = un "book"), une
+notice de périodique est un TITRE qui couvre des dizaines de numéros sur
+plusieurs années ; il fallait donc une UI à plusieurs niveaux plutôt que le
+simple bouton « Accéder au document numérisé » du reste du site : sous la
+fiche, un calendrier année → mois → jour (`buildPresseCalendar()` dans
+`js/inventaire.js`, `.inv-presse-cal*`) — cliquer une année affiche ses 12
+mois (bleu = numérisé, rose pâle = pas de numéro ce mois-là, non cliquable),
+cliquer un mois affiche ses jours (même code couleur, grille alignée sur le
+vrai jour de semaine — décoratif, l'en-tête L M M J V S D). Cliquer un JOUR
+bascule la modale vers la visionneuse sur le "book" de CE numéro
+uniquement — pas toute l'année (demande explicite du 2026-09-23, revenue
+sur un premier essai où les flèches ← → parcouraient l'année entière à
+partir du jour choisi) : un "book" par numéro (voir juste en dessous), donc
+les flèches n'y feuillettent plus que les 4 pages de ce numéro.
+
+`scripts/build-manifest-presse.mjs` (`npm run build:manifest-presse`)
+construit un "book" par NUMÉRO (nommé `<code>_<année>_<MM>_<jour brut du
+dossier>`, ex. `D23_1873_01_05` — le "jour brut" plutôt qu'un jour à deux
+chiffres strict pour rester unique même sur une annotation du type
+`22(sic)`, voir plus bas) dans `js/manifest.json` : « Périodiques » → un
+sous-dossier par titre → un sous-dossier par année (gardé pour la
+navigation manuelle dans `visionneuse.html` hors calendrier) → un "book"
+par numéro. Écrit aussi `js/presse-index.json` :
+`{ "D19": { "cover": "<url>", "years": { "1895": { "10": { "13": "D19_1895_10_13", … } } } } }`
+— `years[année][mois][jour]` est le NOM du "book" de ce numéro (pas un
+index de page comme dans un premier essai le même jour, revenu en arrière
+pour la raison ci-dessus) ; un jour sans entrée numérique (voir `[sd]`/`[nd]`
+plus bas) n'a simplement pas de case dans le calendrier, mais son "book"
+reste ouvrable depuis l'arborescence de `visionneuse.html`. `cover` (1re
+page de la parution la plus ancienne du titre) devient `lien_num` de la
+notice dans `js/inventaire-page.js` (ces notices — fonds sans exemplaire
+physique associé — n'en ont sinon aucune), seulement si `lien_num` n'est
+pas déjà posé. `js/inventaire-page.js` pose aussi `r._presseCalendar` sur
+la notice dont la cote correspond — comparaison par cote exacte, pas par
+`_fondsLabel`, pour rester correct même si ce fonds est renommé. Reconnaît
+les dossiers de titre par SUFFIXE (`_D\d+`), pas par préfixe : le dossier
+D23 n'a pas le préfixe "FRB" que portent D19/D24 sur cette collecte
+(`591786101_D23_…` vs `FRB591786101_D19_…`), un suffixe est la seule
+reconnaissance commune aux trois. Certains dossiers de numéro portent une
+annotation d'origine plutôt qu'un jour à deux chiffres strict — ex.
+`…_1899_01_22(sic)` (date fautive mais reproduite telle quelle sur le
+fac-similé) ou `…_1910_04_[sd]`/`…_1923_10_[nd]` (pas de date lisible du
+tout, 5 dossiers sur ~490 au 2026-09-23) : `formatDateLabel()` gère les deux
+cas plutôt que de les exclure silencieusement (un premier passage sans cette
+gestion perdait 20 des 14 263 pages).
+
+**Scans pas encore sur R2 (2026-09-23, décision explicite de l'équipe) :**
+115 Go/14 263 images dépasseraient le quota mensuel du compte R2. En
+attendant, ils restent en local (dossier OneDrive de l'équipe) et ne sont
+consultables que via `npm run dev` :
+`scripts/dev-server.mjs` sert désormais `/presse-local/*` depuis
+`PRESSE_SOURCE_DIR` (même variable d'env que le script de build, avec le
+même repli par défaut) ; les "book" du manifeste générés en mode local
+(défaut du script) portent `root:"presse-local"`, et
+`visionneuse.html` résout leurs pages contre `PRESSE_LOCAL_ROOT`
+(`/presse-local/`) plutôt que contre `IMAGES_ROOT` (R2) — voir
+`rootForBook()`. Cette page a aussi gagné la capacité d'ouvrir un "book"
+DIRECTEMENT par son nom via `?dossier=` (`findFirstInNode()` dans
+`openDossierCible()`, jusqu'ici limité aux dossiers) : un
+"book" n'a pas de premier-fichier à chercher, il EST la cible.
+
+**À refaire une fois les scans effectivement versés sur R2** (même
+arborescence relative, sous un préfixe `presse/` — même convention que
+`num-ms/`/`num-robaut/` déjà dans ce bucket) : relancer
+`node scripts/build-manifest-presse.mjs --r2`, qui régénère `js/manifest.json`
+sans le flag `root:"presse-local"` et avec des chemins préfixés `presse/` —
+`rootForBook()` retombe alors sur `IMAGES_ROOT` comme le reste du
+manifeste, sans autre changement de code. `PRESSE_LOCAL_ROOT`/la route
+`/presse-local/` de `scripts/dev-server.mjs` peuvent alors être retirés
+(plus rien ne les référence une fois `root:"presse-local"` absent du
+manifeste).
+
 ## Transfert 2e étage → réserve patrimoniale
 
 `transfert-magasins.html` (2026-08-21) répond à un besoin distinct de
@@ -1747,35 +1527,38 @@ blocs :
   décroissants : le livre le plus emprunté du catalogue apparaît donc en
   première ligne sans manipulation.
 
-## Base "inventaire des collections" (Postgres/Neon, 2026-09-09)
+## Base "inventaire des collections" (PostgreSQL local)
 
-Chantier distinct de `data/inventaire.json`/`data/magasins.json` : une base
-Postgres (Neon, projet `patient-shape-42487842`, base dédiée
-`inventaire_des_collections` — pas la base par défaut `neondb`, restée
-inutilisée) qui unifie réserve + bib.xml dans un vrai modèle relationnel,
-pensée pour accueillir plus tard des imports Excel de collections non
-cataloguées (manuscrits, cartes géographiques). **Première dépendance npm
-runtime du projet** (`pg`, node-postgres — voir `package.json`
-`dependencies`) : un driver Postgres est incontournable, contrairement à R2
+Base `inventaire_des_collections` sur un **PostgreSQL local** (installation
+portable, `C:\Logiciels\postgresql-17.11-x64`, pilotée par
+`scripts/db-local.mjs`) qui unifie réserve + bib.xml + imports Excel dans un
+vrai modèle relationnel. **Seule dépendance npm runtime du projet** (`pg`,
+node-postgres) : un driver Postgres est incontournable, contrairement à R2
 dont la signature SigV4 est écrite à la main (`lib/r2.mjs`) précisément pour
 éviter `@aws-sdk/client-s3`.
 
-**N'affecte aujourd'hui AUCUNE page ni aucun endpoint `api/`.** C'est une
-fondation (schéma + scripts de migration) : `data/inventaire.json` continue
-d'être généré exactement comme avant par `npm run build`, aucune page
-HTML n'a changé. La bascule (export JSON généré depuis la base pour
-`recolement.html`/`reserve.html`, endpoints API de recherche pour
-`magasins.html`/`cotes-numeriques.html`, modèle des imports Excel) reste un
-lot ultérieur, volontairement pas commencé.
+Elle a d'abord vécu chez Neon (hébergé), abandonné le 2026-09-22 avec le
+reste de l'hébergement distant — notamment parce que la limite de 512 Mo du
+plan gratuit était atteinte (voir plus bas). Les anciennes chaînes de
+connexion Neon restent en commentaire dans `.env` pour repli.
 
-Écart assumé par rapport à la recette Neon standard (`neon init`/`neon.ts`/
-`neon deploy`) : le schéma est un fichier `.sql` brut
-(`db/migrations/0001_init.sql`) appliqué par un script Node
-(`npm run db:apply-schema`, via `scripts/lib/pg.mjs`) plutôt qu'une config
-déclarative — cohérent avec le "aucune dépendance npm, scripts à la main"
-du reste du projet, et review-able comme n'importe quel autre fichier.
-`npx neon psql` n'est pas utilisable partout (binaire `psql` absent de
-certains environnements de dev), d'où ce choix.
+**Cette base EST désormais la source de vérité des pages**, contrairement à
+la situation initiale où elle n'était qu'une fondation inutilisée :
+`/api/inventaire` et les routes `/data/*.json` du serveur
+(`DATA_EXPORTERS` dans `scripts/dev-server.mjs`) sont générées à la volée
+depuis elle, par les modules `scripts/lib/export-*.mjs`. Les fichiers
+`data/*.json` committés ne servent plus que de **repli** quand la base est
+arrêtée ou la page ouverte hors `npm run dev` — `npm run verify:parity`
+compare les deux.
+
+Le schéma est une suite de fichiers `.sql` bruts (`db/migrations/000N_*.sql`)
+appliqués par un script Node (`npm run db:apply-schema`, via
+`scripts/lib/pg.mjs`) plutôt qu'une config déclarative ou un outil de
+migration — cohérent avec le "scripts à la main" du reste du projet, et
+review-able comme n'importe quel autre fichier. Ce choix, fait à l'époque de
+Neon pour ne dépendre d'aucun outil propre à l'hébergeur, est ce qui a rendu
+la bascule vers un Postgres local indolore : les mêmes fichiers s'appliquent
+tels quels.
 
 **Schéma** (6 tables) : `notices` (une par notice bibliographique — pour un
 exemplaire `bib.xml` sans vraie notice MARC, GESMARC dénormalisant
@@ -1822,7 +1605,7 @@ au moment de l'extraction) pour que `scripts/db-migrate-reserve.mjs`
 (`npm run db:migrate:reserve`) n'ait aucune chance de diverger du JSON.
 `scripts/db-migrate-bib.mjs` (`npm run db:migrate:bib`) lit `xml/bib.xml` en
 flux (`iterateGesmarcItemsFromFile()`, comme `build-magasins.mjs` — jamais
-en mémoire, jamais une fonction Vercel) et lit les codes piège
+en mémoire, jamais dans un endpoint HTTP) et lit les codes piège
 **structurés** de cet export (`Piège 921$a (Code)`/`Piège 921$b (Code)`),
 pas le texte concaténé `Pièges` que lit `build-magasins.mjs` — plus fiable
 pour les colonnes booléennes. Dédoublonnage réserve ↔ bib.xml par
@@ -1846,8 +1629,11 @@ notices/551 notices multi-exemplaires/178 groupes de reliure côté réserve ;
 (`GROUP BY barcode HAVING count(*)>1` → 0 ligne). Les deux scripts sont
 rejouables sans dupliquer (`INSERT ... ON CONFLICT`, jamais de `TRUNCATE`).
 
-**Limite de stockage du plan gratuit Neon (512 Mo) — presque atteinte,
-décision explicite de l'équipe de ne rien changer pour l'instant (2026-09-09).**
+**Historique : la limite de 512 Mo du plan gratuit Neon, atteinte le
+2026-09-09 — l'une des raisons du passage à un Postgres local, où elle ne
+s'applique plus.** Conservé ici parce que le raisonnement sur `raw jsonb`
+et sur `VACUUM` reste valable sur la base locale (le disque n'est pas
+infini non plus, et le gonflement MVCC est le même).
 La colonne `raw jsonb` de `exemplaires` (fiche brute complète par exemplaire,
 pour ne jamais perdre une donnée au-delà des colonnes typées) domine le
 volume : 339 Mo sur les ~200 000 lignes de cette seule table. Un deuxième
@@ -1864,22 +1650,20 @@ migration (après un nouvel export Syracuse) : si `could not extend file...`
 réapparaît, relancer un `VACUUM` (sans `FULL`) sur `exemplaires`/`notices`
 avant de réessayer. Deux vraies solutions existent si le besoin devient
 récurrent (non retenues pour l'instant, décision à reprendre avec
-l'équipe) : passer la base sur un plan Neon payant (lève le plafond), ou
-alléger `exemplaires.raw` côté `bib_xml` (déjà entièrement capté en colonnes
+l'équipe) : l'espace disque local (déjà fait — le plafond a disparu avec
+Neon), ou alléger `exemplaires.raw` côté `bib_xml` (déjà entièrement capté en colonnes
 typées — cote, piège, état, section, bibliothèque, titre, auteur, éditeur,
 ISBN/ISSN — la perte se limiterait à quelques champs mineurs jamais utilisés
 ailleurs : Tome, Titre de série, Imagette, Identifiant).
 
-**Variables d'environnement** (`.env`, jamais commitées, posées par
-`neon link`/`neon connection-string`) : `DATABASE_URL` (poolé, via le
-pooler pgbouncer Neon — destiné aux futurs endpoints Vercel, beaucoup
-d'invocations courtes) et `DATABASE_URL_UNPOOLED` (connexion directe —
-utilisée par les scripts de migration en lot, transactions/lots plus
-longs). `NEON_API_KEY` (scopée au seul projet `patient-shape-42487842`)
-sert au CLI `neon` (`devDependency` locale, invoqué via `npx neon`) —
-`neon login` (OAuth navigateur) ne fonctionne pas dans un environnement de
-dev sans navigateur, d'où l'authentification par clé API. `.neon` (lien du
-répertoire vers le projet Neon) est gitignored comme `.env`.
+**Variables d'environnement** (`.env`, jamais commitées) : `DATABASE_URL` et
+`DATABASE_URL_UNPOOLED` pointent toutes deux sur `localhost:5432` — il n'y a
+plus de pooler séparé. La distinction est conservée dans `scripts/lib/pg.mjs`
+parce qu'elle reste porteuse de sens côté appelant (`unpooled: true` pour les
+migrations en lot, pool par défaut pour les endpoints HTTP) et qu'elle permet
+de remettre un pgbouncer devant la base sans retoucher un appelant. Le CLI
+`neon` et `NEON_API_KEY` ont été retirés avec le reste (le CLI tirait à lui
+seul ~92 Mo de `node_modules`, dont `@vercel/nft`).
 
 ## Stockage partagé (Cloudflare R2) et fonctions serverless
 
@@ -1939,36 +1723,33 @@ pour plusieurs choses indépendantes :
   — voir « Exemplarisation rapide » plus haut. Contrairement aux deux
   catégories ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
   dans le site ne relit ces images pour l'instant.
-- **`syracuse-sync.json`** : surcouche de synchronisation incrémentale avec
-  le portail public Syracuse (`bm-douai.fr`), alimentée par
-  `api/syracuse-tick.mjs` — voir « Synchronisation incrémentale Syracuse »
-  plus bas pour le détail. Cinquième usage indépendant du bucket R2, en
-  plus de `xml/`, de la famille `recolement.json`/…/`desherbage-traitements.json`,
-  de `recolement-backups/` et de `vignette/`.
+- **`syracuse-sync.json`** : vestige de la synchronisation incrémentale
+  retirée le 2026-09-23 (voir la section dédiée). L'objet existe encore dans
+  le bucket mais plus rien ne le lit, ne l'écrit ni ne le sauvegarde.
 
-Neuf fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
+Sept fonctions (`api/recolement.mjs`, `api/spolies.mjs`,
 `api/exemplaires-manuels.mjs`, `api/reliures-manuelles.mjs`,
-`api/vignette.mjs`, `api/transferts.mjs`, `api/desherbage.mjs`,
-`api/syracuse-sync.mjs`, `api/syracuse-tick.mjs`) touchent à R2. Les huit
-premières servent de proxy classique vers un état stocké : `GET` (sauf
+`api/vignette.mjs`, `api/transferts.mjs`, `api/desherbage.mjs`) touchent à
+R2 — il y en a eu neuf, les deux `api/syracuse-*.mjs` ayant été supprimées
+le 2026-09-23. Elles servent de proxy vers un état stocké : `GET` (sauf
 `api/vignette.mjs`, POST uniquement) renvoie l'état courant (public, même
 niveau d'exposition que `data/recolement.json` aujourd'hui) ; `POST` reçoit
 un « patch » unitaire (ex. `{type:'scan', record}` ou `{id, field, value}`)
 et le fusionne côté serveur via lecture+ETag+réécriture conditionnelle
 (`r2CasUpdate` dans `lib/r2.mjs`, compare-and-swap avec retry) — jamais un
 écrasement complet du fichier, pour qu'un scan pris par un collègue au même
-instant ne soit pas perdu. `api/syracuse-tick.mjs` est d'une autre nature :
-un déclencheur de job (`POST` non authentifié, aucune donnée fournie par
-l'appelant) plutôt qu'un proxy d'état — voir plus bas.
+instant ne soit pas perdu.
 
-Depuis 2026-09-02, sept des huit endpoints « proxy classique » (tous sauf
+À côté d'elles, `api/inventaire.mjs` et `api/login.mjs` ne touchent pas à R2
+(Postgres pour la première, comparaison d'identifiants pour la seconde).
+
+Depuis 2026-09-02, six de ces sept endpoints (tous sauf
 `api/vignette.mjs`) partagent une seule implémentation,
 `createPatchEndpoint()` dans `lib/patch-endpoint.mjs` — ils étaient
 auparavant copiés ligne pour ligne, ne différant que par leur clé R2, leur
 état vide et leur `applyPatch()` (`api/reliures-manuelles.mjs` passe en plus
-un `normalizeState` pour son ancien format à plat ; `api/syracuse-sync.mjs`,
-ajouté début 2026-09-09, en hérite directement sans particularité). Un
-correctif profite donc à tous d'un coup. C'est notamment ce qui a permis
+un `normalizeState` pour son ancien format à plat). Un correctif profite
+donc à tous d'un coup. C'est notamment ce qui a permis
 d'ajouter partout un
 **ETag** : l'ETag de l'objet R2 (déjà renvoyé par `r2Get`) est propagé en
 en-tête, et un `If-None-Match` correspondant donne un **304 sans corps**. Le
@@ -1994,8 +1775,8 @@ UTF-8 — nécessaire pour `xml/bib.xml` (voir ci-dessus), dont la taille
 dépasse la limite de longueur d'une string V8 (~512 Mo) : un
 `.toString('utf8')` sur un buffer de cette taille lèverait
 `ERR_STRING_TOO_LONG`. Variables
-d'environnement requises (Vercel + `.env` local, jamais commitées,
-`.env` est dans `.gitignore`) : `R2_ACCOUNT_ID`, `R2_BUCKET`,
+d'environnement requises (`.env` local, jamais commité — il est dans
+`.gitignore`) : `R2_ACCOUNT_ID`, `R2_BUCKET`,
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, plus `ADMIN_USER`/`ADMIN_PASS`
 (utilisées par `/api/login` pour vérifier le formulaire de connexion de
 `index.html`, et pour authentifier les `POST` — voir Sécurité ci-dessous).
@@ -2404,7 +2185,7 @@ navigateur.
 Depuis 2026-07-24, ce qui a changé : les identifiants (`ADMIN_USER` /
 `ADMIN_PASS`) **ne sont plus en clair dans le JavaScript** — le formulaire
 de connexion de `index.html` les envoie à `/api/login`, qui les compare
-côté serveur aux variables d'environnement Vercel (`lib/auth.mjs`,
+côté serveur aux variables d'environnement du `.env` (`lib/auth.mjs`,
 `credentialsMatch()`). Un « voir le code source » ne révèle donc plus le
 mot de passe. Ça ne protège pas davantage l'accès aux *pages* (le gate
 `localStorage` reste un simple indicateur, toujours contournable comme
@@ -2429,14 +2210,48 @@ simple nettoyage : le gate des *pages* reste côté client (localStorage),
 donc ce n'est qu'une barrière anti-curieux pour la navigation, pas une
 vraie protection d'accès — même si l'écriture des données partagées est,
 elle, réellement protégée depuis l'ajout de `/api/login`. Pour aller plus
-loin (protéger aussi l'accès aux pages elles-mêmes), les options réalistes
-restent : Vercel Deployment/Password Protection (plan payant), ou un vrai
-cookie de session posé par `/api/login` puis vérifié par un middleware/edge
-function sur chaque page protégée. Ne pas supposer que l'accès à ces pages
-est sécurisé au-delà de ce qui est décrit ici.
+loin (protéger aussi l'accès aux pages elles-mêmes), maintenant que c'est
+`scripts/dev-server.mjs` qui sert le site, l'option réaliste est devenue
+simple : un vrai cookie de session posé par `/api/login`, puis vérifié dans
+`handleStatic()` avant de servir une page de la liste protégée. Rien
+n'oblige plus à passer par une offre d'hébergeur. Ne pas supposer pour
+autant que l'accès à ces pages est sécurisé aujourd'hui : il ne l'est pas,
+au-delà de ce qui est décrit ici.
 
 ## Pièges connus / historique
 
+- Passage à l'hébergement local (2026-09-23) : Vercel et Neon retirés, plus
+  la synchronisation API Syracuse (voir sa section). Trois pièges relevés à
+  cette occasion, tous issus du même angle mort — **ce que le CDN faisait
+  gratuitement, plus personne ne le fait** :
+  - **Aucune compression HTTP** nulle part dans la stack (`grep -r zlib` →
+    rien) : `/api/inventaire` servait 21,2 Mo bruts par chargement
+    d'`inventaire.html`. Corrigé par `lib/http-compress.mjs` — voir « Format
+    des données et performances ». À se rappeler pour toute nouvelle route
+    qui renverrait un gros corps : passer par `sendCompressed()`, pas
+    `res.end()`.
+  - **Le cache mémoire ne cachait que le corps brut.** Compresser 21 Mo coûte
+    ~760 ms en brotli : branché naïvement, on remplaçait un transfert lent par
+    un serveur lent. `lib/data-json-cache.mjs` retient désormais l'objet
+    `compressibleBody()`, variantes comprises.
+  - **Mesurer sur `localhost` ne prouve rien sur la compression** : la boucle
+    locale n'a pas de goulot de transfert, et le premier essai montrait même
+    un léger ralentissement (coût de décompression). C'est en simulant un lien
+    Wi-Fi à 80 Mbit/s — la situation réelle d'un poste du réseau — que l'écart
+    apparaît : 18,7 s → 1,7 s. Toute mesure de performance réseau faite depuis
+    cette machine doit émuler le lien, sinon elle mesure autre chose.
+- Régression trouvée le 2026-09-23 : `/data/non-catalogues.json` renvoyait un
+  tableau **vide** depuis `db/migrations/0008_reserve_non_catalogues.sql`.
+  `scripts/lib/export-non-catalogues.mjs` interrogeait toujours
+  `exemplaires`/`source='excel_import'`, alors que ces 10 090 lignes avaient
+  été déplacées vers `exemplaires_reserve`. Silencieux : un tableau vide se
+  sert aussi bien qu'un tableau plein, et `inventaire.html` ne s'en rendait
+  pas compte (il prend sa version fusionnée dans `/api/inventaire`). Seule
+  `thematiques/vues-de-douai.html`, qui fusionne encore cette source à part,
+  avait silencieusement perdu ses 82 pièces `610$a = "Cartographie"` du fonds
+  Robaut. **Leçon : une migration qui déplace des lignes entre tables doit
+  s'accompagner d'un `npm run verify:parity` sur TOUS les jeux concernés, pas
+  seulement celui qu'on a en tête.**
 - Chantier de performance du 2026-09-02 (voir « Format des données et
   performances » en tête de fichier pour le détail) : `data/magasins.json`
   82,9 → 20,8 Mo, `data/cotes-numeriques.json` 11,6 → 4,9 Mo,

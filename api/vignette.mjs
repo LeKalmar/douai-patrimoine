@@ -101,7 +101,7 @@ async function handleGet(req, res) {
 
 export default async function handler(req, res) {
   if (!r2Configured()) {
-    res.status(503).json({ error: 'R2 non configuré côté serveur (variables R2_* manquantes sur Vercel).' });
+    res.status(503).json({ error: 'R2 non configuré côté serveur (variables R2_* manquantes dans .env).' });
     return;
   }
   try {

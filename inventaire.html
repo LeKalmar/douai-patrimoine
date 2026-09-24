@@ -263,6 +263,14 @@
       flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .inv-facet-n { font-size: 0.7rem; color: #9A9AA8; flex-shrink: 0; }
+    .inv-facet-more {
+      display: flex; align-items: center; gap: 0.3rem; width: 100%;
+      background: none; border: none; font-family: inherit; font-size: 0.72rem;
+      font-weight: 600; color: var(--carmin); padding: 0.4rem 0 0.1rem; cursor: pointer;
+      text-align: left;
+    }
+    .inv-facet-more svg { width: 11px; height: 11px; flex-shrink: 0; transition: transform 0.15s; }
+    .inv-facet-more--open svg { transform: rotate(180deg); }
     .inv-period { display: flex; gap: 0.45rem; }
     .inv-period input {
       width: 100%; min-width: 0; border: 1px solid var(--trait-fort); background: #fff;
@@ -466,7 +474,7 @@
           <select id="inv-sort">
             <option value="cote">Cote</option>
             <option value="titre">Titre</option>
-            <option value="date">Date croissante</option>
+            <option value="date" selected>Date croissante</option>
             <option value="date-desc">Date décroissante</option>
           </select>
         </div>
@@ -480,10 +488,6 @@
 </div>
 
 <script defer src="js/exemplaires-manuels-shared.js"></script>
-<!-- Surcouche de fraîcheur Syracuse (cote/titre/auteur/date à jour entre
-     deux exports XML) — voir js/syracuse-sync-shared.js et CLAUDE.md,
-     section « Synchronisation incrémentale Syracuse ». -->
-<script defer src="js/syracuse-sync-shared.js"></script>
 <!-- js/inventaire.js est chargée ici comme BIBLIOTHÈQUE : elle est inerte tant
      que startInventaire() n'est pas appelée, et fournit à la page suivante le
      catalogue de fonds, le filtre de dates anciennes, les vignettes et le

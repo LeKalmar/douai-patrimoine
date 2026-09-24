@@ -7,12 +7,20 @@
  * dont ce script réutilise `buildRecord()` telle quelle, pas de réécriture
  * des règles de nettoyage/traduction de type/sujets).
  *
- * `source='excel_import'`, déjà prévu par db/migrations/0001_init.sql (CHECK
- * sur notices.source et exemplaires.source) — aucune migration de schéma
- * nécessaire pour cette phase. `rec` (la sortie de buildRecord()) EST déjà la
- * forme exacte de ligne attendue par data/non-catalogues.json : stocké tel
- * quel dans exemplaires.raw, l'export (scripts/lib/export-non-catalogues.mjs)
- * n'a donc besoin d'aucune transformation supplémentaire à la lecture.
+ * Écrit dans `notices_reserve`/`exemplaires_reserve` (tables dédiées depuis
+ * db/migrations/0007_split_reserve_tables.sql / 0008_reserve_non_catalogues.sql
+ * — demande explicite de l'équipe, 2026-09-23 : ces pièces, bien que
+ * "créées artificiellement" en forme UNIMARC depuis un CSV plutôt qu'issues
+ * d'un vrai export Syracuse, doivent vivre dans les mêmes tables compactes
+ * que la réserve reserve_marc plutôt que dans les tables partagées de
+ * 300 000 lignes). Plus de colonne `source` sur ces deux tables (une seule
+ * catégorie possible désormais par table dédiée) — `exemplaires_reserve`
+ * distingue une pièce non cataloguée d'un exemplaire reserve_marc par
+ * construction : `barcode` toujours NULL ici (jamais eu de code-barre) et
+ * `source_ref` toujours renseigné (l'inverse pour reserve_marc). `rec` (la
+ * sortie de buildRecord()) EST déjà la forme exacte de ligne attendue par
+ * l'export (scripts/lib/export-inventaire.mjs) : stocké tel quel dans
+ * exemplaires_reserve.raw, relu sans aucune transformation supplémentaire.
  *
  * `source_ref` : ni `001 (controlfield)` (absent sur 40% des lignes) ni la
  * cote (930$g, ~14% de doublons sur l'ensemble du CSV) ne sont des clés
@@ -121,20 +129,23 @@ async function main() {
 
   const pool = getPool({ unpooled: true });
 
-  console.log(`  · upsert notices (${records.length} lignes, source='excel_import')`);
-  const noticeCols = ['source', 'source_notice_id', 'titre', 'auteur_principal', 'raw'];
+  console.log(`  · upsert notices_reserve (${records.length} lignes)`);
+  // Pas de colonne `auteur_principal` sur notices_reserve (retirée par
+  // 0007_split_reserve_tables.sql, toujours NULL pour la réserve) — sans
+  // conséquence ici : cette notice n'est de toute façon jamais relue (voir
+  // le commentaire en tête de fichier, `rec` porte déjà tout dans son `raw`
+  // côté exemplaires_reserve).
+  const noticeCols = ['source_notice_id', 'titre', 'raw'];
   const noticeIdByRef = new Map();
   for (const batch of batches(records, CONFIG.batchSize)) {
     const rows2 = batch.map(({ sourceRef, rec }) => ({
-      source: 'excel_import',
       source_notice_id: sourceRef,
       titre: rec['200$a'],
-      auteur_principal: rec['700$a'],
       raw: JSON.stringify(rec),
     }));
-    const { sql, values } = buildBatchInsert('notices', noticeCols, rows2, {
-      onConflict: `ON CONFLICT (source, source_notice_id) DO UPDATE SET
-        titre=EXCLUDED.titre, auteur_principal=EXCLUDED.auteur_principal, raw=EXCLUDED.raw,
+    const { sql, values } = buildBatchInsert('notices_reserve', noticeCols, rows2, {
+      onConflict: `ON CONFLICT (source_notice_id) DO UPDATE SET
+        titre=EXCLUDED.titre, raw=EXCLUDED.raw,
         updated_at=now(), synced_at=now()`,
       returning: 'id, source_notice_id',
     });
@@ -142,13 +153,12 @@ async function main() {
     for (const r of returned) noticeIdByRef.set(r.source_notice_id, r.id);
   }
 
-  console.log(`  · upsert exemplaires (${records.length} lignes, source='excel_import', barcode NULL)`);
-  const exemplaireCols = ['source', 'source_ref', 'type_document', 'notice_id', 'cote_1', 'cote_complete', 'raw'];
+  console.log(`  · upsert exemplaires_reserve (${records.length} lignes, barcode NULL)`);
+  const exemplaireCols = ['source_ref', 'type_document', 'notice_id', 'cote_1', 'cote_complete', 'raw'];
   let upserted = 0;
   for (const batch of batches(records, CONFIG.batchSize)) {
     const rows2 = batch
       .map(({ sourceRef, rec }) => ({
-        source: 'excel_import',
         source_ref: sourceRef,
         type_document: 'manuscrit',
         notice_id: noticeIdByRef.get(sourceRef),
@@ -157,12 +167,11 @@ async function main() {
         raw: JSON.stringify(rec),
       }))
       .filter(r => r.notice_id);
-    const { sql, values } = buildBatchInsert('exemplaires', exemplaireCols, rows2, {
-      // uq_exemplaires_source_ref est un index unique PARTIEL (WHERE
-      // source_ref IS NOT NULL) — l'inférence ON CONFLICT doit répéter ce
-      // prédicat, même patron que le ON CONFLICT (barcode) WHERE barcode IS
-      // NOT NULL de db-migrate-reserve.mjs/db-migrate-bib.mjs.
-      onConflict: `ON CONFLICT (source, source_ref) WHERE source_ref IS NOT NULL DO UPDATE SET
+    const { sql, values } = buildBatchInsert('exemplaires_reserve', exemplaireCols, rows2, {
+      // exemplaires_reserve_source_ref_key est un index unique simple
+      // (source_ref seul, plus besoin de le coupler à `source` — cette
+      // table dédiée n'en a plus, voir 0008_reserve_non_catalogues.sql).
+      onConflict: `ON CONFLICT (source_ref) DO UPDATE SET
         notice_id=EXCLUDED.notice_id, cote_1=EXCLUDED.cote_1, cote_complete=EXCLUDED.cote_complete,
         raw=EXCLUDED.raw, updated_at=now(), synced_at=now()`,
     });

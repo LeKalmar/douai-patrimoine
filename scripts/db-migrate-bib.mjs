@@ -7,18 +7,21 @@
  * scripts/lib/gesmarc.mjs, jamais chargé entièrement en mémoire, comme
  * scripts/build-magasins.mjs).
  *
- * Dédoublonnage avec la réserve (source reserve_marc, voir
+ * Dédoublonnage avec la réserve (désormais `exemplaires_reserve`, table à
+ * part depuis db/migrations/0007_split_reserve_tables.sql — voir
  * db-migrate-reserve.mjs, à exécuter AVANT ce script) : double filet —
- *   1. Pré-filtre en mémoire : l'ensemble des codes-barres déjà
- *      `source='reserve_marc'` est chargé une seule fois au démarrage, tout
- *      item bib.xml dont le code-barre y figure est ignoré sans même
+ *   1. Pré-filtre en mémoire : l'ensemble des codes-barres déjà présents
+ *      dans `exemplaires_reserve` est chargé une seule fois au démarrage,
+ *      tout item bib.xml dont le code-barre y figure est ignoré sans même
  *      atteindre la base (évite ~15 500 upserts inutiles sur ~200 000 items).
  *   2. Filet de sécurité en SQL (le vrai garant de non-duplication, valable
  *      même si le pré-filtre est périmé par une écriture concurrente) :
  *      `ON CONFLICT (barcode) ... DO UPDATE ... WHERE exemplaires.source =
- *      'bib_xml'` — si le code-barre en conflit appartient à une ligne
- *      `reserve_marc`, la condition est fausse et l'update ne fait rien : la
- *      réserve reste seule autorité sur cette ligne.
+ *      'bib_xml'` — un code-barre de la réserve ne peut de toute façon plus
+ *      entrer en conflit ICI, `exemplaires` (la table partagée, CHECK
+ *      resserré par 0007) n'accepte plus `source='reserve_marc'` ; ce garde-
+ *      fou protège désormais contre un autre bib_xml déjà présent, pas
+ *      contre une collision avec la réserve.
  *
  * Idempotent (INSERT ... ON CONFLICT, jamais de TRUNCATE) : un réimport après
  * un nouvel `npm run upload:bib` réutilise les mêmes lignes bib_xml plutôt
@@ -154,9 +157,10 @@ async function flushBatch(pool, itemsByBarcode) {
     .filter(r => r.notice_id); // sécurité : notice_id NOT NULL en base
 
   const { sql: eSql, values: eValues } = buildBatchInsert('exemplaires', exemplaireCols, exemplaireRows, {
-    // Le WHERE final (sur la table, pas sur l'index) est le vrai mécanisme de
-    // dédoublonnage : si le code-barre en conflit appartient à une ligne
-    // reserve_marc, la condition est fausse, l'update ne fait rien.
+    // Le WHERE final n'a plus qu'un rôle défensif depuis 0007 (`exemplaires`
+    // n'accepte plus source='reserve_marc' du tout) : il reste au cas où un
+    // futur `source` viendrait à cohabiter ici, sans jamais pouvoir être
+    // contourné par la réserve elle-même.
     onConflict: `ON CONFLICT (barcode) WHERE barcode IS NOT NULL DO UPDATE SET
       notice_id=EXCLUDED.notice_id, cote_1=EXCLUDED.cote_1, cote_2=EXCLUDED.cote_2, cote_3=EXCLUDED.cote_3,
       cote_complete=EXCLUDED.cote_complete, piege_a_code=EXCLUDED.piege_a_code, piege_b_code=EXCLUDED.piege_b_code,
@@ -180,7 +184,7 @@ async function main() {
   const pool = getPool({ unpooled: true });
 
   console.log('  · pré-filtre : chargement des codes-barres déjà réserve...');
-  const { rows: reserveRows } = await pool.query(`SELECT barcode FROM exemplaires WHERE source = 'reserve_marc' AND barcode IS NOT NULL`);
+  const { rows: reserveRows } = await pool.query(`SELECT barcode FROM exemplaires_reserve WHERE barcode IS NOT NULL`);
   const reserveBarcodes = new Set(reserveRows.map(r => r.barcode));
   console.log(`    → ${reserveBarcodes.size} code(s)-barres réserve à ignorer`);
 

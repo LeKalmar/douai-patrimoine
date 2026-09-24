@@ -1,19 +1,20 @@
 /**
  * pg.mjs
  * ────────────────────────────────────────────────────────────────────────────
- * Point d'entrée unique vers Postgres (Neon) pour les scripts locaux
- * (db-apply-schema.mjs, db-test.mjs, db-migrate-reserve.mjs,
- * db-migrate-bib.mjs) — même rôle que lib/r2.mjs pour R2 : centralise la
- * config, pour qu'un futur endpoint Vercel réutilise le même point d'entrée
- * sans le redéfinir.
+ * Point d'entrée unique vers Postgres pour les scripts locaux
+ * (db-apply-schema.mjs, db-test.mjs, db-migrate-*.mjs) et pour les endpoints
+ * `api/*.mjs` — même rôle que lib/r2.mjs pour R2 : centralise la config,
+ * un seul endroit où la connexion est définie.
  *
- * Lit DATABASE_URL (poolé, via le pooler pgbouncer Neon) et
- * DATABASE_URL_UNPOOLED (connexion directe) via loadDotEnv() — posées dans
- * .env par `neon link`/`neon connection-string` (voir README/plan de
- * migration), jamais commitées. La connexion directe (`unpooled: true`) est
- * préférée pour les scripts de migration en lot (transactions longues) ; la
- * connexion poolée est celle qu'utiliseront les futurs endpoints Vercel
- * (courtes requêtes, beaucoup d'invocations concurrentes).
+ * Lit DATABASE_URL et DATABASE_URL_UNPOOLED via loadDotEnv() (jamais
+ * commitées). Depuis le passage à un PostgreSQL local (voir
+ * scripts/db-local.mjs), ces deux variables pointent sur la même connexion
+ * directe : il n'y a plus de pooler séparé. La distinction est conservée
+ * parce qu'elle reste porteuse de sens côté appelant — `unpooled: true` pour
+ * les scripts de migration en lot (transactions longues, un seul process),
+ * le pool par défaut pour les endpoints HTTP (requêtes courtes, plusieurs
+ * postes du réseau en concurrence) — et parce qu'elle permet de rebrancher
+ * un vrai pooler (pgbouncer) devant la base sans retoucher un seul appelant.
  *
  * Seule dépendance npm runtime du projet (`pg`, voir package.json) — un
  * driver Postgres est incontournable, pas de raison de le réécrire à la main
@@ -34,7 +35,7 @@ export function getPool({ unpooled = false } = {}) {
   const envVar = unpooled ? 'DATABASE_URL_UNPOOLED' : 'DATABASE_URL';
   const connectionString = process.env[envVar];
   if (!connectionString) {
-    throw new Error(`Variable d'environnement manquante : ${envVar} (voir .env, posée par "neon link"/"neon connection-string").`);
+    throw new Error(`Variable d'environnement manquante : ${envVar} (voir .env — base locale, démarrée par "npm run db:local:start").`);
   }
 
   const pool = new Pool({ connectionString });

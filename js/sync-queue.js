@@ -109,7 +109,7 @@
             break;
           }
           if (res.status === 503) {
-            lastError = 'R2 non configuré côté serveur (variables Vercel manquantes)';
+            lastError = 'R2 non configuré côté serveur (variables R2_* manquantes dans .env)';
             break;
           }
           if (!res.ok) {

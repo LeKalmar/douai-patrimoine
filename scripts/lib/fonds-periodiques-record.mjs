@@ -96,6 +96,19 @@ function clean(v) {
   return (v || '').replace(/\s+/g, ' ').trim();
 }
 
+// csv/periodiques.csv donne des dates complètes JJ/MM/AAAA (ou MM/AAAA),
+// parfois une notation libre sans slash ("ap1896" = après 1896, ou déjà une
+// simple année) — trop précis pour l'inventaire public, qui n'affiche que
+// l'année (demande explicite, 2026-09-23). On ne garde que ce qui suit le
+// dernier "/" (JJ/MM/AAAA → AAAA, MM/AAAA → AAAA) ; une notation sans slash
+// est déjà réduite à l'année ou à un texte libre, donc laissée telle quelle.
+function yearOnly(raw) {
+  const s = clean(raw);
+  if (!s) return s;
+  const idx = s.lastIndexOf('/');
+  return idx === -1 ? s : s.slice(idx + 1);
+}
+
 // "Le Vrai Gayant" porte une cote CSV corrompue sur l'export du 2026-09-09 :
 // le même jeton répété 7 fois, séparé par des retours à la ligne littéraux
 // dans le champ cité (copier-coller malheureux dans le tableur d'origine).
@@ -124,9 +137,13 @@ export function buildFondsPeriodiqueRecord(row) {
 
   const titre = clean(row['nom']) || cote;
 
-  const debut = clean(row['date de première parution']);
-  const fin = clean(row['date de dernière parution']);
-  const parution = [debut, fin].filter(Boolean).join(' – ') || null;
+  const debut = yearOnly(row['date de première parution']);
+  const fin = yearOnly(row['date de dernière parution']);
+  // Même année aux deux bouts (ex. "01/10/1865" → "01/10/1865") : un seul
+  // millésime suffit, "1865 – 1865" n'apporterait rien.
+  const parution = debut && fin
+    ? (debut === fin ? debut : `${debut} – ${fin}`)
+    : (debut || fin || null);
 
   const frequence = clean(row['fréquence']) || null;
   const villeLabel = resolveVille(row['ville']);
@@ -143,7 +160,10 @@ export function buildFondsPeriodiqueRecord(row) {
   return {
     '930$g': cote,
     '200$a': titre,
-    '210$d': debut || fin || null,
+    // Affiché tel quel dans la colonne "Année" de l'inventaire public — la
+    // même valeur que _parution ci-dessous (demande explicite, 2026-09-23 :
+    // afficher début ET fin, pas seulement la première parution).
+    '210$d': parution,
     '300$a': notes,
     _fondsLabel: FONDS_PERIODIQUES_LABEL,
     _typeDocument: typeDocumentLabelOf('PER'),

@@ -2,7 +2,7 @@
   "name": "reserve-patrimoniale-douai",
   "version": "1.0.0",
   "private": true,
-  "description": "Site public de la Réserve patrimoniale — build de l'inventaire depuis les exports Syracuse.",
+  "description": "Site de la Réserve patrimoniale — servi en local (npm run dev), données dans Postgres local.",
   "type": "module",
   "engines": {
     "node": ">=18"
@@ -18,19 +18,22 @@
     "build:cotes-numeriques": "node scripts/build-cotes-numeriques.mjs",
     "build:desherbage": "node scripts/build-desherbage.mjs",
     "build:non-catalogues": "node scripts/build-non-catalogues.mjs",
+    "build:manifest-presse": "node scripts/build-manifest-presse.mjs",
     "upload:xml": "node scripts/upload-xml-to-r2.mjs",
-    "upload:desherbage": "node scripts/upload-desherbage-to-r2.mjs",
     "upload:bib": "node scripts/upload-bib-to-r2.mjs",
     "test:r2": "node scripts/test-r2.mjs",
-    "sync:syracuse": "node scripts/run-syracuse-sync.mjs",
-    "backfill:reliure": "node scripts/backfill-reliure.mjs",
+    "backup:r2": "node scripts/backup-r2-blobs.mjs",
     "db:apply-schema": "node scripts/db-apply-schema.mjs",
     "db:test": "node scripts/db-test.mjs",
     "db:migrate:reserve": "node scripts/db-migrate-reserve.mjs",
-    "db:migrate:bib": "node scripts/db-migrate-bib.mjs"
-  },
-  "devDependencies": {
-    "neon": "^4.14.5"
+    "db:migrate:bib": "node scripts/db-migrate-bib.mjs",
+    "db:migrate:non-catalogues": "node scripts/db-migrate-non-catalogues.mjs",
+    "db:migrate:spolies": "node scripts/db-migrate-spolies.mjs",
+    "db:migrate:fonds-car": "node scripts/db-migrate-fonds-car.mjs",
+    "db:migrate:fonds-periodiques": "node scripts/db-migrate-fonds-periodiques.mjs",
+    "backfill:reliure": "node scripts/backfill-reliure.mjs",
+    "verify:parity": "node scripts/verify-json-parity.mjs",
+    "verify:columnar": "node scripts/verify-columnar.mjs"
   },
   "dependencies": {
     "pg": "^8.23.0"

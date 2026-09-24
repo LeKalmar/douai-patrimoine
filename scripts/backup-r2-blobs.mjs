@@ -25,7 +25,6 @@ const KEYS = [
   'reliures-manuelles.json',
   'transferts-magasins.json',
   'desherbage-traitements.json',
-  'syracuse-sync.json',
 ];
 
 function timestamp() {

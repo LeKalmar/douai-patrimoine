@@ -401,6 +401,93 @@ html.rp-embedded .inv-detail-box { height: 550px; }
   letter-spacing: 0.04em;
 }
 
+/* ═══════════════════════════════════════
+   PRESSE NUMÉRISÉE — calendrier année → mois → jour (fonds Périodiques)
+   ═══════════════════════════════════════ */
+.inv-presse-cal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.inv-presse-cal-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.inv-presse-cal-back {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent, #2A3CD4);
+  flex-shrink: 0;
+}
+.inv-presse-cal-back:hover { text-decoration: underline; }
+.inv-presse-cal-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-light, #6e6e7e);
+}
+
+.inv-presse-cal-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+/* Mois : 4 colonnes (3 rangées de 4) — assez large pour rester lisible avec
+   les abréviations ("Janv.", "Sept."…). Jours : 7 colonnes façon semaine,
+   avec l'en-tête L M M J V S D et un décalage initial (voir renderDays()
+   dans js/inventaire.js) qui aligne le 1er du mois sur son vrai jour. */
+.inv-presse-cal-grid--months {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+}
+.inv-presse-cal-grid--days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+}
+.inv-presse-cal-weekday {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-light, #6e6e7e);
+  padding-bottom: 0.1rem;
+}
+
+.inv-presse-cal-cell {
+  min-width: 3rem;
+  padding: 0.4rem 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  text-align: center;
+  transition: background 0.15s, color 0.15s;
+}
+.inv-presse-cal-grid--months .inv-presse-cal-cell,
+.inv-presse-cal-grid--days .inv-presse-cal-cell {
+  min-width: 0;
+  padding: 0.35rem 0.2rem;
+  font-size: 0.76rem;
+}
+/* Disponible : bleu (--accent), comme demandé. */
+.inv-presse-cal-cell--available {
+  color: var(--accent, #2A3CD4);
+  background: var(--accent-light, #E6E8F7);
+}
+.inv-presse-cal-cell--available:hover,
+.inv-presse-cal-cell--available:focus-visible {
+  background: var(--accent, #2A3CD4);
+  color: #fff;
+}
+/* Non disponible : rose pâle, texte estompé, non cliquable (disabled). */
+.inv-presse-cal-cell--unavailable {
+  color: var(--text-light, #6e6e7e);
+  background: var(--warm-light, #FFCAD7);
+  opacity: 0.55;
+  cursor: default;
+}
+.inv-presse-cal-cell--filler { visibility: hidden; }
+
 .inv-expanded-link {
   display: inline-flex;
   align-items: center;

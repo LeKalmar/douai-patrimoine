@@ -375,7 +375,7 @@ Promise.all([
 /* ===== ESPACE PROFESSIONNEL =====
    Les identifiants ne sont plus en clair ici : le formulaire est vérifié
    côté serveur par /api/login (voir lib/auth.mjs), contre les variables
-   d'environnement ADMIN_USER / ADMIN_PASS sur Vercel. Cet endpoint ne fait
+   d'environnement ADMIN_USER / ADMIN_PASS du .env. Cet endpoint ne fait
    que confirmer si la saisie est correcte — le jeton Basic utilisé ensuite
    par récolement.html / livres-spolies.html pour authentifier leurs appels
    vers /api/recolement et /api/spolies est construit ici à partir de ce que
@@ -429,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
           localStorage.setItem('rp_admin_token', btoa(user + ':' + pass));
           window.location.href = 'admin.html';
         } else {
-          errorMsg.textContent = (result.data && result.data.error === 'ADMIN_USER / ADMIN_PASS non configurés côté serveur (variables Vercel).')
+          errorMsg.textContent = (result.data && result.data.error === 'ADMIN_USER / ADMIN_PASS non configurés côté serveur (voir .env).')
             ? 'Connexion indisponible pour le moment (configuration serveur). Contactez l\'administrateur.'
             : 'Identifiant ou mot de passe incorrect.';
           errorMsg.hidden = false;

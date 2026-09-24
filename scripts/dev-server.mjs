@@ -1,21 +1,21 @@
 /**
- * Serveur de développement local — remplace `vercel dev` pour ce projet.
+ * Serveur du site — c'est LUI qui sert le site aujourd'hui, en local comme
+ * pour les autres postes du réseau (voir HOST plus bas). Il n'y a plus
+ * d'hébergement distant derrière.
  *
- * Sert les fichiers statiques à la racine (comme le ferait Vercel/Live
- * Server) ET exécute les fonctions serverless `api/*.mjs`/`api/*.js`
- * directement dans ce process Node, avec une couche de compatibilité
- * minimale (`req.query`, `req.body`, `res.status().json()`) qui reproduit
- * ce que fournit `@vercel/node` en production — aucune de ces fonctions
- * n'a besoin d'être modifiée.
+ * Sert les fichiers statiques à la racine, génère les jeux de données
+ * `/data/*.json` à la volée depuis Postgres (voir DATA_EXPORTERS) et exécute
+ * les fonctions `api/*.mjs` directement dans ce process, avec une couche de
+ * compatibilité minimale (`req.query`, `req.body`, `res.status().json()`)
+ * conservée telle quelle : c'est la signature qu'attendent les fichiers
+ * `api/*.mjs`, et la garder évite d'avoir à tous les réécrire.
  *
- * Pourquoi ce fichier plutôt que `vercel dev` : la CLI Vercel exige une
- * session connectée (`vercel login`) même pour servir en local, ce qui
- * bloque en environnement non interactif et va à l'encontre de l'objectif
- * de pouvoir tester sans dépendre d'un compte hébergé. Ce serveur n'a besoin
- * que de Node et du `.env` déjà présent — zéro dépendance npm, comme le
- * reste du projet.
+ * Zéro dépendance npm en dehors du driver Postgres (`pg`), comme le reste du
+ * projet. Compression gzip/brotli posée ici (voir lib/http-compress.mjs) :
+ * sans CDN devant, personne d'autre ne la pose.
  *
  * Usage : node scripts/dev-server.mjs [port]   (port par défaut : 3000)
+ *         npm run dev
  */
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadDotEnv } from './lib/dotenv.mjs';
 import { getCached } from '../lib/data-json-cache.mjs';
+import { sendCompressed, negotiateEncoding } from '../lib/http-compress.mjs';
 import { exportInventaire } from './lib/export-inventaire.mjs';
 import { exportMagasins } from './lib/export-magasins.mjs';
 import { exportCotesNumeriques } from './lib/export-cotes-numeriques.mjs';
@@ -79,7 +80,16 @@ const MIME = {
   '.map': 'application/json; charset=utf-8',
 };
 
-// ─── Couche de compatibilité "fonction Vercel" ─────────────────────────────
+/* Extensions dont le contenu gagne à être compressé à la volée (voir
+   handleStatic()). Volontairement une liste explicite plutôt qu'un test sur
+   le Content-Type : les formats image/police du tableau MIME ci-dessus sont
+   déjà compressés, les repasser en gzip/brotli ne ferait que brûler du CPU
+   pour quelques octets. */
+const TEXT_EXT = new Set([
+  '.html', '.css', '.js', '.mjs', '.json', '.svg', '.xml', '.txt', '.csv', '.map',
+]);
+
+// ─── Couche de compatibilité serverless ────────────────────────────────────
 
 async function readJsonBody(req) {
   if (req.method === 'GET' || req.method === 'HEAD') return undefined;
@@ -164,9 +174,17 @@ async function handleStatic(req, res, url) {
     const ext = path.extname(finalPath).toLowerCase();
     res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
     // Pas de mise en cache en dev local : on veut toujours voir la dernière
-    // version d'un fichier édité, contrairement aux règles de vercel.json
-    // pensées pour la prod.
+    // version d'un fichier édité.
     res.setHeader('Cache-Control', 'no-cache');
+
+    // Compression des fichiers texte. Compte surtout pour les gros statiques
+    // encore servis tels quels : js/manifest.json fait 4,8 Mo, recolement.html
+    // 200 Ko. Les binaires déjà compressés (JPEG, WOFF2…) restent streamés
+    // tels quels — les recompresser ne gagnerait rien.
+    if (TEXT_EXT.has(ext) && finalStat.size >= 1024 && negotiateEncoding(req)) {
+      sendCompressed(req, res, await readFile(finalPath));
+      return;
+    }
     createReadStream(finalPath).pipe(res);
   } catch {
     res.statusCode = 404;
@@ -175,12 +193,51 @@ async function handleStatic(req, res, url) {
   }
 }
 
+// ─── Presse numérisée (local, pas encore versée sur R2) ────────────────────
+// Sert PRESSE_SOURCE_DIR (même variable d'env que scripts/build-manifest-
+// presse.mjs) sous /presse-local/ — c'est la racine que visionneuse.html
+// résout via PRESSE_LOCAL_ROOT pour les "book" du manifeste marqués
+// `root:"presse-local"` (voir CLAUDE.md, section presse). Décision du
+// 2026-09-23 : 115 Go/14 263 scans, versés sur R2 plus tard une fois le
+// quota mensuel du compte disponible — d'ici là, uniquement accessibles en
+// local via ce serveur de dev.
+const PRESSE_SOURCE_DIR = process.env.PRESSE_SOURCE_DIR ||
+  'C:\\Users\\mjeanjean\\OneDrive - VILLE DE DOUAI\\Bibliothèque - Principal\\' +
+  'P  A  T  R  I  M  O  I  N  E\\3-Travail Interne\\bib. num\\numerisation\\presse';
+
+async function handlePresseLocal(req, res, url) {
+  const rel = decodeURIComponent(url.pathname).replace(/^\/presse-local\//, '');
+  const filePath = path.normalize(path.join(PRESSE_SOURCE_DIR, rel));
+  if (!filePath.startsWith(PRESSE_SOURCE_DIR)) {
+    res.statusCode = 403;
+    res.end('Forbidden');
+    return;
+  }
+  try {
+    const st = await stat(filePath);
+    if (!st.isFile()) throw new Error('not a file');
+    const ext = path.extname(filePath).toLowerCase();
+    res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    createReadStream(filePath).pipe(res);
+  } catch {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end('<h1>404</h1><p>Scan introuvable : ' + rel + '</p>');
+  }
+}
+
 async function handleDataExport(req, res, exporter) {
   try {
     const body = await getCached(req.url, async () => JSON.stringify(await exporter()));
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
-    res.end(body);
+    // Compression négociée (lib/http-compress.mjs) : ces exports pèsent de
+    // quelques Mo à plusieurs dizaines (data/desherbage.json), et sans CDN
+    // devant, plus personne ne la pose. Les variantes compressées sont
+    // retenues par getCached() à côté du corps brut, donc payées une fois
+    // par TTL et non par requête.
+    sendCompressed(req, res, body);
   } catch (err) {
     console.error('[data-export]', err);
     res.statusCode = 500;
@@ -198,6 +255,8 @@ const server = createServer((req, res) => {
     handleDataExport(req, res, exporter);
   } else if (url.pathname.startsWith('/api/')) {
     handleApi(req, res, url);
+  } else if (url.pathname.startsWith('/presse-local/')) {
+    handlePresseLocal(req, res, url);
   } else {
     handleStatic(req, res, url);
   }
@@ -222,6 +281,7 @@ server.listen(PORT, HOST, () => {
     console.log(`  une règle de pare-feu entrante sur ce port (privée, pas publique).`);
   }
   console.log(`  R2 (stockage partagé) : ${r2 ? 'configuré (.env)' : 'absent — GET renverra un état vide, POST échouera'}`);
+  console.log(`  Presse numérisée (local) : ${existsSync(PRESSE_SOURCE_DIR) ? 'trouvée — servie sous /presse-local/' : 'introuvable (' + PRESSE_SOURCE_DIR + ')'}`);
   console.log(`  ADMIN_USER/ADMIN_PASS : ${admin ? 'configurés (.env)' : 'absents — /api/login refusera toute connexion'}`);
   console.log(`  Espace pro : ouvrez index.html, connectez-vous, puis les pages protégées.`);
   console.log(`  Ctrl+C pour arrêter.\n`);

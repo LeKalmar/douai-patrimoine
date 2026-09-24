@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     return;
   }
   if (!isServerConfigured()) {
-    res.status(503).json({ ok: false, error: 'ADMIN_USER / ADMIN_PASS non configurés côté serveur (variables Vercel).' });
+    res.status(503).json({ ok: false, error: 'ADMIN_USER / ADMIN_PASS non configurés côté serveur (voir .env).' });
     return;
   }
 

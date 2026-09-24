@@ -601,6 +601,16 @@
   // Dossier racine pour les images. Tous les chemins du manifeste
   // sont relatifs à cette racine.
   const IMAGES_ROOT  = 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/';
+  // Presse numérisée (2026-09-23) : 115 Go/14 263 scans pas encore versés
+  // sur R2 (dépasserait le quota mensuel du compte, décision de l'équipe) —
+  // servis en local le temps de préparer la fonctionnalité, via le serveur
+  // de dev (scripts/dev-server.mjs, route /presse-local/ → PRESSE_SOURCE_DIR).
+  // Seuls les "book" du manifeste marqués `root:"presse-local"` (voir
+  // scripts/build-manifest-presse.mjs) résolvent contre cette racine plutôt
+  // que IMAGES_ROOT — voir rootForBook() plus bas. Une fois les scans
+  // effectivement sur R2, relancer `npm run build:manifest-presse -- --r2` :
+  // le manifeste n'aura plus ce flag et cette constante n'aura plus d'effet.
+  const PRESSE_LOCAL_ROOT = '/presse-local/';
 
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  ÉTAT                                                            ║
@@ -670,9 +680,11 @@
   // ║  OUVERTURE AUTOMATIQUE DU DOSSIER CIBLE (?dossier=)              ║
   // ╚══════════════════════════════════════════════════════════════════╝
   /**
-   * Cherche dans la hiérarchie un dossier dont le nom correspond à `cible`
-   * (comparaison insensible à la casse), ouvre le premier fichier qu'il contient,
-   * et déplie les nœuds parents dans l'arbre pour le rendre visible.
+   * Cherche dans la hiérarchie un dossier — ou un "book" ciblé directement
+   * par son nom, voir findFirstInNode() — dont le nom correspond à `cible`
+   * (comparaison insensible à la casse), ouvre le premier fichier qu'il
+   * contient, et déplie les nœuds parents dans l'arbre pour le rendre
+   * visible.
    */
   function openDossierCible(cible) {
     if (!cible || !manifest) return;
@@ -681,6 +693,12 @@
     // Recherche récursive du premier fichier contenu dans le dossier cible
     function findFirstInNode(node) {
       if (!node) return null;
+      // Un "book" cible directement (ex. "D23_1873_01_05", un numéro de
+      // presse, voir scripts/build-manifest-presse.mjs) : pas de premier-
+      // fichier à chercher, le livre EST la cible.
+      if (node.type === 'book' && node.name.toLowerCase() === lc) {
+        return { kind: 'book', name: node.name };
+      }
       // Le dossier lui-même correspond-il ?
       const nodeMatchesTarget = node.type === 'folder' && node.name.toLowerCase() === lc;
 
@@ -781,6 +799,13 @@
     });
   }
 
+  // Racine à utiliser pour les pages d'un "book" — PRESSE_LOCAL_ROOT pour un
+  // livre marqué `root:"presse-local"` (presse pas encore versée sur R2, voir
+  // PRESSE_LOCAL_ROOT plus haut), IMAGES_ROOT (R2) pour tous les autres.
+  function rootForBook(node) {
+    return (node && node.root === 'presse-local') ? PRESSE_LOCAL_ROOT : IMAGES_ROOT;
+  }
+
   // Aplatit la hiérarchie en une seule liste pour la navigation préc/suiv.
   // Un livre (type 'book') compte comme un seul item ; ses pages sont navigables en interne.
   function buildFlatList() {
@@ -798,6 +823,7 @@
           breadcrumb: breadcrumb.join(' / ')
         });
       } else if (node.type === 'book') {
+        const bookRoot = rootForBook(node);
         flatFiles.push({
           kind: 'book',
           name: node.name,
@@ -806,7 +832,7 @@
           pages: (node.pages || []).map(p => ({
             name: p.name,
             path: p.path,
-            url:  IMAGES_ROOT + p.path
+            url:  bookRoot + p.path
           }))
         });
       }
@@ -1082,7 +1108,12 @@
       currentPageIdx = Math.max(0, Math.min(currentPageIdx, f.pages.length - 1));
       const page = f.pages[currentPageIdx];
       url = page.url;
-      displayName = f.name;
+      // Légende de page (ex. "13 octobre 1895 — p. 1", voir scripts/build-
+      // manifest-presse.mjs) préférée au nom du livre quand elle existe —
+      // plus parlant qu'un identifiant technique type "D19_1895" pour
+      // savoir où on en est en feuilletant aux flèches. Repli sur le nom du
+      // livre pour les "book" sans légende par page (ex. Ms1721).
+      displayName = page.name || f.name;
     } else {
       currentPageIdx = 0;
       url = f.url;
@@ -1091,7 +1122,7 @@
 
     viewerImg.onload = null;
     viewerImg.src = '';
-    viewerFilename.textContent = f.name;
+    viewerFilename.textContent = displayName;
     imgWrap.style.display = 'inline-block';
     viewerEmpty.style.display = 'none';
     // Affichage du compteur laissé à applyTransform() (via fitToView(), plus

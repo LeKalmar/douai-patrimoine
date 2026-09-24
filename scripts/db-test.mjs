@@ -2,7 +2,7 @@
 /**
  * db-test.mjs
  * ────────────────────────────────────────────────────────────────────────────
- * Script de fumée pour la connexion Postgres (Neon) — même rôle que
+ * Script de fumée pour la connexion Postgres locale — même rôle que
  * `npm run test:r2` pour R2 : vérifie que DATABASE_URL et
  * DATABASE_URL_UNPOOLED fonctionnent, sans toucher aux données réelles.
  * ────────────────────────────────────────────────────────────────────────────
