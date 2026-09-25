@@ -2297,6 +2297,7 @@ ul { list-style: none; }
 .rp-header,
 .rp-hero,
 .rp-expo,
+.rp-expo-carousel,
 .rp-themes,
 .rp-fonds,
 .rp-partenaires,
@@ -2441,6 +2442,52 @@ ul { list-style: none; }
   transition: filter var(--transition);
 }
 .rp-expo-cta:hover { filter: brightness(1.08); color: var(--rose); }
+
+/* ── Carrousel des expositions (2026-09-25) ──────────────────────────────
+   Les diapositives (.rp-expo) sont générées par le script « CARROUSEL DES
+   EXPOSITIONS » d'index.html, triées de la plus récente à la plus ancienne.
+   Défilement automatique toutes les 7 s, suspendu au survol, au focus
+   clavier, par le bouton pause, et désactivé si le système demande de
+   réduire les animations. */
+.rp-expo-carousel { background: var(--encre); color: #fff; }
+.rp-expo-viewport { overflow: hidden; }
+.rp-expo-track {
+  display: flex;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rp-expo-track > .rp-expo { flex: 0 0 100%; min-width: 0; }
+.rp-expo-body { flex: 1 1 17.5rem; min-width: 0; }
+.rp-expo-body .rp-expo-title { min-width: 0; margin-top: 0.2rem; }
+.rp-expo-lead { font-size: 0.88rem; color: rgba(255,255,255,0.82); margin-top: 0.35rem; max-width: 40rem; }
+.rp-expo-thumb {
+  flex: 0 0 9.5rem; height: 6rem;
+  background: center / cover no-repeat;
+  border: 2px solid rgba(255,255,255,0.25);
+}
+.rp-expo-controls {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0 var(--rp-gutter) 1rem;
+}
+.rp-expo-controls[hidden] { display: none; }
+.rp-expo-dots { display: flex; gap: 0.45rem; }
+.rp-expo-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(255,255,255,0.35); transition: background var(--transition);
+}
+.rp-expo-dot[aria-current="true"] { background: var(--corail); }
+.rp-expo-arrow, .rp-expo-pause {
+  color: rgba(255,255,255,0.85); font-size: 1.15rem; line-height: 1;
+  width: 1.9rem; height: 1.9rem; border-radius: 50%;
+  display: grid; place-items: center;
+}
+.rp-expo-pause { font-size: 0.7rem; margin-left: auto; }
+.rp-expo-arrow:hover, .rp-expo-pause:hover { background: rgba(255,255,255,0.14); color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .rp-expo-track { transition: none; }
+}
+@media (max-width: 40rem) {
+  .rp-expo-thumb { display: none; }
+}
 
 /* ── Les thématiques ──────────────────────────────────────────────────────
    Cartes réutilisant le style .rp-fonds-* ci-dessous (mêmes proportions,

@@ -52,11 +52,30 @@
     </div>
   </section>
 
-  <!-- ============ EXPOSITION EN COURS ============ -->
-  <section class="rp-expo" aria-label="Exposition en cours">
-    <p class="rp-expo-eyebrow">Exposition en cours</p>
-    <h2 class="rp-expo-title">500 ans d'histoire des métiers du livre à Douai</h2>
-    <a href="histoire-du-livre.html" class="rp-expo-cta">Visiter →</a>
+  <!-- ============ EXPOSITIONS (carrousel) ============
+       Les diapositives sont générées par le script « CARROUSEL DES
+       EXPOSITIONS » en bas de page, à partir du tableau EXPOSITIONS : triées
+       par date de publication, la plus récente d'abord, puis défilement
+       automatique jusqu'à la plus ancienne. Le contenu ci-dessous n'est que
+       le repli sans JavaScript. -->
+  <section class="rp-expo-carousel" id="expo-carousel" aria-roledescription="carrousel" aria-label="Expositions">
+    <div class="rp-expo-viewport">
+      <div class="rp-expo-track" id="expo-track">
+        <div class="rp-expo">
+          <div class="rp-expo-body">
+            <p class="rp-expo-eyebrow">Exposition en cours</p>
+            <h2 class="rp-expo-title">500 ans d'histoire des métiers du livre à Douai</h2>
+          </div>
+          <a href="histoire-du-livre.html" class="rp-expo-cta">Visiter →</a>
+        </div>
+      </div>
+    </div>
+    <div class="rp-expo-controls" id="expo-controls" hidden>
+      <button type="button" class="rp-expo-arrow" id="expo-prev" aria-label="Exposition précédente">‹</button>
+      <div class="rp-expo-dots" id="expo-dots"></div>
+      <button type="button" class="rp-expo-arrow" id="expo-next" aria-label="Exposition suivante">›</button>
+      <button type="button" class="rp-expo-pause" id="expo-pause" aria-label="Mettre le défilement en pause">❚❚</button>
+    </div>
   </section>
 
   <!-- ============ LES THÉMATIQUES ============ -->
@@ -357,6 +376,143 @@ Promise.all([
     }
   })
   .catch(function () { /* repli : la valeur déjà présente dans le HTML */ });
+</script>
+
+<!-- ===== CARROUSEL DES EXPOSITIONS ===== -->
+<script>
+(function () {
+  /* Pour ajouter une exposition : une entrée de plus ici. L'ordre du tableau
+     n'a pas d'importance — les diapositives sont triées par `publication`
+     (AAAA-MM-JJ), la plus récente en premier ; le défilement automatique va
+     ensuite de la plus récente à la plus ancienne, puis reprend au début. */
+  var EXPOSITIONS = [
+    {
+      titre: '500 ans d\'histoire des métiers du livre à Douai',
+      accroche: 'Imprimeurs, libraires, relieurs et graveurs sur la carte de la ville, de 1550 à nos jours.',
+      lien: 'histoire-du-livre.html',
+      publication: '2026-05-16',
+      image: 'images/expo-histoire-livre.jpg'
+    },
+    {
+      titre: 'Voyageurs douaisiens',
+      accroche: 'Sur un globe, suivez jour après jour les Douaisiens partis au bout du monde et qui l\'ont raconté.',
+      lien: 'voyageurs.html',
+      publication: '2026-09-25',
+      image: 'images/cartographie.jpg'
+    }
+  ];
+  var INTERVAL_MS = 7000;
+  var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
+              'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+  var root = document.getElementById('expo-carousel');
+  var track = document.getElementById('expo-track');
+  var dotsEl = document.getElementById('expo-dots');
+  var pauseBtn = document.getElementById('expo-pause');
+  if (!root || !track) return;
+
+  var expos = EXPOSITIONS.slice().sort(function (a, b) {
+    return a.publication < b.publication ? 1 : a.publication > b.publication ? -1 : 0;
+  });
+
+  function datePublication(iso) {
+    var p = iso.split('-');
+    var jour = +p[2];
+    return (jour === 1 ? '1er' : jour) + ' ' + MOIS[+p[1] - 1] + ' ' + p[0];
+  }
+
+  track.innerHTML = '';
+  var slides = expos.map(function (e, i) {
+    var s = document.createElement('article');
+    s.className = 'rp-expo rp-expo-slide';
+    s.setAttribute('aria-roledescription', 'diapositive');
+    s.setAttribute('aria-label', (i + 1) + ' sur ' + expos.length);
+
+    var body = document.createElement('div');
+    body.className = 'rp-expo-body';
+    var eyebrow = document.createElement('p');
+    eyebrow.className = 'rp-expo-eyebrow';
+    eyebrow.textContent = (i === 0 ? 'Nouvelle exposition' : 'Exposition') +
+      ' · publiée le ' + datePublication(e.publication);
+    var h = document.createElement('h2');
+    h.className = 'rp-expo-title';
+    h.textContent = e.titre;
+    var acc = document.createElement('p');
+    acc.className = 'rp-expo-lead';
+    acc.textContent = e.accroche;
+    body.appendChild(eyebrow); body.appendChild(h); body.appendChild(acc);
+
+    var cta = document.createElement('a');
+    cta.className = 'rp-expo-cta';
+    cta.href = e.lien;
+    cta.textContent = 'Visiter →';
+
+    if (e.image) {
+      var img = document.createElement('span');
+      img.className = 'rp-expo-thumb';
+      img.setAttribute('aria-hidden', 'true');
+      img.style.backgroundImage = 'url("' + encodeURI(e.image) + '")';
+      s.appendChild(img);
+    }
+    s.appendChild(body);
+    s.appendChild(cta);
+    track.appendChild(s);
+    return s;
+  });
+
+  var index = 0, timer = null, paused = false, hover = false;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var dots = expos.map(function (e, i) {
+    var d = document.createElement('button');
+    d.type = 'button';
+    d.className = 'rp-expo-dot';
+    d.setAttribute('aria-label', 'Afficher : ' + e.titre);
+    d.addEventListener('click', function () { go(i); restartTimer(); });
+    dotsEl.appendChild(d);
+    return d;
+  });
+
+  function go(i) {
+    index = (i + slides.length) % slides.length;
+    track.style.transform = 'translateX(' + (-100 * index) + '%)';
+    slides.forEach(function (s, j) {
+      var on = j === index;
+      s.setAttribute('aria-hidden', on ? 'false' : 'true');
+      // Pas de lien atteignable au clavier sur une diapositive masquée.
+      s.querySelectorAll('a').forEach(function (a) { a.tabIndex = on ? 0 : -1; });
+    });
+    dots.forEach(function (d, j) { d.setAttribute('aria-current', j === index ? 'true' : 'false'); });
+  }
+
+  function tick() { go(index + 1); }
+  function restartTimer() {
+    clearInterval(timer); timer = null;
+    if (!paused && !hover && !reduced && slides.length > 1) timer = setInterval(tick, INTERVAL_MS);
+  }
+  function setPaused(p) {
+    paused = p;
+    pauseBtn.textContent = p ? '▶' : '❚❚';
+    pauseBtn.setAttribute('aria-label', p ? 'Reprendre le défilement' : 'Mettre le défilement en pause');
+    restartTimer();
+  }
+
+  document.getElementById('expo-prev').addEventListener('click', function () { go(index - 1); restartTimer(); });
+  document.getElementById('expo-next').addEventListener('click', function () { go(index + 1); restartTimer(); });
+  pauseBtn.addEventListener('click', function () { setPaused(!paused); });
+  // Pas de défilement pendant qu'on lit ou qu'on navigue au clavier dedans.
+  root.addEventListener('mouseenter', function () { hover = true; restartTimer(); });
+  root.addEventListener('mouseleave', function () { hover = false; restartTimer(); });
+  root.addEventListener('focusin', function () { hover = true; restartTimer(); });
+  root.addEventListener('focusout', function (e) {
+    if (!root.contains(e.relatedTarget)) { hover = false; restartTimer(); }
+  });
+
+  if (slides.length > 1) document.getElementById('expo-controls').hidden = false;
+  if (reduced) setPaused(true);
+  go(0);
+  restartTimer();
+})();
 </script>
 
 <!-- ===== CARTE MAPLIBRE — Bibliothèque Marceline Desbordes-Valmore ===== -->

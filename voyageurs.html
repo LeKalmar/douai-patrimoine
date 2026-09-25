@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voyageurs douaisiens — Réserve patrimoniale de Douai</title>
+  <meta name="description" content="Exposition : sur un globe interactif, suivez les voyages des Douaisiens qui ont parcouru le monde et laissé des récits.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <!-- MapLibre 5 : première version à proposer la projection globe
+       (les deux autres cartes du site restent en 3.6.2 / 4.7.1). -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte.
+       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
+       rendu. Voir js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
+
+  <style>
+    /* ── En-tête ─────────────────────────────────────────────────────────── */
+    .vy-header {
+      --rp-gutter: clamp(1.25rem, 4vw, 2.5rem);
+      background: var(--encre); color: #fff;
+      padding: 1.4rem var(--rp-gutter) 1.6rem;
+    }
+    .vy-header-top {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .vy-home {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-size: 0.8rem; color: rgba(255,255,255,0.88);
+      border: 1px solid rgba(255,255,255,0.3); padding: 0.4rem 0.9rem;
+      border-radius: 999px; transition: background var(--transition);
+    }
+    .vy-home:hover { background: rgba(255,255,255,0.14); color: #fff; }
+    .vy-draft {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+      background: var(--corail); color: var(--encre);
+      padding: 0.3rem 0.7rem; border-radius: 999px;
+    }
+    .vy-eyebrow {
+      font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--rose);
+    }
+    .vy-title {
+      font-family: var(--font-display); font-weight: 400;
+      font-size: clamp(1.9rem, 4.5vw, 2.8rem); line-height: 1.1; margin: 0.3rem 0 0.6rem;
+    }
+    .vy-title em { color: var(--rose); }
+    .vy-lead { max-width: 46rem; font-size: 0.95rem; color: rgba(255,255,255,0.86); }
+
+    /* ── Scène : panneau + carte ─────────────────────────────────────────── */
+    .vy-stage {
+      display: grid; grid-template-columns: 320px 1fr;
+      height: clamp(560px, 80vh, 780px);
+      border-bottom: 1px solid var(--trait);
+    }
+    .vy-stage [hidden] { display: none !important; }
+
+    .vy-panel {
+      background: var(--papier-ombre); border-right: 1px solid var(--trait);
+      overflow-y: auto; padding: 1rem;
+    }
+    .vy-label { font-weight: 700; color: var(--ink-soft); }
+
+    .vy-person {
+      background: var(--papier); border: 1px solid var(--trait-fort);
+      border-top: 4px solid var(--c, var(--carmin));
+      padding: 0.9rem; margin-bottom: 0.9rem;
+    }
+    .vy-person-head { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.6rem; }
+    .vy-person-portrait {
+      flex: 0 0 56px; width: 56px; height: 56px; border-radius: 50%;
+      background: var(--encre) center 20% / cover no-repeat; color: #fff;
+      display: grid; place-items: center; font-family: var(--font-display); font-size: 1.2rem;
+      border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+    .vy-person-name { font-family: var(--font-display); font-weight: 400; font-size: 1.15rem; color: var(--encre); line-height: 1.2; }
+    .vy-person-life { font-size: 0.78rem; color: var(--text-light); }
+    .vy-person-link { font-size: 0.76rem; font-weight: 600; color: var(--carmin); }
+    .vy-person-resume { font-size: 0.84rem; line-height: 1.5; margin-bottom: 0.5rem; }
+    .vy-person-ecrits { font-size: 0.78rem; color: var(--text); margin-bottom: 0.6rem; font-style: italic; }
+    .vy-person-ecrits .vy-label { font-style: normal; }
+
+    .vy-voyage-btn, .vy-stop-btn {
+      display: flex; flex-direction: column; align-items: flex-start; width: 100%;
+      text-align: left; padding: 0.55rem 0.7rem; margin-top: 0.4rem;
+      background: #fff; border: 1px solid var(--trait-fort); border-left: 3px solid var(--c, var(--carmin));
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .vy-voyage-btn:hover, .vy-stop-btn:hover { background: var(--accent-light); }
+    .vy-voyage-title { font-weight: 700; font-size: 0.85rem; color: var(--encre); }
+    .vy-voyage-sub { font-size: 0.75rem; color: var(--text-light); }
+
+    .vy-back {
+      font-size: 0.8rem; font-weight: 600; color: var(--carmin); margin-bottom: 0.9rem;
+    }
+    .vy-back:hover { color: var(--encre); }
+    .vy-detail-title { font-family: var(--font-display); font-weight: 400; font-size: 1.3rem; color: var(--encre); line-height: 1.2; }
+    .vy-detail-sub { font-size: 0.8rem; color: var(--text-light); }
+    .vy-detail-facts { font-size: 0.8rem; font-weight: 700; color: var(--carmin); margin: 0.4rem 0 0.6rem; }
+    .vy-stops { list-style: none; counter-reset: arret; }
+    .vy-stops li { counter-increment: arret; }
+    .vy-stop-btn { border-left-color: var(--trait-fort); position: relative; padding-left: 2.3rem; }
+    .vy-stop-btn::before {
+      content: counter(arret); position: absolute; left: 0.6rem; top: 0.6rem;
+      width: 1.3rem; height: 1.3rem; border-radius: 50%;
+      background: var(--encre); color: #fff; font-size: 0.7rem; font-weight: 700;
+      display: grid; place-items: center;
+    }
+    .vy-stop-btn.is-current { background: var(--accent-light); border-left-color: var(--carmin); }
+    .vy-stop-name { font-weight: 600; font-size: 0.84rem; color: var(--ink-soft); }
+    .vy-stop-date { font-size: 0.74rem; color: var(--text-light); }
+    .vy-detail-sources { font-size: 0.75rem; color: var(--text-light); margin-top: 0.9rem; }
+
+    /* ── Carte ───────────────────────────────────────────────────────────── */
+    .vy-mapwrap {
+      position: relative; overflow: hidden;
+      /* L'espace autour du globe. */
+      background: radial-gradient(circle at 50% 45%, #22318f 0%, #111a5c 55%, #080c33 100%);
+    }
+    #vy-map { position: absolute; inset: 0; }
+    .vy-mapwrap .maplibregl-ctrl-attrib { font-size: 0.65rem; }
+
+    .vy-intro {
+      position: absolute; left: 50%; bottom: 1.2rem; transform: translateX(-50%);
+      background: rgba(247,245,240,0.94); color: var(--encre);
+      font-size: 0.85rem; font-weight: 600; padding: 0.55rem 1rem; border-radius: 999px;
+      box-shadow: var(--shadow); pointer-events: none; white-space: nowrap;
+    }
+
+    .vy-hud {
+      position: absolute; top: 12px; left: 12px; min-width: 210px;
+      background: rgba(16,20,58,0.86); color: #fff;
+      border-left: 4px solid var(--c, var(--corail));
+      padding: 0.7rem 0.95rem 0.75rem; box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+    }
+    .vy-hud-name { font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--rose); }
+    .vy-hud-date { font-family: var(--font-display); font-size: 1.45rem; line-height: 1.15; margin: 0.15rem 0; }
+    .vy-hud-day { font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .vy-hud-mode { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: rgba(255,255,255,0.8); margin-top: 0.3rem; }
+    .vy-hud-icon { display: inline-block; width: 22px; height: 22px; background: #fbf8f1; border-radius: 50%; padding: 2px; }
+    .vy-hud-icon svg { width: 100%; height: 100%; }
+
+    .vy-recenter {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: var(--papier); color: var(--encre); font-size: 0.8rem; font-weight: 700;
+      padding: 0.45rem 0.9rem; border-radius: 999px; box-shadow: var(--shadow-hover);
+    }
+
+    .vy-card {
+      position: absolute; left: 12px; bottom: 78px; width: min(380px, calc(100% - 24px));
+      max-height: calc(100% - 200px); overflow-y: auto;
+      background: var(--papier); border-top: 4px solid var(--c, var(--carmin));
+      padding: 1rem 1.1rem; box-shadow: 0 8px 30px rgba(0,0,0,0.28);
+    }
+    .vy-card-meta { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--carmin); font-weight: 700; }
+    .vy-card-title { font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; color: var(--encre); line-height: 1.2; margin: 0.2rem 0 0.5rem; }
+    .vy-card-text { font-size: 0.9rem; line-height: 1.55; }
+    .vy-card-quote {
+      margin: 0.7rem 0 0; padding-left: 0.8rem; border-left: 3px solid var(--rose);
+      font-family: var(--font-display); font-style: italic; font-size: 0.98rem; color: var(--ink-soft);
+    }
+    .vy-card-source { font-size: 0.74rem; color: var(--text-light); margin-top: 0.5rem; }
+    .vy-card-actions { display: flex; justify-content: flex-end; margin-top: 0.8rem; }
+    .vy-card-go {
+      background: var(--encre); color: #fff; font-weight: 700; font-size: 0.85rem;
+      padding: 0.55rem 1.1rem; transition: filter var(--transition);
+    }
+    .vy-card-go:hover { filter: brightness(1.15); }
+
+    /* ── Lecteur ─────────────────────────────────────────────────────────── */
+    .vy-player {
+      position: absolute; left: 12px; right: 12px; bottom: 28px;
+      display: flex; align-items: center; gap: 0.6rem;
+      background: rgba(247,245,240,0.96); padding: 0.45rem 0.7rem;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+    }
+    .vy-pbtn {
+      flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%;
+      display: grid; place-items: center; color: var(--encre);
+    }
+    .vy-pbtn:hover { background: var(--accent-light); }
+    .vy-pbtn svg { width: 18px; height: 18px; }
+    #vy-play { background: var(--encre); color: #fff; }
+    #vy-play:hover { filter: brightness(1.15); }
+    #vy-play .ic-pause, #vy-play.is-playing .ic-play { display: none; }
+    #vy-play.is-playing .ic-pause { display: block; }
+
+    .vy-track {
+      position: relative; flex: 1; height: 8px; background: var(--trait);
+      cursor: pointer; border-radius: 4px;
+    }
+    .vy-track:focus-visible { outline: 2px solid var(--encre); outline-offset: 4px; }
+    .vy-track-fill { position: absolute; inset: 0 auto 0 0; background: var(--carmin); border-radius: 4px; }
+    .vy-tick {
+      position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+      border-radius: 50%; background: #fff; border: 2px solid var(--encre); padding: 0;
+    }
+    .vy-tick:hover { background: var(--rose); }
+
+    .vy-speeds { display: flex; gap: 2px; flex: 0 0 auto; }
+    .vy-speed {
+      font-size: 0.74rem; font-weight: 700; color: var(--text-light);
+      padding: 0.3rem 0.45rem; border-radius: 4px; font-variant-numeric: tabular-nums;
+    }
+    .vy-speed[aria-pressed="true"] { background: var(--encre); color: #fff; }
+
+    /* ── Marqueurs ───────────────────────────────────────────────────────── */
+    .vy-douai { display: flex; align-items: center; gap: 5px; pointer-events: none; }
+    .vy-douai-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--corail); border: 2px solid #fff; box-shadow: 0 0 0 2px var(--encre); }
+    .vy-douai-label { font-family: var(--font-display); font-size: 0.9rem; color: var(--encre); text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
+
+    .vy-portrait-marker {
+      width: 42px; height: 42px; border-radius: 50%; border: 3px solid;
+      background: var(--encre) center 20% / cover no-repeat; color: #fff;
+      font-family: var(--font-display); font-size: 0.95rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35); transition: transform var(--transition);
+    }
+    .vy-portrait-marker:hover, .vy-portrait-marker:focus-visible { transform: scale(1.15); }
+
+    .vy-stop-marker {
+      width: 22px; height: 22px; border-radius: 50%; padding: 0;
+      background: #fff; color: var(--encre); border: 2px solid var(--c, var(--encre));
+      font-size: 0.68rem; font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    .vy-stop-marker:hover, .vy-stop-marker.is-current { background: var(--c, var(--encre)); color: #fff; }
+
+    .vy-traveler { pointer-events: none; }
+    .vy-traveler-icon {
+      width: 46px; height: 46px; margin-top: -18px;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45));
+      transition: transform 0.25s;
+    }
+    .vy-traveler-icon svg { width: 100%; height: 100%; }
+
+    /* ── Écrans étroits : le panneau passe au-dessus de la carte ─────────── */
+    @media (max-width: 760px) {
+      .vy-stage { grid-template-columns: 1fr; height: auto; }
+      .vy-panel { border-right: 0; border-bottom: 1px solid var(--trait); max-height: 340px; }
+      .vy-mapwrap { height: 520px; }
+      .vy-hud { min-width: 0; padding: 0.5rem 0.7rem; }
+      .vy-hud-date { font-size: 1.15rem; }
+      .vy-card { bottom: 72px; max-height: calc(100% - 170px); }
+      .vy-player { bottom: 24px; gap: 0.35rem; padding: 0.35rem 0.5rem; }
+      .vy-speed { padding: 0.25rem 0.3rem; }
+      .vy-intro { white-space: normal; text-align: center; width: calc(100% - 32px); }
+    }
+
+    /* ── Publication en iframe : pas d'unité vh (voir CLAUDE.md) ────────── */
+    html.rp-embedded .vy-stage { height: 640px; }
+    @media (max-width: 760px) {
+      html.rp-embedded .vy-stage { height: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<a href="#vy-stage" class="skip-nav">Aller à la carte</a>
+
+<header class="vy-header">
+  <div class="vy-header-top">
+    <a href="index.html" class="vy-home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour à l'accueil
+    </a>
+    <span class="vy-draft" title="Tracés, dates et textes provisoires, en cours de vérification">Maquette — données provisoires</span>
+  </div>
+  <p class="vy-eyebrow">Exposition · publiée le 25 septembre 2026</p>
+  <h1 class="vy-title">Voyageurs <em>douaisiens</em></h1>
+  <p class="vy-lead">Missionnaires, poètes, aventuriers : nés à Douai ou passés par la ville, ils ont parcouru le monde et laissé des récits. Choisissez un voyage pour le suivre jour après jour.</p>
+</header>
+
+<main class="vy-stage" id="vy-stage" tabindex="-1">
+  <aside class="vy-panel" aria-label="Les voyageurs">
+    <div id="vy-list"></div>
+    <div id="vy-detail"></div>
+  </aside>
+
+  <div class="vy-mapwrap">
+    <div id="vy-map" role="region" aria-label="Globe des voyages"></div>
+
+    <p id="vy-intro" class="vy-intro">Choisissez un voyageur, ou cliquez sur un tracé du globe.</p>
+
+    <div id="vy-hud" class="vy-hud">
+      <p id="vy-hud-name" class="vy-hud-name"></p>
+      <p id="vy-hud-date" class="vy-hud-date"></p>
+      <p id="vy-hud-day" class="vy-hud-day"></p>
+      <p id="vy-hud-mode" class="vy-hud-mode"></p>
+    </div>
+
+    <button id="vy-recenter" class="vy-recenter" type="button">Suivre le voyageur</button>
+
+    <section id="vy-card" class="vy-card" aria-live="polite"></section>
+
+    <div id="vy-player" class="vy-player">
+      <button id="vy-restart" class="vy-pbtn" type="button" aria-label="Recommencer le voyage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>
+      </button>
+      <button id="vy-play" class="vy-pbtn" type="button" aria-label="Lecture">
+        <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>
+        <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/></svg>
+      </button>
+      <div id="vy-track" class="vy-track" role="slider" tabindex="0" aria-label="Progression du voyage"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="vy-track-fill" class="vy-track-fill"></div>
+        <div id="vy-track-ticks"></div>
+      </div>
+      <div class="vy-speeds" role="group" aria-label="Vitesse">
+        <button class="vy-speed" type="button" data-speed="0.5" aria-pressed="false">½×</button>
+        <button class="vy-speed" type="button" data-speed="1" aria-pressed="true">1×</button>
+        <button class="vy-speed" type="button" data-speed="2" aria-pressed="false">2×</button>
+        <button class="vy-speed" type="button" data-speed="4" aria-pressed="false">4×</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="js/voyageurs.js"></script>
+</body>
+</html>

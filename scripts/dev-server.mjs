@@ -32,6 +32,7 @@ import { exportDesherbage } from './lib/export-desherbage.mjs';
 import { exportNonCatalogues } from './lib/export-non-catalogues.mjs';
 import { exportLivresSpolies } from './lib/export-livres-spolies.mjs';
 import { exportDbStatus } from './lib/export-db-status.mjs';
+import { exportVoyageurs } from './lib/export-voyageurs.mjs';
 
 loadDotEnv();
 
@@ -51,6 +52,7 @@ const DATA_EXPORTERS = {
   '/data/non-catalogues.json': exportNonCatalogues,
   '/data/livres-spolies.json': exportLivresSpolies,
   '/data/db-status.json': exportDbStatus,
+  '/data/voyageurs.json': exportVoyageurs,
 };
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

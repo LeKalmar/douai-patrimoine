@@ -1,0 +1,530 @@
+[
+  {
+    "id": "trigault",
+    "nom": "Nicolas Trigault",
+    "vie": "Douai, 1577 — Hangzhou, 1628",
+    "lienDouai": "Né à Douai",
+    "portrait": "images/auteurs/Nicolas Trigault.jpg",
+    "couleur": "#B4213C",
+    "resume": "Jésuite, missionnaire en Chine. Il rapporte en Europe les journaux de Matteo Ricci, qu'il traduit et publie : le livre fait découvrir la Chine à toute l'Europe savante. Il repart ensuite pour l'Asie, dont il ne reviendra pas.",
+    "ecrits": [
+      {
+        "titre": "De Christiana expeditione apud Sinas",
+        "annee": "1615"
+      }
+    ],
+    "voyages": [
+      {
+        "id": "trigault-1618",
+        "titre": "Le second départ pour la Chine",
+        "sousTitre": "Lisbonne → Goa → Macao, 1618-1619",
+        "sources": [
+          "À compléter : lettres de Trigault, historiographie jésuite"
+        ],
+        "points": [
+          {
+            "lieu": "Lisbonne",
+            "coord": [
+              -9.14,
+              38.71
+            ],
+            "date": "1618-04-16",
+            "mode": "bateau",
+            "arret": {
+              "titre": "Départ de Lisbonne",
+              "texte": "Trigault embarque à la tête d'une vingtaine de missionnaires jésuites. Dans les cales, une bibliothèque de plusieurs milliers de volumes réunie pendant sa tournée en Europe, destinée à la mission de Chine."
+            }
+          },
+          {
+            "coord": [
+              -17,
+              32
+            ]
+          },
+          {
+            "coord": [
+              -24.5,
+              15
+            ]
+          },
+          {
+            "coord": [
+              -27,
+              0
+            ]
+          },
+          {
+            "coord": [
+              -25,
+              -20
+            ]
+          },
+          {
+            "coord": [
+              -10,
+              -35
+            ]
+          },
+          {
+            "lieu": "Cap de Bonne-Espérance",
+            "coord": [
+              18.5,
+              -35.8
+            ],
+            "arret": {
+              "titre": "Le passage du cap",
+              "texte": "La traversée est éprouvante : la maladie se déclare à bord et plusieurs compagnons de Trigault meurent en mer avant d'avoir atteint l'Inde."
+            }
+          },
+          {
+            "coord": [
+              26,
+              -35.5
+            ]
+          },
+          {
+            "coord": [
+              33,
+              -30
+            ]
+          },
+          {
+            "coord": [
+              40,
+              -24
+            ]
+          },
+          {
+            "lieu": "Île de Mozambique",
+            "coord": [
+              40.74,
+              -15.03
+            ]
+          },
+          {
+            "coord": [
+              43.3,
+              -11.7
+            ]
+          },
+          {
+            "coord": [
+              50,
+              -2
+            ]
+          },
+          {
+            "coord": [
+              62,
+              8
+            ]
+          },
+          {
+            "lieu": "Goa",
+            "coord": [
+              73.83,
+              15.49
+            ],
+            "date": "1618-10-04",
+            "mode": "bateau",
+            "arret": {
+              "titre": "Arrivée à Goa",
+              "texte": "Près de six mois après le départ, la flotte atteint Goa, capitale de l'Inde portugaise et étape obligée de tous les missionnaires en route vers l'Asie."
+            }
+          },
+          {
+            "coord": [
+              74.5,
+              11
+            ]
+          },
+          {
+            "coord": [
+              76.3,
+              7.5
+            ]
+          },
+          {
+            "coord": [
+              80.6,
+              5.6
+            ]
+          },
+          {
+            "coord": [
+              88,
+              5.8
+            ]
+          },
+          {
+            "coord": [
+              95.5,
+              6.3
+            ]
+          },
+          {
+            "coord": [
+              99.5,
+              4
+            ]
+          },
+          {
+            "lieu": "Malacca",
+            "coord": [
+              102.25,
+              2.19
+            ]
+          },
+          {
+            "coord": [
+              103.9,
+              1.25
+            ]
+          },
+          {
+            "coord": [
+              105.5,
+              3
+            ]
+          },
+          {
+            "coord": [
+              110,
+              12
+            ]
+          },
+          {
+            "coord": [
+              112.5,
+              19
+            ]
+          },
+          {
+            "lieu": "Macao",
+            "coord": [
+              113.54,
+              22.19
+            ],
+            "date": "1619-07-22",
+            "arret": {
+              "titre": "Macao",
+              "texte": "Trigault retrouve les portes de la Chine. Il y poursuivra sa mission jusqu'à sa mort à Hangzhou en 1628, sans jamais revoir Douai."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "desbordes-valmore",
+    "nom": "Marceline Desbordes-Valmore",
+    "vie": "Douai, 1786 — Paris, 1859",
+    "lienDouai": "Née à Douai",
+    "portrait": "images/auteurs/Desbordes-Valmore.jpg",
+    "couleur": "#2A3CD4",
+    "resume": "Poétesse et comédienne. Adolescente, elle part avec sa mère pour la Guadeloupe, où la famille espère l'aide d'un parent fortuné. Le voyage tourne au drame et marque durablement son œuvre.",
+    "ecrits": [
+      {
+        "titre": "Élégies et romances",
+        "annee": "1819"
+      },
+      {
+        "titre": "Poésies",
+        "annee": "1830"
+      }
+    ],
+    "voyages": [
+      {
+        "id": "desbordes-valmore-1801",
+        "titre": "Le voyage en Guadeloupe",
+        "sousTitre": "Douai → Bordeaux → Pointe-à-Pitre, 1801-1802",
+        "sources": [
+          "À compléter : biographies, correspondance de Marceline Desbordes-Valmore"
+        ],
+        "points": [
+          {
+            "lieu": "Douai",
+            "coord": [
+              3.08,
+              50.37
+            ],
+            "date": "1801",
+            "approx": true,
+            "mode": "attelage",
+            "arret": {
+              "titre": "Départ de Douai",
+              "texte": "La famille Desbordes est ruinée. Catherine, la mère, décide de tenter sa chance auprès d'un cousin établi en Guadeloupe, et emmène avec elle la jeune Marceline."
+            }
+          },
+          {
+            "lieu": "Paris",
+            "coord": [
+              2.35,
+              48.86
+            ]
+          },
+          {
+            "lieu": "Bordeaux",
+            "coord": [
+              -0.58,
+              44.84
+            ],
+            "mode": "bateau",
+            "arret": {
+              "titre": "Bordeaux",
+              "texte": "En attendant de pouvoir embarquer, Marceline monte sur les planches pour faire vivre les siens : ce sont les débuts de sa carrière de comédienne."
+            }
+          },
+          {
+            "coord": [
+              -1.25,
+              45.6
+            ]
+          },
+          {
+            "coord": [
+              -6,
+              44.5
+            ]
+          },
+          {
+            "coord": [
+              -15,
+              38
+            ]
+          },
+          {
+            "coord": [
+              -25,
+              28
+            ]
+          },
+          {
+            "coord": [
+              -45,
+              20
+            ]
+          },
+          {
+            "coord": [
+              -58,
+              16.8
+            ]
+          },
+          {
+            "coord": [
+              -61,
+              16.05
+            ]
+          },
+          {
+            "lieu": "Pointe-à-Pitre",
+            "coord": [
+              -61.53,
+              16.24
+            ],
+            "date": "1802",
+            "approx": true,
+            "arret": {
+              "titre": "Arrivée en Guadeloupe",
+              "texte": "Mère et fille débarquent dans une île en pleine insurrection, alors que Bonaparte y rétablit l'esclavage. Le cousin espéré n'est d'aucun secours. Catherine Desbordes meurt de la fièvre jaune ; Marceline, seule, doit rentrer en France."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "rimbaud",
+    "nom": "Arthur Rimbaud",
+    "vie": "Charleville, 1854 — Marseille, 1891",
+    "lienDouai": "Séjourne à Douai en 1870",
+    "couleur": "#B7791F",
+    "resume": "Le poète a seize ans lorsqu'il trouve refuge à Douai, à l'automne 1870, et y recopie ses poèmes (le « Cahier de Douai »). Il abandonne ensuite la littérature pour une vie de voyageur et de négociant en Afrique orientale.",
+    "ecrits": [
+      {
+        "titre": "Poèmes du « Cahier de Douai »",
+        "annee": "1870"
+      },
+      {
+        "titre": "Lettres d'Aden et du Harar",
+        "annee": "1880-1891"
+      }
+    ],
+    "voyages": [
+      {
+        "id": "rimbaud-1891",
+        "titre": "Le dernier voyage",
+        "sousTitre": "Harar → Zeila → Aden → Marseille, 1891",
+        "sources": [
+          "À compléter : itinéraire noté par Rimbaud, lettres à sa famille (avril-mai 1891)"
+        ],
+        "points": [
+          {
+            "lieu": "Harar",
+            "coord": [
+              42.12,
+              9.31
+            ],
+            "date": "1891-04-07",
+            "mode": "civiere",
+            "arret": {
+              "titre": "Départ de Harar",
+              "texte": "Une tumeur au genou droit l'empêche de marcher. Rimbaud fait fabriquer une civière et engage des porteurs pour traverser le désert jusqu'à la côte."
+            }
+          },
+          {
+            "coord": [
+              42.45,
+              9.62
+            ]
+          },
+          {
+            "lieu": "Dans le désert",
+            "coord": [
+              42.85,
+              10.05
+            ],
+            "arret": {
+              "titre": "Le carnet d'étapes",
+              "texte": "Pendant la traversée, Rimbaud note jour après jour les étapes : la pluie, les nuits sans abri, les porteurs qui peinent sous la charge."
+            }
+          },
+          {
+            "coord": [
+              43.1,
+              10.55
+            ]
+          },
+          {
+            "coord": [
+              43.3,
+              10.95
+            ]
+          },
+          {
+            "lieu": "Zeila",
+            "coord": [
+              43.47,
+              11.35
+            ],
+            "date": "1891-04-18",
+            "approx": true,
+            "mode": "bateau",
+            "arret": {
+              "titre": "Zeila",
+              "texte": "Arrivée sur la côte. Rimbaud prend le bateau pour Aden, de l'autre côté du golfe."
+            }
+          },
+          {
+            "coord": [
+              44.2,
+              11.9
+            ]
+          },
+          {
+            "lieu": "Aden",
+            "coord": [
+              45.03,
+              12.78
+            ],
+            "date": "1891-04-22",
+            "approx": true,
+            "depart": "1891-05-09",
+            "mode": "bateau",
+            "arret": {
+              "titre": "Aden",
+              "texte": "Hospitalisé, il écrit à sa mère pour lui raconter la traversée. Les médecins jugent son état grave et le pressent de rentrer en France."
+            }
+          },
+          {
+            "coord": [
+              43.45,
+              12.6
+            ]
+          },
+          {
+            "coord": [
+              41.5,
+              15
+            ]
+          },
+          {
+            "coord": [
+              38.8,
+              20
+            ]
+          },
+          {
+            "coord": [
+              35.5,
+              25.5
+            ]
+          },
+          {
+            "coord": [
+              33.2,
+              28.3
+            ]
+          },
+          {
+            "lieu": "Suez",
+            "coord": [
+              32.55,
+              29.93
+            ]
+          },
+          {
+            "lieu": "Port-Saïd",
+            "coord": [
+              32.3,
+              31.27
+            ]
+          },
+          {
+            "coord": [
+              28,
+              33
+            ]
+          },
+          {
+            "coord": [
+              20,
+              34.5
+            ]
+          },
+          {
+            "coord": [
+              11.8,
+              37.4
+            ]
+          },
+          {
+            "coord": [
+              8,
+              38.6
+            ]
+          },
+          {
+            "coord": [
+              7.4,
+              41.5
+            ]
+          },
+          {
+            "lieu": "Marseille",
+            "coord": [
+              5.37,
+              43.3
+            ],
+            "date": "1891-05-20",
+            "arret": {
+              "titre": "Marseille",
+              "texte": "Débarqué, il est transporté à l'hôpital de la Conception, où on l'ampute de la jambe droite. Il y meurt le 10 novembre 1891, à trente-sept ans."
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -32,6 +32,8 @@
     "db:migrate:spolies": "node scripts/db-migrate-spolies.mjs",
     "db:migrate:fonds-car": "node scripts/db-migrate-fonds-car.mjs",
     "db:migrate:fonds-periodiques": "node scripts/db-migrate-fonds-periodiques.mjs",
+    "db:seed:voyageurs": "node scripts/db-voyageurs.mjs seed",
+    "snapshot:voyageurs": "node scripts/db-voyageurs.mjs snapshot",
     "backfill:reliure": "node scripts/backfill-reliure.mjs",
     "verify:parity": "node scripts/verify-json-parity.mjs",
     "verify:columnar": "node scripts/verify-columnar.mjs"

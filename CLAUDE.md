@@ -181,6 +181,7 @@ revenir à un dev solo sans exposition réseau.
 |---|---|---|
 | `index.html` | Page d'accueil — hero, carrousel d'expositions, accordéon (Venir consulter / Trouver un document), modale de connexion espace pro | Public |
 | `histoire-du-livre.html` | Exposition cartographique interactive « 500 ans d'histoire des métiers du livre » (utilise `js/main.js` + `css/main.css`, MapLibre 3.6.2) | Public |
+| `voyageurs.html` | Exposition « Voyageurs douaisiens » : globe MapLibre 5, voyages animés jour par jour (`js/voyageurs.js`, données du schéma Postgres `expo_voyageurs`) — voir « Exposition Voyageurs douaisiens » | Public |
 | `visionneuse.html` | Visionneuse de documents numérisés, pilotée par `js/manifest.json` (générée par `generer_manifest.html`). Accessible via `?dossier=...` depuis l'inventaire | Public |
 | `admin.html` | Tableau de bord de l'espace professionnel (état de l'inventaire par réserve, liens vers les outils regroupés par thème) — pas de téléchargement de fichiers sources depuis cette page | **Protégé** (voir Sécurité) |
 | `recolement.html` | Outil de scan de codes-barres pour localiser les documents (travée/colonne/étage) dans la réserve. Partage `js/reserve-shared.js` avec `reserve.html` | **Protégé** |
@@ -1269,6 +1270,78 @@ manifeste, sans autre changement de code. `PRESSE_LOCAL_ROOT`/la route
 `/presse-local/` de `scripts/dev-server.mjs` peuvent alors être retirés
 (plus rien ne les référence une fois `root:"presse-local"` absent du
 manifeste).
+
+## Exposition « Voyageurs douaisiens » (maquette, 2026-09-25)
+
+`voyageurs.html` — deuxième exposition publique, à côté de
+`histoire-du-livre.html` : les Douaisiens (nés à Douai ou y ayant vécu) qui
+ont voyagé et, surtout, laissé des récits. Globe MapLibre sur lequel chaque
+voyage est tracé ; un voyage choisi s'anime (inspiration : le compte
+Instagram « Cunning Conquest ») — icône selon le moyen de transport
+(bateau, à pied, attelage, civière), compteur « Jour N / total », date, et
+pause à chaque **arrêt raconté** avec une carte de récit (« Continuer ▸ »).
+Barre de progression cliquable (repères = arrêts), vitesses ½× à 4×, la
+caméra suit le voyageur (zoom selon le moyen de transport) jusqu'à ce qu'on
+déplace la carte à la main (bouton « Suivre le voyageur »). Ancre d'URL
+`voyageurs.html#<id du voyage>` pour ouvrir directement un voyage.
+
+**État : maquette.** Trois figures pour faire tourner l'interface (Nicolas
+Trigault 1618-1619, Marceline Desbordes-Valmore 1801-1802, Rimbaud 1891) ;
+tracés, dates et textes **provisoires, à vérifier** sur les sources avant
+publication (badge « Maquette — données provisoires » dans l'en-tête).
+
+**Données : schéma Postgres dédié `expo_voyageurs`**
+(`db/migrations/0009_expo_voyageurs.sql`), séparé de `public` — aucune
+jointure avec le catalogue ; `DROP SCHEMA expo_voyageurs CASCADE` ne touche à
+rien d'autre. Cinq tables : `voyageurs`, `ecrits`, `voyages`, `etapes`
+(points du tracé, `[lng, lat]`), `sources`. Chaque colonne est documentée
+par un `COMMENT ON` visible dans pgAdmin/DBeaver au moment de la saisie.
+`publie = false` (voyageur ou voyage) = brouillon de recherche, absent de la
+page. Ordres par pas de 10 pour pouvoir insérer une étape entre deux autres.
+- `/data/voyageurs.json` est généré à la volée par
+  `scripts/lib/export-voyageurs.mjs` (`DATA_EXPORTERS`). **Seul export à se
+  replier tout seul** sur le fichier committé `data/voyageurs.json` si la base
+  est arrêtée (page publique : elle ne doit pas se vider parce que Postgres
+  n'a pas été relancé) — avertissement dans la console du serveur.
+- `npm run db:seed:voyageurs` : premier remplissage depuis
+  `data/voyageurs.json`. Refuse si le schéma contient déjà des voyageurs (la
+  base fait foi une fois remplie) ; `-- --force` remplace tout.
+- `npm run snapshot:voyageurs` : réécrit `data/voyageurs.json` depuis la base,
+  pour garder le repli à jour — à lancer avant de committer après des saisies.
+
+Règles des étapes (appliquées par `js/voyageurs.js`, contrôlées en partie par
+des `CHECK` SQL) :
+- Une étape sans `arret_titre` n'est qu'un **point de passage** : il sert à
+  faire passer le tracé par la mer plutôt qu'à travers un continent (entre
+  deux points, le tracé suit le grand cercle).
+- Dates `AAAA`, `AAAA-MM` ou `AAAA-MM-JJ` ; une étape sans date reçoit une
+  date estimée au prorata de la distance, affichée « ≈ ». `date_depart` =
+  séjour sur place : l'icône s'arrête, le compteur continue.
+- Si le début ou la fin du voyage n'est daté qu'à l'année, le compteur
+  devient « ≈ jour N » sans total, et la durée « à préciser » — un « jour
+  213 / 366 » tiré de deux années serait une fausse précision.
+- `mode` vaut pour le tronçon qui PART de l'étape ; vide = inchangé.
+- Rythme de l'animation : moitié distance, moitié temps écoulé (au
+  kilomètre seul, les 12 jours de civière de Rimbaud passaient en un éclair).
+
+Technique : **MapLibre 5.24.0** (projection globe, absente des 3.6.2/4.7.1
+des autres cartes — ne pas « harmoniser » vers le bas). Fond Esri World
+Physical Map (raster, sans noms de lieux modernes — anachroniques ici),
+désaturé. `cooperativeGestures` en mode iframe, hauteur fixe 640 px sous
+`.rp-embedded` (pas de `vh`), toutes les surcouches en `position:absolute`
+dans la carte.
+
+**Carrousel des expositions (`index.html`)** : le bandeau « Exposition en
+cours » est devenu un carrousel, alimenté par le tableau `EXPOSITIONS` du
+script « CARROUSEL DES EXPOSITIONS » en bas de page (une entrée par expo :
+titre, accroche, lien, `publication` AAAA-MM-JJ, image). Tri par date de
+publication, la plus récente en premier (étiquetée « Nouvelle
+exposition »), puis défilement automatique toutes les 7 s vers la plus
+ancienne avant de reprendre au début. Défilement suspendu au survol, au
+focus clavier, par le bouton pause, et désactivé si le système demande de
+réduire les animations. La date de publication de `histoire-du-livre.html`
+(2026-05-16) est celle du plus ancien commit du dépôt, faute de mieux — à
+corriger si la vraie date est connue.
 
 ## Transfert 2e étage → réserve patrimoniale
 
