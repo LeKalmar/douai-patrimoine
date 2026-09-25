@@ -181,7 +181,7 @@ revenir à un dev solo sans exposition réseau.
 |---|---|---|
 | `index.html` | Page d'accueil — hero, carrousel d'expositions, accordéon (Venir consulter / Trouver un document), modale de connexion espace pro | Public |
 | `histoire-du-livre.html` | Exposition cartographique interactive « 500 ans d'histoire des métiers du livre » (utilise `js/main.js` + `css/main.css`, MapLibre 3.6.2) | Public |
-| `voyageurs.html` | Exposition « Voyageurs douaisiens » : globe MapLibre 5, voyages animés jour par jour (`js/voyageurs.js`, données du schéma Postgres `expo_voyageurs`) — voir « Exposition Voyageurs douaisiens » | Public |
+| `voyageurs.html` | Exposition « Voyageurs douaisiens » : globe MapLibre 5 vectoriel (Natural Earth + relief Copernicus DEM), voyages animés jour par jour (`js/voyageurs.js`, données du schéma Postgres `expo_voyageurs`) — voir « Exposition Voyageurs douaisiens » | Public |
 | `visionneuse.html` | Visionneuse de documents numérisés, pilotée par `js/manifest.json` (générée par `generer_manifest.html`). Accessible via `?dossier=...` depuis l'inventaire | Public |
 | `admin.html` | Tableau de bord de l'espace professionnel (état de l'inventaire par réserve, liens vers les outils regroupés par thème) — pas de téléchargement de fichiers sources depuis cette page | **Protégé** (voir Sécurité) |
 | `recolement.html` | Outil de scan de codes-barres pour localiser les documents (travée/colonne/étage) dans la réserve. Partage `js/reserve-shared.js` avec `reserve.html` | **Protégé** |
@@ -1325,9 +1325,33 @@ des `CHECK` SQL) :
   kilomètre seul, les 12 jours de civière de Rimbaud passaient en un éclair).
 
 Technique : **MapLibre 5.24.0** (projection globe, absente des 3.6.2/4.7.1
-des autres cartes — ne pas « harmoniser » vers le bas). Fond Esri World
-Physical Map (raster, sans noms de lieux modernes — anachroniques ici),
-désaturé. `cooperativeGestures` en mode iframe, hauteur fixe 640 px sous
+des autres cartes — ne pas « harmoniser » vers le bas).
+
+Fond de carte **vectoriel, aux couleurs du site** (2026-09-25, demande
+explicite — plus aucune imagerie satellite ni raster d'hébergeur) :
+- **Eau et terres : Natural Earth 1:50m** (domaine public) — terres, lacs,
+  fleuves, servis en local depuis `data/natural-earth/*.json`. Régénérés par
+  `npm run build:natural-earth` (`scripts/build-natural-earth.mjs` :
+  téléchargement depuis le dépôt officiel nvkelso/natural-earth-vector,
+  propriétés retirées sauf `scalerank`, coordonnées arrondies à 3 décimales ;
+  1,9 Mo bruts, ~0,6 Mo compressés). Extension `.json` et non `.geojson`
+  pour passer par la compression du serveur (`TEXT_EXT`). Les petits lacs
+  et fleuves n'apparaissent qu'en zoomant (filtre sur `scalerank`).
+- **Relief : Copernicus DEM GLO-30**, via les tuiles d'élévation publiques
+  Mapterhorn (`tiles.mapterhorn.com`, Terrarium/WebP 512 px, base mondiale
+  = GLO-30 — vérifié dans leur `attribution.json`). MapLibre en calcule un
+  ombrage (`hillshade`) qui module la couleur de la terre ; c'est le seul
+  élément non vectoriel. Service tiers : si Mapterhorn devient indisponible,
+  seul l'ombrage disparaît, la carte reste lisible.
+- Couleurs regroupées dans `THEME` en tête de la section carte de
+  `js/voyageurs.js` : eau `--bleu`, terre `--corail` (essai demandé « pour
+  voir si ce n'est pas choquant »), versants à l'ombre `--warm-dark`, au
+  soleil `--rose`. Tous les tracés ont un liseré `--papier` — sans lui, un
+  tracé bleu sur la mer bleue ou carmin sur la terre corail serait
+  illisible. Fond autour du globe : papier (un fond « espace » bleu nuit ne
+  détachait plus une mer bleue).
+
+`cooperativeGestures` en mode iframe, hauteur fixe 640 px sous
 `.rp-embedded` (pas de `vh`), toutes les surcouches en `position:absolute`
 dans la carte.
 

@@ -18,6 +18,7 @@
     "build:cotes-numeriques": "node scripts/build-cotes-numeriques.mjs",
     "build:desherbage": "node scripts/build-desherbage.mjs",
     "build:non-catalogues": "node scripts/build-non-catalogues.mjs",
+    "build:natural-earth": "node scripts/build-natural-earth.mjs",
     "build:manifest-presse": "node scripts/build-manifest-presse.mjs",
     "upload:xml": "node scripts/upload-xml-to-r2.mjs",
     "upload:bib": "node scripts/upload-bib-to-r2.mjs",

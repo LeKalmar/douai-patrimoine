@@ -119,8 +119,9 @@
     /* ── Carte ───────────────────────────────────────────────────────────── */
     .vy-mapwrap {
       position: relative; overflow: hidden;
-      /* L'espace autour du globe. */
-      background: radial-gradient(circle at 50% 45%, #22318f 0%, #111a5c 55%, #080c33 100%);
+      /* Autour du globe : le papier du site. Un fond « espace » bleu nuit ne
+         détacherait pas un globe dont la mer est elle-même bleue. */
+      background: radial-gradient(circle at 50% 45%, var(--papier) 0%, var(--papier) 45%, var(--papier-ombre) 100%);
     }
     #vy-map { position: absolute; inset: 0; }
     .vy-mapwrap .maplibregl-ctrl-attrib { font-size: 0.65rem; }

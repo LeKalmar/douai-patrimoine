@@ -128,6 +128,10 @@
     return Math.acos(dot);
   }
   function distKm(a, b) { return angleBetween(a, b) * 6371; }
+  function mercator(c) {
+    var lat = clamp(c[1], -85.05, 85.05) * RAD;
+    return [(c[0] + 180) / 360, (1 - Math.log(Math.tan(Math.PI / 4 + lat / 2)) / Math.PI) / 2];
+  }
   /** Point à la fraction f du grand cercle a→b. */
   function slerp(a, b, f) {
     var d = angleBetween(a, b);
@@ -157,6 +161,16 @@
       pointKm.push(base + d);
     }
     var totalKm = pointKm[n - 1];
+
+    // Même abscisse, mais en unités Mercator : c'est l'échelle de
+    // ['line-progress'] côté MapLibre (longueur mesurée dans les tuiles), qui
+    // coupe le tracé parcouru. En kilomètres réels, la coupure dériverait de
+    // l'icône sur les longs trajets nord-sud.
+    var pathMerc = [0];
+    for (var mi = 1; mi < path.length; mi++) {
+      var ma = mercator(path[mi - 1]), mb = mercator(path[mi]);
+      pathMerc.push(pathMerc[mi - 1] + Math.hypot(mb[0] - ma[0], mb[1] - ma[1]));
+    }
 
     // 2. Dates d'arrivée/départ ; les points non datés sont estimés au
     //    prorata de la distance entre les deux points datés voisins.
@@ -221,7 +235,7 @@
     }
 
     return {
-      voyageur: voyageur, v: v, pts: pts, path: path, pathKm: pathKm, pointKm: pointKm,
+      voyageur: voyageur, v: v, pts: pts, path: path, pathKm: pathKm, pointKm: pointKm, pathMerc: pathMerc,
       totalKm: totalKm, totalU: u, phases: phases, stopU: stopU,
       arrive: arrive, leave: leave, prec: prec, approx: approx,
       t0: t0, t1: t1, totalDays: totalDays,
@@ -264,6 +278,8 @@
     var g = span > 0 ? (km - pk[lo]) / span : 0;
     st.idx = lo;
     st.pos = slerp(V.path[lo], V.path[hi], g);
+    var pm = V.pathMerc, totalMerc = pm[pm.length - 1] || 1;
+    st.progress = (pm[lo] + g * (pm[hi] - pm[lo])) / totalMerc;
     st.ahead = V.path[Math.min(hi + 2, V.path.length - 1)];
     st.day = Math.floor((st.t - V.t0) / DAY) + 1;
     return st;
@@ -282,28 +298,97 @@
     return null;
   }
 
-  /* ---------------------------------------------------------- carte */
+  /* ---------------------------------------------------------- carte
+     Fond entièrement vectoriel, aux couleurs du site (style.css) :
+     - eau : bathymétrie Natural Earth 1:10m simplifiée (paliers de 200 à
+       9 000 m) + lacs et fleuves Natural Earth 1:50m (data/natural-earth/,
+       npm run build:natural-earth). Les hauts-fonds sont presque blancs, le
+       bleu du site ne ressort que progressivement avec la profondeur ;
+     - terre : polygones Natural Earth ;
+     - relief : ombrage calculé par MapLibre à partir d'un modèle
+       d'élévation — tuiles Mapterhorn, dont la base mondiale est le
+       Copernicus DEM GLO-30. Seul élément non vectoriel, et il ne fait que
+       moduler la couleur de la terre : aucune imagerie satellite.
+     Les couleurs sont regroupées dans THEME pour pouvoir en essayer
+     d'autres sans toucher aux couches. */
+  var THEME = {
+    eauClaire: '#FFFFFF',    // teinte des hauts-fonds (0 m)
+    eauProfonde: '#2A3CD4',  // --bleu : teinte vers laquelle tend la profondeur
+    terre: '#FFCAD7',        // --rose
+    ombre: '#8E1A30',        // --warm-dark : versants à l'ombre
+    lumiere: '#FFFFFF',      // versants au soleil
+    lisere: '#F7F5F0',       // --papier : liseré des tracés
+    aVenir: '#3E3E52'        // --ink-soft : pointillé du trajet restant à parcourir
+  };
+  /* Part de --bleu mêlée au blanc pour chaque palier de profondeur (m). Plafonnée
+     à ~60 % : même les fosses restent un bleu adouci, jamais le bleu vif du
+     site en aplat. 0 = mer de moins de 200 m (couleur de fond). */
+  var PROFONDEURS = [
+    [0, 0.05], [200, 0.10], [1000, 0.17], [2000, 0.23], [3000, 0.29], [4000, 0.35],
+    [5000, 0.41], [6000, 0.47], [7000, 0.53], [8000, 0.58], [9000, 0.62]
+  ];
+  function mixHex(a, b, t) {
+    var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), out = '#';
+    [16, 8, 0].forEach(function (sh) {
+      var ca = (pa >> sh) & 255, cb = (pb >> sh) & 255;
+      out += ('0' + Math.round(ca + (cb - ca) * t).toString(16)).slice(-2);
+    });
+    return out;
+  }
+  function eau(t) { return mixHex(THEME.eauClaire, THEME.eauProfonde, t); }
+  var couleurProfondeur = ['match', ['get', 'depth']];
+  PROFONDEURS.slice(1).forEach(function (p) { couleurProfondeur.push(p[0], eau(p[1])); });
+  couleurProfondeur.push(eau(PROFONDEURS[PROFONDEURS.length - 1][1]));
   var map = new maplibregl.Map({
     container: 'vy-map',
     style: {
       version: 8,
       projection: { type: 'globe' },
       sources: {
-        relief: {
-          type: 'raster',
-          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}'],
-          tileSize: 256,
-          maxzoom: 8,
-          attribution: 'Fond : Esri, US National Park Service'
+        terres: { type: 'geojson', data: 'data/natural-earth/land.json',
+          attribution: '<a href="https://www.naturalearthdata.com">Natural Earth</a>' },
+        bathymetrie: { type: 'geojson', data: 'data/natural-earth/bathymetry.json' },
+        lacs: { type: 'geojson', data: 'data/natural-earth/lakes.json' },
+        fleuves: { type: 'geojson', data: 'data/natural-earth/rivers.json' },
+        elevation: {
+          type: 'raster-dem',
+          tiles: ['https://tiles.mapterhorn.com/{z}/{x}/{y}.webp'],
+          tileSize: 512,
+          encoding: 'terrarium',
+          maxzoom: 12,
+          attribution: 'Relief : Copernicus DEM GLO-30 © DLR/Airbus, ESA — via <a href="https://mapterhorn.com/attribution">Mapterhorn</a>'
         }
       },
       sky: {
-        'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0]
+        'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.6, 5, 0.6, 7, 0]
       },
       layers: [
-        { id: 'fond', type: 'background', paint: { 'background-color': '#e9e1cf' } },
-        { id: 'relief', type: 'raster', source: 'relief',
-          paint: { 'raster-saturation': -0.45, 'raster-contrast': -0.05, 'raster-brightness-min': 0.08 } }
+        { id: 'eau', type: 'background', paint: { 'background-color': eau(PROFONDEURS[0][1]) } },
+        // Paliers emboîtés, écrits du moins au plus profond : chacun recouvre
+        // le précédent là où la mer est plus profonde.
+        { id: 'bathymetrie', type: 'fill', source: 'bathymetrie',
+          paint: { 'fill-color': couleurProfondeur, 'fill-antialias': false } },
+        { id: 'terres', type: 'fill', source: 'terres',
+          paint: { 'fill-color': THEME.terre, 'fill-antialias': true } },
+        { id: 'relief', type: 'hillshade', source: 'elevation',
+          paint: {
+            'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 1, 0.35, 6, 0.55],
+            'hillshade-shadow-color': THEME.ombre,
+            'hillshade-highlight-color': THEME.lumiere,
+            'hillshade-accent-color': THEME.ombre
+          } },
+        // Petits lacs et fleuves secondaires seulement en zoomant (scalerank
+        // 0 = les plus importants).
+        { id: 'lacs', type: 'fill', source: 'lacs',
+          filter: ['<=', ['get', 'scalerank'], ['step', ['zoom'], 2, 3, 5, 5, 99]],
+          paint: { 'fill-color': eau(0.17) } },
+        { id: 'fleuves', type: 'line', source: 'fleuves',
+          filter: ['<=', ['get', 'scalerank'], ['step', ['zoom'], 3, 3, 6, 5, 99]],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': eau(0.35),
+            'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.4, 4, 1, 8, 2.2]
+          } }
       ]
     },
     center: [30, 25],
@@ -317,16 +402,25 @@
       'CooperativeGesturesHandler.MobileHelpText': 'Utilisez deux doigts pour déplacer la carte'
     }
   });
+  window.__vyMap = map; // DEBUG TEMPORAIRE
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
   var EMPTY_LINE = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } };
+  var TRANSPARENT = 'rgba(0,0,0,0)';
+  /** Couleur jusqu'à la fraction p de la ligne, transparent au-delà. */
+  function progressGradient(color, p) {
+    return ['step', ['line-progress'], color, clamp(p, 1e-6, 1), TRANSPARENT];
+  }
   // Un voyage choisi avant la fin du chargement de la carte (clic rapide dans
   // la liste, ancre #id dans l'URL) est mis en attente : ses couches
   // n'existent pas encore.
   var mapReady = false, queuedVoyage = null;
 
-  map.on('load', function () {
+  // 'style.load' plutôt que 'load' : 'load' attend que toutes les tuiles de
+  // la vue initiale soient arrivées, y compris le relief (service distant) —
+  // les tracés et les portraits attendaient donc le serveur d'élévation.
+  map.once('style.load', function () {
     map.addSource('vy-all', {
       type: 'geojson',
       data: {
@@ -337,6 +431,9 @@
         })
       }
     });
+    map.addLayer({ id: 'vy-all-casing', type: 'line', source: 'vy-all',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': THEME.lisere, 'line-width': 5, 'line-opacity': 0.85 } });
     map.addLayer({ id: 'vy-all-line', type: 'line', source: 'vy-all',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': ['get', 'couleur'], 'line-width': 2.5, 'line-opacity': 0.75 } });
@@ -344,18 +441,22 @@
     map.addLayer({ id: 'vy-all-hit', type: 'line', source: 'vy-all',
       paint: { 'line-color': '#000', 'line-width': 16, 'line-opacity': 0.001 } });
 
-    map.addSource('vy-active-full', { type: 'geojson', data: EMPTY_LINE });
-    map.addLayer({ id: 'vy-active-full', type: 'line', source: 'vy-active-full',
+    // Trajet du voyage choisi : UNE source, chargée une fois à la sélection.
+    // Le tracé parcouru n'est pas une géométrie renvoyée à chaque image (le
+    // redécoupage en tuiles prenait du retard et le trait n'apparaissait
+    // plus) : c'est la même ligne, coloriée par un dégradé en escalier coupé
+    // à la position du voyageur (lineMetrics + line-progress).
+    map.addSource('vy-active', { type: 'geojson', data: EMPTY_LINE, lineMetrics: true });
+    map.addLayer({ id: 'vy-active-full', type: 'line', source: 'vy-active',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#3a2412', 'line-width': 1.6, 'line-opacity': 0.55, 'line-dasharray': [2, 2.5] } });
+      paint: { 'line-color': THEME.aVenir, 'line-width': 1.6, 'line-opacity': 0.6, 'line-dasharray': [2, 2.5] } });
 
-    map.addSource('vy-active-done', { type: 'geojson', data: EMPTY_LINE });
-    map.addLayer({ id: 'vy-active-casing', type: 'line', source: 'vy-active-done',
+    map.addLayer({ id: 'vy-active-casing', type: 'line', source: 'vy-active',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#fbf8f1', 'line-width': 7, 'line-opacity': 0.9 } });
-    map.addLayer({ id: 'vy-active-done', type: 'line', source: 'vy-active-done',
+      paint: { 'line-width': 7, 'line-gradient': progressGradient(THEME.lisere, 0) } });
+    map.addLayer({ id: 'vy-active-done', type: 'line', source: 'vy-active',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#B4213C', 'line-width': 3.5 } });
+      paint: { 'line-width': 3.5, 'line-gradient': progressGradient('#B4213C', 0) } });
 
     map.on('mouseenter', 'vy-all-hit', function () { if (!current) map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'vy-all-hit', function () { map.getCanvas().style.cursor = ''; });
@@ -600,8 +701,8 @@
 
     setOverviewMarkersVisible(false);
     map.setPaintProperty('vy-all-line', 'line-opacity', ['case', ['==', ['get', 'id'], V.v.id], 0, 0.2]);
-    map.setPaintProperty('vy-active-done', 'line-color', V.voyageur.couleur);
-    map.getSource('vy-active-full').setData({ type: 'Feature', properties: {},
+    map.setPaintProperty('vy-all-casing', 'line-opacity', ['case', ['==', ['get', 'id'], V.v.id], 0, 0.25]);
+    map.getSource('vy-active').setData({ type: 'Feature', properties: {},
       geometry: { type: 'LineString', coordinates: V.path } });
     buildStopMarkers(V);
     ensureTraveler();
@@ -639,8 +740,8 @@
     ui.intro.hidden = false;
     setOverviewMarkersVisible(true);
     map.setPaintProperty('vy-all-line', 'line-opacity', 0.75);
-    map.getSource('vy-active-full').setData(EMPTY_LINE);
-    map.getSource('vy-active-done').setData(EMPTY_LINE);
+    map.setPaintProperty('vy-all-casing', 'line-opacity', 0.85);
+    map.getSource('vy-active').setData(EMPTY_LINE);
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* file:// */ }
     map.flyTo({ center: [30, 25], zoom: EMBEDDED ? 1.3 : 1.6, duration: REDUCED_MOTION ? 0 : 1800 });
   }
@@ -747,11 +848,9 @@
     if (!V) return;
     var st = stateAt(V, u);
 
-    // Tracé parcouru.
-    var done = V.path.slice(0, st.idx + 1);
-    done.push(st.pos);
-    map.getSource('vy-active-done').setData({ type: 'Feature', properties: {},
-      geometry: { type: 'LineString', coordinates: done } });
+    // Tracé parcouru : seule la coupure du dégradé bouge.
+    map.setPaintProperty('vy-active-casing', 'line-gradient', progressGradient(THEME.lisere, st.progress));
+    map.setPaintProperty('vy-active-done', 'line-gradient', progressGradient(V.voyageur.couleur, st.progress));
 
     // Voyageur : icône selon le moyen de transport, tournée dans le sens de la marche.
     var mode = st.mode || modeAtPoint(V, st.at);
