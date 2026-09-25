@@ -2299,6 +2299,7 @@ ul { list-style: none; }
 .rp-expo,
 .rp-themes,
 .rp-fonds,
+.rp-partenaires,
 .rp-pratique { --rp-gutter: clamp(1.25rem, 4vw, 2.5rem); }
 
 /* ── En-tête ─────────────────────────────────────────────────────────────── */
@@ -2494,6 +2495,49 @@ ul { list-style: none; }
 .rp-fonds-desc { font-size: 0.82rem; line-height: 1.6; color: var(--text); flex: 1; }
 .rp-fonds-more { font-size: 0.78rem; font-weight: 600; color: var(--carmin); margin-top: 0.25rem; }
 
+/* ── Les associations partenaires ─────────────────────────────────────────
+   Cartes sans photo : le logo du partenaire tient lieu de visuel (fichiers
+   dans images/partenaires/, aplatis sur blanc comme le fond de la carte).
+   La carte ENTIÈRE est le lien — comme .rp-fonds-card, mais vers l'extérieur
+   et dans un nouvel onglet ; d'où l'aria-label porté par le <a>, qui annonce
+   la sortie du site. Pas de bouton : .rp-part-more n'est qu'un repère visuel,
+   le clic est actif partout sur la carte. */
+.rp-partenaires {
+  background: var(--papier-ombre); border-top: 1px solid var(--trait);
+  padding: clamp(2.25rem, 5vw, 2.875rem) var(--rp-gutter);
+}
+.rp-part-intro {
+  font-size: 0.9rem; line-height: 1.7; color: var(--text);
+  max-width: 52rem; margin: -0.5rem 0 1.4rem;
+}
+.rp-part-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.15rem; }
+.rp-part-card {
+  background: #fff; border: 1px solid var(--trait-fort);
+  padding: 1.1rem 1.15rem 1.15rem;
+  display: flex; flex-direction: column; gap: 0.5rem; color: inherit;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.rp-part-card:hover, .rp-part-card:focus-visible {
+  border-color: var(--bleu); box-shadow: 0 6px 20px rgba(20,24,63,0.10);
+  transform: translateY(-2px); color: inherit;
+}
+/* Bandeau de logo en tête de carte. Hauteur fixe, image contenue : les logos
+   des partenaires vont du bandeau très large (440x63) au blason vertical, et
+   une hauteur commune est ce qui les aligne malgré ces formats. alt vide : le
+   nom du partenaire est juste en dessous — le répéter le ferait annoncer deux
+   fois. */
+.rp-part-logo {
+  display: flex; align-items: center; justify-content: flex-start;
+  height: 3.5rem; margin-bottom: 0.1rem;
+}
+.rp-part-logo img { max-height: 100%; max-width: 100%; width: auto; height: auto; }
+.rp-part-name {
+  font-family: var(--font-display); font-weight: 600; font-size: 1.0625rem;
+  color: var(--encre); line-height: 1.25;
+}
+.rp-part-desc { font-size: 0.82rem; line-height: 1.6; color: var(--text); flex: 1; }
+.rp-part-more { font-size: 0.78rem; font-weight: 600; color: var(--carmin); margin-top: 0.25rem; }
+
 /* ── Informations pratiques ──────────────────────────────────────────────── */
 .rp-pratique {
   background: var(--papier-ombre); border-top: 1px solid var(--trait);
@@ -2547,12 +2591,14 @@ ul { list-style: none; }
   .rp-hero { grid-template-columns: 1fr; }
   .rp-hero-portrait { min-height: 20rem; order: -1; }
   .rp-fonds-grid { grid-template-columns: 1fr 1fr; }
+  .rp-part-grid { grid-template-columns: 1fr 1fr; }
   .rp-pratique-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 40rem) {
   .rp-header-inner { flex-direction: column; align-items: flex-start; gap: 0.9rem; }
   .rp-nav { gap: 1rem; }
   .rp-fonds-grid { grid-template-columns: 1fr; }
+  .rp-part-grid { grid-template-columns: 1fr; }
   .rp-pratique-grid { grid-template-columns: 1fr; }
   .rp-expo { flex-direction: column; align-items: flex-start; }
 }
