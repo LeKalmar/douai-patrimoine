@@ -153,6 +153,10 @@ async function buildItems(path) {
       // isPiegeEnReserve() dans lib/magasin-classify.mjs), même si
       // Section (Libellé) diffère.
       _piege: piege,
+      // Codes structurés 921$a/921$b (même source qu'export-magasins.mjs) —
+      // lus par classementAnomalies() de recolement.html.
+      _piegeA: props['Piège 921$a (Code)'] || null,
+      _piegeB: props['Piège 921$b (Code)'] || null,
       // Pour un exemplaire hors magasin, le "fonds" affiché est sa vraie
       // section Syracuse (ex. "Adulte", "Réserve"…) plutôt qu'un libellé de
       // magasin — c'est justement ce qui rend une anomalie de classement

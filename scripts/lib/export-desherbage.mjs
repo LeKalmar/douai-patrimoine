@@ -29,7 +29,7 @@ function parseCount(v) {
 
 export async function exportDesherbage() {
   const pool = getPool({ unpooled: true });
-  const { rows } = await pool.query(`SELECT raw FROM exemplaires WHERE source = 'bib_xml'`);
+  const { rows } = await pool.query(`SELECT raw FROM exemplaires WHERE source = 'bib_xml' AND bibliotheque_libelle LIKE 'Douai%'`);
 
   const items = rows.map(({ raw: props }) => {
     const barcode = (props['Code-barres (valeur)'] || '').trim();

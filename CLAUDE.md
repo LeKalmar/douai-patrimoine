@@ -1918,10 +1918,39 @@ direct** (`horsSectionEntry()`) contre le catalogue magasins actuel, comme
 Syracuse n'en sortait jamais (constaté : 1 652 anomalies affichées au 5e
 étage, dont 1 532 déjà corrigées). Le drapeau stocké ne sert plus que de
 repli si le catalogue n'est pas chargé ou ne connaît pas le code-barre ; il
-reste aussi utilisé pour le badge du panneau de feedback au moment du scan. Cette liste reste vide côté groupe « Réserve » (un
-scan de la réserve patrimoniale/Douaisienne n'a aucun moyen de poser
-`horsSection`), affichée par la même génération générique de template que
-le reste sans code spécifique par groupe.
+reste aussi utilisé pour le badge du panneau de feedback au moment du scan.
+
+**Depuis 2026-09-25 (demande explicite), le critère porte sur trois axes et
+s'applique aussi aux réserves** (`CLASSEMENT_ATTENDU`/`classementAnomalies()`
+dans `recolement.html`), avec une colonne « Anomalies » qui dit lesquels :
+- **mauvaise bibliothèque** : attendu « Douai Marceline Desbordes-Valmore »
+  dans les magasins, « Douai Réserve Patrimoniale » dans les réserves ;
+- **mauvaise section** : Magasin/Magasin Jeunesse, ou Réserve ;
+- **mauvais piège** : 921$a = `3` dans les magasins ; 921$a = `2` +
+  921$b = `CSP` dans les réserves (comparé par code, jamais par le texte libre
+  `Pièges`).
+Conséquence voulue : un livre en section Jeunesse/Adulte avec le piège « en
+réserve » compte toujours comme magasin pour les statistiques
+(`_isMagasin`/`inGroupScope()` inchangés) mais apparaît désormais en
+« mauvaise section » (5e étage : 126 → 1 069 anomalies le jour du passage).
+Côté réserve, bibliothèque et section viennent du MARC-XML : **930$c = code
+bibliothèque, 930$d = code section** (vérifié contre `bib.xml`, `R` =
+Réserve Patrimoniale / Réserve, `VDOUC` = Marceline), traduits par
+`BIBLIOTHEQUE_LABELS`/`SECTION_LABELS`. Côté magasins, `export-magasins.mjs`
+pose `_piegeA`/`_piegeB` (colonnes `piege_a_code`/`piege_b_code`). Les
+exemplaires d'`exemplarisation.html` (`manuel`) et les scans « hors réserve »
+ne sont jamais évalués. Le format du cache IndexedDB (`FMT` de
+`js/catalog-cache.js`) est passé à 2 pour ces quatre champs.
+
+Au scan, un code-barre inconnu du catalogue du local courant est cherché
+dans l'autre catalogue (`anyCatalogEntry()`) : un livre d'une autre
+bibliothèque du réseau retrouvé en réserve, ou un exemplaire réserve retrouvé
+en magasin, est reconnu et signalé plutôt que traité comme « inconnu ». Pour
+que les autres bibliothèques existent en base, **`db-migrate-bib.mjs` ne
+filtre plus sur « Douai… »** ; `export-desherbage.mjs` et
+`export-cotes-numeriques.mjs` filtrent eux-mêmes (`bibliotheque_libelle LIKE
+'Douai%'`) et `export-magasins.mjs` réserve `_isMagasin` à Douai, pour que
+leurs pages ne changent pas.
 
 `reserve.html` (le plan visuel, renommé « Plan des Magasins » à
 l'introduction des magasins 2e/5e étage) visualise ces locaux. La page est

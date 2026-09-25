@@ -44,7 +44,9 @@
   // DONNÉES, qui est le generatedAt du build-report). Incrémenter en cas de
   // changement de forme du payload : les entrées cachées à l'ancien format
   // sont alors ignorées puis réécrites, sans intervention.
-  const FMT = 1;
+  // 2 (2026-09-25) : ajout de bibliotheque/section/piegeA/piegeB (anomalies
+  // de classement de recolement.html).
+  const FMT = 2;
 
   function openDb() {
     return new Promise((resolve, reject) => {
@@ -171,6 +173,11 @@
     const fondsVals = [], fondsMap = new Map(), fondsIdx = new Int32Array(n);
     const piegeVals = [], piegeMap = new Map(), piegeIdx = new Int32Array(n);
     const etatVals = [], etatMap = new Map(), etatIdx = new Int32Array(n);
+    // Classement Syracuse : quelques dizaines de valeurs distinctes chacun.
+    const bibVals = [], bibMap = new Map(), bibIdx = new Int32Array(n);
+    const secVals = [], secMap = new Map(), secIdx = new Int32Array(n);
+    const paVals = [], paMap = new Map(), paIdx = new Int32Array(n);
+    const pbVals = [], pbMap = new Map(), pbIdx = new Int32Array(n);
     const relies = {};
     const noticeId = new Array(n);
     let noticeIdAllSameAsBarcode = true;
@@ -191,6 +198,10 @@
       fondsIdx[i] = intern(fondsVals, fondsMap, e.fonds || '');
       piegeIdx[i] = intern(piegeVals, piegeMap, e.piege || '');
       etatIdx[i] = intern(etatVals, etatMap, e.etat || '');
+      bibIdx[i] = intern(bibVals, bibMap, e.bibliotheque || '');
+      secIdx[i] = intern(secVals, secMap, e.section || '');
+      paIdx[i] = intern(paVals, paMap, e.piegeA || '');
+      pbIdx[i] = intern(pbVals, pbMap, e.piegeB || '');
       let f = 0;
       if (e.manuel) f |= FLAG_MANUEL;
       // isMagasin absent (catalogue réserve) ⇒ dans le périmètre, comme
@@ -205,6 +216,7 @@
     return {
       n, bc: bcs, cote, titre, auteur, digit, flags,
       fondsVals, fondsIdx, piegeVals, piegeIdx, etatVals, etatIdx,
+      bibVals, bibIdx, secVals, secIdx, paVals, paIdx, pbVals, pbIdx,
       noticeId: noticeIdAllSameAsBarcode ? null : noticeId,
       relies,
     };
@@ -216,6 +228,7 @@
   function decode(payload) {
     const { n, bc, cote, titre, auteur, digit, flags,
             fondsVals, fondsIdx, piegeVals, piegeIdx, etatVals, etatIdx,
+            bibVals, bibIdx, secVals, secIdx, paVals, paIdx, pbVals, pbIdx,
             noticeId, relies } = payload;
     const catalog = {};
     for (let i = 0; i < n; i++) {
@@ -238,6 +251,10 @@
         piege: piegeVals[piegeIdx[i]],
         coteDigitRun: digit[i] || null,
         isMagasin: (f & FLAG_IS_MAGASIN) !== 0,
+        bibliotheque: bibVals[bibIdx[i]],
+        section: secVals[secIdx[i]],
+        piegeA: paVals[paIdx[i]],
+        piegeB: pbVals[pbIdx[i]],
       };
     }
     return catalog;

@@ -967,6 +967,16 @@ function buildCatalogFromItems(items, fondsOverride, opts){
       // exclu des statistiques de progression : c'est une anomalie de
       // classement, voir handleScan()/ADV_CATS.horssection.
       isMagasin: !scoped || it._isMagasin !== false,
+      // Classement Syracuse (bibliothèque, section, piège 921$a/$b) — lu par
+      // classementAnomalies() pour la liste « Anomalies de classement ».
+      // Magasins : libellés GESMARC posés par export-magasins.mjs. Réserve
+      // (MARC-XML) : codes bruts 930$c (bibliothèque) / 930$d (section),
+      // vérifiés contre bib.xml le 2026-09-25, traduits en libellés par
+      // BIBLIOTHEQUE_LABELS/SECTION_LABELS pour comparer à la même échelle.
+      bibliotheque: it._bibliotheque || codeLabel(BIBLIOTHEQUE_LABELS, it['930$c']),
+      section: it._secteur || codeLabel(SECTION_LABELS, it['930$d']),
+      piegeA: it._piegeA || it['921$a'] || '',
+      piegeB: it._piegeB || it['921$b'] || '',
     };
     // Une notice (bibliographique) peut avoir plusieurs exemplaires/barcodes —
     // le compteur et la progression se basent sur des notices distinctes, pas
@@ -985,6 +995,77 @@ function buildCatalogFromItems(items, fondsOverride, opts){
    `isMagasin` ci-dessus). Remplace l'ancien couple
    catalogByGroup.magasin (filtré) / magasinWideCatalog (complet). */
 function inGroupScope(entry){ return !!entry && entry.isMagasin !== false; }
+
+/* ──────── CLASSEMENT ATTENDU (anomalies de classement) ────────
+   Ce que Syracuse devrait dire d'un document physiquement rangé dans chaque
+   type de local (demande explicite, 2026-09-25). Un écart sur l'un des trois
+   axes est une anomalie, listée dans ADV_CATS.horssection avec sa nature :
+   - mauvaise bibliothèque : Marceline Desbordes-Valmore pour les magasins,
+     Réserve Patrimoniale pour les réserves (utile depuis que la base contient
+     aussi les autres bibliothèques du réseau — livres de Cuincy, des
+     annexes… retrouvés chez nous) ;
+   - mauvaise section : Magasin/Magasin Jeunesse, ou Réserve ;
+   - mauvais piège : 921$a = 3 (« En magasin ») pour les magasins ;
+     921$a = 2 + 921$b = CSP (« Exclu définitivement du prêt — Consultation
+     sur place ») pour les réserves.
+   Comparaison par libellé pour la bibliothèque et la section (le catalogue
+   magasins ne porte que les libellés GESMARC ; les codes MARC de la réserve
+   sont traduits ci-dessous), par code pour le piège (le libellé GESMARC est
+   du texte libre, ex. « En magasin 5ème étage - Thématique "Pâques" »). */
+const BIBLIOTHEQUE_LABELS = { R:'Douai Réserve Patrimoniale', VDOUC:'Douai Marceline Desbordes-Valmore' };
+const SECTION_LABELS = { R:'Réserve', A:'Adulte', J:'Jeunesse', M:'Magasin', MJ:'Magasin Jeunesse' };
+function codeLabel(labels, code){ code = (code||'').trim(); return labels[code] || code; }
+
+const CLASSEMENT_ATTENDU = {
+  magasin: {
+    bibliotheques: ['Douai Marceline Desbordes-Valmore'],
+    sections: ['Magasin', 'Magasin Jeunesse'],
+    piegeOk: e => e.piegeA === '3',
+    piegeAttendu: '3 – En magasin',
+  },
+  reserve: {
+    bibliotheques: ['Douai Réserve Patrimoniale'],
+    sections: ['Réserve'],
+    piegeOk: e => e.piegeA === '2' && e.piegeB === 'CSP',
+    piegeAttendu: '2 – Exclu définitivement du prêt / CSP – Consultation sur place',
+  },
+};
+
+/* Anomalies d'une entrée de catalogue scannée dans un local du type
+   `catGroup` ('reserve' | 'magasin'). Renvoie un tableau (vide = conforme)
+   de {type, label, detail}. Les exemplaires d'exemplarisation.html (manuel)
+   n'ont pas de classement Syracuse : jamais d'anomalie. */
+function classementAnomalies(entry, catGroup){
+  const rules = CLASSEMENT_ATTENDU[catGroup];
+  if(!entry || !rules || entry.manuel) return [];
+  const out = [];
+  if(!rules.bibliotheques.includes(entry.bibliotheque||'')){
+    out.push({ type:'bibliotheque', label:'Mauvaise bibliothèque', detail: entry.bibliotheque || 'non renseignée' });
+  }
+  if(!rules.sections.includes(entry.section||'')){
+    out.push({ type:'section', label:'Mauvaise section', detail: entry.section || 'non renseignée' });
+  }
+  if(!rules.piegeOk(entry)){
+    // Libellé Syracuse d'abord (lisible), codes 921$a/$b entre crochets.
+    const code = [entry.piegeA, entry.piegeB].filter(Boolean).join('/');
+    const detail = entry.piege ? entry.piege + (code ? ` [${code}]` : '') : (code ? `[${code}]` : 'aucun piège');
+    out.push({ type:'piege', label:'Mauvais piège', detail });
+  }
+  return out;
+}
+function anomaliesText(list){
+  return list.map(a=>`${a.label} (${a.detail})`).join(' · ');
+}
+
+/* Entrée de catalogue d'un code-barre, tous catalogues confondus. Les deux
+   catalogues sont disjoints (db-migrate-bib.mjs n'insère jamais un
+   code-barre déjà réserve), l'ordre ne sert qu'à la priorité de la réserve,
+   seule autorité sur ses codes-barres. */
+function anyCatalogEntry(bc){
+  return (catalogByGroup.reserve && catalogByGroup.reserve[bc])
+      || (catalogByGroup.magasin && catalogByGroup.magasin[bc])
+      || null;
+}
 
 let catalogByGroup = { reserve:null, magasin:null };
 let catalogNoticeCountByGroup = { reserve:0, magasin:0 };
@@ -1521,20 +1602,20 @@ const ADV_CATS = {
     </tr>`,
   },
   horssection: {
-    title: 'Anomalies de classement (hors magasin selon Syracuse)',
-    desc: 'Code-barre scanné dans un magasin mais catalogué dans Syracuse sous une autre section que Magasin/Magasin Jeunesse (colonne "Section réelle") — à vérifier : mauvais classement côté catalogue, ou document à ranger ailleurs.',
-    placeholder: 'Filtrer (cote, titre, section, code-barre, piège)…',
-    headers: ['Cote','Titre','Section réelle','Emplacement','Code-barre','Piège'],
+    title: 'Anomalies de classement (bibliothèque, section, piège Syracuse)',
+    desc: 'Document scanné ici mais dont le classement Syracuse ne correspond pas au local. Attendu dans les magasins : bibliothèque Marceline Desbordes-Valmore, section Magasin/Magasin Jeunesse, piège 3 – En magasin. Attendu dans les réserves : bibliothèque Réserve Patrimoniale, section Réserve, piège 2 – Exclu définitivement du prêt / CSP – Consultation sur place. La colonne « Anomalies » indique ce qui ne va pas et la valeur actuelle dans Syracuse ; la liste se met à jour à chaque actualisation du catalogue, sans nouveau scan.',
+    placeholder: 'Filtrer (cote, titre, anomalie, code-barre, piège)…',
+    headers: ['Cote','Titre','Anomalies','Emplacement','Code-barre','Piège'],
     colspan: 6,
     emptyMsg: 'Aucune anomalie de classement détectée pour l\'instant.',
-    filterFields: ['cote','titre','sectionReelle','barcode','piege'],
+    filterFields: ['cote','titre','anomaliesText','barcode','piege'],
     filePrefix: 'anomalies-classement-magasin',
     needsCatalog: false,
     listFn: horsSectionList,
     rowHtml: r => `<tr>
       <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
-      <td>${esc(r.sectionReelle)||'—'}</td>
+      <td>${r.anomalies.map(a=>`<div><strong style="color:#c62828">${esc(a.label)}</strong> <span style="color:#888">(${esc(a.detail)})</span></div>`).join('')}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
       <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
@@ -1807,18 +1888,17 @@ function handleScan(barcode, damaged, opts){
   const fields = locFieldsOf(loc);
   const group = catalogGroupOfReserve(loc.reserve);
   let cat = catalog ? catalog[barcode] : null;
-  // Anomalie de classement : ce code-barre existe bien dans le catalogue
-  // magasins (qui couvre toute la bibliothèque de Douai depuis 2026-08-26),
-  // mais il y est catalogué sous une autre section Syracuse que
-  // Magasin/Magasin Jeunesse alors qu'on le scanne physiquement dans un
-  // magasin (ou l'inverse) — à faire remonter, ce n'est pas une absence du
-  // catalogue. Le scan est enregistré normalement, titre/cote affichés.
-  // Avant 2026-09-02 ce cas se détectait via un second catalogue complet
-  // (magasinWideCatalog) ; il se lit maintenant sur l'entrée elle-même.
-  let horsSection = false;
-  if(cat && group==='magasin' && !inGroupScope(cat)){
-    horsSection = true;
-  }
+  // Inconnu du catalogue du local courant ? On le cherche dans l'autre
+  // (2026-09-25) : un exemplaire de la réserve retrouvé dans un magasin, ou
+  // un livre d'une autre bibliothèque du réseau retrouvé dans la réserve, est
+  // bien catalogué — c'est une anomalie de classement, pas un inconnu.
+  if(!cat) cat = anyCatalogEntry(barcode);
+  // Anomalie de classement : bibliothèque, section ou piège Syracuse
+  // différents de ce qu'on attend pour ce type de local (voir
+  // CLASSEMENT_ATTENDU). Le scan est enregistré normalement, titre/cote
+  // affichés ; la liste ADV_CATS.horssection réévalue ensuite en direct.
+  const anomalies = classementAnomalies(cat, group);
+  const horsSection = anomalies.length > 0;
   const prev = scans[barcode];
 
   const record = {
@@ -1847,12 +1927,11 @@ function handleScan(barcode, damaged, opts){
     // un vrai scan physique ultérieur du code-barre (sans ces opts) doit
     // faire disparaître ce doute, pas le conserver indéfiniment.
     coteApprox: !!(opts && opts.coteApprox),
-    // Section Syracuse réelle (record.fonds ci-dessus) différente de
-    // Magasin/Magasin Jeunesse alors que ce scan a eu lieu dans un magasin —
-    // voir ADV_CATS.horssection plus bas. Ne s'efface pas tout seul si le
-    // même code-barre est rescanné plus tard sans que le catalogue soit
-    // chargé : on conserve le dernier statut connu.
-    horsSection: horsSection || (prev ? !!prev.horsSection : false),
+    // Anomalie de classement au moment du scan (voir classementAnomalies()
+    // et ADV_CATS.horssection plus bas, qui réévalue en direct). Si aucun
+    // catalogue ne connaît le code-barre (pas encore chargé), on conserve le
+    // dernier statut connu plutôt que de l'effacer.
+    horsSection: cat ? horsSection : (prev ? !!prev.horsSection : false),
     ts: Date.now()
   };
 
@@ -1892,7 +1971,7 @@ function handleScan(barcode, damaged, opts){
     ? applyReliureCascade(barcode, cat.relies, fields)
     : [];
 
-  showFeedback(record, status, prev, reliureRecords);
+  showFeedback(record, status, prev, reliureRecords, anomalies);
 
   renderExpected();
   renderHereLog();
@@ -1932,7 +2011,7 @@ function applyReliureCascade(sourceBarcode, siblingBarcodes, fields){
   return results;
 }
 
-function showFeedback(record, status, prev, reliureRecords){
+function showFeedback(record, status, prev, reliureRecords, anomalies){
   const fb = document.getElementById('feedback');
   fb.className = 'feedback show ' + (status==='unknown' ? 'warn' : status==='dup' ? 'dup' : status==='moved' ? 'dup' : 'ok');
   const badgeTxt = { ok:'✓ Enregistré', dup:'🔁 Déjà scanné ici', moved:'↔ Déplacé depuis un autre emplacement', unknown:'⚠ Code-barre inconnu du catalogue' }[status];
@@ -1943,7 +2022,9 @@ function showFeedback(record, status, prev, reliureRecords){
     ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}
     ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Mauvais numéro / code-barre absent »">📎 Sans code-barre</span>` : ''}
     ${record.coteApprox ? `<span class="fb-badge" style="background:#f57f17;color:#fff" title="La cote tapée ne correspondait pas exactement à celle du catalogue — retrouvé par son numéro, à vérifier">≈ Cote approximative</span>` : ''}
-    ${record.horsSection ? `<span class="fb-badge" style="background:#c62828;color:#fff" title="Catalogué sous une autre section que Magasin/Magasin Jeunesse — à vérifier dans Syracuse">⚠ Anomalie de classement</span>` : ''}</div>`;
+    ${anomalies && anomalies.length
+      ? anomalies.map(an=>`<span class="fb-badge" style="background:#c62828;color:#fff" title="${esc(an.detail)} — à vérifier dans Syracuse">⚠ ${esc(an.label)}</span>`).join('')
+      : record.horsSection ? `<span class="fb-badge" style="background:#c62828;color:#fff" title="À vérifier dans Syracuse">⚠ Anomalie de classement</span>` : ''}</div>`;
   html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
   html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
   if(status==='moved' && prev){
@@ -2823,8 +2904,15 @@ function manualCoteList(group){
   // inGroupScope plutôt qu'une simple présence dans `cat` : le catalogue
   // magasins couvre toute la bibliothèque, un exemplaire d'une autre section
   // doit rester compté ici comme il l'était quand ce catalogue était filtré.
-  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode]))
+  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode]) && !catalogedElsewhereForReserve(r.barcode, group))
     .sort((a,b)=>b.ts-a.ts);
+}
+// Côté réserve, un code-barre absent de data/inventaire.json mais présent
+// dans le catalogue magasins (livre d'une autre bibliothèque du réseau
+// retrouvé en réserve) est catalogué — il relève des anomalies de
+// classement, pas de cette liste. Côté magasins, comportement inchangé.
+function catalogedElsewhereForReserve(bc, group){
+  return catalogGroupOf(group)==='reserve' && !!(catalogByGroup.magasin && catalogByGroup.magasin[bc]);
 }
 function manualCoteCount(group){
   const cat = catalogByGroup[catalogGroupOf(group)];
@@ -2832,7 +2920,7 @@ function manualCoteCount(group){
   let n=0;
   for(const bc in scans){
     const r=scans[bc];
-    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode])) n++;
+    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode]) && !catalogedElsewhereForReserve(r.barcode, group)) n++;
   }
   return n;
 }
@@ -3013,26 +3101,34 @@ function scannedCount(group){
 // en magasin puis sorti de la section Magasin y entre. Le drapeau stocké
 // ne sert plus que de repli quand le catalogue magasins n'est pas (encore)
 // chargé ou ne connaît pas ce code-barre.
+//
+// Depuis la même date, le critère n'est plus seulement la section : voir
+// CLASSEMENT_ATTENDU/classementAnomalies() — bibliothèque, section et piège,
+// pour les magasins ET pour les réserves. Renvoie la liste des anomalies
+// (vide = conforme). Les scans « hors réserve » (HORS-RESERVE) ne sont
+// rangés nulle part par définition : pas de classement attendu.
 function horsSectionEntry(r){
-  if(traveeGroupOf(r.travee)==='reserve') return null;
-  const cat = catalogByGroup.magasin;
-  const e = cat ? cat[r.barcode] : null;
-  if(e) return inGroupScope(e) ? null : e;
-  return r.horsSection ? { fonds:r.fonds } : null;
+  if(r.travee==='HORS-RESERVE') return [];
+  const catGroup = catalogGroupOf(traveeGroupOf(r.travee));
+  const e = anyCatalogEntry(r.barcode);
+  if(e) return classementAnomalies(e, catGroup);
+  // Catalogues pas encore chargés, ou code-barre inconnu des deux : repli
+  // sur le drapeau posé au scan, sans détail.
+  return r.horsSection ? [{ type:'inconnu', label:'Anomalie de classement', detail:'détail indisponible, catalogue non chargé' }] : [];
 }
 function horsSectionList(group){
   const out = [];
   for(const bc in scans){
     const r = scans[bc];
     if(traveeGroupOf(r.travee)!==group) continue;
-    const e = horsSectionEntry(r);
-    if(e) out.push(Object.assign({}, r, { sectionReelle:e.fonds || r.fonds }));
+    const anomalies = horsSectionEntry(r);
+    if(anomalies.length) out.push(Object.assign({}, r, { anomalies, anomaliesText: anomaliesText(anomalies) }));
   }
   return out.sort((a,b)=>b.ts-a.ts);
 }
 function horsSectionCount(group){
   let n=0;
-  for(const bc in scans){ const r=scans[bc]; if(traveeGroupOf(r.travee)===group && horsSectionEntry(r)) n++; }
+  for(const bc in scans){ const r=scans[bc]; if(traveeGroupOf(r.travee)===group && horsSectionEntry(r).length) n++; }
   return n;
 }
 

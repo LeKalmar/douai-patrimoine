@@ -89,13 +89,18 @@ async function syncXmlFromR2() {
 }
 
 // Extrait les champs utiles d'un item GESMARC, ou null s'il est hors
-// périmètre (pas de code-barre, ou bibliothèque hors réseau Douai — même
-// filtre que build-magasins.mjs/build-cotes-numeriques.mjs).
+// périmètre (pas de code-barre).
+// Jusqu'au 2026-09-25, les bibliothèques hors Douai (Cuincy…) étaient
+// écartées ici. Elles sont désormais gardées : certains de leurs livres sont
+// physiquement chez nous, et recolement.html doit les reconnaître au scan
+// pour les signaler en « mauvaise bibliothèque ». Les exports qui doivent
+// rester limités à Douai filtrent eux-mêmes sur bibliotheque_libelle
+// (export-desherbage.mjs, export-cotes-numeriques.mjs ; _isMagasin dans
+// export-magasins.mjs).
 function extractItem(props) {
   const barcode = (props['Code-barres (valeur)'] || '').trim();
   if (!barcode) return null;
   const bibliotheque = props['Bibliothèque (Libellé)'] || '';
-  if (!bibliotheque.startsWith('Douai')) return null;
 
   const cote1 = props['Cote n° 1'] || null;
   const cote2 = props['Cote n° 2'] || null;
@@ -249,12 +254,12 @@ async function main() {
     }
 
     if (totalItems % CONFIG.logEvery === 0) {
-      console.log(`    … ${totalItems} items lus, ${keptDouai} Douai, ${skippedReserve} déjà réserve (ignorés), ${upserted} upsertés`);
+      console.log(`    … ${totalItems} items lus, ${keptDouai} gardés, ${skippedReserve} déjà réserve (ignorés), ${upserted} upsertés`);
     }
   }
   upserted += await flushBatch(pool, batch);
 
-  console.log(`  · terminé : ${totalItems} items lus, ${keptDouai} Douai gardés, ${skippedReserve} déjà réserve (ignorés), ${upserted} upsertés en source='bib_xml' (dont ${added} nouveaux)`);
+  console.log(`  · terminé : ${totalItems} items lus, ${keptDouai} gardés (toutes bibliothèques), ${skippedReserve} déjà réserve (ignorés), ${upserted} upsertés en source='bib_xml' (dont ${added} nouveaux)`);
 
   await pool.query(
     `INSERT INTO sync_runs (source, started_at, finished_at, notices_upserted, exemplaires_upserted, status)

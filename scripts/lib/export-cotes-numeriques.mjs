@@ -34,7 +34,7 @@ function numericLocDigitRun(cote) {
 export async function exportCotesNumeriques() {
   const pool = getPool({ unpooled: true });
   const { rows } = await pool.query(`
-    SELECT raw FROM exemplaires WHERE source = 'bib_xml'
+    SELECT raw FROM exemplaires WHERE source = 'bib_xml' AND bibliotheque_libelle LIKE 'Douai%'
   `);
 
   const items = [];

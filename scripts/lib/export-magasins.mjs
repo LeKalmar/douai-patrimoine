@@ -38,15 +38,21 @@ const VIGNETTE_BASE_URL = 'https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/v
 export async function exportMagasins() {
   const pool = getPool({ unpooled: true });
   const { rows } = await pool.query(`
-    SELECT raw FROM exemplaires WHERE source = 'bib_xml'
+    SELECT raw, piege_a_code, piege_b_code FROM exemplaires WHERE source = 'bib_xml'
   `);
 
-  const items = rows.map(({ raw: props }) => {
+  const items = rows.map(({ raw: props, piege_a_code, piege_b_code }) => {
     const bibliotheque = props['Bibliothèque (Libellé)'] || '';
     const section = props['Section (Libellé)'] || '';
     const barcode = (props['Code-barres (valeur)'] || '').trim();
     const piege = (props['Pièges'] || '').trim() || null;
-    const isMag = MAGASIN_SECTIONS.includes(section) || isPiegeEnReserve(piege);
+    // Depuis 2026-09-25 la base contient aussi les autres bibliothèques du
+    // réseau (Cuincy…) : elles restent dans l'export — recolement.html doit
+    // reconnaître au scan un de leurs livres retrouvé chez nous, pour le
+    // signaler en « mauvaise bibliothèque » — mais jamais dans le périmètre
+    // magasins (magasins.html, statistiques de progression du récolement).
+    const isMag = bibliotheque.startsWith('Douai')
+      && (MAGASIN_SECTIONS.includes(section) || isPiegeEnReserve(piege));
 
     const cote1 = props['Cote n° 1'] || '';
     const cote2 = props['Cote n° 2'] || '';
@@ -69,6 +75,10 @@ export async function exportMagasins() {
       _secteur: section,
       _bibliotheque: bibliotheque,
       _piege: piege,
+      // Codes piège 921$a/921$b structurés (colonnes typées, pas le texte
+      // libre de 'Pièges') — lus par classementAnomalies() de recolement.html.
+      _piegeA: piege_a_code || null,
+      _piegeB: piege_b_code || null,
       _fondsLabel: isMag ? fondsLabel(digitRun, section) : (section || 'Section inconnue'),
     };
   });
