@@ -1629,6 +1629,22 @@ notices/551 notices multi-exemplaires/178 groupes de reliure côté réserve ;
 (`GROUP BY barcode HAVING count(*)>1` → 0 ligne). Les deux scripts sont
 rejouables sans dupliquer (`INSERT ... ON CONFLICT`, jamais de `TRUNCATE`).
 
+**Actualisation incrémentale depuis un export partiel (2026-09-25).** Entre
+deux `bib.xml` complets, un export Syracuse « exemplaires modifiés depuis »
+(même format GESMARC, mêmes champs) déposé dans `data/xml/update/` s'applique
+avec `npm run db:update:bib -- data/xml/update/<fichier>.xml` : même upsert
+que `db:migrate:bib` (code-barre connu → mis à jour, inconnu → ajouté,
+réserve ignorée), jamais de suppression — et c'est voulu : l'équipe ne
+supprime pas les exemplaires morts dans Syracuse, elle les garde pour le
+suivi en les **piégeant** (Pilon, Perdu…). Ils arrivent donc dans l'export
+partiel avec leur nouveau piège, qui se propage tel quel. Le script
+avance aussi le `generatedAt` de `data/magasins-build-report.json` (liste
+dans `incrementalUpdates`, stats du dernier build complet inchangées) :
+c'est la clé du cache IndexedDB de `recolement.html`, sans quoi les postes
+garderaient l'ancien catalogue magasins. Premier passage : export du
+2026-09-25 (modifs depuis le 10/09), 4 700 items, 4 381 upsertés dont 762
+nouveaux, 4 codes-barres réserve ignorés.
+
 **Historique : la limite de 512 Mo du plan gratuit Neon, atteinte le
 2026-09-09 — l'une des raisons du passage à un Postgres local, où elle ne
 s'applique plus.** Conservé ici parce que le raisonnement sur `raw jsonb`
@@ -1895,7 +1911,14 @@ rouge « ⚠ Anomalie de classement » dans le panneau de feedback du scan, et
 alimente une liste supplémentaire des « Statistiques avancées » —
 `ADV_CATS.horssection` (`horsSectionList()`), avec le même export `.txt`
 que les autres catégories — pour repérer les documents à reclasser ou à
-corriger dans Syracuse. Cette liste reste vide côté groupe « Réserve » (un
+corriger dans Syracuse. **Depuis 2026-09-25, cette liste est évaluée en
+direct** (`horsSectionEntry()`) contre le catalogue magasins actuel, comme
+« scannés non catalogués » : jusque-là elle ne relisait que le drapeau
+`horsSection` figé au moment du scan, si bien qu'un document reclassé dans
+Syracuse n'en sortait jamais (constaté : 1 652 anomalies affichées au 5e
+étage, dont 1 532 déjà corrigées). Le drapeau stocké ne sert plus que de
+repli si le catalogue n'est pas chargé ou ne connaît pas le code-barre ; il
+reste aussi utilisé pour le badge du panneau de feedback au moment du scan. Cette liste reste vide côté groupe « Réserve » (un
 scan de la réserve patrimoniale/Douaisienne n'a aucun moyen de poser
 `horsSection`), affichée par la même génération générique de template que
 le reste sans code spécifique par groupe.

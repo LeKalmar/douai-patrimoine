@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-10T06:52:15.847Z",
+  "generatedAt": "2026-09-25T15:18:24.910Z",
   "durationMs": 101800,
   "stats": {
     "totalItems": 291022,
@@ -113,5 +113,16 @@
     "100048-172 DIO 937.05",
     "100048-173 DIO 930",
     "100048-174 EUS 885.01"
+  ],
+  "incrementalUpdates": [
+    {
+      "file": "ExportSyracuse_Exemplaire_20260925_171259.xml",
+      "appliedAt": "2026-09-25T15:18:24.910Z",
+      "itemsRead": 4700,
+      "keptDouai": 4385,
+      "skippedReserve": 4,
+      "upserted": 4381,
+      "added": 762
+    }
   ]
 }

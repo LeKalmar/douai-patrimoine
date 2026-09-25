@@ -30,18 +30,37 @@
  * Script LOCAL uniquement (jamais une fonction Vercel — fichier de 738+ Mo
  * en flux), comme scripts/build-magasins.mjs aujourd'hui.
  *
+ * Actualisation incrémentale (2026-09-25) : `--input <fichier.xml>` lit un
+ * export GESMARC partiel (ex. « exemplaires modifiés depuis le dernier
+ * export général », déposé dans data/xml/update/) au lieu de bib.xml. Même
+ * format, mêmes champs, même upsert : un code-barre déjà présent est mis à
+ * jour (cote, section, piège, état, prêts… — `raw` est remplacé en entier),
+ * un code-barre inconnu est ajouté. Rien n'est jamais supprimé, et c'est
+ * voulu : les exemplaires morts restent dans Syracuse pour le suivi, marqués
+ * par un piège (Pilon, Perdu…), qui arrive avec l'export partiel comme
+ * n'importe quelle autre modification. Dans ce mode, le
+ * `generatedAt` de data/magasins-build-report.json est avancé (le reste du
+ * rapport est conservé, l'actualisation notée dans `incrementalUpdates`) :
+ * c'est la clé de fraîcheur du cache IndexedDB du catalogue magasins de
+ * recolement.html (js/catalog-cache.js) — sans ça, les postes ayant déjà
+ * ouvert la page garderaient l'ancien catalogue.
+ *
  * Aucune dépendance npm au-delà de `pg`. Node ≥ 18.
  * ────────────────────────────────────────────────────────────────────────────
  */
-import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve, basename } from 'node:path';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
 import { iterateGesmarcItemsFromFile, parseGesmarcItem } from './lib/gesmarc.mjs';
 import { getPool, buildBatchInsert, closeAllPools } from './lib/pg.mjs';
 
+const inputArgIdx = process.argv.indexOf('--input');
+const INCREMENTAL_INPUT = inputArgIdx !== -1 ? process.argv[inputArgIdx + 1] : null;
+
 const CONFIG = {
   r2Key: 'xml/bib.xml',
-  input: 'data/xml/bib.xml',
+  input: INCREMENTAL_INPUT || 'data/xml/bib.xml',
+  magasinsReport: 'data/magasins-build-report.json',
   batchSize: 500,
   logEvery: 20_000,
 };
@@ -175,13 +194,34 @@ async function flushBatch(pool, itemsByBarcode) {
   return exemplaireRows.length;
 }
 
+// Avance la clé de fraîcheur du cache IndexedDB du catalogue magasins (voir
+// l'en-tête). Ne touche pas aux stats du rapport : elles décrivent le dernier
+// build complet et restent affichées telles quelles dans admin.html.
+function bumpMagasinsReport(entry) {
+  if (!existsSync(CONFIG.magasinsReport)) return;
+  const report = JSON.parse(readFileSync(CONFIG.magasinsReport, 'utf8'));
+  report.generatedAt = entry.appliedAt;
+  report.incrementalUpdates = [...(report.incrementalUpdates || []), entry];
+  writeFileSync(CONFIG.magasinsReport, JSON.stringify(report, null, 2) + '\n');
+  console.log(`  · ${CONFIG.magasinsReport} : generatedAt avancé (cache catalogue de recolement.html invalidé)`);
+}
+
 async function main() {
   const startedAt = Date.now();
-  console.log('▶ db-migrate-bib: démarrage');
+  const runStartedAt = new Date();
+  console.log(`▶ db-migrate-bib: démarrage${INCREMENTAL_INPUT ? ` (actualisation incrémentale : ${INCREMENTAL_INPUT})` : ''}`);
 
-  await syncXmlFromR2();
+  if (INCREMENTAL_INPUT) {
+    if (!existsSync(INCREMENTAL_INPUT)) throw new Error(`${INCREMENTAL_INPUT} introuvable.`);
+  } else {
+    await syncXmlFromR2();
+  }
 
   const pool = getPool({ unpooled: true });
+
+  const { rows: bibRows } = await pool.query(`SELECT barcode FROM exemplaires WHERE source = 'bib_xml' AND barcode IS NOT NULL`);
+  const knownBibBarcodes = new Set(bibRows.map(r => r.barcode));
+  let added = 0;
 
   console.log('  · pré-filtre : chargement des codes-barres déjà réserve...');
   const { rows: reserveRows } = await pool.query(`SELECT barcode FROM exemplaires_reserve WHERE barcode IS NOT NULL`);
@@ -201,6 +241,7 @@ async function main() {
 
     if (reserveBarcodes.has(it.barcode)) { skippedReserve++; continue; }
 
+    if (!knownBibBarcodes.has(it.barcode)) { added++; knownBibBarcodes.add(it.barcode); }
     batch.set(it.barcode, it);
     if (batch.size >= CONFIG.batchSize) {
       upserted += await flushBatch(pool, batch);
@@ -213,7 +254,25 @@ async function main() {
   }
   upserted += await flushBatch(pool, batch);
 
-  console.log(`  · terminé : ${totalItems} items lus, ${keptDouai} Douai gardés, ${skippedReserve} déjà réserve (ignorés), ${upserted} upsertés en source='bib_xml'`);
+  console.log(`  · terminé : ${totalItems} items lus, ${keptDouai} Douai gardés, ${skippedReserve} déjà réserve (ignorés), ${upserted} upsertés en source='bib_xml' (dont ${added} nouveaux)`);
+
+  await pool.query(
+    `INSERT INTO sync_runs (source, started_at, finished_at, notices_upserted, exemplaires_upserted, status)
+     VALUES ($1, $2, now(), $3, $3, 'ok')`,
+    [INCREMENTAL_INPUT ? 'bib_xml_update' : 'bib_xml', runStartedAt, upserted],
+  );
+
+  if (INCREMENTAL_INPUT) {
+    bumpMagasinsReport({
+      file: basename(INCREMENTAL_INPUT),
+      appliedAt: new Date().toISOString(),
+      itemsRead: totalItems,
+      keptDouai,
+      skippedReserve,
+      upserted,
+      added,
+    });
+  }
 
   const dur = ((Date.now() - startedAt) / 1000).toFixed(2);
   console.log(`✓ db-migrate-bib: terminé en ${dur}s`);

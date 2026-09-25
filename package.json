@@ -27,6 +27,7 @@
     "db:test": "node scripts/db-test.mjs",
     "db:migrate:reserve": "node scripts/db-migrate-reserve.mjs",
     "db:migrate:bib": "node scripts/db-migrate-bib.mjs",
+    "db:update:bib": "node scripts/db-migrate-bib.mjs --input",
     "db:migrate:non-catalogues": "node scripts/db-migrate-non-catalogues.mjs",
     "db:migrate:spolies": "node scripts/db-migrate-spolies.mjs",
     "db:migrate:fonds-car": "node scripts/db-migrate-fonds-car.mjs",

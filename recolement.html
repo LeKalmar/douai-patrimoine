@@ -3005,14 +3005,34 @@ function scannedCount(group){
 // record.fonds porte déjà le libellé de cette section réelle (_fondsLabel
 // posé par build-magasins.mjs pour les exemplaires hors magasin — voir
 // CLAUDE.md), pas besoin d'une structure de données séparée.
+//
+// Évalué EN DIRECT contre le catalogue actuel (2026-09-25), plus seulement
+// sur le drapeau posé au moment du scan : un document reclassé en
+// Magasin dans Syracuse sort de la liste dès que le catalogue est
+// actualisé (npm run db:update:bib), sans rescan — et un document scanné
+// en magasin puis sorti de la section Magasin y entre. Le drapeau stocké
+// ne sert plus que de repli quand le catalogue magasins n'est pas (encore)
+// chargé ou ne connaît pas ce code-barre.
+function horsSectionEntry(r){
+  if(traveeGroupOf(r.travee)==='reserve') return null;
+  const cat = catalogByGroup.magasin;
+  const e = cat ? cat[r.barcode] : null;
+  if(e) return inGroupScope(e) ? null : e;
+  return r.horsSection ? { fonds:r.fonds } : null;
+}
 function horsSectionList(group){
-  return Object.values(scans).filter(r=>r.horsSection && traveeGroupOf(r.travee)===group)
-    .map(r=>Object.assign({}, r, { sectionReelle:r.fonds }))
-    .sort((a,b)=>b.ts-a.ts);
+  const out = [];
+  for(const bc in scans){
+    const r = scans[bc];
+    if(traveeGroupOf(r.travee)!==group) continue;
+    const e = horsSectionEntry(r);
+    if(e) out.push(Object.assign({}, r, { sectionReelle:e.fonds || r.fonds }));
+  }
+  return out.sort((a,b)=>b.ts-a.ts);
 }
 function horsSectionCount(group){
   let n=0;
-  for(const bc in scans){ const r=scans[bc]; if(r.horsSection && traveeGroupOf(r.travee)===group) n++; }
+  for(const bc in scans){ const r=scans[bc]; if(traveeGroupOf(r.travee)===group && horsSectionEntry(r)) n++; }
   return n;
 }
 
