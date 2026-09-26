@@ -101,11 +101,25 @@ export async function readVoyageursFromDb() {
   }));
 }
 
+// Au-delà, on sert le repli. Constaté le 2026-09-25 : après un plantage, une
+// instance Postgres acceptait encore les connexions mais ne répondait plus aux
+// requêtes — sans délai, la route restait pendante et la page publique vide,
+// le repli ne se déclenchant jamais (aucune erreur levée).
+const DB_TIMEOUT_MS = 4000;
+
 export async function exportVoyageurs() {
+  let timer;
   try {
-    return await readVoyageursFromDb();
+    return await Promise.race([
+      readVoyageursFromDb(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`pas de réponse en ${DB_TIMEOUT_MS / 1000} s`)), DB_TIMEOUT_MS);
+      }),
+    ]);
   } catch (err) {
     console.warn(`[voyageurs] base indisponible (${err.message}) — repli sur ${SNAPSHOT}`);
     return JSON.parse(await readFile(SNAPSHOT, 'utf-8'));
+  } finally {
+    clearTimeout(timer);
   }
 }

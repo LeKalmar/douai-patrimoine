@@ -80,6 +80,7 @@ const MIME = {
   '.pdf': 'application/pdf',
   '.csv': 'text/csv; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
+  '.pmtiles': 'application/vnd.pmtiles',
 };
 
 /* Extensions dont le contenu gagne à être compressé à la volée (voir
@@ -159,6 +160,25 @@ async function handleApi(req, res, url) {
 
 // ─── Fichiers statiques ─────────────────────────────────────────────────────
 
+/** En-tête Range « bytes=début-fin » (une seule plage, forme utilisée par
+    les lecteurs PMTiles) → {start, end} inclusifs, null sans en-tête (ou
+    forme non gérée : on sert alors le fichier entier, ce que la norme
+    autorise), 'invalide' si la plage sort du fichier. */
+function parseRange(header, size) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header || '');
+  if (!m || (m[1] === '' && m[2] === '')) return null;
+  let start, end;
+  if (m[1] === '') {              // « bytes=-N » : les N derniers octets
+    start = Math.max(0, size - Number(m[2]));
+    end = size - 1;
+  } else {
+    start = Number(m[1]);
+    end = m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
+  }
+  if (start >= size || start > end) return 'invalide';
+  return { start, end };
+}
+
 async function handleStatic(req, res, url) {
   let rel = decodeURIComponent(url.pathname);
   if (rel === '/') rel = '/index.html';
@@ -187,6 +207,25 @@ async function handleStatic(req, res, url) {
       sendCompressed(req, res, await readFile(finalPath));
       return;
     }
+    // Lecture par morceaux (en-tête Range) : indispensable aux archives
+    // PMTiles (fond de carte de voyageurs.html), dont le navigateur ne lit que
+    // les quelques Ko de chaque tuile affichée, jamais le fichier entier.
+    res.setHeader('Accept-Ranges', 'bytes');
+    const range = parseRange(req.headers.range, finalStat.size);
+    if (range === 'invalide') {
+      res.statusCode = 416;
+      res.setHeader('Content-Range', `bytes */${finalStat.size}`);
+      res.end();
+      return;
+    }
+    if (range) {
+      res.statusCode = 206;
+      res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${finalStat.size}`);
+      res.setHeader('Content-Length', range.end - range.start + 1);
+      createReadStream(finalPath, range).pipe(res);
+      return;
+    }
+    res.setHeader('Content-Length', finalStat.size);
     createReadStream(finalPath).pipe(res);
   } catch {
     res.statusCode = 404;

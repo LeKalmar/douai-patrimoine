@@ -1327,29 +1327,75 @@ des `CHECK` SQL) :
 Technique : **MapLibre 5.24.0** (projection globe, absente des 3.6.2/4.7.1
 des autres cartes — ne pas « harmoniser » vers le bas).
 
-Fond de carte **vectoriel, aux couleurs du site** (2026-09-25, demande
-explicite — plus aucune imagerie satellite ni raster d'hébergeur) :
-- **Eau et terres : Natural Earth 1:50m** (domaine public) — terres, lacs,
-  fleuves, servis en local depuis `data/natural-earth/*.json`. Régénérés par
-  `npm run build:natural-earth` (`scripts/build-natural-earth.mjs` :
-  téléchargement depuis le dépôt officiel nvkelso/natural-earth-vector,
-  propriétés retirées sauf `scalerank`, coordonnées arrondies à 3 décimales ;
-  1,9 Mo bruts, ~0,6 Mo compressés). Extension `.json` et non `.geojson`
-  pour passer par la compression du serveur (`TEXT_EXT`). Les petits lacs
-  et fleuves n'apparaissent qu'en zoomant (filtre sur `scalerank`).
+Fond de carte **vectoriel, aux couleurs du site, streamé en tuiles**
+(2026-09-25 ; passé en tuiles PMTiles et au 1:10m le 2026-09-26, demande
+explicite — aucune imagerie satellite) :
+- **Eau, terres, lacs, fleuves, bathymétrie : Natural Earth 1:10m** (domaine
+  public, la plus fine résolution publiée), compléments régionaux compris
+  (petites îles, lacs et fleuves d'Europe/Amérique du Nord/Australie).
+  `npm run build:natural-earth` (`scripts/build-natural-earth.mjs`, ~25 s)
+  télécharge les couches, les découpe en tuiles vectorielles MVT du zoom 0 au
+  zoom 7 (`MAX_ZOOM`, la carte sur-zoome jusqu'à 8) et les range dans UNE
+  archive `data/natural-earth/fond.pmtiles` (~22 Mo, gitignorée : elle se
+  regénère). Couches (`source-layer`) : `terres`, `lacs`, `fleuves`,
+  `bathymetrie` (propriété `depth`, paliers 200 → 10 000 m emboîtés, écrits du
+  moins au plus profond ; L_0 omis, c'est la couleur de fond). Lacs et
+  fleuves n'entrent dans une tuile qu'à partir de leur `min_zoom` Natural
+  Earth moins un.
+- **Pourquoi des tuiles** : la première version servait des GeoJSON 1:50m
+  (et une bathymétrie 1:10m simplifiée à 0,1°) que le navigateur devait
+  télécharger en entier puis redécouper à chaque zoom — lent, et trop
+  grossier une fois zoomé sur une expédition. Le lecteur PMTiles
+  (`pmtiles@4.5.0` depuis jsDelivr, protocole `pmtiles://` enregistré dans
+  `js/voyageurs.js`) ne lit que les tuiles de la vue par requêtes HTTP Range :
+  mesuré 389 Ko pour la vue d'ensemble, ~750 Ko après un zoom sur Rimbaud,
+  sur 21,6 Mo d'archive.
+- **Sans dépendance npm** (`npm` était de toute façon cassé sur ce poste le
+  2026-09-26 — module interne `./tlog` manquant) : le découpage est fait par
+  `geojson-vt` 5.0.2, téléchargé à la volée depuis jsDelivr et **refusé si
+  l'empreinte SHA-256 d'un fichier diffère** (`GVT_FILES`) ; l'encodage
+  protobuf MVT et l'écriture de l'archive PMTiles v3 (numérotation de
+  Hilbert, répertoires compressés, dédoublonnage des tuiles identiques) sont
+  écrits à la main dans le script. **Piège** : `geojson-vt` 5 ne réoriente
+  plus les anneaux des polygones (les versions précédentes le faisaient) ;
+  le script les réoriente lui-même (`rewindPolygon()`, extérieur horaire en
+  lng/lat) avant le découpage.
+- **Où est servie l'archive** : `FOND_CARTE_URL` dans `js/voyageurs.js`.
+  Aujourd'hui le serveur local (`handleStatic()` gère désormais l'en-tête
+  `Range` — réponse 206/416 — indispensable à PMTiles ; un serveur lancé avant
+  ce changement renvoie le fichier entier et la carte reste vide). Cible :
+  le bucket R2 **public** des images de `visionneuse.html`
+  (`pub-85062da5…r2.dev`), qui accepte déjà Range et CORS `*` (vérifié). Les
+  clés R2 du `.env` sont limitées au bucket privé `douai-patrimoine` (liste
+  des buckets refusée) : le dépôt sur le bucket public se fait à la main,
+  puis on change `FOND_CARTE_URL`.
 - **Relief : Copernicus DEM GLO-30**, via les tuiles d'élévation publiques
   Mapterhorn (`tiles.mapterhorn.com`, Terrarium/WebP 512 px, base mondiale
-  = GLO-30 — vérifié dans leur `attribution.json`). MapLibre en calcule un
-  ombrage (`hillshade`) qui module la couleur de la terre ; c'est le seul
-  élément non vectoriel. Service tiers : si Mapterhorn devient indisponible,
-  seul l'ombrage disparaît, la carte reste lisible.
-- Couleurs regroupées dans `THEME` en tête de la section carte de
-  `js/voyageurs.js` : eau `--bleu`, terre `--corail` (essai demandé « pour
-  voir si ce n'est pas choquant »), versants à l'ombre `--warm-dark`, au
-  soleil `--rose`. Tous les tracés ont un liseré `--papier` — sans lui, un
-  tracé bleu sur la mer bleue ou carmin sur la terre corail serait
-  illisible. Fond autour du globe : papier (un fond « espace » bleu nuit ne
-  détachait plus une mer bleue).
+  = GLO-30 — vérifié dans leur `attribution.json`), ombrage `hillshade`
+  calculé par MapLibre. Les tuiles de pleine mer répondent 404 (normal, ça
+  s'affiche en console). Si Mapterhorn tombe, seul l'ombrage disparaît.
+- Couleurs dans `THEME` (`js/voyageurs.js`) : terre `--rose` (le corail a été
+  essayé puis écarté le 2026-09-25), mer en dégradé du blanc (hauts-fonds)
+  vers `--bleu` selon `PROFONDEURS`, plafonné à ~60 % de bleu pour ne jamais
+  retomber sur le bleu vif en aplat ; versants à l'ombre `--warm-dark`, au
+  soleil blanc ; trajet restant en pointillé `--ink-soft`. Tous les tracés ont
+  un liseré `--papier`. Fond autour du globe : papier.
+- **Initialisation sur `style.load`, pas `load`** : `load` attend toutes
+  les tuiles de la vue initiale, relief distant compris — tracés et portraits
+  mettaient jusqu'à 38 s à apparaître en rendu logiciel (3,5 s après).
+- **Tracé parcouru** : la ligne complète du voyage est chargée une fois
+  (source `vy-active`, `lineMetrics: true`) et le trait parcouru n'est qu'un
+  `line-gradient` en escalier coupé à la position du voyageur. Renvoyer à
+  chaque image la géométrie partielle par `setData()` (première version)
+  obligeait MapLibre à la redécouper sans cesse ; le trait n'apparaissait
+  plus. La coupure est exprimée en longueur **Mercator** (`pathMerc`), l'unité
+  de `['line-progress']`, pas en kilomètres — sinon elle dériverait de
+  l'icône sur les longs trajets nord-sud.
+- `/data/voyageurs.json` : repli sur le fichier committé au bout de 4 s sans
+  réponse de la base (`DB_TIMEOUT_MS`, `scripts/lib/export-voyageurs.mjs`).
+  Constaté le 2026-09-25 : après un plantage, une instance Postgres acceptait
+  les connexions sans jamais répondre, la route restait pendante et la page
+  vide.
 
 `cooperativeGestures` en mode iframe, hauteur fixe 640 px sous
 `.rp-embedded` (pas de `vh`), toutes les surcouches en `position:absolute`

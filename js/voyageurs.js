@@ -339,17 +339,25 @@
   var couleurProfondeur = ['match', ['get', 'depth']];
   PROFONDEURS.slice(1).forEach(function (p) { couleurProfondeur.push(p[0], eau(p[1])); });
   couleurProfondeur.push(eau(PROFONDEURS[PROFONDEURS.length - 1][1]));
+  /* Archive du fond de carte (npm run build:natural-earth). Servie par le
+     serveur local en attendant son dépôt sur le bucket R2 public des images
+     (celui de visionneuse.html, qui accepte déjà les lectures par morceaux et
+     les requêtes de toute origine) : il suffira alors de remplacer cette URL
+     par https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/<chemin>. */
+  var FOND_CARTE_URL = new URL('data/natural-earth/fond.pmtiles', location.href).href;
+  maplibregl.addProtocol('pmtiles', new pmtiles.Protocol().tile);
+
   var map = new maplibregl.Map({
     container: 'vy-map',
     style: {
       version: 8,
       projection: { type: 'globe' },
       sources: {
-        terres: { type: 'geojson', data: 'data/natural-earth/land.json',
+        // Tuiles vectorielles Natural Earth 1:10m (couches terres, lacs,
+        // fleuves, bathymetrie), lues par morceaux dans une seule archive
+        // PMTiles — voir FOND_CARTE_URL.
+        fond: { type: 'vector', url: 'pmtiles://' + FOND_CARTE_URL,
           attribution: '<a href="https://www.naturalearthdata.com">Natural Earth</a>' },
-        bathymetrie: { type: 'geojson', data: 'data/natural-earth/bathymetry.json' },
-        lacs: { type: 'geojson', data: 'data/natural-earth/lakes.json' },
-        fleuves: { type: 'geojson', data: 'data/natural-earth/rivers.json' },
         elevation: {
           type: 'raster-dem',
           tiles: ['https://tiles.mapterhorn.com/{z}/{x}/{y}.webp'],
@@ -366,9 +374,9 @@
         { id: 'eau', type: 'background', paint: { 'background-color': eau(PROFONDEURS[0][1]) } },
         // Paliers emboîtés, écrits du moins au plus profond : chacun recouvre
         // le précédent là où la mer est plus profonde.
-        { id: 'bathymetrie', type: 'fill', source: 'bathymetrie',
+        { id: 'bathymetrie', type: 'fill', source: 'fond', 'source-layer': 'bathymetrie',
           paint: { 'fill-color': couleurProfondeur, 'fill-antialias': false } },
-        { id: 'terres', type: 'fill', source: 'terres',
+        { id: 'terres', type: 'fill', source: 'fond', 'source-layer': 'terres',
           paint: { 'fill-color': THEME.terre, 'fill-antialias': true } },
         { id: 'relief', type: 'hillshade', source: 'elevation',
           paint: {
@@ -377,13 +385,11 @@
             'hillshade-highlight-color': THEME.lumiere,
             'hillshade-accent-color': THEME.ombre
           } },
-        // Petits lacs et fleuves secondaires seulement en zoomant (scalerank
-        // 0 = les plus importants).
-        { id: 'lacs', type: 'fill', source: 'lacs',
-          filter: ['<=', ['get', 'scalerank'], ['step', ['zoom'], 2, 3, 5, 5, 99]],
+        // Petits lacs et cours d'eau : déjà écartés des tuiles des vues
+        // d'ensemble au build (min_zoom Natural Earth), aucun filtre ici.
+        { id: 'lacs', type: 'fill', source: 'fond', 'source-layer': 'lacs',
           paint: { 'fill-color': eau(0.17) } },
-        { id: 'fleuves', type: 'line', source: 'fleuves',
-          filter: ['<=', ['get', 'scalerank'], ['step', ['zoom'], 3, 3, 6, 5, 99]],
+        { id: 'fleuves', type: 'line', source: 'fond', 'source-layer': 'fleuves',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: {
             'line-color': eau(0.35),
@@ -402,7 +408,6 @@
       'CooperativeGesturesHandler.MobileHelpText': 'Utilisez deux doigts pour déplacer la carte'
     }
   });
-  window.__vyMap = map; // DEBUG TEMPORAIRE
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
