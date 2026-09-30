@@ -1469,6 +1469,57 @@ via PapaParse). `csv/inventaire.csv` (24,5 Mo) reste très en-deçà de la
 limite de longueur d'une string V8 (contrairement à `xml/bib.xml`,
 plusieurs Go) : lu entièrement en mémoire, pas en flux.
 
+## Inventaire public : modale, recherche avancée, Cartes et Périodiques (2026-09-30)
+
+Porté depuis la branche `local-server` (site servi en local, données en
+Postgres), adapté à `main` (Vercel). Côté page, le code est celui de
+`local-server` (`inventaire.html`, `js/inventaire.js`, `js/inventaire-page.js`,
+`inventaire-thumbnail.css`, `visionneuse.html`) : notice ouverte dans une
+**modale** (`openDetailModal()`) au lieu d'une ligne dépliée ; visionneuse
+**dans la même modale** (`openViewerInModal()`, iframe
+`visionneuse.html?…&modal=1` sans barre latérale, bouton plein écran) ;
+**recherche avancée** (lignes catégorie + valeur à suggestions : type, lieu,
+langue, auteur) ; facettes Langue et Date (« Sans date connue »), « Voir
+plus » au-delà de 12 valeurs ; tri par défaut sur la date ; lieux d'édition
+normalisés (adresse d'éditeur tronquée à la ville) ; cartes de fonds triées
+par volume.
+
+**Ce qui diffère de `local-server` — la source des données :**
+
+- **Pas d'`/api/inventaire`.** L'inventaire complet pèse ~20 Mo, au-delà de
+  la limite de réponse d'une fonction Vercel (4,5 Mo). `load()` recompose donc
+  trois fichiers statiques (CDN, compressés sans rien coder) :
+  `data/inventaire.json` + `data/non-catalogues.json` +
+  `data/fonds-complementaires.json`. Neon n'est pas lu à l'exécution.
+- **`_langue`/`_typeDocument`** (libellé de 101$a / 920$t) sont posés par
+  `buildItems()` (`scripts/lib/reserve-index.mjs`, tables
+  `scripts/lib/langue-labels.mjs`/`type-document-labels.mjs`), donc par
+  `npm run build` — y compris le build Vercel à chaque déploiement.
+- **Cartes géographiques et Périodiques** : `npm run build:fonds-complementaires`
+  (`scripts/build-fonds-complementaires.mjs`) lit `csv/Fonds CAR.csv`,
+  `csv/periodiques.csv` et `csv/periodiques2.csv` avec les MÊMES modules de
+  transformation que `local-server` (`scripts/lib/fonds-car-record.mjs`,
+  `fonds-periodiques-record.mjs`) et les mêmes règles de rapprochement
+  periodiques2 → periodiques (par titre, puis par numéro de cote). 425 cartes
+  + 106 périodiques cotés au 2026-09-30. À relancer après modification d'un de
+  ces CSV, puis committer le JSON.
+- **La surcouche Syracuse est conservée** (retirée sur `local-server`, toujours
+  active ici) : appliquée dans `load()` avant le calcul de `_year`/`_hay`.
+- **Presse numérisée** : le calendrier année → mois → jour
+  (`buildPresseCalendar()`) est présent mais inerte — `js/presse-index.json` et
+  la branche « Périodiques » du manifeste n'existent pas sur `main`, les scans
+  n'étant servis qu'en local (`/presse-local/`) tant qu'ils ne sont pas sur R2.
+  Le 404 sur `js/presse-index.json` est attendu. Une fois les scans versés,
+  porter `build-manifest-presse.mjs --r2` et ses deux sorties.
+- **Modale en iframe** : si la page hôte envoie `hostViewport`,
+  `openDetailModal()` laisse `js/parent-page-height.js` caler la surcouche sur
+  la zone visible (`rpEmbed.placeOverlays()`) au lieu du `scrollIntoView` de
+  repli ; la boîte est plafonnée à cette hauteur
+  (`html.rp-embedded .inv-detail-box`).
+- `style.css` : `html { max-width: 1100px; margin: 0 auto }`, venu avec la
+  modale sur `local-server` — s'applique à toutes les pages qui chargent
+  cette feuille.
+
 ## Transfert 2e étage → réserve patrimoniale
 
 `transfert-magasins.html` (2026-08-21) répond à un besoin distinct de
