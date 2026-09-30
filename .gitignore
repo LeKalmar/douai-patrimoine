@@ -12,3 +12,4 @@ _syracuse.pages
 # Fond de carte de voyageurs.html (archive PMTiles de ~22 Mo) : se regénère
 # en 25 s par `npm run build:natural-earth`, destiné au bucket R2 public.
 data/natural-earth/
+syracuse.html

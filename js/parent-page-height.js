@@ -80,6 +80,11 @@
 
     var lastSent = -1;
     var timer = null;
+    /* Renvois successifs pour la même hauteur de contenu parce que le cadre
+       n'a pas la bonne taille. Plafonné : si la page hôte impose une autre
+       hauteur (script du portail), on ne veut pas d'un ping-pong sans fin. */
+    var MAX_FRAME_RESYNC = 5;
+    var frameResyncCount = 0;
 
     /* Hauteur du contenu, mesurée sur <body> et NON sur
        documentElement.scrollHeight : ce dernier vaut au minimum la hauteur
@@ -99,7 +104,20 @@
     function send(force) {
         var h = contentHeight();
         if (!h) return;
-        if (!force && Math.abs(h - lastSent) < MIN_DELTA) return;
+        if (!force && Math.abs(h - lastSent) < MIN_DELTA) {
+            /* Contenu inchangé… mais le cadre a-t-il encore la hauteur qu'on
+               a demandée ? La page hôte peut l'avoir remise à une hauteur de
+               secours (resize de sa fenêtre, 'load' de l'iframe arrivé après
+               notre dernier envoi) : sans ce renvoi, l'iframe restait trop
+               courte et retrouvait son propre défilement au bout de quelques
+               secondes. Changer la hauteur de l'iframe déclenche un 'resize'
+               ici, d'où l'on arrive. */
+            if (Math.abs(window.innerHeight - h) < MIN_DELTA) return;
+            if (frameResyncCount >= MAX_FRAME_RESYNC) return;
+            frameResyncCount++;
+        } else {
+            frameResyncCount = 0;
+        }
         lastSent = h;
         window.parent.postMessage({ type: MESSAGE_TYPE, height: h }, '*');
     }

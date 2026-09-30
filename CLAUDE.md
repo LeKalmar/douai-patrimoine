@@ -241,6 +241,14 @@ du contenu et l'envoie à la page hôte, qui redimensionne l'iframe. Message —
 sans ce bout de code côté hôte, rien de tout ceci n'opère et l'iframe garde
 sa hauteur fixe.
 
+La page hôte remet l'iframe à une hauteur de secours à chaque `load` (pour
+les pages qui ne mesurent rien, comme la visionneuse). Le script renvoie donc
+sa hauteur dès que son cadre n'a plus la hauteur demandée, même si le contenu
+n'a pas changé (`resize` de l'iframe, `window.innerHeight` ≠ hauteur mesurée,
+5 renvois au plus). Sans ce renvoi, une remise à zéro arrivée après les
+derniers envois forcés (2,5 s) laissait l'iframe trop courte, avec son propre
+défilement (corrigé le 2026-09-30).
+
 Le script est inclus **dans `<head>`, sans `defer`**, sur **toutes les pages
 du site sauf `visionneuse.html`** (2026-09-08 ; seule `index.html` l'avait
 auparavant — d'où le double défilement dès qu'on ouvrait `inventaire.html` ou
