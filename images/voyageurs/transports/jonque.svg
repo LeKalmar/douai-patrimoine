@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Jonque — silhouette monochrome dessinée pour l'exposition « Voyageurs
+     douaisiens », dans le style des autres icônes de transport (aplat unique,
+     proue vers la droite). Voiles lattées : bandes horizontales découpées par
+     un clipPath, pour que les lattes restent de vrais vides (le fichier sert
+     de masque CSS, seule l'opacité compte). -->
+<svg width="800px" height="800px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="voiles">
+      <!-- grand-voile -->
+      <path d="M266 66 L190 50 Q118 160 150 282 L272 282 Z"/>
+      <!-- misaine (avant) -->
+      <path d="M400 124 L338 112 Q288 204 314 286 L406 286 Z"/>
+      <!-- artimon (arrière) -->
+      <path d="M130 138 L88 130 Q58 190 80 240 L134 240 Z"/>
+    </clipPath>
+  </defs>
+  <g fill="#000000">
+    <!-- lattes : bandes pleines séparées par des vides de 8 px -->
+    <g clip-path="url(#voiles)">
+      <rect x="40" y="40" width="380" height="36"/>
+      <rect x="40" y="84" width="380" height="36"/>
+      <rect x="40" y="128" width="380" height="36"/>
+      <rect x="40" y="172" width="380" height="36"/>
+      <rect x="40" y="216" width="380" height="36"/>
+      <rect x="40" y="260" width="380" height="36"/>
+    </g>
+    <!-- mâts -->
+    <rect x="258" y="34" width="10" height="282"/>
+    <rect x="392" y="104" width="9" height="210"/>
+    <rect x="123" y="120" width="8" height="150"/>
+    <!-- flamme en tête du grand mât -->
+    <path d="M268 34 L306 44 L268 54 Z"/>
+    <!-- coque : château arrière haut, proue relevée -->
+    <path d="M44 250 L112 262 L128 298 Q262 324 404 310 L468 290 Q446 358 396 402 Q262 424 138 404 Q84 372 60 318 Z"/>
+    <!-- gouvernail -->
+    <path d="M66 346 L100 356 L96 418 L64 412 Z"/>
+  </g>
+</svg>

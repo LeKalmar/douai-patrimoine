@@ -60,7 +60,7 @@ async function seed(force) {
         v.points.forEach((p, k) => etapes.push({
           voyage_id: v.id, ordre: (k + 1) * ORDRE_PAS, lieu: p.lieu,
           lng: p.coord[0], lat: p.coord[1],
-          date_arrivee: p.date, date_depart: p.depart, date_approx: !!p.approx, mode: p.mode,
+          date_arrivee: p.date, date_depart: p.depart, date_approx: !!p.approx, mode: p.mode, zoom: p.zoom,
           arret_titre: p.arret?.titre, arret_texte: p.arret?.texte,
           arret_citation: p.arret?.citation, arret_source: p.arret?.source,
         }));
@@ -73,7 +73,7 @@ async function seed(force) {
       ['expo_voyageurs.voyages', ['id', 'voyageur_id', 'titre', 'sous_titre', 'ordre', 'publie'], voyages],
       ['expo_voyageurs.sources', ['voyage_id', 'ordre', 'reference'], sources],
       ['expo_voyageurs.etapes', ['voyage_id', 'ordre', 'lieu', 'lng', 'lat', 'date_arrivee', 'date_depart',
-        'date_approx', 'mode', 'arret_titre', 'arret_texte', 'arret_citation', 'arret_source'], etapes],
+        'date_approx', 'mode', 'zoom', 'arret_titre', 'arret_texte', 'arret_citation', 'arret_source'], etapes],
     ];
     for (const [table, cols, rows] of inserts) {
       const q = buildBatchInsert(table, cols, rows);

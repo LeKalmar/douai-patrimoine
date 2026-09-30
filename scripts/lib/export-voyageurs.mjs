@@ -46,7 +46,7 @@ export async function readVoyageursFromDb() {
                 FROM expo_voyageurs.ecrits ORDER BY voyageur_id, ordre`),
     pool.query(`SELECT id, voyageur_id, titre, sous_titre
                 FROM expo_voyageurs.voyages WHERE publie ORDER BY voyageur_id, ordre, id`),
-    pool.query(`SELECT voyage_id, lieu, lng, lat, date_arrivee, date_depart, date_approx, mode,
+    pool.query(`SELECT voyage_id, lieu, lng, lat, date_arrivee, date_depart, date_approx, mode, zoom,
                        arret_titre, arret_texte, arret_citation, arret_source
                 FROM expo_voyageurs.etapes ORDER BY voyage_id, ordre`),
     pool.query(`SELECT voyage_id, reference
@@ -90,6 +90,7 @@ export async function readVoyageursFromDb() {
           depart: p.date_depart,
           approx: p.date_approx,
           mode: p.mode,
+          zoom: p.zoom,
           arret: p.arret_titre ? compact({
             titre: p.arret_titre,
             texte: p.arret_texte,

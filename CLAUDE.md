@@ -194,6 +194,7 @@ revenir à un dev solo sans exposition réseau.
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `rotobib.html` | Désherbage assisté par les statistiques de prêt : scan d'un code-barre, fiche + histogramme de prêts sur 4 ans, décision (conserver/pilon/braderie/relocalisation), export .txt par traitement — voir « Rotobib » | **Protégé** |
 | `desherbage-stats.html` | Vue d'ensemble purement statistique (lecture seule) de l'export de désherbage : prêts totaux par année, répartition par prêts cumulés, liste triable des exemplaires — voir « Rotobib » | **Protégé** |
+| `voyageurs-admin.html` | Éditeur de l'exposition « Voyageurs douaisiens » : fiches, tracé des voyages à la souris, étapes et récits — voir « Exposition Voyageurs douaisiens » | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
 `_archive/` contient des pages retirées du site actif (voir
@@ -1278,17 +1279,29 @@ manifeste).
 ont voyagé et, surtout, laissé des récits. Globe MapLibre sur lequel chaque
 voyage est tracé ; un voyage choisi s'anime (inspiration : le compte
 Instagram « Cunning Conquest ») — icône selon le moyen de transport
-(bateau, à pied, attelage, civière), compteur « Jour N / total », date, et
+(bateau, jonque, à pied, attelage, civière, inconnu), compteur « Jour N / total », date, et
 pause à chaque **arrêt raconté** avec une carte de récit (« Continuer ▸ »).
 Barre de progression cliquable (repères = arrêts), vitesses ½× à 4×, la
 caméra suit le voyageur (zoom selon le moyen de transport) jusqu'à ce qu'on
 déplace la carte à la main (bouton « Suivre le voyageur »). Ancre d'URL
 `voyageurs.html#<id du voyage>` pour ouvrir directement un voyage.
 
+Vue d'ensemble (2026-09-26) : **un seul portrait par voyageur**, posé
+au-dessus du point d'arrivée de son voyage qui finit le plus tard (clic =
+ce voyage). Douai reste le repère principal ; les autres villes de départ
+et d'arrivée ont un petit rond de la couleur de l'expédition (en parts si
+plusieurs voyageurs y passent) et le nom du lieu de l'étape (`lieu`, du
+premier voyage rencontré quand deux extrémités à moins de 5 km sont
+fusionnées) — `addCityMarkers()`. Les noms sont **à l'essai** et pourront
+être retirés pour la lisibilité. Pendant un voyage, seules les villes de ce
+voyage restent affichées.
+
 **État : maquette.** Trois figures pour faire tourner l'interface (Nicolas
 Trigault 1618-1619, Marceline Desbordes-Valmore 1801-1802, Rimbaud 1891) ;
 tracés, dates et textes **provisoires, à vérifier** sur les sources avant
-publication (badge « Maquette — données provisoires » dans l'en-tête).
+publication. Le badge « Maquette — données provisoires » de l'en-tête a été
+retiré le 2026-09-26 (demande explicite, pour gagner de la hauteur) : plus
+rien sur la page ne signale le caractère provisoire des données.
 
 **Données : schéma Postgres dédié `expo_voyageurs`**
 (`db/migrations/0009_expo_voyageurs.sql`), séparé de `public` — aucune
@@ -1307,7 +1320,39 @@ page. Ordres par pas de 10 pour pouvoir insérer une étape entre deux autres.
   `data/voyageurs.json`. Refuse si le schéma contient déjà des voyageurs (la
   base fait foi une fois remplie) ; `-- --force` remplace tout.
 - `npm run snapshot:voyageurs` : réécrit `data/voyageurs.json` depuis la base,
-  pour garder le repli à jour — à lancer avant de committer après des saisies.
+  pour garder le repli à jour — à lancer avant de committer après des saisies
+  faites **hors** de l'éditeur (pgAdmin, SQL). L'éditeur le fait tout seul.
+
+**Éditeur : `voyageurs-admin.html`** (2026-09-26, lien dans `admin.html`,
+section « Expositions »), avec `js/voyageurs-admin.js` et
+`api/voyageurs-admin.mjs`. Fiches voyageur (identité, portrait, couleur,
+écrits) et voyage (titre, étapes, sources), brouillons compris. Le tracé se
+dessine sur la carte : mode « Ajouter des étapes » (clic = nouvelle étape
+après l'étape sélectionnée, clic sur le trait = insertion entre deux étapes ;
+« ↩ Créer le retour » dans la fiche d'une étape recopie en sens inverse les
+points de l'aller jusqu'à une étape choisie — `addReturnPath()` : points de
+passage sans date ni récit, modes et zooms repris de l'aller, pour qu'un
+aller-retour suive exactement le même tracé au lieu d'être redessiné),
+glisser-déposer, Ctrl+Z, recherche de lieux (Nominatim/OpenStreetMap, à la
+touche Entrée seulement — l'autocomplétion est interdite par leur politique
+d'usage), fond OSM détaillé en option à tout zoom (la page publique, elle,
+ne passe sur OSM qu'à partir du zoom 10 — voir `zoom` ci-dessous). Dates saisies « 16/04/1618 » converties en `1618-04-16`. Contrôles
+en direct avant enregistrement, reprenant les `CHECK` SQL et les règles
+ci-dessous (dates estimées affichées « ≈ … (estimée) », comme sur la page).
+- **API** : GET **et** POST authentifiés (les brouillons sont des notes de
+  recherche, contrairement aux endpoints R2 à lecture publique). Une action
+  par POST, dans une transaction ; un voyage est réécrit en bloc (étapes et
+  sources renumérotées de 10 en 10). Contrôle de concurrence par
+  `updated_at` (`version`) : 409 si un·e collègue a enregistré entre-temps.
+  Changer un identifiant est permis (`ON UPDATE CASCADE`) ; l'éditeur prévient
+  qu'un ancien lien `voyageurs.html#id` cessera de fonctionner.
+- Après chaque écriture : `invalidate('/data/voyageurs.json')` (sinon la page
+  publique attendrait le TTL de 60 s) **et réécriture de
+  `data/voyageurs.json`** — le repli committé suit donc la base sans
+  `snapshot:voyageurs` manuel ; il apparaît modifié dans `git status` après
+  chaque saisie, c'est voulu.
+- `style.css` plafonne `<html>` à 1100 px : la page lève ce plafond pour elle
+  seule (`html { max-width: none }`), sans quoi la carte tombait à ~300 px.
 
 Règles des étapes (appliquées par `js/voyageurs.js`, contrôlées en partie par
 des `CHECK` SQL) :
@@ -1320,9 +1365,42 @@ des `CHECK` SQL) :
 - Si le début ou la fin du voyage n'est daté qu'à l'année, le compteur
   devient « ≈ jour N » sans total, et la durée « à préciser » — un « jour
   213 / 366 » tiré de deux années serait une fausse précision.
-- `mode` vaut pour le tronçon qui PART de l'étape ; vide = inchangé.
+- `mode` vaut pour le tronçon qui PART de l'étape ; vide = inchangé. Valeurs :
+  `bateau`, `jonque` (2026-09-29, `0011_voyageurs_jonque.sql` ; icône
+  `images/voyageurs/transports/jonque.svg` dessinée pour le projet, zoom
+  automatique 7), `pied`, `attelage`, `civiere`, `inconnu` (2026-09-29,
+  `0012_voyageurs_inconnu.sql` ; oiseau en « V » `inconnu.svg`, zoom 4 —
+  tronçon dont les sources ne disent pas le moyen ; **pas de trait sur la
+  carte publique** — `HIDDEN_MODES`, `visibleParts` pour les tracés en
+  MultiLineString, `hiddenRanges` rendus transparents dans le dégradé du
+  tracé parcouru ; le voyageur y circule quand même, l'éditeur les affiche).
+  `MODE_PACE` ralentit la
+  lecture d'un moyen de transport (jonque ×2) : la vitesse est calée sur
+  `baseU` (somme sans ralentissement), donc un tronçon ralenti allonge le
+  voyage au lieu d'accélérer les autres. Ajouter un moyen de transport =
+  CHECK SQL, `MODES` de l'API, `MODE_*` des deux JS, icône dans `ICON_FILES`.
+- `zoom` (2026-09-26, colonne ajoutée par `0010_voyageurs_zoom.sql`, 1 à 13)
+  impose le zoom de la caméra à une étape trop restreinte pour le zoom
+  automatique par moyen de transport (`MODE_ZOOM`) ; vide = automatique.
+  `cameraZoom()` : le zoom imposé vaut tel quel dans un rayon
+  `zoomReachKm(z)` le long du tracé, puis son effet diminue de moitié à
+  chaque rayon supplémentaire ; entre deux étapes à zoom imposé, fondu de
+  l'une à l'autre. Zoom maximal de la carte publique : 13 (`MAX_ZOOM`, aussi
+  plafond du champ et de l'éditeur). À partir du zoom 10 (`OSM_ZOOM`, fondu
+  sur une demi-unité), des tuiles raster OpenStreetMap recouvrent tout le
+  fond vectoriel : Natural Earth y est trop grossier (côtes à ~1 km près,
+  ni villes ni routes). Seul élément du fond qui ne soit pas aux couleurs
+  du site ; tuiles `tile.openstreetmap.org` (politique d'usage OSM :
+  attribution visible, trafic modéré — à revoir si l'exposition attire
+  beaucoup de monde).
 - Rythme de l'animation : moitié distance, moitié temps écoulé (au
   kilomètre seul, les 12 jours de civière de Rimbaud passaient en un éclair).
+- La carte de récit (`.vy-card`) est **à droite** (2026-09-26) et la caméra
+  décale le voyageur dans la partie libre via le `padding` MapLibre
+  (`cardPadding()`), pour qu'elle ne le masque pas. Ce `padding` persiste
+  dans la caméra : il est remis à zéro avant le `fitBounds` de la vue
+  d'ensemble (sinon un décalage resté du voyage précédent la décentre) et
+  dans le `flyTo` de retour au globe.
 
 Technique : **MapLibre 5.24.0** (projection globe, absente des 3.6.2/4.7.1
 des autres cartes — ne pas « harmoniser » vers le bas).
@@ -1899,8 +1977,9 @@ et le fusionne côté serveur via lecture+ETag+réécriture conditionnelle
 écrasement complet du fichier, pour qu'un scan pris par un collègue au même
 instant ne soit pas perdu.
 
-À côté d'elles, `api/inventaire.mjs` et `api/login.mjs` ne touchent pas à R2
-(Postgres pour la première, comparaison d'identifiants pour la seconde).
+À côté d'elles, `api/inventaire.mjs`, `api/voyageurs-admin.mjs` et
+`api/login.mjs` ne touchent pas à R2 (Postgres pour les deux premières,
+comparaison d'identifiants pour la dernière).
 
 Depuis 2026-09-02, six de ces sept endpoints (tous sauf
 `api/vignette.mjs`) partagent une seule implémentation,

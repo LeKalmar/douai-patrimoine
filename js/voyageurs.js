@@ -40,40 +40,33 @@
   var DAY = 86400000;
   var BASE_SECONDS = 50;          // durée d'un voyage complet à la vitesse 1×
   var DENSIFY_KM = 40;            // pas des points intermédiaires sur les grands cercles
-  var MODE_ZOOM = { bateau: 3.1, attelage: 5.2, pied: 6.2, civiere: 6.8 };
-  var MODE_LABEL = { bateau: 'En mer', attelage: 'En voiture à cheval', pied: 'À pied', civiere: 'Porté en civière' };
+  var MODE_ZOOM = { bateau: 3.1, jonque: 7, attelage: 6, pied: 6.2, civiere: 6.8, inconnu: 4 };
+  // Rythme de lecture par moyen de transport : un tronçon en jonque (cabotage,
+  // fleuves) défile deux fois moins vite que le même tronçon en bateau. Absent = 1.
+  var MODE_PACE = { jonque: 2 };
+  // Moyens de transport dont le tronçon n'est pas tracé sur la carte publique.
+  var HIDDEN_MODES = { inconnu: true };
+  var MAX_ZOOM = 13;              // zoom maximal de la carte (et du champ `zoom` d'une étape)
+  var OSM_ZOOM = 10;              // à partir de ce zoom, OpenStreetMap remplace le fond vectoriel
+  var MODE_LABEL = { bateau: 'En mer', jonque: 'En jonque', attelage: 'En voiture à cheval', pied: 'À pied', civiere: 'Porté en civière', inconnu: 'Moyen de transport inconnu' };
   var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
               'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   var PRECISION_RANK = { annee: 0, mois: 1, jour: 2 };
   var DOUAI = [3.08, 50.37];
 
   /* ---------------------------------------------------------- icônes */
+  /* Bateau, voiture à cheval, à pied : dessins de images/voyageurs/transports/,
+     appliqués en masque CSS et remplis de la couleur du voyageur (--c).
+     facesLeft : le dessin regarde vers la gauche, il faut le retourner
+     quand le voyageur avance vers l'est. */
+  var ICON_FILES = {
+    bateau: { src: 'images/voyageurs/transports/small-fishing-sailboat-svgrepo-com.svg', facesLeft: false },
+    jonque: { src: 'images/voyageurs/transports/jonque.svg', facesLeft: false },
+    inconnu: { src: 'images/voyageurs/transports/inconnu.svg', facesLeft: false },
+    attelage: { src: 'images/voyageurs/transports/carriage-svgrepo-com.svg', facesLeft: true },
+    pied: { src: 'images/voyageurs/transports/hiking-svgrepo-com.svg', facesLeft: false }
+  };
   var ICONS = {
-    bateau:
-      '<svg viewBox="0 0 48 48" aria-hidden="true">' +
-      '<path d="M5 31h38l-6 9H11z" fill="#7a4a24" stroke="#3a2412" stroke-width="1.5" stroke-linejoin="round"/>' +
-      '<path d="M8 35h32" stroke="#3a2412" stroke-width="1"/>' +
-      '<path d="M24 5v26" stroke="#3a2412" stroke-width="2"/>' +
-      '<path d="M25.5 8c8 3 11.5 10 11.5 20H25.5z" fill="#fbf8f1" stroke="#3a2412" stroke-width="1.3"/>' +
-      '<path d="M22.5 11c-6 3-9 8.5-9 17h9z" fill="#efe6d2" stroke="#3a2412" stroke-width="1.3"/>' +
-      '<path d="M24 5l7 2.2-7 2.2z" fill="#B4213C"/>' +
-      '</svg>',
-    pied:
-      '<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="#3a2412" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="25" cy="8" r="4" fill="#efe6d2"/>' +
-      '<path d="M24 13l-3 13 7 7 1 10"/><path d="M21 26l-5 9-3 8"/>' +
-      '<path d="M23 16l-7 6"/><path d="M24 16l6 6 5 1"/>' +
-      '<path d="M36 12v33" stroke="#7a4a24"/>' +
-      '</svg>',
-    attelage:
-      '<svg viewBox="0 0 48 48" aria-hidden="true">' +
-      '<path d="M16 14h22v16H14z" fill="#7a4a24" stroke="#3a2412" stroke-width="1.5" stroke-linejoin="round"/>' +
-      '<rect x="20" y="17" width="6" height="6" fill="#efe6d2"/><rect x="29" y="17" width="6" height="6" fill="#efe6d2"/>' +
-      '<path d="M14 26H4" stroke="#3a2412" stroke-width="2"/>' +
-      '<circle cx="18" cy="35" r="6" fill="#efe6d2" stroke="#3a2412" stroke-width="2"/>' +
-      '<circle cx="34" cy="35" r="6" fill="#efe6d2" stroke="#3a2412" stroke-width="2"/>' +
-      '<path d="M16 11h24" stroke="#B4213C" stroke-width="2.5" stroke-linecap="round"/>' +
-      '</svg>',
     civiere:
       '<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="#3a2412" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M12 12h24l-3 7H15z" fill="#efe6d2"/>' +
@@ -83,6 +76,12 @@
       '<circle cx="41" cy="17" r="3" fill="#efe6d2"/><path d="M41 21v10l-3 10M41 31l3 10"/>' +
       '</svg>'
   };
+  function iconHtml(mode) {
+    var f = ICON_FILES[mode];
+    if (!f) return ICONS[mode] || '';
+    var url = 'url(\'' + f.src + '\')';
+    return '<span class="vy-icon-mask" aria-hidden="true" style="-webkit-mask-image:' + url + ';mask-image:' + url + '"></span>';
+  }
 
   /* ---------------------------------------------------------- utilitaires */
   function $(sel) { return document.querySelector(sel); }
@@ -148,7 +147,8 @@
     var n = pts.length;
 
     // 1. Géométrie densifiée + kilomètre cumulé à chaque sommet.
-    var path = [pts[0].coord.slice()], pathKm = [0], pointKm = [0];
+    // pointPathIdx[i] : indice, dans path, du sommet qui est l'étape i.
+    var path = [pts[0].coord.slice()], pathKm = [0], pointKm = [0], pointPathIdx = [0];
     for (var i = 0; i < n - 1; i++) {
       var a = pts[i].coord, b = pts[i + 1].coord;
       var d = distKm(a, b);
@@ -159,6 +159,7 @@
         pathKm.push(base + d * s / steps);
       }
       pointKm.push(base + d);
+      pointPathIdx.push(path.length - 1);
     }
     var totalKm = pointKm[n - 1];
 
@@ -214,7 +215,10 @@
     //    traversée de 5 000 km ; au temps seul, une longue attente sans
     //    repère daté ralentirait tout. Un séjour ne compte que par sa durée.
     var WEIGHT_KM = 0.5, WEIGHT_TIME = 0.5;
-    var phases = [], u = 0, stopU = {};
+    // baseU : même somme sans MODE_PACE. La vitesse de lecture est calée
+    // sur elle (frame()) : un tronçon ralenti allonge le voyage au lieu
+    // d'accélérer tous les autres.
+    var phases = [], u = 0, baseU = 0, stopU = {}, segMode = [];
     var mode = pts[0].mode || 'bateau';
     for (var p = 0; p < n; p++) {
       if (pts[p].arret) stopU[p] = u;
@@ -222,21 +226,52 @@
       if (stayDays > 0) {
         var len = clamp(WEIGHT_TIME * stayDays / totalDays, 0.02, 0.12);
         phases.push({ kind: 'stay', at: p, u0: u, len: len, t0: arrive[p], t1: leave[p] });
-        u += len;
+        u += len; baseU += len;
       }
       if (p < n - 1) {
         if (pts[p].mode) mode = pts[p].mode;
         var km = pointKm[p + 1] - pointKm[p];
         var days = Math.max(0, arrive[p + 1] - leave[p]) / DAY;
         var mlen = WEIGHT_KM * km / (totalKm || 1) + WEIGHT_TIME * days / totalDays;
+        baseU += mlen;
+        mlen *= MODE_PACE[mode] || 1;
         phases.push({ kind: 'move', from: p, u0: u, len: mlen, km: km, km0: pointKm[p], mode: mode });
         u += mlen;
+        segMode.push(mode);
       }
     }
 
+    // 3 bis. Tronçons au moyen de transport inconnu : pas de trait sur la
+    //    carte (on ne sait pas par où il est passé ; un trait droit serait
+    //    une fausse information, et très visible). Le voyageur y circule
+    //    quand même. visibleParts : morceaux de path à tracer ;
+    //    hiddenRanges : mêmes trous en fraction de longueur Mercator (unité
+    //    de ['line-progress']), pour le dégradé du tracé parcouru.
+    var visibleParts = [], hiddenRanges = [], totalMerc = pathMerc[pathMerc.length - 1] || 1, run = null;
+    for (var sg = 0; sg < segMode.length; sg++) {
+      var i0 = pointPathIdx[sg], i1 = pointPathIdx[sg + 1];
+      if (HIDDEN_MODES[segMode[sg]]) {
+        run = null;
+        var r0 = pathMerc[i0] / totalMerc, r1 = pathMerc[i1] / totalMerc;
+        var lastR = hiddenRanges[hiddenRanges.length - 1];
+        if (lastR && lastR[1] >= r0) lastR[1] = r1; else hiddenRanges.push([r0, r1]);
+      } else {
+        if (!run) { run = [path[i0]]; visibleParts.push(run); }
+        for (var pi = i0 + 1; pi <= i1; pi++) run.push(path[pi]);
+      }
+    }
+
+    // 4. Étapes à zoom imposé (voir cameraZoom()), dans l'ordre du tracé.
+    var zoomStops = [];
+    pts.forEach(function (p, i) {
+      var z = typeof p.zoom === 'number' ? p.zoom : NaN;
+      if (isFinite(z)) zoomStops.push({ km: pointKm[i], z: z, r: zoomReachKm(z) });
+    });
+
     return {
       voyageur: voyageur, v: v, pts: pts, path: path, pathKm: pathKm, pointKm: pointKm, pathMerc: pathMerc,
-      totalKm: totalKm, totalU: u, phases: phases, stopU: stopU,
+      zoomStops: zoomStops, visibleParts: visibleParts, hiddenRanges: hiddenRanges,
+      totalKm: totalKm, totalU: u, baseU: baseU || u, phases: phases, stopU: stopU,
       arrive: arrive, leave: leave, prec: prec, approx: approx,
       t0: t0, t1: t1, totalDays: totalDays,
       // Nombre de jours affiché, bornes comprises (du jour 1 au jour N).
@@ -365,6 +400,17 @@
           encoding: 'terrarium',
           maxzoom: 12,
           attribution: 'Relief : Copernicus DEM GLO-30 © DLR/Airbus, ESA — via <a href="https://mapterhorn.com/attribution">Mapterhorn</a>'
+        },
+        // Vues rapprochées (à partir de OSM_ZOOM) : Natural Earth y est trop
+        // grossier (côtes à ~1 km près, ni villes ni routes). Tuiles
+        // demandées seulement à ces zooms (minzoom).
+        osm: {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          minzoom: OSM_ZOOM - 1,
+          maxzoom: 19,
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }
       },
       sky: {
@@ -394,12 +440,15 @@
           paint: {
             'line-color': eau(0.35),
             'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.4, 4, 1, 8, 2.2]
-          } }
+          } },
+        // Recouvre tout le fond vectoriel, en fondu sur une demi-unité de zoom.
+        { id: 'osm', type: 'raster', source: 'osm', minzoom: OSM_ZOOM - 0.5,
+          paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], OSM_ZOOM - 0.5, 0, OSM_ZOOM, 1] } }
       ]
     },
     center: [30, 25],
     zoom: EMBEDDED ? 1.3 : 1.6,
-    maxZoom: 8,
+    maxZoom: MAX_ZOOM,
     attributionControl: false,
     cooperativeGestures: EMBEDDED,
     locale: {
@@ -414,8 +463,29 @@
   var EMPTY_LINE = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } };
   var TRANSPARENT = 'rgba(0,0,0,0)';
   /** Couleur jusqu'à la fraction p de la ligne, transparent au-delà. */
-  function progressGradient(color, p) {
-    return ['step', ['line-progress'], color, clamp(p, 1e-6, 1), TRANSPARENT];
+  /* Dégradé en escalier du tracé parcouru : `color` jusqu'à la fraction p,
+     transparent ensuite — et transparent aussi sur les tronçons masqués
+     (`hidden`, intervalles [début, fin] en fraction de line-progress). */
+  function progressGradient(color, p, hidden) {
+    p = clamp(p, 1e-6, 1);
+    var cuts = [0, p, 1];
+    (hidden || []).forEach(function (r) { cuts.push(r[0], r[1]); });
+    cuts = cuts.map(function (c) { return clamp(c, 0, 1); }).sort(function (a, b) { return a - b; });
+    function colorAt(m) {
+      if (m >= p) return TRANSPARENT;
+      for (var k = 0; k < (hidden || []).length; k++) if (m > hidden[k][0] && m < hidden[k][1]) return TRANSPARENT;
+      return color;
+    }
+    var expr = null, last = null, prevCut = -1;
+    for (var c = 0; c < cuts.length - 1; c++) {
+      var a = cuts[c], b = cuts[c + 1];
+      if (b - a < 1e-9) continue;
+      var col = colorAt((a + b) / 2);
+      if (!expr) { expr = ['step', ['line-progress'], col]; last = col; prevCut = 0; continue; }
+      if (col === last || a <= prevCut) continue;
+      expr.push(a, col); last = col; prevCut = a;
+    }
+    return expr && expr.length > 3 ? expr : ['step', ['line-progress'], expr ? expr[2] : color, 1, TRANSPARENT];
   }
   // Un voyage choisi avant la fin du chargement de la carte (clic rapide dans
   // la liste, ancre #id dans l'URL) est mis en attente : ses couches
@@ -432,7 +502,7 @@
         type: 'FeatureCollection',
         features: VOYAGES.map(function (V) {
           return { type: 'Feature', properties: { id: V.v.id, couleur: V.voyageur.couleur },
-                   geometry: { type: 'LineString', coordinates: V.path } };
+                   geometry: { type: 'MultiLineString', coordinates: V.visibleParts } };
         })
       }
     });
@@ -452,7 +522,10 @@
     // plus) : c'est la même ligne, coloriée par un dégradé en escalier coupé
     // à la position du voyageur (lineMetrics + line-progress).
     map.addSource('vy-active', { type: 'geojson', data: EMPTY_LINE, lineMetrics: true });
-    map.addLayer({ id: 'vy-active-full', type: 'line', source: 'vy-active',
+    // Reste à parcourir, en pointillé : source à part, sans les tronçons
+    // masqués (un line-dasharray ne se combine pas avec un line-gradient).
+    map.addSource('vy-active-visible', { type: 'geojson', data: EMPTY_LINE });
+    map.addLayer({ id: 'vy-active-full', type: 'line', source: 'vy-active-visible',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': THEME.aVenir, 'line-width': 1.6, 'line-opacity': 0.6, 'line-dasharray': [2, 2.5] } });
 
@@ -499,16 +572,28 @@
   });
 
   /* ---------------------------------------------------------- marqueurs */
-  var overviewMarkers = [], stopMarkers = [], travelerMarker = null, travelerEl = null;
+  var overviewMarkers = [], cityMarkers = [], stopMarkers = [], travelerMarker = null, travelerEl = null;
+  var DOUAI_RADIUS_KM = 15;   // une ville de départ/arrivée plus proche que ça EST Douai
+  var CITY_MERGE_KM = 5;      // deux extrémités plus proches que ça = même ville
 
   function addOverviewMarkers() {
-    // Douai, point de départ commun de l'exposition.
+    // Douai, point de départ commun de l'exposition : mise en avant principale.
     var d = el('div', 'vy-douai');
     d.appendChild(el('span', 'vy-douai-dot'));
     d.appendChild(el('span', 'vy-douai-label', 'Douai'));
     new maplibregl.Marker({ element: d, anchor: 'left', offset: [-6, 0] }).setLngLat(DOUAI).addTo(map);
 
+    addCityMarkers();
+
+    // Un seul portrait par personne, au point d'arrivée de son dernier voyage
+    // (date de fin la plus tardive). Un clic ouvre ce voyage.
+    var lastVoyage = {};
     VOYAGES.forEach(function (V) {
+      var cur = lastVoyage[V.voyageur.id];
+      if (!cur || V.t1 > cur.t1) lastVoyage[V.voyageur.id] = V;
+    });
+    Object.keys(lastVoyage).forEach(function (vid) {
+      var V = lastVoyage[vid];
       var m = el('button', 'vy-portrait-marker');
       m.type = 'button';
       m.style.borderColor = V.voyageur.couleur;
@@ -516,12 +601,60 @@
       m.title = V.voyageur.nom + ' — ' + V.v.titre;
       fillPortrait(m, V.voyageur);
       m.addEventListener('click', function (e) { e.stopPropagation(); selectVoyage(V.v.id); });
-      var mk = new maplibregl.Marker({ element: m }).setLngLat(V.pts[0].coord).addTo(map);
+      // MapLibre positionne le marqueur par un `transform` posé sur l'élément
+      // qu'on lui confie : le bouton (qui a sa propre transition de survol) est
+      // donc enveloppé, sans quoi il suivrait la carte avec un temps de retard.
+      var anchor = el('div', 'vy-portrait-anchor');
+      anchor.appendChild(m);
+      // Posé au-dessus du point (anchor bottom), pour laisser voir le rond et
+      // le nom de la ville d'arrivée.
+      var mk = new maplibregl.Marker({ element: anchor, anchor: 'bottom', offset: [0, -8] })
+        .setLngLat(V.pts[V.pts.length - 1].coord).addTo(map);
       overviewMarkers.push(mk);
     });
   }
-  function setOverviewMarkersVisible(on) {
+
+  /* Villes de départ et d'arrivée des voyages : petit rond de la couleur de
+     l'expédition (partagé en parts si plusieurs voyageurs y passent) et nom
+     du lieu. Douai a son propre repère, plus marqué : on ne le double pas. */
+  function addCityMarkers() {
+    var cities = [];
+    VOYAGES.forEach(function (V) {
+      [0, V.pts.length - 1].forEach(function (i) {
+        var p = V.pts[i];
+        if (distKm(p.coord, DOUAI) < DOUAI_RADIUS_KM) return;
+        var c = null;
+        for (var k = 0; k < cities.length; k++) {
+          if (distKm(cities[k].coord, p.coord) < CITY_MERGE_KM) { c = cities[k]; break; }
+        }
+        if (!c) { c = { coord: p.coord, lieu: '', couleurs: [], voyages: [] }; cities.push(c); }
+        if (!c.lieu && p.lieu) c.lieu = p.lieu;
+        if (c.couleurs.indexOf(V.voyageur.couleur) < 0) c.couleurs.push(V.voyageur.couleur);
+        if (c.voyages.indexOf(V.v.id) < 0) c.voyages.push(V.v.id);
+      });
+    });
+    cities.forEach(function (c) {
+      var node = el('div', 'vy-city');
+      var dot = el('span', 'vy-city-dot');
+      var n = c.couleurs.length;
+      dot.style.background = n === 1 ? c.couleurs[0]
+        : 'conic-gradient(' + c.couleurs.map(function (col, j) {
+            return col + ' ' + (j / n * 360) + 'deg ' + ((j + 1) / n * 360) + 'deg';
+          }).join(', ') + ')';
+      node.appendChild(dot);
+      if (c.lieu) node.appendChild(el('span', 'vy-city-label', c.lieu));
+      var mk = new maplibregl.Marker({ element: node, anchor: 'left', offset: [-5, 0] }).setLngLat(c.coord).addTo(map);
+      cityMarkers.push({ marker: mk, voyages: c.voyages });
+    });
+  }
+
+  /* Vue d'ensemble (V absent) : portraits et toutes les villes. Pendant un
+     voyage : ni portraits, ni villes des autres voyages. */
+  function setOverviewMarkersVisible(on, V) {
     overviewMarkers.forEach(function (mk) { mk.getElement().style.display = on ? '' : 'none'; });
+    cityMarkers.forEach(function (c) {
+      c.marker.getElement().style.display = on || (V && c.voyages.indexOf(V.v.id) >= 0) ? '' : 'none';
+    });
   }
   function fillPortrait(node, vr) {
     if (vr.portrait) {
@@ -562,7 +695,7 @@
   function setTravelerIcon(mode) {
     if (mode === lastIconMode) return;
     lastIconMode = mode;
-    travelerEl.firstChild.innerHTML = ICONS[mode] || ICONS.pied;
+    travelerEl.firstChild.innerHTML = iconHtml(mode) || iconHtml('pied');
   }
 
   /* ---------------------------------------------------------- état de lecture */
@@ -574,6 +707,8 @@
   var pendingStop = null;    // index du prochain arrêt raconté à déclencher
   var shownStop = null;      // index de l'arrêt dont la carte est affichée
   var camZoom = null;
+  var camOnTraveler = false; // la caméra est-elle déjà centrée sur le voyageur ?
+  var NO_PADDING = { top: 0, bottom: 0, left: 0, right: 0 };
   var rafId = 0, lastFrame = 0;
   var facing = 1;
 
@@ -695,6 +830,7 @@
     pause();
     current = V;
     u = 0; follow = true; camZoom = null; shownStop = null; lastIconMode = null;
+    camOnTraveler = false;
     pendingStop = firstStopIndex(V, -1);
 
     document.body.classList.add('vy-has-voyage');
@@ -704,14 +840,17 @@
     renderDetail(V);
     renderTicks(V);
 
-    setOverviewMarkersVisible(false);
+    setOverviewMarkersVisible(false, V);
     map.setPaintProperty('vy-all-line', 'line-opacity', ['case', ['==', ['get', 'id'], V.v.id], 0, 0.2]);
     map.setPaintProperty('vy-all-casing', 'line-opacity', ['case', ['==', ['get', 'id'], V.v.id], 0, 0.25]);
     map.getSource('vy-active').setData({ type: 'Feature', properties: {},
       geometry: { type: 'LineString', coordinates: V.path } });
+    map.getSource('vy-active-visible').setData({ type: 'Feature', properties: {},
+      geometry: { type: 'MultiLineString', coordinates: V.visibleParts } });
     buildStopMarkers(V);
     ensureTraveler();
     travelerMarker.getElement().style.display = '';
+    travelerEl.style.setProperty('--c', V.voyageur.couleur);
 
     ui.hud.hidden = false;
     ui.player.hidden = false;
@@ -723,7 +862,10 @@
     // Vue d'ensemble du voyage, puis carte du premier arrêt (le départ).
     var bounds = new maplibregl.LngLatBounds();
     V.path.forEach(function (c) { bounds.extend(c); });
-    map.fitBounds(bounds, { padding: fitPadding(), duration: REDUCED_MOTION ? 0 : 2200, maxZoom: 6 });
+    // Un décalage de caméra resté du voyage précédent (carte de récit
+    // ouverte) décentrerait la vue d'ensemble : on le remet à zéro avant.
+    map.setPadding(NO_PADDING);
+    map.fitBounds(bounds, { padding: fitPadding(pendingStop === 0), duration: REDUCED_MOTION ? 0 : 2200, maxZoom: 6 });
     render();
     if (pendingStop === 0) {
       map.once('moveend', function () { if (current === V && u === 0) triggerStop(0); });
@@ -733,6 +875,7 @@
   function deselect() {
     pause();
     current = null;
+    camOnTraveler = false;
     hideCard();
     clearStopMarkers();
     if (travelerMarker) travelerMarker.getElement().style.display = 'none';
@@ -747,15 +890,33 @@
     map.setPaintProperty('vy-all-line', 'line-opacity', 0.75);
     map.setPaintProperty('vy-all-casing', 'line-opacity', 0.85);
     map.getSource('vy-active').setData(EMPTY_LINE);
+    map.getSource('vy-active-visible').setData(EMPTY_LINE);
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* file:// */ }
-    map.flyTo({ center: [30, 25], zoom: EMBEDDED ? 1.3 : 1.6, duration: REDUCED_MOTION ? 0 : 1800 });
+    map.flyTo({ center: [30, 25], zoom: EMBEDDED ? 1.3 : 1.6, padding: NO_PADDING,
+                duration: REDUCED_MOTION ? 0 : 1800 });
   }
 
-  function fitPadding() {
-    // En haut : le tableau de bord ; en bas : le lecteur.
+  function fitPadding(withCard) {
+    // En haut : le tableau de bord ; en bas : le lecteur ; à droite, la carte
+    // de récit si elle va s'ouvrir sur la vue d'ensemble (arrêt de départ).
     var narrow = window.innerWidth < 760;
-    return narrow ? { top: 110, bottom: 90, left: 30, right: 30 }
-                  : { top: 120, bottom: 100, left: 60, right: 60 };
+    var pad = narrow ? { top: 110, bottom: 90, left: 30, right: 30 }
+                     : { top: 120, bottom: 100, left: 60, right: 60 };
+    if (withCard) pad.right += cardWidth();
+    return pad;
+  }
+
+  // Largeur occupée à droite par la carte de récit (voir .vy-card), 0 quand
+  // la carte est trop étroite pour qu'il reste une partie libre à côté.
+  function cardWidth() {
+    var mapW = map.getContainer().clientWidth;
+    var w = Math.min(380, mapW - 24) + 12;
+    return mapW - w < 240 ? 0 : w;
+  }
+  // Décalage de caméra : le voyageur est centré dans la partie de la carte
+  // que la carte de récit laisse libre, pas sous elle.
+  function cardPadding() {
+    return { top: 0, bottom: 0, left: 0, right: ui.card.hidden ? 0 : cardWidth() };
   }
 
   function firstStopIndex(V, after) {
@@ -797,7 +958,7 @@
     if (!playing || !current) return;
     var dt = Math.min(100, now - lastFrame) / 1000;
     lastFrame = now;
-    var next = u + dt * speed * current.totalU / BASE_SECONDS;
+    var next = u + dt * speed * current.baseU / BASE_SECONDS;
 
     // Arrêt raconté atteint : on s'y cale et on met en pause.
     if (pendingStop != null && current.stopU[pendingStop] <= next) {
@@ -827,8 +988,10 @@
     pendingStop = firstStopIndex(current, i);
     follow = true;
     ui.recenter.hidden = true;
-    render(true);
+    // Carte de récit d'abord : le recentrage de render(true) tient ainsi
+    // compte de la place qu'elle occupe (et remplace son propre easeTo).
     triggerStop(i);
+    render(true);
   }
 
   function seek(frac) {
@@ -854,8 +1017,8 @@
     var st = stateAt(V, u);
 
     // Tracé parcouru : seule la coupure du dégradé bouge.
-    map.setPaintProperty('vy-active-casing', 'line-gradient', progressGradient(THEME.lisere, st.progress));
-    map.setPaintProperty('vy-active-done', 'line-gradient', progressGradient(V.voyageur.couleur, st.progress));
+    map.setPaintProperty('vy-active-casing', 'line-gradient', progressGradient(THEME.lisere, st.progress, V.hiddenRanges));
+    map.setPaintProperty('vy-active-done', 'line-gradient', progressGradient(V.voyageur.couleur, st.progress, V.hiddenRanges));
 
     // Voyageur : icône selon le moyen de transport, tournée dans le sens de la marche.
     var mode = st.mode || modeAtPoint(V, st.at);
@@ -863,7 +1026,8 @@
     travelerMarker.setLngLat(st.pos);
     var p1 = map.project(st.pos), p2 = map.project(st.ahead);
     if (Math.abs(p2.x - p1.x) > 0.5) facing = p2.x >= p1.x ? 1 : -1;
-    travelerEl.firstChild.style.transform = 'scaleX(' + facing + ')';
+    var flip = ICON_FILES[mode] && ICON_FILES[mode].facesLeft ? -1 : 1;
+    travelerEl.firstChild.style.transform = 'scaleX(' + facing * flip + ')';
 
     // Tableau de bord.
     ui.hudDate.textContent = (st.approx ? '≈ ' : '') + formatDate(st.t, st.precision);
@@ -873,7 +1037,7 @@
       ? 'Jour ' + Math.max(1, st.day).toLocaleString('fr-FR') + ' / ' + V.dayCount.toLocaleString('fr-FR')
       : '≈ jour ' + Math.max(1, st.day).toLocaleString('fr-FR');
     ui.hudMode.innerHTML = '';
-    var ic = el('span', 'vy-hud-icon'); ic.innerHTML = ICONS[mode] || '';
+    var ic = el('span', 'vy-hud-icon'); ic.innerHTML = iconHtml(mode);
     ui.hudMode.appendChild(ic);
     ui.hudMode.appendChild(document.createTextNode(st.mode ? MODE_LABEL[st.mode] : placeLabel(V, st)));
 
@@ -882,14 +1046,49 @@
     ui.track.setAttribute('aria-valuenow', Math.round(frac * 100));
     ui.track.setAttribute('aria-valuetext', ui.hudDate.textContent + ', ' + ui.hudDay.textContent);
 
-    // Caméra : suit le voyageur, zoom adapté au moyen de transport.
+    // Caméra : suit le voyageur, zoom adapté au moyen de transport ou
+    // imposé par l'étape.
     if (follow && (playing || jump)) {
-      var target = MODE_ZOOM[mode] || 4;
+      var target = cameraZoom(V, st, mode);
       if (camZoom == null || jump) camZoom = map.getZoom();
       camZoom += (target - camZoom) * (jump ? 1 : 0.02);
-      if (jump) map.easeTo({ center: st.pos, zoom: camZoom, duration: REDUCED_MOTION ? 0 : 900 });
-      else map.jumpTo({ center: st.pos, zoom: camZoom });
+      // Décalage dû à la carte de récit : rejoint en douceur pendant la
+      // lecture (jumpTo interromprait un easeTo lancé à côté).
+      var pad = cardPadding();
+      if (!jump) { var curR = map.getPadding().right || 0; pad.right = curR + (pad.right - curR) * 0.08; }
+      camOnTraveler = true;
+      if (jump) map.easeTo({ center: st.pos, zoom: camZoom, padding: pad, duration: REDUCED_MOTION ? 0 : 900 });
+      else map.jumpTo({ center: st.pos, zoom: camZoom, padding: pad });
     }
+  }
+
+  /* Zoom de la caméra à l'abscisse st.km.
+     Par défaut, d'après le moyen de transport (MODE_ZOOM). Une étape peut
+     imposer le sien (champ `zoom`, pour les étapes qui se jouent dans un
+     espace restreint). Il vaut tel quel autour de l'étape, dans un rayon
+     `r` (≈ ce que montre la carte à ce zoom), puis son effet s'estompe de
+     moitié à chaque rayon supplémentaire le long du tracé : la caméra
+     plonge en approchant et remonte en repartant, sans à-coup. Entre deux
+     étapes à zoom imposé, on passe progressivement de l'une à l'autre. */
+  function zoomReachKm(z) { return 20000 / Math.pow(2, z); }
+  function cameraZoom(V, st, mode) {
+    var auto = MODE_ZOOM[mode] || 4;
+    var zs = V.zoomStops;
+    if (!zs.length) return auto;
+    var s = st.km, a = null, b = null;
+    for (var i = 0; i < zs.length; i++) {
+      if (zs[i].km <= s) a = zs[i];
+      else { b = zs[i]; break; }
+    }
+    function pull(stop, d) {
+      var w = d <= stop.r ? 1 : Math.pow(2, -(d - stop.r) / stop.r);
+      return auto + w * (stop.z - auto);
+    }
+    if (a && b) {
+      var t = b.km > a.km ? (s - a.km) / (b.km - a.km) : 0;
+      return pull(a, s - a.km) * (1 - t) + pull(b, b.km - s) * t;
+    }
+    return a ? pull(a, s - a.km) : pull(b, b.km - s);
   }
 
   function modeAtPoint(V, at) {
@@ -942,6 +1141,13 @@
     actions.appendChild(go);
     ui.card.appendChild(actions);
     ui.card.hidden = false;
+    if (follow && camOnTraveler) {
+      // La caméra rattrape le zoom en douceur pendant la lecture : si elle
+      // n'y est pas encore (étape à zoom imposé), on finit le mouvement ici.
+      var st = stateAt(V, u);
+      camZoom = cameraZoom(V, st, st.mode || modeAtPoint(V, st.at));
+      map.easeTo({ padding: cardPadding(), zoom: camZoom, duration: REDUCED_MOTION ? 0 : 600 });
+    }
     document.querySelectorAll('.vy-stop-btn').forEach(function (b) {
       b.classList.toggle('is-current', +b.dataset.stop === i);
     });
@@ -955,7 +1161,12 @@
     go.focus({ preventScroll: true });
   }
   function hideCard() {
+    var wasShown = !ui.card.hidden;
     ui.card.hidden = true;
+    // À l'arrêt, le voyageur revient au centre ; en lecture, render() s'en charge.
+    if (wasShown && follow && camOnTraveler && !playing) {
+      map.easeTo({ padding: NO_PADDING, duration: REDUCED_MOTION ? 0 : 600 });
+    }
     shownStop = null;
     document.querySelectorAll('.vy-stop-btn.is-current').forEach(function (b) { b.classList.remove('is-current'); });
     stopMarkers.forEach(function (m) { m.getElement().classList.remove('is-current'); });

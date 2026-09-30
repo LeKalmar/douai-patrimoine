@@ -26,28 +26,24 @@
       background: var(--encre); color: #fff;
       padding: 1.4rem var(--rp-gutter) 1.6rem;
     }
-    .vy-header-top {
+    .vy-title-row {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;
+      gap: 0.6rem 1rem; flex-wrap: wrap; margin: 0.3rem 0 0.6rem;
     }
     .vy-home {
+      flex: 0 0 auto;
       display: inline-flex; align-items: center; gap: 0.4rem;
       font-size: 0.8rem; color: rgba(255,255,255,0.88);
       border: 1px solid rgba(255,255,255,0.3); padding: 0.4rem 0.9rem;
       border-radius: 999px; transition: background var(--transition);
     }
     .vy-home:hover { background: rgba(255,255,255,0.14); color: #fff; }
-    .vy-draft {
-      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
-      background: var(--corail); color: var(--encre);
-      padding: 0.3rem 0.7rem; border-radius: 999px;
-    }
     .vy-eyebrow {
       font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--rose);
     }
     .vy-title {
       font-family: var(--font-display); font-weight: 400;
-      font-size: clamp(1.9rem, 4.5vw, 2.8rem); line-height: 1.1; margin: 0.3rem 0 0.6rem;
+      font-size: clamp(1.9rem, 4.5vw, 2.8rem); line-height: 1.1; margin: 0;
     }
     .vy-title em { color: var(--rose); }
     .vy-lead { max-width: 46rem; font-size: 0.95rem; color: rgba(255,255,255,0.86); }
@@ -152,9 +148,12 @@
       padding: 0.45rem 0.9rem; border-radius: 999px; box-shadow: var(--shadow-hover);
     }
 
+    /* À droite, pour dégager le voyageur ; la caméra le recentre en plus dans
+       la partie libre de la carte (cardPadding() dans js/voyageurs.js). Le
+       haut reste libre pour les boutons de zoom. */
     .vy-card {
-      position: absolute; left: 12px; bottom: 78px; width: min(380px, calc(100% - 24px));
-      max-height: calc(100% - 200px); overflow-y: auto;
+      position: absolute; right: 12px; bottom: 78px; width: min(380px, calc(100% - 24px));
+      max-height: calc(100% - 160px); overflow-y: auto;
       background: var(--papier); border-top: 4px solid var(--c, var(--carmin));
       padding: 1rem 1.1rem; box-shadow: 0 8px 30px rgba(0,0,0,0.28);
     }
@@ -215,6 +214,13 @@
     .vy-douai-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--corail); border: 2px solid #fff; box-shadow: 0 0 0 2px var(--encre); }
     .vy-douai-label { font-family: var(--font-display); font-size: 0.9rem; color: var(--encre); text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
 
+    /* Villes de départ/arrivée : même principe que Douai, en plus discret. */
+    .vy-city { display: flex; align-items: center; gap: 4px; pointer-events: none; }
+    .vy-city-dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(16,20,58,0.45); }
+    .vy-city-label { font-size: 0.72rem; font-weight: 700; color: var(--encre); text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
+
+    /* Conteneur déplacé par MapLibre (transform) : aucune transition ici. */
+    .vy-portrait-anchor { display: flex; }
     .vy-portrait-marker {
       width: 42px; height: 42px; border-radius: 50%; border: 3px solid;
       background: var(--encre) center 20% / cover no-repeat; color: #fff;
@@ -237,6 +243,19 @@
       transition: transform 0.25s;
     }
     .vy-traveler-icon svg { width: 100%; height: 100%; }
+    /* Liseré papier : l'icône colorée reste lisible sur la mer comme sur la terre. */
+    .vy-traveler-icon:has(.vy-icon-mask) {
+      filter: drop-shadow(0 0 1px var(--papier)) drop-shadow(0 0 1px var(--papier))
+              drop-shadow(0 2px 3px rgba(0,0,0,0.45));
+    }
+    /* Dessin SVG utilisé comme masque, rempli de la couleur du voyageur. */
+    .vy-icon-mask {
+      display: block; width: 100%; height: 100%;
+      background: var(--c, var(--encre));
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-position: center; mask-position: center;
+      -webkit-mask-size: contain; mask-size: contain;
+    }
 
     /* ── Écrans étroits : le panneau passe au-dessus de la carte ─────────── */
     @media (max-width: 760px) {
@@ -263,15 +282,14 @@
 <a href="#vy-stage" class="skip-nav">Aller à la carte</a>
 
 <header class="vy-header">
-  <div class="vy-header-top">
+  <p class="vy-eyebrow">Exposition · publiée le 25 septembre 2026</p>
+  <div class="vy-title-row">
+    <h1 class="vy-title">Voyageurs <em>douaisiens</em></h1>
     <a href="index.html" class="vy-home">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       Retour à l'accueil
     </a>
-    <span class="vy-draft" title="Tracés, dates et textes provisoires, en cours de vérification">Maquette — données provisoires</span>
   </div>
-  <p class="vy-eyebrow">Exposition · publiée le 25 septembre 2026</p>
-  <h1 class="vy-title">Voyageurs <em>douaisiens</em></h1>
   <p class="vy-lead">Missionnaires, poètes, aventuriers : nés à Douai ou passés par la ville, ils ont parcouru le monde et laissé des récits. Choisissez un voyage pour le suivre jour après jour.</p>
 </header>
 

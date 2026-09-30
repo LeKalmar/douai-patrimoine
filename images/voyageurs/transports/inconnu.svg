@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Moyen de transport inconnu — oiseau en « V », silhouette monochrome
+     dessinée pour l'exposition « Voyageurs douaisiens », même principe que
+     les autres icônes de transport (aplat unique, sert de masque CSS).
+     Symétrique : le retournement selon le sens de la marche ne change rien. -->
+<svg width="800px" height="800px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <path fill="#000000" d="M28 206 C108 128 204 150 256 250 C308 150 404 128 484 206 C404 204 318 222 256 366 C194 222 108 204 28 206 Z"/>
+</svg>
