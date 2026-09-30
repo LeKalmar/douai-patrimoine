@@ -1528,6 +1528,17 @@ par volume.
   la zone visible (`rpEmbed.placeOverlays()`) au lieu du `scrollIntoView` de
   repli ; la boîte est plafonnée à cette hauteur
   (`html.rp-embedded .inv-detail-box`).
+- **Tous les accès à la vue numérisée passent par cette modale**
+  (2026-09-30) : grande vignette, bouton « Accéder au document numérisé »,
+  calendrier de presse et, désormais, la **petite vignette** de la liste
+  (`buildThumbFrame(…, onOpenViewer)`, appelé par `buildRow()` : fiche
+  ouverte directement en mode visionneuse, ✕ revient à la fiche). Elle
+  naviguait auparavant vers une page `visionneuse.html` pleine, qui en
+  iframe s'affichait là où le portail était défilé — seul chemin qui
+  échappait au centrage. Vérifié en navigateur headless sous une page hôte
+  reprenant le script du portail : les quatre chemins centrés, y compris
+  après défilement du portail. `buildThumbFrame()` sans ce rappel (catalogue
+  de `startInventaire()`) garde la navigation classique.
 - `style.css` : `html { max-width: 1100px; margin: 0 auto }`, venu avec la
   modale sur `local-server` — s'applique à toutes les pages qui chargent
   cette feuille.

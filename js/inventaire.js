@@ -945,8 +945,11 @@ function buildSousFondsBlock(sfName, records, fondsName, sfKey) {
  * @param {string}  [visionneuseMode]   – 'dossier' (défaut) ou 'image', voir visionneuseSrc()
  * @param {string}  [titre]             – titre du document, pour le bandeau au-dessus de la
  *                                        visionneuse intégrée (openViewerInModal, `large` uniquement)
+ * @param {Function} [onOpenViewer]     – petite vignette uniquement : appelée au clic à la
+ *                                        place de la navigation vers visionneuse.html (ex.
+ *                                        ouvrir la modale de fiche directement en visionneuse)
  */
-function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionneuseMode = 'dossier', titre = '') {
+function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionneuseMode = 'dossier', titre = '', onOpenViewer = null) {
   const frame = document.createElement('div');
   frame.className = 'doc-thumb-frame' + (large ? ' doc-thumb-frame--large' : '');
 
@@ -973,8 +976,12 @@ function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionn
     // exemplarisation.html — voir buildExpandedContent) : grande vignette
     // (panneau de détail, `large`) → ouvre la visionneuse DANS la même
     // modale (openViewerInModal(), 2026-09-22) ; petite vignette (ligne
-    // repliée de la liste) → navigation classique dans le même onglet
-    // (comportement inchangé depuis 2026-09-11). Une simple photo sans
+    // repliée de la liste) → `onOpenViewer` s'il est fourni (inventaire.html :
+    // même modale, ouverte directement en visionneuse — 2026-09-30, pour
+    // que ce chemin profite aussi du centrage sur l'écran du visiteur en
+    // iframe, voir « MODALES » dans js/parent-page-height.js ; une page
+    // visionneuse.html pleine, elle, s'affichait là où le portail était
+    // défilé), sinon navigation classique dans le même onglet. Une simple photo sans
     // document numérisé associé n'a nulle part où mener (2026-09-22,
     // demande explicite) : ni clic, ni curseur "cliquable"
     // (.doc-thumb-frame--static, voir inventaire-thumbnail.css) — elle
@@ -985,6 +992,8 @@ function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionn
         e.stopPropagation();
         if (large) {
           openViewerInModal(visionneuseTarget, visionneuseMode, titre);
+        } else if (typeof onOpenViewer === 'function') {
+          onOpenViewer();
         } else {
           window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
         }

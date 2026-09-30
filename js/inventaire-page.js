@@ -1096,9 +1096,20 @@
     thumb.className = 'inv-thumb';
     var thumbNumVal = (rec['num'] || '').trim();
     var thumbLienNumeriseVal = (rec['_lienNumerise'] || '').trim();
+    var thumbTarget = thumbNumVal || thumbLienNumeriseVal;
+    var thumbMode = thumbNumVal ? 'dossier' : 'image';
+    /* Clic sur la vignette d'un document numérisé : la modale de fiche,
+       ouverte directement en visionneuse (✕ revient à la fiche) — même
+       modale, donc même centrage à l'écran en iframe, que la grande
+       vignette, le bouton et le calendrier de presse, au lieu d'une page
+       visionneuse.html pleine qui s'affichait là où le portail était
+       défilé. */
     thumb.appendChild(buildThumbFrame(
-      (rec['lien_num'] || '').trim(), false,
-      thumbNumVal || thumbLienNumeriseVal, thumbNumVal ? 'dossier' : 'image'
+      (rec['lien_num'] || '').trim(), false, thumbTarget, thumbMode, '',
+      function () {
+        showDetail(rec);
+        openViewerInModal(thumbTarget, thumbMode, rec['200$a'] || '');
+      }
     ));
     row.appendChild(thumb);
 
