@@ -607,9 +607,10 @@
   // de dev (scripts/dev-server.mjs, route /presse-local/ → PRESSE_SOURCE_DIR).
   // Seuls les "book" du manifeste marqués `root:"presse-local"` (voir
   // scripts/build-manifest-presse.mjs) résolvent contre cette racine plutôt
-  // que IMAGES_ROOT — voir rootForBook() plus bas. Une fois les scans
-  // effectivement sur R2, relancer `npm run build:manifest-presse -- --r2` :
-  // le manifeste n'aura plus ce flag et cette constante n'aura plus d'effet.
+  // que IMAGES_ROOT — voir rootForBook() plus bas. Sur main, le manifeste
+  // est généré depuis R2 (préfixe presse/, scripts/build-manifest-presse.mjs)
+  // et ne porte jamais ce flag : cette constante y est sans effet, gardée
+  // pour rester alignée sur la branche local-server.
   const PRESSE_LOCAL_ROOT = '/presse-local/';
 
   // ╔══════════════════════════════════════════════════════════════════╗

@@ -320,9 +320,9 @@
          dans la visionneuse pour un titre donné (cote 930$g = "D19"/"D23"/
          "D24", voir scripts/lib/fonds-periodiques-record.mjs). Petit fichier
          statique, mais dégradation silencieuse comme les autres sources si le
-         fetch échoue. Absent de main tant que les scans de presse ne sont pas
-         sur R2 (servis uniquement en local, via /presse-local/) : le
-         calendrier de buildPresseCalendar() reste alors simplement masqué. */
+         fetch échoue. Sur main, généré depuis le contenu réel du préfixe R2
+         `presse/` (npm run build:manifest-presse) : un titre pas encore versé
+         n'y figure pas, et sa notice n'affiche simplement pas de calendrier. */
       fetch('js/presse-index.json').then(function (r) {
         return r.ok ? r.json() : {};
       }).catch(function () { return {}; })

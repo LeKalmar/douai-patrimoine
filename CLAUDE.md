@@ -1505,12 +1505,24 @@ par volume.
   ces CSV, puis committer le JSON.
 - **La surcouche Syracuse est conservée** (retirée sur `local-server`, toujours
   active ici) : appliquée dans `load()` avant le calcul de `_year`/`_hay`.
-- **Presse numérisée** : le calendrier année → mois → jour
-  (`buildPresseCalendar()`) est présent mais inerte — `js/presse-index.json` et
-  la branche « Périodiques » du manifeste n'existent pas sur `main`, les scans
-  n'étant servis qu'en local (`/presse-local/`) tant qu'ils ne sont pas sur R2.
-  Le 404 sur `js/presse-index.json` est attendu. Une fois les scans versés,
-  porter `build-manifest-presse.mjs --r2` et ses deux sorties.
+- **Presse numérisée (branchée sur R2 le 2026-09-30)** : les scans sont
+  déposés dans le bucket, préfixe `presse/`, avec le même rangement qu'en
+  local (`presse/<Titre>/<Titre>_<année>/<Titre>_<année>_<MM>_<JJ>/*.jpg`).
+  L'équipe n'en verse qu'une partie (115 Go au total, au-delà du quota
+  mensuel) : D23 et D24 d'abord, D19 pas encore. `npm run build:manifest-presse`
+  (`scripts/build-manifest-presse.mjs`) construit la branche « Périodiques » de
+  `js/manifest.json` et `js/presse-index.json` **depuis la liste réelle des
+  objets R2** (`r2ListAll()`, `lib/r2.mjs` — pagination S3, R2 plafonnant
+  chaque réponse à 1 000 clés), et non depuis le disque local comme sur
+  `local-server` : un titre ou un numéro non versé n'apparaît donc jamais,
+  pas de lien mort. Même format de sortie que `local-server`, rien à changer
+  côté page ni visionneuse (livres sans `root`, résolus contre `IMAGES_ROOT`).
+  **À relancer après chaque envoi terminé** (un envoi en cours indexerait des
+  numéros incomplets), puis committer les deux fichiers. Une notice dont la
+  cote (`930$g`, D19/D23/D24) figure dans l'index reçoit son calendrier
+  année → mois → jour et la 1re page la plus ancienne comme vignette —
+  une page JPEG pleine résolution (~5–6 Mo), il n'existe pas encore de
+  vignette réduite pour la presse.
 - **Modale en iframe** : si la page hôte envoie `hostViewport`,
   `openDetailModal()` laisse `js/parent-page-height.js` caler la surcouche sur
   la zone visible (`rpEmbed.placeOverlays()`) au lieu du `scrollIntoView` de

@@ -1,0 +1,110 @@
+<!doctype html><html><head><meta charset="utf-8"><title>host test</title></head><body style="margin:0;font-family:sans-serif"><div style="height:500px;background:#ccd">BANDEAU PORTAIL</div><div id="main-ermes-container"><div class="panel-body">
+<style>
+	#main-ermes-container, #main, #portal,
+	#portal > .row, #zone-2, #frame--2,
+	.frame, .frame-standard, .ermes-frame-html, .rsItem {
+		height: auto !important;
+		padding: 0 !important;
+		margin-bottom: 0 !important;
+	}
+	.panel-body {
+		padding-top: 0 !important;
+	}
+	iframe {
+		display: block;
+		width: 100%;
+		border: none;
+		/* pas de height fixe ici, le JS la définit */
+	}
+</style>
+<iframe id="patrimoine-iframe" src="/inventaire.html" data-responsive="true"></iframe>
+<script>
+	var patrimoineIframe = document.getElementById('patrimoine-iframe');
+	var MIN_FALLBACK_HEIGHT = 700; // hauteur minimale utilisable de la visionneuse
+
+	// Hauteur de secours : l'espace réellement visible sous l'iframe, avec un
+	// plancher. Sans plancher, une page Syracuse au bandeau chargé (menu, fil
+	// d'Ariane, titre...) au-dessus de l'iframe pourrait ne laisser que
+	// quelques centaines de pixels — inutilisable pour un outil comme la
+	// visionneuse. Avec le plancher, la page Syracuse défile légèrement pour
+	// voir le bas de l'outil : un seul défilement (celui de Syracuse), comme
+	// pour le reste du site.
+	function fallbackHeight() {
+		var rect = patrimoineIframe.getBoundingClientRect();
+		var docTop = rect.top + window.scrollY;
+		return Math.max(MIN_FALLBACK_HEIGHT, window.innerHeight - docTop);
+	}
+
+	// Dernière hauteur envoyée par la page affichée dans l'iframe (null tant
+	// que la page courante n'a rien envoyé, ex. la visionneuse, qui ne mesure
+	// pas son contenu).
+	var reportedHeight = null;
+
+	function applyHeight() {
+		patrimoineIframe.style.height = (reportedHeight || fallbackHeight()) + 'px';
+		sendViewport();
+	}
+
+	// ── Modales ──────────────────────────────────────────────────────────
+	// On indique au site la partie de l'iframe réellement visible à l'écran,
+	// pour qu'il y centre ses modales (sinon elles se centrent sur l'iframe
+	// entière, souvent loin de ce que regarde le visiteur).
+	// Si le portail a un bandeau FIXE en haut de l'écran qui recouvre la page,
+	// mettre ici sa hauteur en pixels pour que les modales ne passent pas
+	// dessous.
+	var HOST_TOP_OFFSET = 0;
+	var viewportFrame = null;
+
+	function sendViewportNow() {
+		viewportFrame = null;
+		var win = patrimoineIframe.contentWindow;
+		if (!win) return;
+		var r = patrimoineIframe.getBoundingClientRect();
+		var visTop = Math.max(r.top, HOST_TOP_OFFSET);
+		var visBottom = Math.min(r.bottom, window.innerHeight);
+		win.postMessage({
+			type: 'hostViewport',
+			visibleTop: Math.round(visTop - r.top),
+			visibleHeight: Math.round(Math.max(0, visBottom - visTop))
+		}, '*');
+	}
+
+	// Au plus un envoi par image affichée pendant le défilement.
+	function sendViewport() {
+		if (viewportFrame === null) viewportFrame = requestAnimationFrame(sendViewportNow);
+	}
+
+	// `true` (capture) : attrape aussi le défilement d'un conteneur du portail,
+	// pas seulement celui de la fenêtre.
+	document.addEventListener('scroll', sendViewport, true);
+
+	// 'load' se déclenche à CHAQUE navigation dans l'iframe (y compris les
+	// navigations en JS type location.href utilisées par le site pour rester
+	// dans la même iframe) — sans ce reset, une page qui ne mesure pas son
+	// contenu hérite de la hauteur laissée par la page précédente. Une page
+	// qui mesure son contenu renvoie aussitôt sa hauteur (elle détecte que
+	// son cadre a changé de taille).
+	patrimoineIframe.addEventListener('load', function() {
+		reportedHeight = null;
+		applyHeight();
+	});
+
+	// Un redimensionnement de la page Syracuse (fenêtre, ou 'resize' déclenché
+	// par un script du portail) ne doit PAS écraser la hauteur envoyée par
+	// l'iframe : c'était la cause du repli au bout de quelques secondes.
+	window.addEventListener('resize', applyHeight);
+
+	window.addEventListener('message', function(event) {
+		// N'écouter que NOTRE iframe (un autre module du portail pourrait
+		// envoyer un message de même forme).
+		if (event.source !== patrimoineIframe.contentWindow) return;
+		var data = event.data;
+		if (!data) return;
+		if (data.type === 'hostViewportRequest') { sendViewport(); return; }
+		if (data.type !== 'iframeHeight') return;
+		var h = Number(data.height);
+		if (!(h > 0)) return;
+		reportedHeight = Math.ceil(h);
+		applyHeight();
+	});
+</script></div></div><div style="height:1500px;background:#dcc">PIED PORTAIL</div></body></html>
