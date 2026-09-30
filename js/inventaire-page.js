@@ -308,13 +308,6 @@
       typeof fetchExemplairesManuelsAsCatalogRows === 'function'
         ? fetchExemplairesManuelsAsCatalogRows().catch(function () { return []; })
         : Promise.resolve([]),
-      /* Surcouche Syracuse (synchronisation incrémentale, voir
-         js/syracuse-sync-shared.js) : corrige cote/titre/auteur/date sur les
-         exemplaires touchés depuis le dernier rebuild XML — { } si l'API est
-         indisponible ou si rien n'a encore été synchronisé. */
-      typeof fetchSyracuseSyncOverlay === 'function'
-        ? fetchSyracuseSyncOverlay()
-        : Promise.resolve({}),
       /* Presse numérisée (fonds Périodiques, scripts/build-manifest-presse.mjs) :
          { "D19": ["1895","1896",…], … } — quelles années sont consultables
          dans la visionneuse pour un titre donné (cote 930$g = "D19"/"D23"/
@@ -329,23 +322,9 @@
     ])
       .then(function (res) {
         records = res[0].concat(res[1], res[2], res[3]);
-        var overlay = res[4] || {};
-        var presseIndex = res[5] || {};
+        var presseIndex = res[4] || {};
         records.forEach(function (r, i) {
           r._id = i;
-          var barcode = (r['995$f'] || r['915$b'] || '').trim();
-          var fresh = barcode ? overlay[barcode] : null;
-          if (fresh) {
-            // Appliqué AVANT _year/_hay pour que la correction alimente
-            // aussi le tri/la recherche/le filtre par date, pas seulement
-            // l'affichage — mêmes champs que ce que rend buildRow()/
-            // buildExpandedContent() (210$d, 200$a, 700$a, 930$g).
-            console.log('[syracuse-sync] correction appliquée sur', barcode, '—', fresh);
-            if (fresh.dt) r['210$d'] = fresh.dt;
-            if (fresh.titre) r['200$a'] = fresh.titre;
-            if (fresh.auteur) r['700$a'] = fresh.auteur;
-            if (fresh.cote) r['930$g'] = fresh.cote;
-          }
           /* _fondsLabel (data/non-catalogues.json, data/magasins.json) est
              posé directement depuis une source fiable pour ce sous-ensemble
              (930$e du registre papier) — préféré à getFondsFromCote() plutôt
@@ -442,9 +421,7 @@
         });
         /* Un document sans cote (930$g) n'est pas localisable en réserve —
            masqué de l'inventaire public plutôt qu'affiché avec une case vide
-           (demande explicite 2026-09-12). Après application de la surcouche
-           Syracuse : une cote corrigée à distance (fresh.cote ci-dessus) doit
-           pouvoir faire réapparaître un exemplaire qui en était dépourvu. */
+           (demande explicite 2026-09-12). */
         records = records.filter(function (r) { return (r['930$g'] || '').trim(); });
         boot();
       })
