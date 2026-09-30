@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-09-30T13:28:13.900Z",
+  "durationMs": 83,
+  "stats": {
+    "cartes": {
+      "lues": 425,
+      "retenues": 425,
+      "sansNom": 0,
+      "sansCote": 0
+    },
+    "periodiques": {
+      "lues1": 100,
+      "lues2": 106,
+      "sansId": 0,
+      "sansNom": 0,
+      "sansCote2": 0,
+      "rapprochesParTitre": 21,
+      "rapprochesParCote": 3,
+      "nouvellesEntrees2": 82,
+      "sansCoteFinale": 76,
+      "retenus": 106
+    }
+  }
+}

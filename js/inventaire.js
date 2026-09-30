@@ -4,6 +4,12 @@
 const JSON_PATH = 'data/inventaire.json';
 const PAGE_SIZE = 10;
 
+// Calendrier de la presse numérisée (voir buildPresseCalendar() plus bas).
+const MOIS_LONGS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const MOIS_COURTS = ['Janv.', 'Fév.', 'Mars', 'Avr.', 'Mai', 'Juin',
+  'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
+
 // Clé de la colonne "sous-fonds" dans le CSV. La seule valeur qui l'alimente
 // aujourd'hui est le sous-fonds « ⚡ Exemplarisation rapide (à cataloguer) »
 // posé par js/exemplaires-manuels-shared.js — désactivé (null) pour que
@@ -41,6 +47,8 @@ const FONDS_IMAGES = {
   'Littérature':                 'images/litterature.jpg',
   'Robaut':                      'images/robaut.jpg',
   "Livres d'Artiste":            "images/livre-d-artiste.jpg",
+  'Cartes géographiques':        'images/cartographie.jpg',
+  'Périodiques':                 'images/periodiques.jpg',
 };
 
 // Descriptions et métadonnées des fonds
@@ -164,9 +172,20 @@ const DETAIL_COLS = [
   { key: '215$a',                     label: 'Pagination' },
   { key: '215$b',                     label: 'Volumes' },
   { key: '215$d',                     label: 'Dimensions' },
-  { key: '101$a',                     label: 'Langue' },
+  // Champ dérivé (pas une clé MARC brute) : traduction du/des code(s) langue
+  // UNIMARC 101$a ("fre" → "Français"…) faite au build, voir
+  // scripts/lib/langue-labels.mjs (LANGUE_LABELS/langueLabelOf) — le code
+  // brut 101$a reste disponible sur `rec` mais n'est plus affiché tel quel.
+  { key: '_langue',                   label: 'Langue' },
   { key: '610$a',                     label: 'Sujets' },
   { key: '300$a',                     label: 'Note générale' },
+  // Champs dérivés propres au fonds Périodiques (voir
+  // scripts/lib/fonds-periodiques-record.mjs) — absents (donc ignorés, voir
+  // le filtre `if (!val.trim()) return` plus bas) sur tous les autres fonds.
+  { key: '_frequence',                label: 'Périodicité' },
+  { key: '_parution',                 label: 'Dates de parution' },
+  { key: '_villeLabel',               label: 'Ville de publication' },
+  { key: '_imprimeurLabel',           label: 'Imprimeur' },
 ];
 
 // ══════════════════════════════════════════
@@ -300,6 +319,27 @@ function parsePublicationDate(dateStr) {
 
   const str = String(dateStr).trim();
 
+  // Cas champ répété : « 64410§1989 » (cote D10809, fonds Douaisien) — le
+  // « § » est déjà la convention du projet pour joindre des occurrences
+  // répétées d'un même sous-champ MARC (700$a, 930$e_11…), utilisée ici
+  // aussi sur 210$d : un premier segment parfois inexploitable (garbage
+  // numérique, notation ancienne, note de pagination — cf. « 1986§non
+  // paginé », « M. DCC. XXXVIII§1738 ») suivi du millésime retenu par le
+  // catalogueur. On préfère donc le dernier segment s'il donne une date
+  // exploitable, avec repli sur le premier sinon (cas où c'est l'inverse,
+  // ex. « 1998§26 cm » : le premier segment est le millésime, le second une
+  // note de format).
+  if (str.indexOf('§') !== -1) {
+    const parts = str.split('§');
+    const last = parsePublicationDatePart(parts[parts.length - 1].trim());
+    if (last) return last;
+    return parsePublicationDatePart(parts[0].trim());
+  }
+
+  return parsePublicationDatePart(str);
+}
+
+function parsePublicationDatePart(str) {
   // Cas : [17xx] → XVIIIe siècle → 1701–1800
   const centuryMatch = str.match(/^\[(\d{2})xx\]$/i);
   if (centuryMatch) {
@@ -318,6 +358,32 @@ function parsePublicationDate(dateStr) {
       start: decade,
       end: decade + 9
     };
+  }
+
+  // Cas archaïque : « l'an 1000 800 50 (Valenciennes, impr. de A. Prignet,
+  // 1850) » — un seul exemplaire du fonds Imprimés (cote I-19-1850-1-3,
+  // confirmée par ce même millésime dans la cote), millésime décomposé en
+  // unités sur la page de titre (1000+800+50=1850) façon almanach des
+  // Rosati, le vrai millésime réapparaissant entre parenthèses à la fin.
+  // Sans ce cas, le premier groupe de 4 chiffres (« 1000 ») serait pris à
+  // tort pour l'année, antérieur de 4 siècles aux premiers incunables.
+  const archaicMatch = str.match(/^l['’]an\s+[\d\s]+\(.*?(\d{4})/i);
+  if (archaicMatch) {
+    const year = parseInt(archaicMatch[1], 10);
+    return { start: year, end: year };
+  }
+
+  // Cas calendrier hégirien : « l'an de l'Hégyre 1170 [1756] » — un seul
+  // exemplaire (ouvrage du monde musulman) porte son millésime dans le
+  // calendrier hégirien, non comparable à une année grégorienne (l'hégire
+  // ne s'incrémente pas de 1 par an solaire), suivi de sa conversion
+  // grégorienne entre crochets. Sans ce cas, le millésime hégirien
+  // (« 1170 ») serait pris à tort pour l'année, alors que la conversion
+  // donnée par le catalogueur (1756) est juste devant, entre crochets.
+  const hijriMatch = str.match(/l['’]an\s+de\s+l['’]h[ée]g[iy]re\s+\d+\s*\[(\d{4})\]/i);
+  if (hijriMatch) {
+    const year = parseInt(hijriMatch[1], 10);
+    return { start: year, end: year };
   }
 
   // Cas : année précise
@@ -787,7 +853,7 @@ function renderTable(body, records, stateKey, state) {
     tr.dataset.rowId = rowId;
     tr.dataset.lienNum = lienNum;
     tr.style.cursor = 'pointer';
-    tr.addEventListener('click', () => toggleDetail(rowId, rec));
+    tr.addEventListener('click', () => openDetailModal(rec, lienNum));
 
     COLS.forEach(col => {
       const td = document.createElement('td');
@@ -826,17 +892,6 @@ function renderTable(body, records, stateKey, state) {
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
-
-    // ── Ligne expansée (état ouvert) ──────────────────────────
-    const dtr = document.createElement('tr');
-    dtr.className = 'inv-row-expanded';
-    dtr.id = `detail-${rowId}`;
-    const dtd = document.createElement('td');
-    dtd.className = 'inv-expanded-cell';
-    dtd.colSpan = COLS.length;
-    dtd.appendChild(buildExpandedContent(rec, lienNum));
-    dtr.appendChild(dtd);
-    tbody.appendChild(dtr);
   });
   table.appendChild(tbody);
   wrap.appendChild(table);
@@ -888,8 +943,10 @@ function buildSousFondsBlock(sfName, records, fondsName, sfKey) {
  * @param {string}  [visionneuseTarget] – valeur "num" (dossier) ou chemin R2 ("_lienNumerise")
  *                                        d'un document consultable dans la visionneuse
  * @param {string}  [visionneuseMode]   – 'dossier' (défaut) ou 'image', voir visionneuseSrc()
+ * @param {string}  [titre]             – titre du document, pour le bandeau au-dessus de la
+ *                                        visionneuse intégrée (openViewerInModal, `large` uniquement)
  */
-function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionneuseMode = 'dossier') {
+function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionneuseMode = 'dossier', titre = '') {
   const frame = document.createElement('div');
   frame.className = 'doc-thumb-frame' + (large ? ' doc-thumb-frame--large' : '');
 
@@ -910,31 +967,163 @@ function buildThumbFrame(lienNum, large = false, visionneuseTarget = '', visionn
     img.className = 'doc-thumbnail';
     img.loading = 'lazy';
     img.decoding = 'async';
-    img.title = visionneuseTarget ? 'Accéder au document numérisé' : 'Voir la photo';
     img.addEventListener('error', () => setPlaceholder());
-    // Petite ou grande vignette : même comportement. S'il existe un document
-    // consultable dans la visionneuse (colonne "num", ou lien posé via
-    // exemplarisation.html — voir buildExpandedContent), le clic y navigue
-    // directement, dans le même onglet (pas de nouvel onglet, pas de
-    // surcouche/modale) — pour rester dans l'iframe du site hôte comme
-    // n'importe quel lien du site (demande explicite, 2026-09-11). Sinon,
-    // repli sur l'ouverture du fichier brut (simple photo sans document
-    // numérisé associé).
-    img.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (visionneuseTarget) {
-        window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
-      } else {
-        window.open(lienNum, '_blank', 'noopener');
-      }
-    });
-    if (large) frame.style.cursor = 'zoom-in';
+    // Vignette cliquable UNIQUEMENT s'il existe un document consultable
+    // dans la visionneuse (colonne "num", ou lien posé via
+    // exemplarisation.html — voir buildExpandedContent) : grande vignette
+    // (panneau de détail, `large`) → ouvre la visionneuse DANS la même
+    // modale (openViewerInModal(), 2026-09-22) ; petite vignette (ligne
+    // repliée de la liste) → navigation classique dans le même onglet
+    // (comportement inchangé depuis 2026-09-11). Une simple photo sans
+    // document numérisé associé n'a nulle part où mener (2026-09-22,
+    // demande explicite) : ni clic, ni curseur "cliquable"
+    // (.doc-thumb-frame--static, voir inventaire-thumbnail.css) — elle
+    // renvoyait auparavant vers le fichier brut dans un nouvel onglet.
+    if (visionneuseTarget) {
+      img.title = 'Accéder au document numérisé';
+      img.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (large) {
+          openViewerInModal(visionneuseTarget, visionneuseMode, titre);
+        } else {
+          window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
+        }
+      });
+      if (large) frame.style.cursor = 'zoom-in';
+    } else {
+      frame.classList.add('doc-thumb-frame--static');
+    }
     frame.appendChild(img);
     img.src = lienNum;
   } else {
     setPlaceholder();
   }
   return frame;
+}
+
+// ══════════════════════════════════════════
+//  Presse numérisée — calendrier année → mois → jour
+// ══════════════════════════════════════════
+/**
+ * Construit le petit calendrier affiché sous une notice de périodique
+ * numérisé (rec._presseCalendar — année → mois "MM" → jour "J" → nom du
+ * "book" de ce numéro, posé dans js/inventaire-page.js depuis
+ * js/presse-index.json, voir scripts/build-manifest-presse.mjs). Trois
+ * niveaux dans la même boîte, un seul affiché à la fois (bouton « Retour »
+ * pour remonter) :
+ *   années → boîtes bleues, une par année numérisée
+ *   mois   → 12 boîtes, bleues (numérisé) ou grisées (rien cette année-là)
+ *   jours  → une boîte par jour du mois, bleue seulement si un numéro existe
+ * Cliquer un jour bascule la modale vers la visionneuse sur le "book" de ce
+ * numéro — qui ne contient QUE ses propres pages (un "book" par numéro,
+ * pas par année, voir scripts/build-manifest-presse.mjs) : les flèches
+ * gauche/droite n'y feuillettent donc que ce numéro-là, pas toute l'année
+ * (demande explicite du 2026-09-23).
+ *
+ * @returns {HTMLElement|null} null si la notice n'a pas de presse numérisée
+ */
+function buildPresseCalendar(rec, titre) {
+  const calendar = rec._presseCalendar;
+  const years = calendar ? Object.keys(calendar).sort() : [];
+  if (!years.length) return null;
+
+  const box = document.createElement('div');
+  box.className = 'inv-presse-cal';
+
+  const header = document.createElement('div');
+  header.className = 'inv-presse-cal-header';
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'inv-presse-cal-back';
+  backBtn.textContent = '‹ Retour';
+  backBtn.hidden = true;
+  const label = document.createElement('span');
+  label.className = 'inv-presse-cal-label';
+  header.appendChild(backBtn);
+  header.appendChild(label);
+
+  const grid = document.createElement('div');
+  box.appendChild(header);
+  box.appendChild(grid);
+
+  let onBack = null;
+
+  function cell(text, available, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'inv-presse-cal-cell' + (available ? ' inv-presse-cal-cell--available' : ' inv-presse-cal-cell--unavailable');
+    btn.textContent = text;
+    btn.disabled = !available;
+    if (available) btn.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+    return btn;
+  }
+
+  function renderYears() {
+    backBtn.hidden = true;
+    onBack = null;
+    label.textContent = 'Presse numérisée — années disponibles';
+    grid.className = 'inv-presse-cal-grid inv-presse-cal-grid--years';
+    grid.innerHTML = '';
+    years.forEach(year => grid.appendChild(cell(year, true, () => renderMonths(year))));
+  }
+
+  function renderMonths(year) {
+    backBtn.hidden = false;
+    onBack = renderYears;
+    label.textContent = `Presse numérisée — ${year}`;
+    grid.className = 'inv-presse-cal-grid inv-presse-cal-grid--months';
+    grid.innerHTML = '';
+    const monthsAvail = calendar[year] || {};
+    MOIS_COURTS.forEach((name, i) => {
+      const mm = String(i + 1).padStart(2, '0');
+      grid.appendChild(cell(name, !!monthsAvail[mm], () => renderDays(year, mm)));
+    });
+  }
+
+  function renderDays(year, month) {
+    backBtn.hidden = false;
+    onBack = () => renderMonths(year);
+    label.textContent = `Presse numérisée — ${MOIS_LONGS[parseInt(month, 10) - 1]} ${year}`;
+    grid.className = 'inv-presse-cal-grid inv-presse-cal-grid--days';
+    grid.innerHTML = '';
+    // En-tête jours de semaine (lundi en tête, convention française) —
+    // purement décoratif, sert juste à aligner la grille des jours en
+    // dessous comme un vrai calendrier.
+    ['L', 'M', 'M', 'J', 'V', 'S', 'D'].forEach(w => {
+      const wd = document.createElement('span');
+      wd.className = 'inv-presse-cal-weekday';
+      wd.textContent = w;
+      grid.appendChild(wd);
+    });
+    const daysAvail = (calendar[year] && calendar[year][month]) || {};
+    const daysInMonth = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+    // Décalage avant le 1er du mois pour aligner sur son vrai jour de
+    // semaine (getDay() : 0=dimanche…6=samedi → converti en 0=lundi…6=dimanche).
+    const firstWeekday = (new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1).getDay() + 6) % 7;
+    for (let i = 0; i < firstWeekday; i++) {
+      const filler = document.createElement('span');
+      filler.className = 'inv-presse-cal-cell inv-presse-cal-cell--filler';
+      grid.appendChild(filler);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const bookName = daysAvail[String(d)]; // ex. "D23_1873_01_05" — voir scripts/build-manifest-presse.mjs
+      grid.appendChild(cell(String(d), bookName !== undefined, () => {
+        const dateLabel = `${d} ${MOIS_LONGS[parseInt(month, 10) - 1]} ${year}`;
+        // Un "book" par numéro (pas par année) : la visionneuse n'y feuillette
+        // que les pages de CE numéro aux flèches gauche/droite (demande
+        // explicite du 2026-09-23).
+        openViewerInModal(bookName, 'dossier', `${titre} — ${dateLabel}`);
+      }));
+    }
+  }
+
+  backBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (onBack) onBack();
+  });
+
+  renderYears();
+  return box;
 }
 
 // ══════════════════════════════════════════
@@ -953,11 +1142,16 @@ function buildExpandedContent(rec, lienNum) {
   const lienNumeriseVal = (rec['_lienNumerise'] || '').trim();
   const visionneuseTarget = numVal || lienNumeriseVal;
   const visionneuseMode = numVal ? 'dossier' : 'image';
+  // Titre complet — calculé ici (avant la vignette) pour pouvoir être
+  // transmis à openViewerInModal() (bandeau de titre au-dessus de la
+  // visionneuse intégrée, voir buildThumbFrame ci-dessous et le bouton
+  // plus bas), en plus de son usage habituel dans titreEl juste après.
+  const titre = rec['200$a'] || '';
 
   // ── Colonne gauche : grande miniature ──
   const imgCol = document.createElement('div');
   imgCol.className = 'inv-expanded-img';
-  const largeFrame = buildThumbFrame(lienNum, true, visionneuseTarget, visionneuseMode);
+  const largeFrame = buildThumbFrame(lienNum, true, visionneuseTarget, visionneuseMode, titre);
   imgCol.appendChild(largeFrame);
   wrap.appendChild(imgCol);
 
@@ -965,8 +1159,6 @@ function buildExpandedContent(rec, lienNum) {
   const infoCol = document.createElement('div');
   infoCol.className = 'inv-expanded-info';
 
-  // Titre complet
-  const titre = rec['200$a'] || '';
   const titreEl = document.createElement('h3');
   titreEl.className = 'inv-expanded-title';
   titreEl.textContent = titre || '(Sans titre)';
@@ -1039,14 +1231,18 @@ function buildExpandedContent(rec, lienNum) {
     infoCol.appendChild(p);
   }
 
+  // Presse numérisée (fonds Périodiques) : calendrier année → mois → jour,
+  // voir buildPresseCalendar() ci-dessous.
+  const presseCalendar = buildPresseCalendar(rec, titre);
+  if (presseCalendar) infoCol.appendChild(presseCalendar);
+
   // Bouton visionneuse — conditionné par la colonne "num" (notices Syracuse
   // avec un dossier dans le manifeste) ou par "_lienNumerise" (exemplaire
   // lié manuellement depuis exemplarisation.html à une image R2 précise —
   // voir js/exemplaires-manuels-shared.js). Un seul bouton, quelle que soit
   // la source. Même comportement que la grande vignette juste au-dessus
-  // (voir imgCol) : navigation classique dans le même onglet, pas de
-  // nouvel onglet ni de surcouche — pour rester dans l'iframe du site hôte
-  // comme n'importe quel lien du site (demande explicite, 2026-09-11).
+  // (voir imgCol) : ouvre la visionneuse DANS cette même modale
+  // (openViewerInModal(), 2026-09-22), à la place de la fiche.
   if (visionneuseTarget) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1054,7 +1250,7 @@ function buildExpandedContent(rec, lienNum) {
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Accéder au document numérisé`;
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      window.location.href = visionneuseSrc(visionneuseTarget, visionneuseMode);
+      openViewerInModal(visionneuseTarget, visionneuseMode, titre);
     });
     infoCol.appendChild(btn);
   }
@@ -1083,29 +1279,170 @@ function buildExpandedContent(rec, lienNum) {
   return wrap;
 }
 
-function toggleDetail(rowId, rec) {
-  const dtr = document.getElementById(`detail-${rowId}`);
-  if (!dtr) return;
+/**
+ * Ouvre le détail d'une notice dans une modale centrée, plutôt que dans une
+ * ligne dépliée sous la ligne cliquée (ancien comportement) — reprend le
+ * contenu de buildExpandedContent() tel quel, juste déplacé dans une boîte
+ * de dialogue.
+ *
+ * @param {Object}   rec       – enregistrement du catalogue
+ * @param {string}   lienNum   – URL de la vignette (voir buildExpandedContent)
+ * @param {Function} [onClose] – rappel exécuté à la fermeture (bouton ✕, clic
+ *                               hors modale ou Échap) — pas sur un remplacement
+ *                               du contenu par un nouvel appel à openDetailModal.
+ *                               Sert par ex. à effacer un état "notice ouverte"
+ *                               persisté (js/inventaire-page.js).
+ */
+function openDetailModal(rec, lienNum, onClose) {
+  const overlay = ensureDetailModal();
+  // Mémorisés pour que closeViewerInModal() puisse reconstruire la fiche
+  // après un aller-retour par la visionneuse intégrée, sans avoir besoin
+  // de rappeler openDetailModal() depuis l'extérieur.
+  overlay._currentRec = rec;
+  overlay._currentLienNum = lienNum;
+  overlay._viewerActive = false;
+  overlay.querySelector('.inv-detail-box').classList.remove('inv-detail-box--viewer');
+  overlay.querySelector('.inv-detail-close').setAttribute('aria-label', 'Fermer');
 
-  const isOpen = dtr.classList.contains('visible');
+  const content = document.getElementById('inv-detail-content');
+  content.innerHTML = '';
+  content.appendChild(buildExpandedContent(rec, lienNum));
 
-  // Fermer toutes les autres lignes expansées
-  document.querySelectorAll('.inv-row-expanded.visible').forEach(el => {
-    if (el.id !== `detail-${rowId}`) {
-      el.classList.remove('visible');
-      const sibling = document.querySelector(`[data-row-id="${el.id.replace('detail-', '')}"]`);
-      if (sibling) sibling.classList.remove('expanded');
+  overlay.hidden = false;
+  overlay._onClose = typeof onClose === 'function' ? onClose : null;
+  document.addEventListener('keydown', detailModalEscHandler);
+
+  // En iframe, deux cas (voir « MODALES » dans js/parent-page-height.js) :
+  // - la page hôte transmet la zone de l'iframe visible à l'écran
+  //   (hostViewport) : parent-page-height.js cale la surcouche exactement
+  //   dessus, la modale s'ouvre donc déjà sous les yeux du visiteur — rien
+  //   à faire défiler, on force juste ce placement tout de suite ;
+  // - ancien script collé côté hôte, sans hostViewport : la modale est posée
+  //   dans le document (voir le CSS .rp-embedded dans
+  //   inventaire-thumbnail.css) et on amène la page hôte dessus —
+  //   scrollIntoView traverse la frontière d'iframe.
+  if (isEmbedded()) {
+    const rp = window.rpEmbed;
+    if (rp && rp.hasHostViewport && rp.hasHostViewport()) {
+      rp.placeOverlays();
+    } else {
+      overlay.querySelector('.inv-detail-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  });
-
-  dtr.classList.toggle('visible', !isOpen);
-  const tr = document.querySelector(`[data-row-id="${rowId}"]`);
-  if (tr) tr.classList.toggle('expanded', !isOpen);
-
-  // Scroll doux vers la ligne si on l'ouvre
-  if (!isOpen) {
-    setTimeout(() => dtr.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
   }
+  notifyHeight();
+}
+
+function closeDetailModal() {
+  const overlay = document.getElementById('inv-detail-overlay');
+  if (!overlay || overlay.hidden) return;
+  overlay.hidden = true;
+  document.removeEventListener('keydown', detailModalEscHandler);
+  const onClose = overlay._onClose;
+  overlay._onClose = null;
+  notifyHeight();
+  if (onClose) onClose();
+}
+
+// Le bouton ✕/Échap/clic hors modale reviennent d'abord à la fiche si la
+// visionneuse intégrée est ouverte (closeViewerInModal() renvoie true dans
+// ce cas), et ne ferment toute la modale que sinon — voir
+// openViewerInModal() ci-dessous.
+function detailModalEscHandler(e) {
+  if (e.key === 'Escape' && !closeViewerInModal()) closeDetailModal();
+}
+
+/** Crée (une seule fois) la modale de détail et ses écouteurs, la renvoie. */
+function ensureDetailModal() {
+  let overlay = document.getElementById('inv-detail-overlay');
+  if (overlay) return overlay;
+
+  overlay = document.createElement('div');
+  overlay.id = 'inv-detail-overlay';
+  overlay.className = 'inv-detail-overlay';
+  overlay.hidden = true;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `
+    <div class="inv-detail-box">
+      <button type="button" class="inv-detail-close" aria-label="Fermer">✕</button>
+      <div id="inv-detail-content"></div>
+    </div>`;
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay && !closeViewerInModal()) closeDetailModal();
+  });
+  overlay.querySelector('.inv-detail-close').addEventListener('click', () => {
+    if (!closeViewerInModal()) closeDetailModal();
+  });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+/**
+ * Bascule le contenu de la modale de détail vers la visionneuse intégrée —
+ * un iframe visionneuse.html?...&modal=1, sans sa barre latérale ni son
+ * arborescence de dossiers (voir .viewer-layout--modal dans
+ * visionneuse.html) — à la place de la fiche. Le bouton ✕ de la modale
+ * (inv-detail-close) revient alors à la fiche au lieu de fermer toute la
+ * modale, voir closeViewerInModal() et detailModalEscHandler() ci-dessus.
+ *
+ * @param {string} target – valeur "num" (dossier) ou chemin R2
+ *                           (_lienNumerise), voir buildExpandedContent()
+ * @param {string} mode   – 'dossier' (défaut) ou 'image', voir visionneuseSrc()
+ * @param {string} [titre] – titre du document, affiché dans le bandeau
+ *                           au-dessus de la visionneuse (la visionneuse
+ *                           elle-même n'a pas accès à la notice)
+ */
+function openViewerInModal(target, mode, titre) {
+  const overlay = document.getElementById('inv-detail-overlay');
+  const content = document.getElementById('inv-detail-content');
+  if (!overlay || !content) return;
+
+  overlay._viewerActive = true;
+  overlay.querySelector('.inv-detail-box').classList.add('inv-detail-box--viewer');
+  overlay.querySelector('.inv-detail-close').setAttribute('aria-label', 'Revenir à la notice');
+
+  content.innerHTML = '';
+  const titleBar = document.createElement('div');
+  titleBar.className = 'inv-detail-viewer-title';
+  titleBar.textContent = titre || '';
+  content.appendChild(titleBar);
+
+  const frame = document.createElement('iframe');
+  frame.className = 'inv-detail-viewer-frame';
+  frame.title = titre || 'Document numérisé';
+  // allow="fullscreen"/allowfullscreen : sans ça, le bouton plein écran de
+  // la visionneuse (Fullscreen API appelée depuis l'intérieur de l'iframe)
+  // est refusé par le navigateur — même same-origin, la Fullscreen API
+  // exige que l'iframe délègue explicitement cette permission.
+  frame.setAttribute('allow', 'fullscreen');
+  frame.setAttribute('allowfullscreen', '');
+  frame.src = visionneuseSrc(target, mode) + '&modal=1';
+  content.appendChild(frame);
+  notifyHeight();
+}
+
+/**
+ * Referme la visionneuse intégrée et reconstruit la fiche depuis
+ * overlay._currentRec/_currentLienNum (posés par openDetailModal()).
+ * Renvoie false si la visionneuse n'était pas active — pour que les
+ * appelants (✕, clic hors modale, Échap) sachent s'ils doivent fermer
+ * toute la modale à la place.
+ */
+function closeViewerInModal() {
+  const overlay = document.getElementById('inv-detail-overlay');
+  if (!overlay || !overlay._viewerActive) return false;
+
+  overlay._viewerActive = false;
+  overlay.querySelector('.inv-detail-box').classList.remove('inv-detail-box--viewer');
+  overlay.querySelector('.inv-detail-close').setAttribute('aria-label', 'Fermer');
+
+  const content = document.getElementById('inv-detail-content');
+  if (content && overlay._currentRec) {
+    content.innerHTML = '';
+    content.appendChild(buildExpandedContent(overlay._currentRec, overlay._currentLienNum));
+  }
+  notifyHeight();
+  return true;
 }
 
 // ══════════════════════════════════════════

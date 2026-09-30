@@ -27,6 +27,8 @@ import {
   iterateRecords, parseRecord, getSubfield, getAllSubfields, flatten,
 } from './marc-xml.mjs';
 import { piegeLabelOf } from './piege-labels.mjs';
+import { langueLabelOf } from './langue-labels.mjs';
+import { typeDocumentLabelOf } from './type-document-labels.mjs';
 
 // ── Union-Find (reliures $481/$482) ─────────────────────────────────────────
 export function makeUnionFind() {
@@ -201,6 +203,8 @@ export function buildItems(xml, index, { whitelist = null, multiSep = '§', vign
     merged._noticeId = noticeId ?? null;
     merged._joinType = joinType;
     merged._piege = piegeLabelOf(merged);
+    merged._langue = langueLabelOf(merged['101$a']);
+    merged._typeDocument = typeDocumentLabelOf(merged['920$t']);
     if (captureRaw) merged._itemRaw = flatten(rec, null, multiSep);
 
     // Vignette : reconstruite à partir du code-barres de l'exemplaire, plus
