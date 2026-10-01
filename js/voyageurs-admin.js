@@ -66,7 +66,7 @@
   var textSnapshotPending = false;
   var map = null, mapReady = false, onMapReady = [];
   var markers = [], dispCoords = [], dragging = false, lineRaf = 0;
-  var segPopup = null, projGlobe = false, osmOn = false, fondWarned = false;
+  var segPopup = null, projGlobe = false, osmOn = false, reliefOn = false, fondWarned = false;
 
   /* ---------------------------------------------------------- utilitaires */
   function $(sel) { return document.querySelector(sel); }
@@ -924,6 +924,20 @@
   }
   function eau(t) { return mixHex(THEME.eauClaire, THEME.eauProfonde, t); }
 
+  /* Teintes hypsométriques du bouton « Relief » : altitude en mètres →
+     couleur. Transparent au niveau de la mer, pour laisser la bathymétrie
+     et les côtes intactes. */
+  var RELIEF_TEINTES = ['interpolate', ['linear'], ['elevation'],
+    0, 'rgba(160,196,150,0)', 30, '#A0C496', 300, '#D3DDA3', 800, '#EBD59A',
+    1500, '#D2A26C', 2500, '#A8714F', 4000, '#8A6A62', 5500, '#F4F1EE'];
+
+  function applyRelief() {
+    if (!mapReady) return;
+    var v = reliefOn ? 'visible' : 'none';
+    map.setLayoutProperty('relief-teintes', 'visibility', v);
+    map.setLayoutProperty('relief', 'visibility', v);
+  }
+
   function ensureMap(cb) {
     if (map) {
       map.resize();
@@ -950,7 +964,13 @@
           // et routes pour placer une étape précisément. Jamais sur la page
           // publique.
           osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256,
-            maxzoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }
+            maxzoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' },
+          // Relief facultatif (bouton « Relief ») : même modèle d'élévation
+          // que la page publique. Tant que ses deux couches sont masquées,
+          // aucune tuile n'est demandée.
+          elevation: { type: 'raster-dem', tiles: ['https://tiles.mapterhorn.com/{z}/{x}/{y}.webp'], tileSize: 512,
+            encoding: 'terrarium', maxzoom: 12,
+            attribution: 'Relief : Copernicus DEM GLO-30 © DLR/Airbus, ESA — via <a href="https://mapterhorn.com/attribution">Mapterhorn</a>' }
         },
         layers: [
           { id: 'eau', type: 'background', paint: { 'background-color': eau(PROFONDEURS[0][1]) } },
@@ -961,7 +981,19 @@
           { id: 'lacs', type: 'fill', source: 'fond', 'source-layer': 'lacs', paint: { 'fill-color': eau(0.17) } },
           { id: 'fleuves', type: 'line', source: 'fond', 'source-layer': 'fleuves',
             paint: { 'line-color': eau(0.35), 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.4, 4, 1, 8, 2.2] } },
-          { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.9 } }
+          { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.9 } },
+          // Au-dessus du fond détaillé, pour lire les routes OSM et le relief
+          // ensemble. Teintes par altitude (plaines, plateaux, haute
+          // montagne) puis ombrage, bien plus marqué que sur la page
+          // publique : ici il sert à repérer vallées et cols, pas à décorer.
+          { id: 'relief-teintes', type: 'color-relief', source: 'elevation', layout: { visibility: 'none' },
+            paint: { 'color-relief-opacity': 0.55, 'color-relief-color': RELIEF_TEINTES } },
+          { id: 'relief', type: 'hillshade', source: 'elevation', layout: { visibility: 'none' },
+            paint: {
+              'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 0.85],
+              'hillshade-shadow-color': '#2B2118', 'hillshade-highlight-color': '#FFFFFF',
+              'hillshade-accent-color': '#2B2118'
+            } }
         ]
       },
       center: DOUAI,
@@ -979,7 +1011,7 @@
       fondWarned = true;
       var w = $('#va-mapwarn');
       w.innerHTML = 'Fond de carte introuvable (<code>data/natural-earth/fond.pmtiles</code>). ' +
-        'Lancez <code>npm run build:natural-earth</code> sur le poste serveur, ou utilisez le bouton ' +
+        'Régénérez-le avec <code>npm run build:natural-earth</code>, ou utilisez le bouton ' +
         '<strong>🗺 Fond détaillé</strong> en attendant.';
       w.hidden = false;
     });
@@ -1023,6 +1055,7 @@
       });
 
       mapReady = true;
+      applyRelief();
       var q = onMapReady; onMapReady = [];
       q.forEach(function (f) { f(); });
     });
@@ -1166,6 +1199,12 @@
     projGlobe = !projGlobe;
     this.setAttribute('aria-pressed', String(projGlobe));
     if (map) map.setProjection({ type: projGlobe ? 'globe' : 'mercator' });
+  });
+  $('#va-relief').addEventListener('click', function () {
+    reliefOn = !reliefOn;
+    this.setAttribute('aria-pressed', String(reliefOn));
+    $('#va-relief-legend').hidden = !reliefOn;
+    applyRelief();
   });
   $('#va-osm').addEventListener('click', function () {
     osmOn = !osmOn;
@@ -1640,7 +1679,7 @@
   /* ---------------------------------------------------------- démarrage */
   api('GET').then(function (j) {
     DATA = j.voyageurs;
-    setStatus(true, 'Base connectée');
+    setStatus(true, 'Stockage connecté');
     $('#va-loading').hidden = true;
     var m = /^#(voyageur|voyage)=(.+)$/.exec(location.hash);
     var id = m ? decodeURIComponent(m[2]) : null;
@@ -1648,7 +1687,7 @@
     else if (m && m[1] === 'voyage' && findVoyage(id)) openVoyage(id);
     else goWelcome();
   }).catch(function (err) {
-    setStatus(false, 'Base injoignable');
+    setStatus(false, 'Stockage injoignable');
     $('#va-loading').hidden = true;
     var box = $('#va-fatal');
     box.innerHTML = '<strong>Impossible de charger les données de l\'exposition.</strong><br>' + esc(err.message) +

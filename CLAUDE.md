@@ -169,6 +169,8 @@ nosniff` et `Referrer-Policy: strict-origin-when-cross-origin`.
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `rotobib.html` | Désherbage assisté par les statistiques de prêt : scan d'un code-barre, fiche + histogramme de prêts sur 4 ans, décision (conserver/pilon/braderie/relocalisation), export .txt par traitement — voir « Rotobib » | **Protégé** |
 | `desherbage-stats.html` | Vue d'ensemble purement statistique (lecture seule) de l'export de désherbage : prêts totaux par année, répartition par prêts cumulés, liste triable des exemplaires — voir « Rotobib » | **Protégé** |
+| `voyageurs.html` | Exposition « Voyageurs douaisiens » : globe MapLibre 5, voyages animés jour par jour (`js/voyageurs.js`, données dans R2) — **en préparation**, non liée depuis le site public — voir « Exposition Voyageurs douaisiens » | **Protégé** (jusqu'à publication) |
+| `voyageurs-admin.html` | Éditeur de l'exposition « Voyageurs douaisiens » : fiches, tracé des voyages à la souris, étapes et récits | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
 
 `_archive/` contient des pages retirées du site actif (voir
@@ -1801,6 +1803,235 @@ blocs :
   décroissants : le livre le plus emprunté du catalogue apparaît donc en
   première ligne sans manipulation.
 
+## Exposition « Voyageurs douaisiens » (en préparation — portée sur `main` le 2026-10-01)
+
+`voyageurs.html` — deuxième exposition, à côté de `histoire-du-livre.html` :
+les Douaisiens (nés à Douai ou y ayant vécu) qui ont voyagé et, surtout,
+laissé des récits. Globe MapLibre sur lequel chaque voyage est tracé ; un
+voyage choisi s'anime — icône selon le moyen de transport (bateau, jonque, à
+pied, attelage, civière, inconnu), compteur « Jour N / total », date, et
+pause à chaque **arrêt raconté** avec une carte de récit (« Continuer ▸ »).
+Barre de progression cliquable (repères = arrêts), vitesses ½× à 4×, la
+caméra suit le voyageur jusqu'à ce qu'on déplace la carte à la main (bouton
+« Suivre le voyageur »). Ancre d'URL `voyageurs.html#<id du voyage>`.
+Vue d'ensemble : un seul portrait par voyageur, posé au-dessus du point
+d'arrivée de son voyage qui finit le plus tard ; Douai reste le repère
+principal, les autres villes de départ/arrivée ont un petit rond
+(`addCityMarkers()`).
+
+Développée sur la branche `local-server` (données dans un schéma Postgres
+`expo_voyageurs`), portée ici **sans Postgres** : pages, scripts et images
+sont ceux de `local-server` ; seuls le stockage et l'API changent.
+
+**État : en préparation, accessible depuis l'espace pro uniquement.**
+Tracés, dates et textes sont provisoires, à vérifier sur les sources.
+- Aucun lien depuis une page publique : les deux seules entrées sont dans
+  `admin.html`, section « Expositions » (éditeur + aperçu). Le carrousel
+  d'expositions qu'`index.html` a sur `local-server` n'a **pas** été porté.
+- `voyageurs.html` porte le même contrôle `localStorage` que les pages pro
+  (script en tête de `<head>`, redirection vers `index.html`) et
+  `noindex, nofollow`.
+- **La vraie barrière est côté serveur** : les données ne sont dans aucun
+  fichier statique, seulement dans R2, et l'API ne les rend qu'avec le mot de
+  passe (`LECTURE_PUBLIQUE = false` dans `api/voyageurs-admin.mjs`).
+  Contourner le contrôle `localStorage` n'affiche donc qu'une page vide.
+  `data/voyageurs.json` (repli committé de `local-server`) n'existe
+  volontairement pas sur `main` : il aurait été lisible par son URL.
+  Restent publics par leur URL : les portraits et icônes de
+  `images/voyageurs/` et le fond de carte.
+
+**Pour publier** (trois gestes) : passer `LECTURE_PUBLIQUE` à `true` (la vue
+publique devient lisible sans connexion, avec ETag/304 et cache CDN comme
+les autres états partagés) ; retirer de `voyageurs.html` le script de
+contrôle et la balise `robots`, remettre le lien « Retour à l'accueil » et
+la date dans `.vy-eyebrow` ; ajouter le lien depuis `index.html`.
+
+**Données : clé R2 `voyageurs.json`** (bucket `douai-patrimoine`), un seul
+objet `{ voyageurs: [ {…fiche, publie, version, ecrits:[…], voyages:[ {…,
+publie, version, sources:[…], points:[…]} ] } ] }` — la forme que l'éditeur
+manipulait déjà. L'ordre des tableaux est l'ordre d'affichage (plus de
+colonnes `ordre`). `publie:false` (voyageur ou voyage) = brouillon de
+recherche, absent de la vue publique. Forme et règles (celles des `CHECK` et
+contraintes SQL de `local-server`, reprises à la main : formats d'identifiant
+et de date, unicité des identifiants, voyageur rattaché existant, voyage
+publié = au moins deux étapes dont une datée…) sont dans
+`lib/voyageurs-state.mjs`, module sans entrée/sortie partagé entre l'API et
+le script d'amorçage.
+- **`api/voyageurs-admin.mjs`** : `GET` (authentifié) = tout, brouillons
+  compris ; `GET ?vue=publique` = ce que lit `js/voyageurs.js`, publiés
+  seulement (authentifié tant que `LECTURE_PUBLIQUE` est faux — la page
+  envoie `rp_admin_token`) ; `POST` (authentifié) = une action
+  (`saveVoyageur`, `saveVoyage`, `deleteVoyageur`, `deleteVoyage`,
+  `reorder`), appliquée par `r2CasUpdate`. Un voyage est réécrit en bloc.
+  Contrôle de concurrence à deux niveaux : `version` par fiche (horodatage du
+  dernier enregistrement, 409 si un·e collègue a enregistré la même fiche
+  entre-temps) et compare-and-swap sur l'objet (deux enregistrements
+  simultanés sur deux fiches différentes sont rejoués, aucun n'est perdu).
+  N'utilise pas `createPatchEndpoint()` : lecture authentifiée et réponse
+  `{ok, id, voyageurs}` attendue par l'éditeur.
+- **Plafond de fonctions Vercel atteint** : avec celle-ci, `api/` compte 12
+  fonctions, le maximum d'un déploiement sur le plan Hobby. D'où une seule
+  fonction pour l'éditeur et la vue publique. Toute nouvelle route devra
+  être regroupée avec une existante.
+- **Amorçage** : `npm run seed:voyageurs -- <fichier.json> [--apply]
+  [--force]` (`scripts/seed-voyageurs.mjs`). Accepte la réponse de `GET
+  /api/voyageurs-admin` (brouillons compris) ou le tableau de
+  `data/voyageurs.json` de `local-server` (publiés seulement). Sans
+  `--apply`, simulation ; refuse d'écraser une clé existante sans `--force`.
+  Fait le 2026-10-01 depuis `data/voyageurs.json` de `origin/local-server`
+  (6 voyageurs, 8 voyages) — **les brouillons restés dans la base Postgres
+  locale n'y étaient pas** (base arrêtée ce jour-là). Depuis, R2 fait foi
+  pour `main` et Postgres pour `local-server` : les deux ne se synchronisent
+  pas.
+
+**Éditeur : `voyageurs-admin.html`** (`js/voyageurs-admin.js`). Fiches
+voyageur (identité, portrait, couleur, écrits) et voyage (titre, étapes,
+sources), brouillons compris. Le tracé se dessine sur la carte : mode
+« Ajouter des étapes » (clic = nouvelle étape après l'étape sélectionnée,
+clic sur le trait = insertion ; « ↩ Créer le retour » recopie l'aller en
+sens inverse — `addReturnPath()`), glisser-déposer, Ctrl+Z, recherche de
+lieux (Nominatim, à la touche Entrée seulement — l'autocomplétion est
+interdite par leur politique d'usage), fond OSM détaillé en option. Dates
+saisies « 16/04/1618 » converties en `1618-04-16`. Contrôles en direct avant
+enregistrement, doublés côté serveur. `style.css` plafonne `<html>` à
+1100 px : la page lève ce plafond pour elle seule (`html { max-width: none
+}`). Le champ « portrait » attend un chemin d'image déjà déployé
+(`images/voyageurs/…`) : ajouter un portrait reste un commit.
+
+Bouton **« ⛰ Relief »** (2026-10-01, demande explicite : retrouver les routes
+empruntées) : deux couches sur la source d'élévation de la page publique
+(Mapterhorn, `raster-dem`), masquées par défaut — aucune tuile demandée tant
+que le bouton est éteint. `relief-teintes` (type `color-relief`, MapLibre
+≥ 5.6 ; paliers d'altitude dans `RELIEF_TEINTES`, transparent au niveau de la
+mer) puis `relief` (`hillshade`, ombres sombres et exagération 0,6 → 0,85,
+bien plus marqué que sur la page publique où il n'est que décoratif). Posées
+**au-dessus** de la couche `osm` : « Fond détaillé » + « Relief » se
+combinent (routes et toponymes OSM sur le relief). Légende `#va-relief-legend`
+dans `voyageurs-admin.html` : son dégradé CSS recopie `RELIEF_TEINTES`, à
+changer ensemble. La page publique n'est pas touchée.
+
+Règles des étapes (appliquées par `js/voyageurs.js`, contrôlées en partie par
+des `CHECK` SQL) :
+- Une étape sans `arret_titre` n'est qu'un **point de passage** : il sert à
+  faire passer le tracé par la mer plutôt qu'à travers un continent (entre
+  deux points, le tracé suit le grand cercle).
+- Dates `AAAA`, `AAAA-MM` ou `AAAA-MM-JJ` ; une étape sans date reçoit une
+  date estimée au prorata de la distance, affichée « ≈ ». `date_depart` =
+  séjour sur place : l'icône s'arrête, le compteur continue.
+- Si le début ou la fin du voyage n'est daté qu'à l'année, le compteur
+  devient « ≈ jour N » sans total, et la durée « à préciser » — un « jour
+  213 / 366 » tiré de deux années serait une fausse précision.
+- `mode` vaut pour le tronçon qui PART de l'étape ; vide = inchangé. Valeurs :
+  `bateau`, `jonque` (2026-09-29, `0011_voyageurs_jonque.sql` ; icône
+  `images/voyageurs/transports/jonque.svg` dessinée pour le projet, zoom
+  automatique 7), `pied`, `attelage`, `civiere`, `inconnu` (2026-09-29,
+  `0012_voyageurs_inconnu.sql` ; oiseau en « V » `inconnu.svg`, zoom 4 —
+  tronçon dont les sources ne disent pas le moyen ; **pas de trait sur la
+  carte publique** — `HIDDEN_MODES`, `visibleParts` pour les tracés en
+  MultiLineString, `hiddenRanges` rendus transparents dans le dégradé du
+  tracé parcouru ; le voyageur y circule quand même, l'éditeur les affiche).
+  `MODE_PACE` ralentit la
+  lecture d'un moyen de transport (jonque ×2) : la vitesse est calée sur
+  `baseU` (somme sans ralentissement), donc un tronçon ralenti allonge le
+  voyage au lieu d'accélérer les autres. Ajouter un moyen de transport =
+  CHECK SQL, `MODES` de l'API, `MODE_*` des deux JS, icône dans `ICON_FILES`.
+- `zoom` (2026-09-26, colonne ajoutée par `0010_voyageurs_zoom.sql`, 1 à 13)
+  impose le zoom de la caméra à une étape trop restreinte pour le zoom
+  automatique par moyen de transport (`MODE_ZOOM`) ; vide = automatique.
+  `cameraZoom()` : le zoom imposé vaut tel quel dans un rayon
+  `zoomReachKm(z)` le long du tracé, puis son effet diminue de moitié à
+  chaque rayon supplémentaire ; entre deux étapes à zoom imposé, fondu de
+  l'une à l'autre. Zoom maximal de la carte publique : 13 (`MAX_ZOOM`, aussi
+  plafond du champ et de l'éditeur). À partir du zoom 10 (`OSM_ZOOM`, fondu
+  sur une demi-unité), des tuiles raster OpenStreetMap recouvrent tout le
+  fond vectoriel : Natural Earth y est trop grossier (côtes à ~1 km près,
+  ni villes ni routes). Seul élément du fond qui ne soit pas aux couleurs
+  du site ; tuiles `tile.openstreetmap.org` (politique d'usage OSM :
+  attribution visible, trafic modéré — à revoir si l'exposition attire
+  beaucoup de monde).
+- Rythme de l'animation : moitié distance, moitié temps écoulé (au
+  kilomètre seul, les 12 jours de civière de Rimbaud passaient en un éclair).
+- La carte de récit (`.vy-card`) est **à droite** (2026-09-26) et la caméra
+  décale le voyageur dans la partie libre via le `padding` MapLibre
+  (`cardPadding()`), pour qu'elle ne le masque pas. Ce `padding` persiste
+  dans la caméra : il est remis à zéro avant le `fitBounds` de la vue
+  d'ensemble (sinon un décalage resté du voyage précédent la décentre) et
+  dans le `flyTo` de retour au globe.
+
+Technique : **MapLibre 5.24.0** (projection globe, absente des 3.6.2/4.7.1
+des autres cartes — ne pas « harmoniser » vers le bas).
+
+Fond de carte **vectoriel, aux couleurs du site, streamé en tuiles**
+(2026-09-25 ; passé en tuiles PMTiles et au 1:10m le 2026-09-26, demande
+explicite — aucune imagerie satellite) :
+- **Eau, terres, lacs, fleuves, bathymétrie : Natural Earth 1:10m** (domaine
+  public, la plus fine résolution publiée), compléments régionaux compris
+  (petites îles, lacs et fleuves d'Europe/Amérique du Nord/Australie).
+  `npm run build:natural-earth` (`scripts/build-natural-earth.mjs`, ~25 s)
+  télécharge les couches, les découpe en tuiles vectorielles MVT du zoom 0 au
+  zoom 7 (`MAX_ZOOM`, la carte sur-zoome jusqu'à 8) et les range dans UNE
+  archive `data/natural-earth/fond.pmtiles` (~22 Mo, gitignorée : elle se
+  regénère). Couches (`source-layer`) : `terres`, `lacs`, `fleuves`,
+  `bathymetrie` (propriété `depth`, paliers 200 → 10 000 m emboîtés, écrits du
+  moins au plus profond ; L_0 omis, c'est la couleur de fond). Lacs et
+  fleuves n'entrent dans une tuile qu'à partir de leur `min_zoom` Natural
+  Earth moins un.
+- **Pourquoi des tuiles** : la première version servait des GeoJSON 1:50m
+  (et une bathymétrie 1:10m simplifiée à 0,1°) que le navigateur devait
+  télécharger en entier puis redécouper à chaque zoom — lent, et trop
+  grossier une fois zoomé sur une expédition. Le lecteur PMTiles
+  (`pmtiles@4.5.0` depuis jsDelivr, protocole `pmtiles://` enregistré dans
+  `js/voyageurs.js`) ne lit que les tuiles de la vue par requêtes HTTP Range :
+  mesuré 389 Ko pour la vue d'ensemble, ~750 Ko après un zoom sur Rimbaud,
+  sur 21,6 Mo d'archive.
+- **Sans dépendance npm** (`npm` était de toute façon cassé sur ce poste le
+  2026-09-26 — module interne `./tlog` manquant) : le découpage est fait par
+  `geojson-vt` 5.0.2, téléchargé à la volée depuis jsDelivr et **refusé si
+  l'empreinte SHA-256 d'un fichier diffère** (`GVT_FILES`) ; l'encodage
+  protobuf MVT et l'écriture de l'archive PMTiles v3 (numérotation de
+  Hilbert, répertoires compressés, dédoublonnage des tuiles identiques) sont
+  écrits à la main dans le script. **Piège** : `geojson-vt` 5 ne réoriente
+  plus les anneaux des polygones (les versions précédentes le faisaient) ;
+  le script les réoriente lui-même (`rewindPolygon()`, extérieur horaire en
+  lng/lat) avant le découpage.
+- **Où est servie l'archive** : `FOND_CARTE_URL` dans `js/voyageurs.js` (et
+  `fondUrl` dans `js/voyageurs-admin.js`) — `data/natural-earth/fond.pmtiles`,
+  **committée sur `main`** (21,6 Mo ; `.gitignore` n'ignore plus que le reste
+  du dossier) et servie en statique par Vercel, qui répond aux requêtes
+  `Range` (206, vérifié le 2026-10-01 — indispensable à PMTiles). Sur
+  `local-server` le fichier est gitignoré et regénéré. `vercel.json` lui
+  donne une semaine de cache. `scripts/dev-server.mjs` gère `Range` lui
+  aussi (206/416) : sans cela la carte reste vide en local. Alternative si le
+  poids dans git gêne : le bucket R2 public des images de `visionneuse.html`
+  (dépôt à la main, les clés du `.env` n'y ont pas accès), puis changer les
+  deux URL.
+- **Relief : Copernicus DEM GLO-30**, via les tuiles d'élévation publiques
+  Mapterhorn (`tiles.mapterhorn.com`, Terrarium/WebP 512 px, base mondiale
+  = GLO-30 — vérifié dans leur `attribution.json`), ombrage `hillshade`
+  calculé par MapLibre. Les tuiles de pleine mer répondent 404 (normal, ça
+  s'affiche en console). Si Mapterhorn tombe, seul l'ombrage disparaît.
+- Couleurs dans `THEME` (`js/voyageurs.js`) : terre `--rose` (le corail a été
+  essayé puis écarté le 2026-09-25), mer en dégradé du blanc (hauts-fonds)
+  vers `--bleu` selon `PROFONDEURS`, plafonné à ~60 % de bleu pour ne jamais
+  retomber sur le bleu vif en aplat ; versants à l'ombre `--warm-dark`, au
+  soleil blanc ; trajet restant en pointillé `--ink-soft`. Tous les tracés ont
+  un liseré `--papier`. Fond autour du globe : papier.
+- **Initialisation sur `style.load`, pas `load`** : `load` attend toutes
+  les tuiles de la vue initiale, relief distant compris — tracés et portraits
+  mettaient jusqu'à 38 s à apparaître en rendu logiciel (3,5 s après).
+- **Tracé parcouru** : la ligne complète du voyage est chargée une fois
+  (source `vy-active`, `lineMetrics: true`) et le trait parcouru n'est qu'un
+  `line-gradient` en escalier coupé à la position du voyageur. Renvoyer à
+  chaque image la géométrie partielle par `setData()` (première version)
+  obligeait MapLibre à la redécouper sans cesse ; le trait n'apparaissait
+  plus. La coupure est exprimée en longueur **Mercator** (`pathMerc`), l'unité
+  de `['line-progress']`, pas en kilomètres — sinon elle dériverait de
+  l'icône sur les longs trajets nord-sud.
+
+`cooperativeGestures` en mode iframe, hauteur fixe 640 px sous
+`.rp-embedded` (pas de `vh`), toutes les surcouches en `position:absolute`
+dans la carte.
+
 ## Base Postgres/Neon — retirée de `main` (2026-09-30)
 
 Une base Postgres (Neon) unifiant réserve + `bib.xml` avait été amorcée le
@@ -1879,6 +2110,11 @@ pour plusieurs choses indépendantes :
   plus bas pour le détail. Cinquième usage indépendant du bucket R2, en
   plus de `xml/`, de la famille `recolement.json`/…/`desherbage-traitements.json`,
   de `recolement-backups/` et de `vignette/`.
+
+S'y ajoute `voyageurs.json` (exposition « Voyageurs douaisiens », via
+`api/voyageurs-admin.mjs` — lecture authentifiée, contrairement aux états
+ci-dessous ; voir la section dédiée). Avec elle, `api/` compte 12 fonctions,
+le plafond du plan Vercel Hobby.
 
 Neuf fonctions Vercel (`api/recolement.mjs`, `api/spolies.mjs`,
 `api/exemplaires-manuels.mjs`, `api/reliures-manuelles.mjs`,

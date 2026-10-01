@@ -184,6 +184,20 @@
     .va-search-item span { color: var(--text-light); display: block; margin-bottom: 0.3rem; }
     .va-search-item .va-inline { gap: 0.3rem; }
     .va-search-empty { padding: 0.5rem 0.6rem; font-size: 0.78rem; color: var(--text-light); }
+    /* Légende des teintes du bouton « Relief » (RELIEF_TEINTES dans
+       js/voyageurs-admin.js : mêmes couleurs, mêmes paliers). */
+    .va-relief-legend {
+      /* Au-dessus de la ligne d'attribution, qui s'étire jusqu'ici une fois dépliée. */
+      position: absolute; left: 10px; bottom: 38px; z-index: 2; width: 230px;
+      background: rgba(255,255,255,0.92); border: 1px solid var(--trait-fort);
+      padding: 0.35rem 0.5rem 0.3rem; font-size: 0.68rem; font-weight: 700; color: var(--encre);
+    }
+    .va-relief-ramp {
+      display: block; height: 9px; margin: 0.2rem 0 0.15rem;
+      background: linear-gradient(to right, #A0C496, #D3DDA3, #EBD59A, #D2A26C, #A8714F, #8A6A62);
+    }
+    .va-relief-ticks { display: flex; justify-content: space-between; }
+    .va-relief-ticks b { font-weight: 400; color: var(--text-light); }
     .va-maphint {
       position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 2; width: max-content;
       background: rgba(20,24,63,0.9); color: #fff; font-size: 0.8rem; padding: 0.5rem 0.9rem;
@@ -475,7 +489,13 @@
                 <button type="button" id="va-fit" title="Recadrer la carte sur tout le voyage">⤢ Tout voir</button>
                 <button type="button" id="va-proj" aria-pressed="false" title="Basculer entre carte plane et globe">🌍 Globe</button>
                 <button type="button" id="va-osm" aria-pressed="false" title="Afficher un fond détaillé (villes, routes) pour placer les points précisément">🗺 Fond détaillé</button>
+                <button type="button" id="va-relief" aria-pressed="false" title="Afficher le relief (altitudes et ombrage) pour repérer vallées, cols et massifs">⛰ Relief</button>
               </div>
+            </div>
+            <div class="va-relief-legend" id="va-relief-legend" hidden>
+              <span>Altitude</span>
+              <i class="va-relief-ramp" aria-hidden="true"></i>
+              <span class="va-relief-ticks"><b>0</b><b>300</b><b>800</b><b>1 500</b><b>2 500</b><b>4 000 m</b></span>
             </div>
             <div class="va-mapwarn" id="va-mapwarn" hidden></div>
             <div class="va-maphint" id="va-maphint" hidden></div>
