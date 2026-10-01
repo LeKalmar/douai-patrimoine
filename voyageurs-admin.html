@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Éditeur — Voyageurs douaisiens</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <!-- Même version que voyageurs.html (projection globe disponible). -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <!-- Publication en iframe : voir js/parent-page-height.js. Sans « defer ». -->
+  <script src="js/parent-page-height.js"></script>
+  <style>
+    /* style.css plafonne <html> à 1100 px pour tout le site : trop étroit pour
+       un éditeur de carte (arborescence + carte + colonne des étapes). */
+    html { max-width: none; }
+    body { background: var(--papier); color: var(--text); font-family: var(--font-body); line-height: 1.45; }
+    [hidden] { display: none !important; }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ── Bandeau ──────────────────────────────────────────────────────── */
+    .va-head { background: var(--bleu); color: #fff; }
+    .va-head-inner {
+      max-width: 1800px; margin: 0 auto; padding: 1.2rem clamp(1rem, 3vw, 2rem);
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    }
+    .va-eyebrow { font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--rose); margin-bottom: 0.35rem; }
+    .va-head h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.9rem; line-height: 1.05; }
+    .va-head-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; font-size: 0.78rem; }
+    .va-head-actions a {
+      border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.42rem 0.8rem;
+      transition: background var(--transition);
+    }
+    .va-head-actions a:hover { background: rgba(255,255,255,0.14); color: #fff; }
+    .va-status { color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 0.4rem; }
+    .va-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #7BE0A0; }
+    .va-status--off .va-status-dot { background: #F9A825; }
+
+    /* ── Mise en page ─────────────────────────────────────────────────── */
+    .va-layout {
+      max-width: 1800px; margin: 0 auto; padding: 1.2rem clamp(1rem, 3vw, 2rem) 0;
+      display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 1.2rem; align-items: start;
+    }
+    @media (max-width: 62rem) { .va-layout { grid-template-columns: 1fr; } }
+
+    /* ── Arborescence ─────────────────────────────────────────────────── */
+    .va-side { background: #fff; border: 1px solid #E3DED4; padding: 0.9rem; position: sticky; top: 0.8rem; max-height: calc(100vh - 1.6rem); overflow-y: auto; }
+    html.rp-embedded .va-side { position: static; max-height: none; }
+    .va-side-title { font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--carmin); margin-bottom: 0.6rem; }
+    .va-vr { border-left: 4px solid var(--c, var(--carmin)); background: var(--papier); margin-bottom: 0.6rem; }
+    .va-vr-head { display: flex; align-items: center; gap: 0.3rem; }
+    .va-vr-name {
+      flex: 1; text-align: left; background: none; border: 0; padding: 0.5rem 0.6rem;
+      font-weight: 700; font-size: 0.86rem; color: var(--encre);
+    }
+    .va-vr-name:hover, .va-vy:hover { background: var(--accent-light); }
+    .va-updown { display: flex; flex-direction: column; padding-right: 0.25rem; }
+    .va-updown button { background: none; border: 0; font-size: 0.6rem; color: var(--text-light); padding: 0 0.25rem; line-height: 1.1; }
+    .va-updown button:hover { color: var(--carmin); }
+    .va-updown button:disabled { visibility: hidden; }
+    .va-vys { list-style: none; padding: 0 0 0.35rem; }
+    .va-vy-row { display: flex; align-items: center; }
+    .va-vy {
+      flex: 1; display: block; text-align: left; background: none; border: 0;
+      padding: 0.3rem 0.6rem 0.3rem 1.1rem; font-size: 0.8rem; color: var(--text);
+    }
+    .va-vy small { display: block; color: var(--text-light); font-size: 0.7rem; }
+    .is-active { background: var(--accent-light) !important; box-shadow: inset 3px 0 0 var(--bleu); }
+    .va-add-vy { background: none; border: 0; color: var(--carmin); font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.6rem 0.5rem 1.1rem; }
+    .va-add-vy:hover { color: var(--encre); }
+    .va-badge {
+      display: inline-block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em;
+      padding: 0.05rem 0.4rem; border-radius: 999px; vertical-align: 1px; margin-left: 0.25rem;
+    }
+    .va-badge--draft { background: #FFF1CC; color: #7A5A00; }
+    .va-badge--new { background: var(--rose); color: var(--warm-dark); }
+
+    /* ── Boutons et champs ────────────────────────────────────────────── */
+    .va-btn {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      border: 1px solid var(--trait-fort); background: #fff; color: var(--encre);
+      padding: 0.45rem 0.8rem; font-size: 0.8rem; font-weight: 600; transition: background var(--transition);
+    }
+    .va-btn:hover { background: var(--accent-light); }
+    .va-btn:disabled { opacity: 0.45; cursor: not-allowed; background: #fff; }
+    .va-btn--primary { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+    .va-btn--primary:hover { background: #1f2fb0; }
+    .va-btn--primary:disabled { background: var(--bleu); }
+    .va-btn--danger { color: var(--carmin); }
+    .va-btn--danger:hover { background: #FBE3E6; }
+    .va-btn--small { padding: 0.25rem 0.55rem; font-size: 0.74rem; }
+    .va-btn--block { width: 100%; justify-content: center; }
+
+    .va-main { min-width: 0; padding-bottom: 5rem; }
+    .va-card { background: #fff; border: 1px solid #E3DED4; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+    .va-card h3 { font-family: var(--font-display); font-weight: 400; font-size: 1.2rem; color: var(--encre); margin-bottom: 0.3rem; }
+    .va-help { font-size: 0.8rem; color: var(--text-light); margin-bottom: 0.9rem; max-width: 60rem; }
+    .va-help kbd { font-family: inherit; font-size: 0.72rem; border: 1px solid var(--trait-fort); border-bottom-width: 2px; padding: 0 0.3rem; background: var(--papier); }
+    .va-titlebar { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
+    .va-titlebar h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.7rem; color: var(--encre); line-height: 1.1; }
+    .va-titlebar .va-eyebrow { color: var(--carmin); }
+
+    .va-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem 1rem; }
+    .va-span2 { grid-column: 1 / -1; }
+    @media (max-width: 40rem) { .va-grid { grid-template-columns: 1fr; } }
+    .va-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); }
+    .va-field .req { color: var(--carmin); }
+    .va-field small, .va-check small { font-weight: 400; font-size: 0.72rem; color: var(--text-light); }
+    .va-field input[type=text], .va-field input[type=number], .va-field select, .va-field textarea {
+      font: inherit; font-weight: 400; font-size: 0.88rem; color: var(--text);
+      border: 1px solid var(--trait-fort); background: #fff; padding: 0.45rem 0.55rem; width: 100%;
+    }
+    .va-field textarea { resize: vertical; min-height: 4.5rem; line-height: 1.45; }
+    .va-field input:focus, .va-field select:focus, .va-field textarea:focus { outline: 2px solid var(--bleu); outline-offset: -1px; border-color: var(--bleu); }
+    .va-field input.is-invalid { border-color: var(--carmin); background: #FFF6F7; }
+    .va-inline { display: flex; gap: 0.4rem; align-items: center; }
+    .va-inline > input { flex: 1; min-width: 0; }
+    .va-check { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.84rem; font-weight: 700; color: var(--ink-soft); }
+    .va-check input { margin-top: 0.2rem; width: 1rem; height: 1rem; accent-color: var(--bleu); }
+    .va-check span { display: flex; flex-direction: column; }
+    .va-hint-ok { color: #2E7D32 !important; }
+    .va-hint-bad { color: var(--carmin) !important; font-weight: 700 !important; }
+    .va-linklike { background: none; border: 0; padding: 0; color: var(--carmin); font-size: inherit; font-weight: 600; text-decoration: underline; }
+
+    /* Voyageur : portrait + écrits */
+    .va-portrait-row { display: flex; gap: 0.8rem; align-items: center; }
+    .va-portrait-prev {
+      flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%;
+      background: var(--encre) center 20% / cover no-repeat; color: #fff;
+      display: grid; place-items: center; font-family: var(--font-display); font-size: 1.3rem;
+      border: 3px solid var(--c, var(--carmin));
+    }
+    .va-color-row { display: flex; gap: 0.5rem; align-items: center; }
+    .va-color-row input[type=color] { width: 3rem; height: 2.2rem; border: 1px solid var(--trait-fort); padding: 0.1rem; background: #fff; }
+    .va-swatches { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .va-swatch { width: 1.4rem; height: 1.4rem; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--trait-fort); padding: 0; }
+    .va-ecrit { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 0.4rem; margin-bottom: 0.4rem; }
+    .va-ecrit input { font: inherit; font-size: 0.85rem; border: 1px solid var(--trait-fort); padding: 0.4rem 0.5rem; min-width: 0; }
+    .va-ecrit-head { font-size: 0.7rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.05em; }
+    .va-voyage-links { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; }
+    .va-voyage-links button { width: 100%; text-align: left; }
+
+    /* ── Éditeur de tracé ─────────────────────────────────────────────── */
+    /* Carte et colonne des étapes côte à côte tant que la carte garde une
+       largeur utile ; empilées en dessous (requête de conteneur : c'est la
+       place laissée par l'arborescence qui compte, pas la largeur d'écran). */
+    .va-editor-wrap { container-type: inline-size; }
+    .va-editor {
+      display: grid; grid-template-columns: minmax(0, 1fr) 350px;
+      height: clamp(520px, 72vh, 780px); border: 1px solid var(--trait-fort);
+    }
+    html.rp-embedded .va-editor { height: 640px; }
+    @container (max-width: 860px) {
+      .va-editor { grid-template-columns: 1fr; height: auto; }
+      .va-mapwrap { height: 480px; }
+      .va-steps { max-height: 620px; border-left: 0 !important; border-top: 1px solid var(--trait-fort); }
+    }
+    .va-editor-foot { font-size: 0.78rem; color: var(--ink-soft); padding: 0.45rem 0.1rem 0; min-height: 1.6rem; }
+    .va-mapwrap { position: relative; overflow: hidden; background: var(--papier); }
+    #va-map { position: absolute; inset: 0; }
+    .va-mapwrap.is-adding #va-map .maplibregl-canvas { cursor: crosshair; }
+    .va-maptools {
+      position: absolute; top: 10px; left: 10px; right: 56px; z-index: 2;
+      display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: flex-start; pointer-events: none;
+    }
+    .va-maptools > * { pointer-events: auto; }
+    .va-seg { display: inline-flex; box-shadow: 0 1px 6px rgba(0,0,0,0.18); }
+    .va-seg button {
+      border: 1px solid var(--trait-fort); background: #fff; color: var(--encre); white-space: nowrap;
+      font-size: 0.76rem; font-weight: 600; padding: 0.42rem 0.6rem; margin-left: -1px;
+    }
+    .va-seg button:first-child { margin-left: 0; }
+    .va-seg button[aria-pressed="true"] { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+    .va-seg button:disabled { color: #aaa; cursor: not-allowed; }
+    .va-search { position: relative; width: 220px; box-shadow: 0 1px 6px rgba(0,0,0,0.18); }
+    .va-search input { width: 100%; font: inherit; font-size: 0.82rem; border: 1px solid var(--trait-fort); padding: 0.45rem 0.6rem; }
+    .va-search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--trait-fort); border-top: 0; max-height: 320px; overflow-y: auto; }
+    .va-search-item { padding: 0.45rem 0.6rem; border-top: 1px solid var(--trait); font-size: 0.78rem; }
+    .va-search-item strong { display: block; color: var(--encre); font-size: 0.82rem; }
+    .va-search-item span { color: var(--text-light); display: block; margin-bottom: 0.3rem; }
+    .va-search-item .va-inline { gap: 0.3rem; }
+    .va-search-empty { padding: 0.5rem 0.6rem; font-size: 0.78rem; color: var(--text-light); }
+    .va-maphint {
+      position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 2; width: max-content;
+      background: rgba(20,24,63,0.9); color: #fff; font-size: 0.8rem; padding: 0.5rem 0.9rem;
+      max-width: calc(100% - 24px); text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+    .va-maphint b { color: var(--rose); }
+    .va-mapwarn {
+      position: absolute; top: 56px; left: 10px; right: 10px; z-index: 2;
+      background: #FFF1CC; color: #5c4400; font-size: 0.78rem; padding: 0.5rem 0.7rem; border-left: 4px solid #F9A825;
+    }
+
+    /* Marqueurs d'étape */
+    .va-pt {
+      width: 14px; height: 14px; border-radius: 50%; background: #fff;
+      border: 3px solid var(--c, var(--carmin)); box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+      display: grid; place-items: center; cursor: grab; font-size: 0.68rem; font-weight: 700; color: #fff;
+    }
+    .va-pt span { display: none; }
+    .va-pt--arret { width: 24px; height: 24px; background: var(--c, var(--carmin)); border: 2px solid #fff; }
+    .va-pt--arret span { display: block; }
+    .va-pt.is-sel { outline: 3px solid var(--bleu); outline-offset: 2px; z-index: 5; }
+    .va-pt:active { cursor: grabbing; }
+    .va-pt-flag {
+      position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%);
+      background: var(--encre); color: #fff; font-size: 0.62rem; font-weight: 700; padding: 0.05rem 0.35rem; white-space: nowrap;
+      letter-spacing: 0.04em; text-transform: uppercase; pointer-events: none;
+    }
+    .va-popup .maplibregl-popup-content { font-size: 0.76rem; padding: 0.4rem 0.6rem; color: var(--ink-soft); }
+
+    /* Colonne des étapes */
+    .va-steps { background: var(--papier-ombre); border-left: 1px solid var(--trait-fort); overflow-y: auto; display: flex; flex-direction: column; }
+        .va-steps-head {
+      position: sticky; top: 0; z-index: 1; background: var(--papier-ombre);
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+      padding: 0.7rem 0.8rem 0.5rem; border-bottom: 1px solid var(--trait-fort);
+    }
+    .va-steps-head strong { font-size: 0.86rem; color: var(--encre); }
+    .va-steps-legend { font-size: 0.7rem; color: var(--text-light); padding: 0.5rem 0.8rem 0; }
+    .va-steps-list { list-style: none; padding: 0.4rem 0.6rem 0.8rem; }
+    .va-step {
+      display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto; gap: 0.5rem; align-items: center;
+      width: 100%; text-align: left; background: #fff; border: 1px solid var(--trait-fort);
+      padding: 0.4rem 0.5rem; margin-top: 0.3rem; font-size: 0.8rem;
+    }
+    .va-step:hover { background: var(--accent-light); }
+    .va-step--passage { background: transparent; border-style: dashed; padding-top: 0.2rem; padding-bottom: 0.2rem; }
+    .va-step-num {
+      width: 1.5rem; height: 1.5rem; border-radius: 50%; display: grid; place-items: center;
+      font-size: 0.68rem; font-weight: 700; background: var(--c, var(--carmin)); color: #fff;
+    }
+    .va-step--passage .va-step-num { background: #fff; color: var(--text-light); border: 2px solid var(--c, var(--carmin)); width: 1.1rem; height: 1.1rem; font-size: 0.58rem; margin-left: 0.2rem; }
+    .va-step-main { min-width: 0; }
+    .va-step-main > span { display: block; }
+    .va-step-name { font-weight: 600; color: var(--encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .va-step--passage .va-step-name { font-weight: 400; font-style: italic; color: var(--text-light); }
+    .va-step-date { font-size: 0.72rem; color: var(--text-light); }
+    .va-step-date.is-est { font-style: italic; opacity: 0.8; }
+    .va-step-mode { font-size: 0.7rem; color: var(--ink-soft); white-space: nowrap; }
+    .va-step-err { color: var(--carmin); font-weight: 700; }
+    .va-empty { font-size: 0.82rem; color: var(--text-light); padding: 1rem 0.8rem; }
+
+    /* Fiche d'une étape */
+    .va-pform { padding: 0.8rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .va-pform-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+    .va-pform-title { font-family: var(--font-display); font-size: 1.15rem; color: var(--encre); }
+    .va-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .va-kind label {
+      border: 1px solid var(--trait-fort); background: #fff; padding: 0.45rem 0.55rem; font-size: 0.76rem; cursor: pointer;
+      display: flex; gap: 0.4rem; align-items: flex-start;
+    }
+    .va-kind label strong { display: block; color: var(--encre); font-size: 0.8rem; }
+    .va-kind label:has(input:checked) { border-color: var(--bleu); box-shadow: inset 0 0 0 1px var(--bleu); background: var(--accent-light); }
+    .va-kind input { margin-top: 0.15rem; accent-color: var(--bleu); }
+    .va-pform .va-grid { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .va-pform fieldset { border: 0; border-top: 1px solid var(--trait-fort); padding-top: 0.6rem; display: flex; flex-direction: column; gap: 0.6rem; }
+    .va-pform legend { font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--carmin); padding-right: 0.4rem; }
+    .va-pform-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; border-top: 1px solid var(--trait-fort); padding-top: 0.7rem; }
+
+    /* ── Barre d'enregistrement ───────────────────────────────────────── */
+    .va-savebar {
+      position: sticky; bottom: 0; z-index: 20; margin-top: 1rem;
+      background: #fff; border: 1px solid var(--trait-fort); box-shadow: 0 -4px 18px rgba(20,24,63,0.12);
+      padding: 0.7rem 1rem; display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+    }
+    .va-savebar-state { flex: 1; min-width: 14rem; font-size: 0.8rem; }
+    .va-savebar-state strong { color: var(--encre); }
+    .va-issues-toggle { background: none; border: 0; padding: 0; font-size: 0.8rem; font-weight: 700; }
+    .va-issues-toggle.has-err { color: var(--carmin); }
+    .va-issues-toggle.has-warn { color: #8a6400; }
+    .va-issues-toggle.is-ok { color: #2E7D32; cursor: default; }
+    .va-issues { list-style: none; width: 100%; max-height: 180px; overflow-y: auto; border-top: 1px solid var(--trait); padding-top: 0.4rem; }
+    .va-issues li { font-size: 0.78rem; padding: 0.15rem 0; }
+    .va-issues li button { background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; text-decoration: underline dotted; }
+    .va-issue-err::before { content: '✖ '; color: var(--carmin); font-weight: 700; }
+    .va-issue-warn::before { content: '⚠ '; color: #b08000; }
+
+    .va-toast {
+      position: fixed; right: 1rem; bottom: 5.5rem; z-index: 50; max-width: 26rem;
+      background: var(--encre); color: #fff; font-size: 0.84rem; padding: 0.7rem 1rem; box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    }
+    .va-toast--err { background: var(--warm-dark); }
+
+    .va-welcome ol { padding-left: 1.2rem; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.45rem; margin: 0.6rem 0 1rem; }
+    .va-welcome p { font-size: 0.88rem; max-width: 52rem; }
+    .va-loading { font-size: 0.9rem; color: var(--text-light); padding: 2rem 0; }
+    .va-error { background: #FBE3E6; color: var(--warm-dark); border-left: 4px solid var(--carmin); padding: 0.9rem 1rem; font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+
+<header class="va-head">
+  <div class="va-head-inner">
+    <div>
+      <p class="va-eyebrow">Espace professionnel · Expositions</p>
+      <h1>Voyageurs douaisiens — éditeur</h1>
+    </div>
+    <div class="va-head-actions">
+      <span class="va-status" id="va-status"><span class="va-status-dot" aria-hidden="true"></span><span id="va-status-text">Chargement…</span></span>
+      <a href="voyageurs.html" target="_blank" rel="noopener">Voir l'exposition ↗</a>
+      <a href="admin.html">← Espace pro</a>
+    </div>
+  </div>
+</header>
+
+<div class="va-layout">
+  <!-- ── Liste des voyageurs et de leurs voyages ── -->
+  <aside class="va-side" aria-label="Voyageurs et voyages">
+    <p class="va-side-title">Voyageurs &amp; voyages</p>
+    <div id="va-tree"></div>
+    <button type="button" class="va-btn va-btn--block" id="va-new-voyageur">+ Nouveau voyageur</button>
+  </aside>
+
+  <main class="va-main">
+    <p class="va-loading" id="va-loading">Chargement des données de l'exposition…</p>
+    <div class="va-error" id="va-fatal" hidden></div>
+
+    <!-- ── Accueil ── -->
+    <section class="va-card va-welcome" id="va-welcome" hidden>
+      <h3>Alimenter l'exposition</h3>
+      <p>Choisissez un voyageur ou un voyage dans la colonne de gauche, ou créez-en un. Les modifications ne sont
+        enregistrées qu'au clic sur <strong>Enregistrer</strong> (barre en bas de page) ; elles apparaissent alors
+        immédiatement sur <a href="voyageurs.html" target="_blank" rel="noopener">la page publique</a> si le voyage
+        est marqué « Publié ».</p>
+      <ol>
+        <li><strong>Le voyageur</strong> : nom, dates de vie, lien avec Douai, portrait, couleur du tracé, écrits laissés.</li>
+        <li><strong>Le voyage</strong> : un titre, puis le tracé, que vous dessinez directement sur la carte, étape par étape.</li>
+        <li><strong>Les étapes</strong> : chacune est soit un simple <em>point de passage</em> (il sert à faire passer
+          le trait par la mer plutôt qu'à travers un continent), soit un <em>arrêt raconté</em> où la lecture se met en
+          pause pour afficher un récit, une citation et sa source.</li>
+      </ol>
+      <p>Un voyage non publié reste un brouillon : visible ici seulement, jamais sur la page publique.</p>
+    </section>
+
+    <!-- ── Fiche voyageur ── -->
+    <section id="va-voyageur" hidden>
+      <div class="va-titlebar">
+        <div>
+          <p class="va-eyebrow">Voyageur</p>
+          <h2 id="vr-heading">—</h2>
+        </div>
+      </div>
+      <div class="va-card">
+        <h3>Identité</h3>
+        <div class="va-grid" id="vr-form">
+          <label class="va-field">
+            <span>Nom <span class="req">*</span></span>
+            <input type="text" data-f="nom" placeholder="Ex. Nicolas Trigault">
+          </label>
+          <label class="va-field">
+            <span>Identifiant</span>
+            <input type="text" data-f="id" placeholder="ex. trigault" spellcheck="false">
+            <small>Minuscules, chiffres et tirets. Proposé d'après le nom.</small>
+          </label>
+          <label class="va-field">
+            <span>Dates et lieux de vie</span>
+            <input type="text" data-f="vie" placeholder="Ex. Douai, 1577 — Hangzhou, 1628">
+          </label>
+          <label class="va-field">
+            <span>Lien avec Douai</span>
+            <input type="text" data-f="lienDouai" placeholder="Ex. Né à Douai · Séjourne à Douai en 1870">
+          </label>
+          <label class="va-field va-span2">
+            <span>Présentation</span>
+            <textarea data-f="resume" rows="4" placeholder="Quelques phrases : qui est-il ou elle, pourquoi voyage-t-il ou elle, qu'en a-t-il ou elle rapporté ?"></textarea>
+          </label>
+          <div class="va-field">
+            <span>Portrait</span>
+            <div class="va-portrait-row">
+              <div class="va-portrait-prev" id="vr-portrait-prev"></div>
+              <input type="text" data-f="portrait" placeholder="images/auteurs/Nom.jpg" spellcheck="false">
+            </div>
+            <small>Chemin de l'image depuis la racine du site. Sans image, les initiales sont affichées.</small>
+          </div>
+          <div class="va-field">
+            <span>Couleur du tracé</span>
+            <div class="va-color-row">
+              <input type="color" data-f="couleur" aria-label="Couleur du tracé">
+              <div class="va-swatches" id="vr-swatches"></div>
+            </div>
+            <small>Couleur du trait et du cadre du portrait sur la carte.</small>
+          </div>
+          <label class="va-check va-span2">
+            <input type="checkbox" data-f="publie">
+            <span>Publié sur l'exposition
+              <small>Décoché : le voyageur et tous ses voyages disparaissent de la page publique.</small></span>
+          </label>
+        </div>
+      </div>
+      <div class="va-card">
+        <h3>Écrits laissés</h3>
+        <p class="va-help">Récits, lettres, ouvrages. La cote permettra plus tard un lien vers l'inventaire si le document est conservé à Douai.</p>
+        <div class="va-ecrit va-ecrit-head" aria-hidden="true"><span>Titre</span><span>Année</span><span>Cote à Douai</span><span></span></div>
+        <div id="vr-ecrits"></div>
+        <button type="button" class="va-btn va-btn--small" id="vr-add-ecrit">+ Ajouter un écrit</button>
+      </div>
+      <div class="va-card" id="vr-voyages-card">
+        <h3>Voyages</h3>
+        <ul class="va-voyage-links" id="vr-voyages"></ul>
+        <p class="va-help" id="vr-voyages-hint" hidden>Enregistrez d'abord le voyageur pour pouvoir lui ajouter des voyages.</p>
+        <button type="button" class="va-btn va-btn--small" id="vr-add-voyage" style="margin-top:0.6rem">+ Nouveau voyage</button>
+      </div>
+    </section>
+
+    <!-- ── Fiche voyage ── -->
+    <section id="va-voyage" hidden>
+      <div class="va-titlebar">
+        <div>
+          <p class="va-eyebrow" id="vy-eyebrow">Voyage</p>
+          <h2 id="vy-heading">—</h2>
+        </div>
+        <a class="va-btn va-btn--small" id="vy-public-link" target="_blank" rel="noopener">Voir sur l'exposition ↗</a>
+      </div>
+
+      <div class="va-card">
+        <h3>1. Informations générales</h3>
+        <div class="va-grid" id="vy-form">
+          <label class="va-field va-span2">
+            <span>Titre du voyage <span class="req">*</span></span>
+            <input type="text" data-f="titre" placeholder="Ex. Le second départ pour la Chine">
+          </label>
+          <label class="va-field va-span2">
+            <span>Sous-titre</span>
+            <input type="text" data-f="sousTitre" placeholder="Ex. Lisbonne → Goa → Macao, 1618-1619">
+            <small>L'itinéraire et les dates en bref. <button type="button" class="va-linklike" id="vy-suggest-sub">Proposer d'après les étapes</button></small>
+          </label>
+          <label class="va-field">
+            <span>Voyageur</span>
+            <select data-f="voyageurId" id="vy-voyageur-select"></select>
+          </label>
+          <label class="va-field">
+            <span>Identifiant</span>
+            <input type="text" data-f="id" placeholder="ex. trigault-1618" spellcheck="false">
+            <small id="vy-id-hint">Adresse directe : voyageurs.html#…</small>
+          </label>
+          <label class="va-check va-span2">
+            <input type="checkbox" data-f="publie">
+            <span>Publié sur l'exposition
+              <small>Décoché = brouillon, visible ici seulement. Il faut au moins deux étapes, dont une datée, pour publier.</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="va-card">
+        <h3>2. Tracé et étapes</h3>
+        <p class="va-help">
+          Passez en mode <strong>✚ Ajouter des étapes</strong> puis cliquez sur la carte : chaque clic ajoute une étape
+          après celle qui est sélectionnée (ou à la fin du voyage). Cliquer <em>sur le trait</em> insère une étape entre
+          deux autres. Faites <strong>glisser</strong> un point pour le déplacer, cliquez dessus pour remplir sa fiche.
+          Entre deux étapes, le trait suit le plus court chemin sur le globe : ajoutez des points de passage pour le
+          faire contourner les côtes.
+          Raccourcis : <kbd>Échap</kbd> termine l'ajout, <kbd>Suppr</kbd> retire l'étape sélectionnée,
+          <kbd>Ctrl</kbd>+<kbd>Z</kbd> annule la dernière modification du tracé.
+        </p>
+        <div class="va-editor-wrap">
+        <div class="va-editor">
+          <div class="va-mapwrap" id="va-mapwrap">
+            <div id="va-map"></div>
+            <div class="va-maptools">
+              <div class="va-seg" role="group" aria-label="Outil">
+                <button type="button" id="va-tool-select" aria-pressed="true">✋ Sélectionner / déplacer</button>
+                <button type="button" id="va-tool-add" aria-pressed="false">✚ Ajouter des étapes</button>
+              </div>
+              <div class="va-search">
+                <input type="search" id="va-search" placeholder="Chercher un lieu (ex. Lisbonne)…" autocomplete="off">
+                <div class="va-search-results" id="va-search-results" hidden></div>
+              </div>
+              <div class="va-seg" role="group" aria-label="Affichage">
+                <button type="button" id="va-undo" title="Annuler la dernière modification du tracé (Ctrl+Z)" disabled>↶ Annuler</button>
+                <button type="button" id="va-fit" title="Recadrer la carte sur tout le voyage">⤢ Tout voir</button>
+                <button type="button" id="va-proj" aria-pressed="false" title="Basculer entre carte plane et globe">🌍 Globe</button>
+                <button type="button" id="va-osm" aria-pressed="false" title="Afficher un fond détaillé (villes, routes) pour placer les points précisément">🗺 Fond détaillé</button>
+              </div>
+            </div>
+            <div class="va-mapwarn" id="va-mapwarn" hidden></div>
+            <div class="va-maphint" id="va-maphint" hidden></div>
+          </div>
+          <div class="va-steps" id="va-steps"></div>
+        </div>
+        </div>
+        <p class="va-editor-foot" id="va-mapstats"></p>
+      </div>
+
+      <div class="va-card">
+        <h3>3. Sources</h3>
+        <p class="va-help">Bibliographie du voyage, affichée sous la liste des étapes. Une référence par ligne.</p>
+        <label class="va-field">
+          <textarea data-f="sourcesText" rows="4" placeholder="Ex. Lettres de Trigault, éd. …, p. 12"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <!-- ── Barre d'enregistrement (commune aux deux fiches) ── -->
+    <div class="va-savebar" id="va-savebar" hidden>
+      <div class="va-savebar-state">
+        <span id="va-dirty"></span>
+        <button type="button" class="va-issues-toggle" id="va-issues-toggle"></button>
+      </div>
+      <button type="button" class="va-btn va-btn--danger" id="va-delete">Supprimer…</button>
+      <button type="button" class="va-btn" id="va-revert" disabled>Annuler les modifications</button>
+      <button type="button" class="va-btn va-btn--primary" id="va-save" disabled>Enregistrer</button>
+      <ul class="va-issues" id="va-issues" hidden></ul>
+    </div>
+  </main>
+</div>
+
+<div class="va-toast" id="va-toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/dist/pmtiles.js"></script>
+<script src="js/voyageurs-admin.js"></script>
+</body>
+</html>

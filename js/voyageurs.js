@@ -1,0 +1,1228 @@
+/* ============================================================
+   VOYAGEURS DOUAISIENS — carte-globe animée (voyageurs.html)
+   ------------------------------------------------------------
+   Données : /api/voyageurs-admin?vue=publique — voyageurs et voyages
+   publiés, lus dans R2 (clé voyageurs.json, voir lib/voyageurs-state.mjs).
+   Tant que l'exposition est en préparation, cette lecture demande la
+   connexion à l'espace pro : d'où l'en-tête Authorization ci-dessous, sans
+   effet une fois la lecture ouverte (LECTURE_PUBLIQUE dans l'API).
+
+   Principe de l'animation : chaque voyage est découpé en « phases »
+   successives — des déplacements (d'un point au suivant, longueur en km)
+   et des séjours (le voyageur reste sur place entre `date` et `depart`,
+   l'icône ne bouge pas mais le compteur de jours avance). Toutes les
+   phases sont mises bout à bout sur un même axe `u` ; la lecture fait
+   avancer `u` à vitesse constante et tout le reste (position, date, jour,
+   moyen de transport, tracé parcouru) en est déduit. Aller à un arrêt ou
+   cliquer sur la barre de progression revient simplement à changer `u`.
+
+   Les dates des points qui n'en ont pas sont estimées au prorata de la
+   distance entre les deux points datés qui les encadrent ; elles sont
+   alors affichées précédées de « ≈ ».
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var token = localStorage.getItem('rp_admin_token');
+  fetch('/api/voyageurs-admin?vue=publique', {
+    cache: 'no-cache',
+    headers: token ? { Authorization: 'Basic ' + token } : {}
+  })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(start)
+    .catch(function (err) {
+      console.error('[voyageurs]', err);
+      var list = document.getElementById('vy-list');
+      if (list) list.textContent = "Les données de l'exposition n'ont pas pu être chargées.";
+    });
+
+  function start(DATA) {
+  var EMBEDDED = document.documentElement.classList.contains('rp-embedded');
+  var REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var DAY = 86400000;
+  var BASE_SECONDS = 50;          // durée d'un voyage complet à la vitesse 1×
+  var DENSIFY_KM = 40;            // pas des points intermédiaires sur les grands cercles
+  var MODE_ZOOM = { bateau: 3.1, jonque: 7, attelage: 6, pied: 6.2, civiere: 6.8, inconnu: 4 };
+  // Rythme de lecture par moyen de transport : un tronçon en jonque (cabotage,
+  // fleuves) défile deux fois moins vite que le même tronçon en bateau. Absent = 1.
+  var MODE_PACE = { jonque: 2 };
+  // Moyens de transport dont le tronçon n'est pas tracé sur la carte publique.
+  var HIDDEN_MODES = { inconnu: true };
+  var MAX_ZOOM = 13;              // zoom maximal de la carte (et du champ `zoom` d'une étape)
+  var OSM_ZOOM = 10;              // à partir de ce zoom, OpenStreetMap remplace le fond vectoriel
+  var MODE_LABEL = { bateau: 'En mer', jonque: 'En jonque', attelage: 'En voiture à cheval', pied: 'À pied', civiere: 'Porté en civière', inconnu: 'Moyen de transport inconnu' };
+  var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
+              'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  var PRECISION_RANK = { annee: 0, mois: 1, jour: 2 };
+  var DOUAI = [3.08, 50.37];
+
+  /* ---------------------------------------------------------- icônes */
+  /* Bateau, voiture à cheval, à pied : dessins de images/voyageurs/transports/,
+     appliqués en masque CSS et remplis de la couleur du voyageur (--c).
+     facesLeft : le dessin regarde vers la gauche, il faut le retourner
+     quand le voyageur avance vers l'est. */
+  var ICON_FILES = {
+    bateau: { src: 'images/voyageurs/transports/small-fishing-sailboat-svgrepo-com.svg', facesLeft: false },
+    jonque: { src: 'images/voyageurs/transports/jonque.svg', facesLeft: false },
+    inconnu: { src: 'images/voyageurs/transports/inconnu.svg', facesLeft: false },
+    attelage: { src: 'images/voyageurs/transports/carriage-svgrepo-com.svg', facesLeft: true },
+    pied: { src: 'images/voyageurs/transports/hiking-svgrepo-com.svg', facesLeft: false }
+  };
+  var ICONS = {
+    civiere:
+      '<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="#3a2412" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 12h24l-3 7H15z" fill="#efe6d2"/>' +
+      '<path d="M15 19v5M33 19v5"/>' +
+      '<path d="M3 24h42" stroke="#7a4a24" stroke-width="3"/>' +
+      '<circle cx="7" cy="17" r="3" fill="#efe6d2"/><path d="M7 21v10l-3 10M7 31l3 10"/>' +
+      '<circle cx="41" cy="17" r="3" fill="#efe6d2"/><path d="M41 21v10l-3 10M41 31l3 10"/>' +
+      '</svg>'
+  };
+  function iconHtml(mode) {
+    var f = ICON_FILES[mode];
+    if (!f) return ICONS[mode] || '';
+    var url = 'url(\'' + f.src + '\')';
+    return '<span class="vy-icon-mask" aria-hidden="true" style="-webkit-mask-image:' + url + ';mask-image:' + url + '"></span>';
+  }
+
+  /* ---------------------------------------------------------- utilitaires */
+  function $(sel) { return document.querySelector(sel); }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function initials(name) {
+    return name.split(/\s+/).filter(Boolean).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase();
+  }
+
+  /* ---------------------------------------------------------- dates */
+  function parseDate(s, approx) {
+    if (!s) return null;
+    var m = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(String(s));
+    if (!m) return null;
+    var y = +m[1], mo = m[2] ? +m[2] - 1 : 6, d = m[3] ? +m[3] : (m[2] ? 15 : 1);
+    return { t: Date.UTC(y, mo, d), precision: m[3] ? 'jour' : (m[2] ? 'mois' : 'annee'), approx: !!approx };
+  }
+  function formatDate(t, precision) {
+    var d = new Date(t);
+    var y = d.getUTCFullYear(), mo = MOIS[d.getUTCMonth()], day = d.getUTCDate();
+    if (precision === 'annee') return String(y);
+    if (precision === 'mois') return mo + ' ' + y;
+    return (day === 1 ? '1er' : day) + ' ' + mo + ' ' + y;
+  }
+  function minPrecision(a, b) {
+    return PRECISION_RANK[a] <= PRECISION_RANK[b] ? a : b;
+  }
+
+  /* ---------------------------------------------------------- géodésie */
+  var RAD = Math.PI / 180;
+  function toVec(c) {
+    var lng = c[0] * RAD, lat = c[1] * RAD;
+    return [Math.cos(lat) * Math.cos(lng), Math.cos(lat) * Math.sin(lng), Math.sin(lat)];
+  }
+  function angleBetween(a, b) {
+    var va = toVec(a), vb = toVec(b);
+    var dot = clamp(va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2], -1, 1);
+    return Math.acos(dot);
+  }
+  function distKm(a, b) { return angleBetween(a, b) * 6371; }
+  function mercator(c) {
+    var lat = clamp(c[1], -85.05, 85.05) * RAD;
+    return [(c[0] + 180) / 360, (1 - Math.log(Math.tan(Math.PI / 4 + lat / 2)) / Math.PI) / 2];
+  }
+  /** Point à la fraction f du grand cercle a→b. */
+  function slerp(a, b, f) {
+    var d = angleBetween(a, b);
+    if (d < 1e-9) return [a[0], a[1]];
+    var va = toVec(a), vb = toVec(b);
+    var A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+    var x = A * va[0] + B * vb[0], y = A * va[1] + B * vb[1], z = A * va[2] + B * vb[2];
+    return [Math.atan2(y, x) / RAD, Math.atan2(z, Math.sqrt(x * x + y * y)) / RAD];
+  }
+
+  /* ---------------------------------------------------------- préparation d'un voyage */
+  function prepareVoyage(voyageur, v) {
+    var pts = v.points;
+    var n = pts.length;
+
+    // 1. Géométrie densifiée + kilomètre cumulé à chaque sommet.
+    // pointPathIdx[i] : indice, dans path, du sommet qui est l'étape i.
+    var path = [pts[0].coord.slice()], pathKm = [0], pointKm = [0], pointPathIdx = [0];
+    for (var i = 0; i < n - 1; i++) {
+      var a = pts[i].coord, b = pts[i + 1].coord;
+      var d = distKm(a, b);
+      var steps = Math.max(1, Math.ceil(d / DENSIFY_KM));
+      var base = pathKm[pathKm.length - 1];
+      for (var s = 1; s <= steps; s++) {
+        path.push(slerp(a, b, s / steps));
+        pathKm.push(base + d * s / steps);
+      }
+      pointKm.push(base + d);
+      pointPathIdx.push(path.length - 1);
+    }
+    var totalKm = pointKm[n - 1];
+
+    // Même abscisse, mais en unités Mercator : c'est l'échelle de
+    // ['line-progress'] côté MapLibre (longueur mesurée dans les tuiles), qui
+    // coupe le tracé parcouru. En kilomètres réels, la coupure dériverait de
+    // l'icône sur les longs trajets nord-sud.
+    var pathMerc = [0];
+    for (var mi = 1; mi < path.length; mi++) {
+      var ma = mercator(path[mi - 1]), mb = mercator(path[mi]);
+      pathMerc.push(pathMerc[mi - 1] + Math.hypot(mb[0] - ma[0], mb[1] - ma[1]));
+    }
+
+    // 2. Dates d'arrivée/départ ; les points non datés sont estimés au
+    //    prorata de la distance entre les deux points datés voisins.
+    var arrive = new Array(n), leave = new Array(n), prec = new Array(n), approx = new Array(n);
+    var anchors = [];
+    pts.forEach(function (p, i) {
+      var a = parseDate(p.date, p.approx);
+      if (a) {
+        var dep = parseDate(p.depart, p.approx) || a;
+        arrive[i] = a.t; leave[i] = dep.t; prec[i] = a.precision; approx[i] = a.approx;
+        anchors.push(i);
+      }
+    });
+    if (!anchors.length) throw new Error('Voyage sans aucune date : ' + v.id);
+    for (var k = 0; k < anchors.length - 1; k++) {
+      var i0 = anchors[k], i1 = anchors[k + 1];
+      var span = pointKm[i1] - pointKm[i0] || 1;
+      var p0 = minPrecision(prec[i0], prec[i1]);
+      for (var j = i0 + 1; j < i1; j++) {
+        var f = (pointKm[j] - pointKm[i0]) / span;
+        arrive[j] = leave[j] = leave[i0] + f * (arrive[i1] - leave[i0]);
+        prec[j] = p0; approx[j] = true;
+      }
+    }
+    // Avant la première / après la dernière date : on recopie la date voisine.
+    for (var b0 = 0; b0 < anchors[0]; b0++) {
+      arrive[b0] = leave[b0] = arrive[anchors[0]]; prec[b0] = prec[anchors[0]]; approx[b0] = true;
+    }
+    var last = anchors[anchors.length - 1];
+    for (var e0 = last + 1; e0 < n; e0++) {
+      arrive[e0] = leave[e0] = leave[last]; prec[e0] = prec[last]; approx[e0] = true;
+    }
+
+    var t0 = arrive[0], t1 = leave[n - 1];
+    var totalDays = Math.max(1, (t1 - t0) / DAY);
+
+    // 3. Phases mises bout à bout sur l'axe u. La durée d'affichage d'un
+    //    déplacement mêle pour moitié sa part de la distance totale et pour
+    //    moitié sa part du temps écoulé : au kilomètre seul, douze jours de
+    //    marche dans le désert défileraient en un éclair à côté d'une
+    //    traversée de 5 000 km ; au temps seul, une longue attente sans
+    //    repère daté ralentirait tout. Un séjour ne compte que par sa durée.
+    var WEIGHT_KM = 0.5, WEIGHT_TIME = 0.5;
+    // baseU : même somme sans MODE_PACE. La vitesse de lecture est calée
+    // sur elle (frame()) : un tronçon ralenti allonge le voyage au lieu
+    // d'accélérer tous les autres.
+    var phases = [], u = 0, baseU = 0, stopU = {}, segMode = [];
+    var mode = pts[0].mode || 'bateau';
+    for (var p = 0; p < n; p++) {
+      if (pts[p].arret) stopU[p] = u;
+      var stayDays = (leave[p] - arrive[p]) / DAY;
+      if (stayDays > 0) {
+        var len = clamp(WEIGHT_TIME * stayDays / totalDays, 0.02, 0.12);
+        phases.push({ kind: 'stay', at: p, u0: u, len: len, t0: arrive[p], t1: leave[p] });
+        u += len; baseU += len;
+      }
+      if (p < n - 1) {
+        if (pts[p].mode) mode = pts[p].mode;
+        var km = pointKm[p + 1] - pointKm[p];
+        var days = Math.max(0, arrive[p + 1] - leave[p]) / DAY;
+        var mlen = WEIGHT_KM * km / (totalKm || 1) + WEIGHT_TIME * days / totalDays;
+        baseU += mlen;
+        mlen *= MODE_PACE[mode] || 1;
+        phases.push({ kind: 'move', from: p, u0: u, len: mlen, km: km, km0: pointKm[p], mode: mode });
+        u += mlen;
+        segMode.push(mode);
+      }
+    }
+
+    // 3 bis. Tronçons au moyen de transport inconnu : pas de trait sur la
+    //    carte (on ne sait pas par où il est passé ; un trait droit serait
+    //    une fausse information, et très visible). Le voyageur y circule
+    //    quand même. visibleParts : morceaux de path à tracer ;
+    //    hiddenRanges : mêmes trous en fraction de longueur Mercator (unité
+    //    de ['line-progress']), pour le dégradé du tracé parcouru.
+    var visibleParts = [], hiddenRanges = [], totalMerc = pathMerc[pathMerc.length - 1] || 1, run = null;
+    for (var sg = 0; sg < segMode.length; sg++) {
+      var i0 = pointPathIdx[sg], i1 = pointPathIdx[sg + 1];
+      if (HIDDEN_MODES[segMode[sg]]) {
+        run = null;
+        var r0 = pathMerc[i0] / totalMerc, r1 = pathMerc[i1] / totalMerc;
+        var lastR = hiddenRanges[hiddenRanges.length - 1];
+        if (lastR && lastR[1] >= r0) lastR[1] = r1; else hiddenRanges.push([r0, r1]);
+      } else {
+        if (!run) { run = [path[i0]]; visibleParts.push(run); }
+        for (var pi = i0 + 1; pi <= i1; pi++) run.push(path[pi]);
+      }
+    }
+
+    // 4. Étapes à zoom imposé (voir cameraZoom()), dans l'ordre du tracé.
+    var zoomStops = [];
+    pts.forEach(function (p, i) {
+      var z = typeof p.zoom === 'number' ? p.zoom : NaN;
+      if (isFinite(z)) zoomStops.push({ km: pointKm[i], z: z, r: zoomReachKm(z) });
+    });
+
+    return {
+      voyageur: voyageur, v: v, pts: pts, path: path, pathKm: pathKm, pointKm: pointKm, pathMerc: pathMerc,
+      zoomStops: zoomStops, visibleParts: visibleParts, hiddenRanges: hiddenRanges,
+      totalKm: totalKm, totalU: u, baseU: baseU || u, phases: phases, stopU: stopU,
+      arrive: arrive, leave: leave, prec: prec, approx: approx,
+      t0: t0, t1: t1, totalDays: totalDays,
+      // Nombre de jours affiché, bornes comprises (du jour 1 au jour N).
+      dayCount: Math.floor((t1 - t0) / DAY) + 1,
+      durationKnown: prec[0] !== 'annee' && prec[n - 1] !== 'annee'
+    };
+  }
+
+  /** Position, date, mode… à l'abscisse u du voyage. */
+  function stateAt(V, u) {
+    u = clamp(u, 0, V.totalU);
+    var ph = V.phases[0];
+    for (var i = 0; i < V.phases.length; i++) {
+      if (V.phases[i].u0 <= u) ph = V.phases[i]; else break;
+    }
+    var f = ph.len > 0 ? clamp((u - ph.u0) / ph.len, 0, 1) : 0;
+    var st = { u: u };
+    if (ph.kind === 'stay') {
+      st.km = V.pointKm[ph.at];
+      st.t = ph.t0 + f * (ph.t1 - ph.t0);
+      st.mode = null;
+      st.precision = V.prec[ph.at];
+      st.approx = true;
+      st.at = ph.at;
+    } else {
+      var a = ph.from, b = a + 1;
+      st.km = ph.km0 + f * ph.km;
+      st.t = V.leave[a] + f * (V.arrive[b] - V.leave[a]);
+      st.mode = ph.mode;
+      st.precision = minPrecision(V.prec[a], V.prec[b]);
+      st.approx = f > 0.001 && f < 0.999 ? (st.precision !== 'jour' || V.approx[a] || V.approx[b]) : V.approx[f < 0.5 ? a : b];
+      st.at = f <= 0.001 ? a : (f >= 0.999 ? b : null);
+      st.segFrom = a;
+    }
+    // Position sur le tracé densifié.
+    var km = st.km, pk = V.pathKm, lo = 0, hi = pk.length - 1;
+    while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (pk[mid] <= km) lo = mid; else hi = mid; }
+    var span = pk[hi] - pk[lo];
+    var g = span > 0 ? (km - pk[lo]) / span : 0;
+    st.idx = lo;
+    st.pos = slerp(V.path[lo], V.path[hi], g);
+    var pm = V.pathMerc, totalMerc = pm[pm.length - 1] || 1;
+    st.progress = (pm[lo] + g * (pm[hi] - pm[lo])) / totalMerc;
+    st.ahead = V.path[Math.min(hi + 2, V.path.length - 1)];
+    st.day = Math.floor((st.t - V.t0) / DAY) + 1;
+    return st;
+  }
+
+  /* ---------------------------------------------------------- données préparées */
+  var VOYAGES = [];
+  DATA.forEach(function (vr) {
+    (vr.voyages || []).forEach(function (v) {
+      try { VOYAGES.push(prepareVoyage(vr, v)); }
+      catch (err) { console.error(err); }
+    });
+  });
+  function findVoyage(id) {
+    for (var i = 0; i < VOYAGES.length; i++) if (VOYAGES[i].v.id === id) return VOYAGES[i];
+    return null;
+  }
+
+  /* ---------------------------------------------------------- carte
+     Fond entièrement vectoriel, aux couleurs du site (style.css) :
+     - eau : bathymétrie Natural Earth 1:10m simplifiée (paliers de 200 à
+       9 000 m) + lacs et fleuves Natural Earth 1:50m (data/natural-earth/,
+       npm run build:natural-earth). Les hauts-fonds sont presque blancs, le
+       bleu du site ne ressort que progressivement avec la profondeur ;
+     - terre : polygones Natural Earth ;
+     - relief : ombrage calculé par MapLibre à partir d'un modèle
+       d'élévation — tuiles Mapterhorn, dont la base mondiale est le
+       Copernicus DEM GLO-30. Seul élément non vectoriel, et il ne fait que
+       moduler la couleur de la terre : aucune imagerie satellite.
+     Les couleurs sont regroupées dans THEME pour pouvoir en essayer
+     d'autres sans toucher aux couches. */
+  var THEME = {
+    eauClaire: '#FFFFFF',    // teinte des hauts-fonds (0 m)
+    eauProfonde: '#2A3CD4',  // --bleu : teinte vers laquelle tend la profondeur
+    terre: '#FFCAD7',        // --rose
+    ombre: '#8E1A30',        // --warm-dark : versants à l'ombre
+    lumiere: '#FFFFFF',      // versants au soleil
+    lisere: '#F7F5F0',       // --papier : liseré des tracés
+    aVenir: '#3E3E52'        // --ink-soft : pointillé du trajet restant à parcourir
+  };
+  /* Part de --bleu mêlée au blanc pour chaque palier de profondeur (m). Plafonnée
+     à ~60 % : même les fosses restent un bleu adouci, jamais le bleu vif du
+     site en aplat. 0 = mer de moins de 200 m (couleur de fond). */
+  var PROFONDEURS = [
+    [0, 0.05], [200, 0.10], [1000, 0.17], [2000, 0.23], [3000, 0.29], [4000, 0.35],
+    [5000, 0.41], [6000, 0.47], [7000, 0.53], [8000, 0.58], [9000, 0.62]
+  ];
+  function mixHex(a, b, t) {
+    var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), out = '#';
+    [16, 8, 0].forEach(function (sh) {
+      var ca = (pa >> sh) & 255, cb = (pb >> sh) & 255;
+      out += ('0' + Math.round(ca + (cb - ca) * t).toString(16)).slice(-2);
+    });
+    return out;
+  }
+  function eau(t) { return mixHex(THEME.eauClaire, THEME.eauProfonde, t); }
+  var couleurProfondeur = ['match', ['get', 'depth']];
+  PROFONDEURS.slice(1).forEach(function (p) { couleurProfondeur.push(p[0], eau(p[1])); });
+  couleurProfondeur.push(eau(PROFONDEURS[PROFONDEURS.length - 1][1]));
+  /* Archive du fond de carte (npm run build:natural-earth). Servie par le
+     serveur local en attendant son dépôt sur le bucket R2 public des images
+     (celui de visionneuse.html, qui accepte déjà les lectures par morceaux et
+     les requêtes de toute origine) : il suffira alors de remplacer cette URL
+     par https://pub-85062da5f8a7451b9c168f8b3cfd980b.r2.dev/<chemin>. */
+  var FOND_CARTE_URL = new URL('data/natural-earth/fond.pmtiles', location.href).href;
+  maplibregl.addProtocol('pmtiles', new pmtiles.Protocol().tile);
+
+  var map = new maplibregl.Map({
+    container: 'vy-map',
+    style: {
+      version: 8,
+      projection: { type: 'globe' },
+      sources: {
+        // Tuiles vectorielles Natural Earth 1:10m (couches terres, lacs,
+        // fleuves, bathymetrie), lues par morceaux dans une seule archive
+        // PMTiles — voir FOND_CARTE_URL.
+        fond: { type: 'vector', url: 'pmtiles://' + FOND_CARTE_URL,
+          attribution: '<a href="https://www.naturalearthdata.com">Natural Earth</a>' },
+        elevation: {
+          type: 'raster-dem',
+          tiles: ['https://tiles.mapterhorn.com/{z}/{x}/{y}.webp'],
+          tileSize: 512,
+          encoding: 'terrarium',
+          maxzoom: 12,
+          attribution: 'Relief : Copernicus DEM GLO-30 © DLR/Airbus, ESA — via <a href="https://mapterhorn.com/attribution">Mapterhorn</a>'
+        },
+        // Vues rapprochées (à partir de OSM_ZOOM) : Natural Earth y est trop
+        // grossier (côtes à ~1 km près, ni villes ni routes). Tuiles
+        // demandées seulement à ces zooms (minzoom).
+        osm: {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          minzoom: OSM_ZOOM - 1,
+          maxzoom: 19,
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }
+      },
+      sky: {
+        'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.6, 5, 0.6, 7, 0]
+      },
+      layers: [
+        { id: 'eau', type: 'background', paint: { 'background-color': eau(PROFONDEURS[0][1]) } },
+        // Paliers emboîtés, écrits du moins au plus profond : chacun recouvre
+        // le précédent là où la mer est plus profonde.
+        { id: 'bathymetrie', type: 'fill', source: 'fond', 'source-layer': 'bathymetrie',
+          paint: { 'fill-color': couleurProfondeur, 'fill-antialias': false } },
+        { id: 'terres', type: 'fill', source: 'fond', 'source-layer': 'terres',
+          paint: { 'fill-color': THEME.terre, 'fill-antialias': true } },
+        { id: 'relief', type: 'hillshade', source: 'elevation',
+          paint: {
+            'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'], 1, 0.35, 6, 0.55],
+            'hillshade-shadow-color': THEME.ombre,
+            'hillshade-highlight-color': THEME.lumiere,
+            'hillshade-accent-color': THEME.ombre
+          } },
+        // Petits lacs et cours d'eau : déjà écartés des tuiles des vues
+        // d'ensemble au build (min_zoom Natural Earth), aucun filtre ici.
+        { id: 'lacs', type: 'fill', source: 'fond', 'source-layer': 'lacs',
+          paint: { 'fill-color': eau(0.17) } },
+        { id: 'fleuves', type: 'line', source: 'fond', 'source-layer': 'fleuves',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': eau(0.35),
+            'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.4, 4, 1, 8, 2.2]
+          } },
+        // Recouvre tout le fond vectoriel, en fondu sur une demi-unité de zoom.
+        { id: 'osm', type: 'raster', source: 'osm', minzoom: OSM_ZOOM - 0.5,
+          paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], OSM_ZOOM - 0.5, 0, OSM_ZOOM, 1] } }
+      ]
+    },
+    center: [30, 25],
+    zoom: EMBEDDED ? 1.3 : 1.6,
+    maxZoom: MAX_ZOOM,
+    attributionControl: false,
+    cooperativeGestures: EMBEDDED,
+    locale: {
+      'CooperativeGesturesHandler.WindowsHelpText': 'Utilisez Ctrl + molette pour zoomer',
+      'CooperativeGesturesHandler.MacHelpText': 'Utilisez ⌘ + molette pour zoomer',
+      'CooperativeGesturesHandler.MobileHelpText': 'Utilisez deux doigts pour déplacer la carte'
+    }
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+  var EMPTY_LINE = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } };
+  var TRANSPARENT = 'rgba(0,0,0,0)';
+  /** Couleur jusqu'à la fraction p de la ligne, transparent au-delà. */
+  /* Dégradé en escalier du tracé parcouru : `color` jusqu'à la fraction p,
+     transparent ensuite — et transparent aussi sur les tronçons masqués
+     (`hidden`, intervalles [début, fin] en fraction de line-progress). */
+  function progressGradient(color, p, hidden) {
+    p = clamp(p, 1e-6, 1);
+    var cuts = [0, p, 1];
+    (hidden || []).forEach(function (r) { cuts.push(r[0], r[1]); });
+    cuts = cuts.map(function (c) { return clamp(c, 0, 1); }).sort(function (a, b) { return a - b; });
+    function colorAt(m) {
+      if (m >= p) return TRANSPARENT;
+      for (var k = 0; k < (hidden || []).length; k++) if (m > hidden[k][0] && m < hidden[k][1]) return TRANSPARENT;
+      return color;
+    }
+    var expr = null, last = null, prevCut = -1;
+    for (var c = 0; c < cuts.length - 1; c++) {
+      var a = cuts[c], b = cuts[c + 1];
+      if (b - a < 1e-9) continue;
+      var col = colorAt((a + b) / 2);
+      if (!expr) { expr = ['step', ['line-progress'], col]; last = col; prevCut = 0; continue; }
+      if (col === last || a <= prevCut) continue;
+      expr.push(a, col); last = col; prevCut = a;
+    }
+    return expr && expr.length > 3 ? expr : ['step', ['line-progress'], expr ? expr[2] : color, 1, TRANSPARENT];
+  }
+  // Un voyage choisi avant la fin du chargement de la carte (clic rapide dans
+  // la liste, ancre #id dans l'URL) est mis en attente : ses couches
+  // n'existent pas encore.
+  var mapReady = false, queuedVoyage = null;
+
+  // 'style.load' plutôt que 'load' : 'load' attend que toutes les tuiles de
+  // la vue initiale soient arrivées, y compris le relief (service distant) —
+  // les tracés et les portraits attendaient donc le serveur d'élévation.
+  map.once('style.load', function () {
+    map.addSource('vy-all', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: VOYAGES.map(function (V) {
+          return { type: 'Feature', properties: { id: V.v.id, couleur: V.voyageur.couleur },
+                   geometry: { type: 'MultiLineString', coordinates: V.visibleParts } };
+        })
+      }
+    });
+    map.addLayer({ id: 'vy-all-casing', type: 'line', source: 'vy-all',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': THEME.lisere, 'line-width': 5, 'line-opacity': 0.85 } });
+    map.addLayer({ id: 'vy-all-line', type: 'line', source: 'vy-all',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'couleur'], 'line-width': 2.5, 'line-opacity': 0.75 } });
+    // Zone de clic élargie, invisible.
+    map.addLayer({ id: 'vy-all-hit', type: 'line', source: 'vy-all',
+      paint: { 'line-color': '#000', 'line-width': 16, 'line-opacity': 0.001 } });
+
+    // Trajet du voyage choisi : UNE source, chargée une fois à la sélection.
+    // Le tracé parcouru n'est pas une géométrie renvoyée à chaque image (le
+    // redécoupage en tuiles prenait du retard et le trait n'apparaissait
+    // plus) : c'est la même ligne, coloriée par un dégradé en escalier coupé
+    // à la position du voyageur (lineMetrics + line-progress).
+    map.addSource('vy-active', { type: 'geojson', data: EMPTY_LINE, lineMetrics: true });
+    // Reste à parcourir, en pointillé : source à part, sans les tronçons
+    // masqués (un line-dasharray ne se combine pas avec un line-gradient).
+    map.addSource('vy-active-visible', { type: 'geojson', data: EMPTY_LINE });
+    map.addLayer({ id: 'vy-active-full', type: 'line', source: 'vy-active-visible',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': THEME.aVenir, 'line-width': 1.6, 'line-opacity': 0.6, 'line-dasharray': [2, 2.5] } });
+
+    map.addLayer({ id: 'vy-active-casing', type: 'line', source: 'vy-active',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-width': 7, 'line-gradient': progressGradient(THEME.lisere, 0) } });
+    map.addLayer({ id: 'vy-active-done', type: 'line', source: 'vy-active',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-width': 3.5, 'line-gradient': progressGradient('#B4213C', 0) } });
+
+    map.on('mouseenter', 'vy-all-hit', function () { if (!current) map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'vy-all-hit', function () { map.getCanvas().style.cursor = ''; });
+    map.on('click', 'vy-all-hit', function (e) {
+      if (current || !e.features || !e.features.length) return;
+      selectVoyage(e.features[0].properties.id);
+    });
+
+    addOverviewMarkers();
+    mapReady = true;
+
+    var fromHash = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+    if (!queuedVoyage && fromHash && findVoyage(fromHash)) queuedVoyage = fromHash;
+    if (queuedVoyage) selectVoyage(queuedVoyage);
+    else startSpin();
+  });
+
+  /* ---------------------------------------------------------- rotation du globe en vue d'ensemble */
+  var spinning = false, spinLast = 0, userTouched = false;
+  function startSpin() {
+    if (REDUCED_MOTION || userTouched || spinning) return;
+    spinning = true; spinLast = performance.now();
+    requestAnimationFrame(spinFrame);
+  }
+  function spinFrame(now) {
+    if (!spinning) return;
+    var dt = Math.min(64, now - spinLast); spinLast = now;
+    var c = map.getCenter();
+    map.jumpTo({ center: [c.lng + dt * 0.0035, c.lat] });
+    requestAnimationFrame(spinFrame);
+  }
+  function stopSpin() { spinning = false; }
+  ['mousedown', 'touchstart', 'wheel'].forEach(function (ev) {
+    map.getCanvasContainer().addEventListener(ev, function () { userTouched = true; stopSpin(); }, { passive: true });
+  });
+
+  /* ---------------------------------------------------------- marqueurs */
+  var overviewMarkers = [], cityMarkers = [], stopMarkers = [], travelerMarker = null, travelerEl = null;
+  var DOUAI_RADIUS_KM = 15;   // une ville de départ/arrivée plus proche que ça EST Douai
+  var CITY_MERGE_KM = 5;      // deux extrémités plus proches que ça = même ville
+
+  function addOverviewMarkers() {
+    // Douai, point de départ commun de l'exposition : mise en avant principale.
+    var d = el('div', 'vy-douai');
+    d.appendChild(el('span', 'vy-douai-dot'));
+    d.appendChild(el('span', 'vy-douai-label', 'Douai'));
+    new maplibregl.Marker({ element: d, anchor: 'left', offset: [-6, 0] }).setLngLat(DOUAI).addTo(map);
+
+    addCityMarkers();
+
+    // Un seul portrait par personne, au point d'arrivée de son dernier voyage
+    // (date de fin la plus tardive). Un clic ouvre ce voyage.
+    var lastVoyage = {};
+    VOYAGES.forEach(function (V) {
+      var cur = lastVoyage[V.voyageur.id];
+      if (!cur || V.t1 > cur.t1) lastVoyage[V.voyageur.id] = V;
+    });
+    Object.keys(lastVoyage).forEach(function (vid) {
+      var V = lastVoyage[vid];
+      var m = el('button', 'vy-portrait-marker');
+      m.type = 'button';
+      m.style.borderColor = V.voyageur.couleur;
+      m.setAttribute('aria-label', V.voyageur.nom + ' — ' + V.v.titre);
+      m.title = V.voyageur.nom + ' — ' + V.v.titre;
+      fillPortrait(m, V.voyageur);
+      m.addEventListener('click', function (e) { e.stopPropagation(); selectVoyage(V.v.id); });
+      // MapLibre positionne le marqueur par un `transform` posé sur l'élément
+      // qu'on lui confie : le bouton (qui a sa propre transition de survol) est
+      // donc enveloppé, sans quoi il suivrait la carte avec un temps de retard.
+      var anchor = el('div', 'vy-portrait-anchor');
+      anchor.appendChild(m);
+      // Posé au-dessus du point (anchor bottom), pour laisser voir le rond et
+      // le nom de la ville d'arrivée.
+      var mk = new maplibregl.Marker({ element: anchor, anchor: 'bottom', offset: [0, -8] })
+        .setLngLat(V.pts[V.pts.length - 1].coord).addTo(map);
+      overviewMarkers.push(mk);
+    });
+  }
+
+  /* Villes de départ et d'arrivée des voyages : petit rond de la couleur de
+     l'expédition (partagé en parts si plusieurs voyageurs y passent) et nom
+     du lieu. Douai a son propre repère, plus marqué : on ne le double pas. */
+  function addCityMarkers() {
+    var cities = [];
+    VOYAGES.forEach(function (V) {
+      [0, V.pts.length - 1].forEach(function (i) {
+        var p = V.pts[i];
+        if (distKm(p.coord, DOUAI) < DOUAI_RADIUS_KM) return;
+        var c = null;
+        for (var k = 0; k < cities.length; k++) {
+          if (distKm(cities[k].coord, p.coord) < CITY_MERGE_KM) { c = cities[k]; break; }
+        }
+        if (!c) { c = { coord: p.coord, lieu: '', couleurs: [], voyages: [] }; cities.push(c); }
+        if (!c.lieu && p.lieu) c.lieu = p.lieu;
+        if (c.couleurs.indexOf(V.voyageur.couleur) < 0) c.couleurs.push(V.voyageur.couleur);
+        if (c.voyages.indexOf(V.v.id) < 0) c.voyages.push(V.v.id);
+      });
+    });
+    cities.forEach(function (c) {
+      var node = el('div', 'vy-city');
+      var dot = el('span', 'vy-city-dot');
+      var n = c.couleurs.length;
+      dot.style.background = n === 1 ? c.couleurs[0]
+        : 'conic-gradient(' + c.couleurs.map(function (col, j) {
+            return col + ' ' + (j / n * 360) + 'deg ' + ((j + 1) / n * 360) + 'deg';
+          }).join(', ') + ')';
+      node.appendChild(dot);
+      if (c.lieu) node.appendChild(el('span', 'vy-city-label', c.lieu));
+      var mk = new maplibregl.Marker({ element: node, anchor: 'left', offset: [-5, 0] }).setLngLat(c.coord).addTo(map);
+      cityMarkers.push({ marker: mk, voyages: c.voyages });
+    });
+  }
+
+  /* Vue d'ensemble (V absent) : portraits et toutes les villes. Pendant un
+     voyage : ni portraits, ni villes des autres voyages. */
+  function setOverviewMarkersVisible(on, V) {
+    overviewMarkers.forEach(function (mk) { mk.getElement().style.display = on ? '' : 'none'; });
+    cityMarkers.forEach(function (c) {
+      c.marker.getElement().style.display = on || (V && c.voyages.indexOf(V.v.id) >= 0) ? '' : 'none';
+    });
+  }
+  function fillPortrait(node, vr) {
+    if (vr.portrait) {
+      node.style.backgroundImage = 'url("' + encodeURI(vr.portrait) + '")';
+      node.classList.add('has-img');
+    } else {
+      node.textContent = initials(vr.nom);
+    }
+  }
+
+  function buildStopMarkers(V) {
+    clearStopMarkers();
+    var num = 0;
+    V.pts.forEach(function (p, i) {
+      if (!p.arret) return;
+      num++;
+      var b = el('button', 'vy-stop-marker', String(num));
+      b.type = 'button';
+      b.style.setProperty('--c', V.voyageur.couleur);
+      b.title = p.arret.titre;
+      b.setAttribute('aria-label', 'Arrêt ' + num + ' : ' + p.arret.titre);
+      b.addEventListener('click', function (e) { e.stopPropagation(); goToStop(i); });
+      stopMarkers.push(new maplibregl.Marker({ element: b }).setLngLat(p.coord).addTo(map));
+    });
+  }
+  function clearStopMarkers() {
+    stopMarkers.forEach(function (m) { m.remove(); });
+    stopMarkers = [];
+  }
+
+  function ensureTraveler() {
+    if (travelerMarker) return;
+    travelerEl = el('div', 'vy-traveler');
+    travelerEl.appendChild(el('div', 'vy-traveler-icon'));
+    travelerMarker = new maplibregl.Marker({ element: travelerEl }).setLngLat([0, 0]).addTo(map);
+  }
+  var lastIconMode = null;
+  function setTravelerIcon(mode) {
+    if (mode === lastIconMode) return;
+    lastIconMode = mode;
+    travelerEl.firstChild.innerHTML = iconHtml(mode) || iconHtml('pied');
+  }
+
+  /* ---------------------------------------------------------- état de lecture */
+  var current = null;        // voyage préparé sélectionné
+  var u = 0;                 // abscisse de lecture
+  var playing = false;
+  var speed = 1;
+  var follow = true;
+  var pendingStop = null;    // index du prochain arrêt raconté à déclencher
+  var shownStop = null;      // index de l'arrêt dont la carte est affichée
+  var camZoom = null;
+  var camOnTraveler = false; // la caméra est-elle déjà centrée sur le voyageur ?
+  var NO_PADDING = { top: 0, bottom: 0, left: 0, right: 0 };
+  var rafId = 0, lastFrame = 0;
+  var facing = 1;
+
+  var ui = {
+    list: $('#vy-list'),
+    detail: $('#vy-detail'),
+    hud: $('#vy-hud'),
+    hudDate: $('#vy-hud-date'),
+    hudDay: $('#vy-hud-day'),
+    hudMode: $('#vy-hud-mode'),
+    hudName: $('#vy-hud-name'),
+    player: $('#vy-player'),
+    play: $('#vy-play'),
+    restart: $('#vy-restart'),
+    track: $('#vy-track'),
+    fill: $('#vy-track-fill'),
+    ticks: $('#vy-track-ticks'),
+    speeds: document.querySelectorAll('.vy-speed'),
+    card: $('#vy-card'),
+    recenter: $('#vy-recenter'),
+    intro: $('#vy-intro')
+  };
+
+  /* ---------------------------------------------------------- panneau latéral */
+  function renderList() {
+    ui.list.innerHTML = '';
+    DATA.forEach(function (vr) {
+      var card = el('article', 'vy-person');
+      card.style.setProperty('--c', vr.couleur);
+      var head = el('div', 'vy-person-head');
+      var ph = el('span', 'vy-person-portrait');
+      fillPortrait(ph, vr);
+      head.appendChild(ph);
+      var id = el('div', 'vy-person-id');
+      id.appendChild(el('h3', 'vy-person-name', vr.nom));
+      id.appendChild(el('p', 'vy-person-life', vr.vie));
+      id.appendChild(el('p', 'vy-person-link', vr.lienDouai));
+      head.appendChild(id);
+      card.appendChild(head);
+      card.appendChild(el('p', 'vy-person-resume', vr.resume));
+      if (vr.ecrits && vr.ecrits.length) {
+        var ec = el('p', 'vy-person-ecrits');
+        ec.appendChild(el('span', 'vy-label', 'Écrits · '));
+        ec.appendChild(document.createTextNode(vr.ecrits.map(function (e) {
+          return e.titre + (e.annee ? ' (' + e.annee + ')' : '');
+        }).join(' ; ')));
+        card.appendChild(ec);
+      }
+      (vr.voyages || []).forEach(function (v) {
+        var b = el('button', 'vy-voyage-btn');
+        b.type = 'button';
+        b.dataset.voyage = v.id;
+        b.appendChild(el('span', 'vy-voyage-title', v.titre));
+        b.appendChild(el('span', 'vy-voyage-sub', v.sousTitre || ''));
+        b.addEventListener('click', function () { selectVoyage(v.id); });
+        card.appendChild(b);
+      });
+      ui.list.appendChild(card);
+    });
+  }
+
+  function renderDetail(V) {
+    ui.detail.innerHTML = '';
+    var back = el('button', 'vy-back', '← Tous les voyageurs');
+    back.type = 'button';
+    back.addEventListener('click', deselect);
+    ui.detail.appendChild(back);
+
+    var head = el('div', 'vy-person-head');
+    var ph = el('span', 'vy-person-portrait');
+    fillPortrait(ph, V.voyageur);
+    head.appendChild(ph);
+    var id = el('div', 'vy-person-id');
+    id.appendChild(el('h3', 'vy-person-name', V.voyageur.nom));
+    id.appendChild(el('p', 'vy-person-life', V.voyageur.vie));
+    head.appendChild(id);
+    ui.detail.appendChild(head);
+
+    ui.detail.appendChild(el('h4', 'vy-detail-title', V.v.titre));
+    ui.detail.appendChild(el('p', 'vy-detail-sub', V.v.sousTitre || ''));
+    var facts = el('p', 'vy-detail-facts',
+      Math.round(V.totalKm).toLocaleString('fr-FR') + ' km · ' +
+      (V.durationKnown ? V.dayCount.toLocaleString('fr-FR') + ' jours' : 'durée à préciser'));
+    ui.detail.appendChild(facts);
+
+    var ol = el('ol', 'vy-stops');
+    V.pts.forEach(function (p, i) {
+      if (!p.arret) return;
+      var li = el('li');
+      var b = el('button', 'vy-stop-btn');
+      b.type = 'button';
+      b.dataset.stop = i;
+      b.appendChild(el('span', 'vy-stop-name', p.arret.titre));
+      b.appendChild(el('span', 'vy-stop-date', dateLabelAtPoint(V, i)));
+      b.addEventListener('click', function () { goToStop(i); });
+      li.appendChild(b);
+      ol.appendChild(li);
+    });
+    ui.detail.appendChild(ol);
+
+    if (V.v.sources && V.v.sources.length) {
+      var src = el('p', 'vy-detail-sources');
+      src.appendChild(el('span', 'vy-label', 'Sources · '));
+      src.appendChild(document.createTextNode(V.v.sources.join(' ; ')));
+      ui.detail.appendChild(src);
+    }
+  }
+
+  function dateLabelAtPoint(V, i) {
+    return (V.approx[i] ? '≈ ' : '') + formatDate(V.arrive[i], V.prec[i]);
+  }
+
+  /* ---------------------------------------------------------- sélection */
+  function selectVoyage(id) {
+    var V = findVoyage(id);
+    if (!V) return;
+    if (!mapReady) { queuedVoyage = id; return; }
+    stopSpin(); userTouched = true;
+    pause();
+    current = V;
+    u = 0; follow = true; camZoom = null; shownStop = null; lastIconMode = null;
+    camOnTraveler = false;
+    pendingStop = firstStopIndex(V, -1);
+
+    document.body.classList.add('vy-has-voyage');
+    ui.list.hidden = true;
+    ui.detail.hidden = false;
+    ui.intro.hidden = true;
+    renderDetail(V);
+    renderTicks(V);
+
+    setOverviewMarkersVisible(false, V);
+    map.setPaintProperty('vy-all-line', 'line-opacity', ['case', ['==', ['get', 'id'], V.v.id], 0, 0.2]);
+    map.setPaintProperty('vy-all-casing', 'line-opacity', ['case', ['==', ['get', 'id'], V.v.id], 0, 0.25]);
+    map.getSource('vy-active').setData({ type: 'Feature', properties: {},
+      geometry: { type: 'LineString', coordinates: V.path } });
+    map.getSource('vy-active-visible').setData({ type: 'Feature', properties: {},
+      geometry: { type: 'MultiLineString', coordinates: V.visibleParts } });
+    buildStopMarkers(V);
+    ensureTraveler();
+    travelerMarker.getElement().style.display = '';
+    travelerEl.style.setProperty('--c', V.voyageur.couleur);
+
+    ui.hud.hidden = false;
+    ui.player.hidden = false;
+    ui.hudName.textContent = V.voyageur.nom;
+    ui.hud.style.setProperty('--c', V.voyageur.couleur);
+
+    try { history.replaceState(null, '', '#' + encodeURIComponent(V.v.id)); } catch (e) { /* file:// */ }
+
+    // Vue d'ensemble du voyage, puis carte du premier arrêt (le départ).
+    var bounds = new maplibregl.LngLatBounds();
+    V.path.forEach(function (c) { bounds.extend(c); });
+    // Un décalage de caméra resté du voyage précédent (carte de récit
+    // ouverte) décentrerait la vue d'ensemble : on le remet à zéro avant.
+    map.setPadding(NO_PADDING);
+    map.fitBounds(bounds, { padding: fitPadding(pendingStop === 0), duration: REDUCED_MOTION ? 0 : 2200, maxZoom: 6 });
+    render();
+    if (pendingStop === 0) {
+      map.once('moveend', function () { if (current === V && u === 0) triggerStop(0); });
+    }
+  }
+
+  function deselect() {
+    pause();
+    current = null;
+    camOnTraveler = false;
+    hideCard();
+    clearStopMarkers();
+    if (travelerMarker) travelerMarker.getElement().style.display = 'none';
+    document.body.classList.remove('vy-has-voyage');
+    ui.list.hidden = false;
+    ui.detail.hidden = true;
+    ui.hud.hidden = true;
+    ui.player.hidden = true;
+    ui.recenter.hidden = true;
+    ui.intro.hidden = false;
+    setOverviewMarkersVisible(true);
+    map.setPaintProperty('vy-all-line', 'line-opacity', 0.75);
+    map.setPaintProperty('vy-all-casing', 'line-opacity', 0.85);
+    map.getSource('vy-active').setData(EMPTY_LINE);
+    map.getSource('vy-active-visible').setData(EMPTY_LINE);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* file:// */ }
+    map.flyTo({ center: [30, 25], zoom: EMBEDDED ? 1.3 : 1.6, padding: NO_PADDING,
+                duration: REDUCED_MOTION ? 0 : 1800 });
+  }
+
+  function fitPadding(withCard) {
+    // En haut : le tableau de bord ; en bas : le lecteur ; à droite, la carte
+    // de récit si elle va s'ouvrir sur la vue d'ensemble (arrêt de départ).
+    var narrow = window.innerWidth < 760;
+    var pad = narrow ? { top: 110, bottom: 90, left: 30, right: 30 }
+                     : { top: 120, bottom: 100, left: 60, right: 60 };
+    if (withCard) pad.right += cardWidth();
+    return pad;
+  }
+
+  // Largeur occupée à droite par la carte de récit (voir .vy-card), 0 quand
+  // la carte est trop étroite pour qu'il reste une partie libre à côté.
+  function cardWidth() {
+    var mapW = map.getContainer().clientWidth;
+    var w = Math.min(380, mapW - 24) + 12;
+    return mapW - w < 240 ? 0 : w;
+  }
+  // Décalage de caméra : le voyageur est centré dans la partie de la carte
+  // que la carte de récit laisse libre, pas sous elle.
+  function cardPadding() {
+    return { top: 0, bottom: 0, left: 0, right: ui.card.hidden ? 0 : cardWidth() };
+  }
+
+  function firstStopIndex(V, after) {
+    for (var i = after + 1; i < V.pts.length; i++) if (V.pts[i].arret) return i;
+    return null;
+  }
+
+  /* ---------------------------------------------------------- lecture */
+  function play() {
+    if (!current) return;
+    if (u >= current.totalU - 1e-6) restart();
+    hideCard();
+    playing = true;
+    follow = true;
+    ui.recenter.hidden = true;
+    ui.play.setAttribute('aria-label', 'Pause');
+    ui.play.classList.add('is-playing');
+    lastFrame = performance.now();
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(frame);
+  }
+  function pause() {
+    playing = false;
+    cancelAnimationFrame(rafId);
+    ui.play.setAttribute('aria-label', 'Lecture');
+    ui.play.classList.remove('is-playing');
+  }
+  function restart() {
+    if (!current) return;
+    u = 0; camZoom = null;
+    pendingStop = firstStopIndex(current, -1);
+    // L'arrêt de départ a déjà été vu : on repart directement.
+    if (pendingStop === 0) pendingStop = firstStopIndex(current, 0);
+    hideCard();
+    render();
+  }
+
+  function frame(now) {
+    if (!playing || !current) return;
+    var dt = Math.min(100, now - lastFrame) / 1000;
+    lastFrame = now;
+    var next = u + dt * speed * current.baseU / BASE_SECONDS;
+
+    // Arrêt raconté atteint : on s'y cale et on met en pause.
+    if (pendingStop != null && current.stopU[pendingStop] <= next) {
+      u = current.stopU[pendingStop];
+      var idx = pendingStop;
+      pendingStop = firstStopIndex(current, idx);
+      render();
+      pause();
+      triggerStop(idx);
+      return;
+    }
+    u = next;
+    if (u >= current.totalU) {
+      u = current.totalU;
+      render();
+      pause();
+      return;
+    }
+    render();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function goToStop(i) {
+    if (!current) return;
+    pause();
+    u = current.stopU[i];
+    pendingStop = firstStopIndex(current, i);
+    follow = true;
+    ui.recenter.hidden = true;
+    // Carte de récit d'abord : le recentrage de render(true) tient ainsi
+    // compte de la place qu'elle occupe (et remplace son propre easeTo).
+    triggerStop(i);
+    render(true);
+  }
+
+  function seek(frac) {
+    if (!current) return;
+    var wasPlaying = playing;
+    pause();
+    hideCard();
+    u = clamp(frac, 0, 1) * current.totalU;
+    // Le prochain arrêt raconté est le premier situé après la nouvelle position.
+    pendingStop = null;
+    for (var i = 0; i < current.pts.length; i++) {
+      if (current.pts[i].arret && current.stopU[i] > u + 1e-6) { pendingStop = i; break; }
+    }
+    follow = true;
+    render(true);
+    if (wasPlaying) play();
+  }
+
+  /* ---------------------------------------------------------- rendu d'une image */
+  function render(jump) {
+    var V = current;
+    if (!V) return;
+    var st = stateAt(V, u);
+
+    // Tracé parcouru : seule la coupure du dégradé bouge.
+    map.setPaintProperty('vy-active-casing', 'line-gradient', progressGradient(THEME.lisere, st.progress, V.hiddenRanges));
+    map.setPaintProperty('vy-active-done', 'line-gradient', progressGradient(V.voyageur.couleur, st.progress, V.hiddenRanges));
+
+    // Voyageur : icône selon le moyen de transport, tournée dans le sens de la marche.
+    var mode = st.mode || modeAtPoint(V, st.at);
+    setTravelerIcon(mode);
+    travelerMarker.setLngLat(st.pos);
+    var p1 = map.project(st.pos), p2 = map.project(st.ahead);
+    if (Math.abs(p2.x - p1.x) > 0.5) facing = p2.x >= p1.x ? 1 : -1;
+    var flip = ICON_FILES[mode] && ICON_FILES[mode].facesLeft ? -1 : 1;
+    travelerEl.firstChild.style.transform = 'scaleX(' + facing * flip + ')';
+
+    // Tableau de bord.
+    ui.hudDate.textContent = (st.approx ? '≈ ' : '') + formatDate(st.t, st.precision);
+    // Dates connues à l'année seulement : un « jour 213 / 366 » serait une
+    // fausse précision. On garde un ordre de grandeur, sans total.
+    ui.hudDay.textContent = V.durationKnown
+      ? 'Jour ' + Math.max(1, st.day).toLocaleString('fr-FR') + ' / ' + V.dayCount.toLocaleString('fr-FR')
+      : '≈ jour ' + Math.max(1, st.day).toLocaleString('fr-FR');
+    ui.hudMode.innerHTML = '';
+    var ic = el('span', 'vy-hud-icon'); ic.innerHTML = iconHtml(mode);
+    ui.hudMode.appendChild(ic);
+    ui.hudMode.appendChild(document.createTextNode(st.mode ? MODE_LABEL[st.mode] : placeLabel(V, st)));
+
+    var frac = V.totalU ? u / V.totalU : 0;
+    ui.fill.style.width = (frac * 100).toFixed(2) + '%';
+    ui.track.setAttribute('aria-valuenow', Math.round(frac * 100));
+    ui.track.setAttribute('aria-valuetext', ui.hudDate.textContent + ', ' + ui.hudDay.textContent);
+
+    // Caméra : suit le voyageur, zoom adapté au moyen de transport ou
+    // imposé par l'étape.
+    if (follow && (playing || jump)) {
+      var target = cameraZoom(V, st, mode);
+      if (camZoom == null || jump) camZoom = map.getZoom();
+      camZoom += (target - camZoom) * (jump ? 1 : 0.02);
+      // Décalage dû à la carte de récit : rejoint en douceur pendant la
+      // lecture (jumpTo interromprait un easeTo lancé à côté).
+      var pad = cardPadding();
+      if (!jump) { var curR = map.getPadding().right || 0; pad.right = curR + (pad.right - curR) * 0.08; }
+      camOnTraveler = true;
+      if (jump) map.easeTo({ center: st.pos, zoom: camZoom, padding: pad, duration: REDUCED_MOTION ? 0 : 900 });
+      else map.jumpTo({ center: st.pos, zoom: camZoom, padding: pad });
+    }
+  }
+
+  /* Zoom de la caméra à l'abscisse st.km.
+     Par défaut, d'après le moyen de transport (MODE_ZOOM). Une étape peut
+     imposer le sien (champ `zoom`, pour les étapes qui se jouent dans un
+     espace restreint). Il vaut tel quel autour de l'étape, dans un rayon
+     `r` (≈ ce que montre la carte à ce zoom), puis son effet s'estompe de
+     moitié à chaque rayon supplémentaire le long du tracé : la caméra
+     plonge en approchant et remonte en repartant, sans à-coup. Entre deux
+     étapes à zoom imposé, on passe progressivement de l'une à l'autre. */
+  function zoomReachKm(z) { return 20000 / Math.pow(2, z); }
+  function cameraZoom(V, st, mode) {
+    var auto = MODE_ZOOM[mode] || 4;
+    var zs = V.zoomStops;
+    if (!zs.length) return auto;
+    var s = st.km, a = null, b = null;
+    for (var i = 0; i < zs.length; i++) {
+      if (zs[i].km <= s) a = zs[i];
+      else { b = zs[i]; break; }
+    }
+    function pull(stop, d) {
+      var w = d <= stop.r ? 1 : Math.pow(2, -(d - stop.r) / stop.r);
+      return auto + w * (stop.z - auto);
+    }
+    if (a && b) {
+      var t = b.km > a.km ? (s - a.km) / (b.km - a.km) : 0;
+      return pull(a, s - a.km) * (1 - t) + pull(b, b.km - s) * t;
+    }
+    return a ? pull(a, s - a.km) : pull(b, b.km - s);
+  }
+
+  function modeAtPoint(V, at) {
+    if (at == null) return 'pied';
+    for (var i = at; i >= 0; i--) if (V.pts[i].mode) return V.pts[i].mode;
+    return 'pied';
+  }
+  function placeLabel(V, st) {
+    var p = st.at != null ? V.pts[st.at] : null;
+    return p && p.lieu ? 'À ' + p.lieu : 'Halte';
+  }
+
+  function renderTicks(V) {
+    ui.ticks.innerHTML = '';
+    V.pts.forEach(function (p, i) {
+      if (!p.arret) return;
+      var t = el('button', 'vy-tick');
+      t.type = 'button';
+      t.style.left = (V.stopU[i] / V.totalU * 100) + '%';
+      t.title = p.arret.titre;
+      t.setAttribute('aria-label', 'Aller à : ' + p.arret.titre);
+      t.addEventListener('click', function (e) { e.stopPropagation(); goToStop(i); });
+      ui.ticks.appendChild(t);
+    });
+  }
+
+  /* ---------------------------------------------------------- carte d'arrêt */
+  function triggerStop(i) {
+    var V = current, p = V.pts[i];
+    shownStop = i;
+    // Arrêt atteint : « Continuer » doit repartir vers le suivant, pas
+    // retomber sur celui-ci.
+    if (pendingStop === i) pendingStop = firstStopIndex(V, i);
+    ui.card.innerHTML = '';
+    ui.card.style.setProperty('--c', V.voyageur.couleur);
+    var meta = el('p', 'vy-card-meta', (p.lieu ? p.lieu + ' · ' : '') + dateLabelAtPoint(V, i));
+    ui.card.appendChild(meta);
+    ui.card.appendChild(el('h3', 'vy-card-title', p.arret.titre));
+    ui.card.appendChild(el('p', 'vy-card-text', p.arret.texte));
+    if (p.arret.citation) ui.card.appendChild(el('blockquote', 'vy-card-quote', p.arret.citation));
+    if (p.arret.source) ui.card.appendChild(el('p', 'vy-card-source', p.arret.source));
+    var isLast = firstStopIndex(V, i) == null && V.stopU[i] >= V.totalU - 1e-6;
+    var actions = el('div', 'vy-card-actions');
+    var go = el('button', 'vy-card-go', isLast ? 'Revoir le voyage ↺' : (i === 0 ? 'Partir ▸' : 'Continuer ▸'));
+    go.type = 'button';
+    go.addEventListener('click', function () {
+      if (isLast) { restart(); }
+      play();
+    });
+    actions.appendChild(go);
+    ui.card.appendChild(actions);
+    ui.card.hidden = false;
+    if (follow && camOnTraveler) {
+      // La caméra rattrape le zoom en douceur pendant la lecture : si elle
+      // n'y est pas encore (étape à zoom imposé), on finit le mouvement ici.
+      var st = stateAt(V, u);
+      camZoom = cameraZoom(V, st, st.mode || modeAtPoint(V, st.at));
+      map.easeTo({ padding: cardPadding(), zoom: camZoom, duration: REDUCED_MOTION ? 0 : 600 });
+    }
+    document.querySelectorAll('.vy-stop-btn').forEach(function (b) {
+      b.classList.toggle('is-current', +b.dataset.stop === i);
+    });
+    stopMarkers.forEach(function (m) { m.getElement().classList.remove('is-current'); });
+    var n = 0;
+    V.pts.forEach(function (pp, j) {
+      if (!pp.arret) return;
+      if (j === i && stopMarkers[n]) stopMarkers[n].getElement().classList.add('is-current');
+      n++;
+    });
+    go.focus({ preventScroll: true });
+  }
+  function hideCard() {
+    var wasShown = !ui.card.hidden;
+    ui.card.hidden = true;
+    // À l'arrêt, le voyageur revient au centre ; en lecture, render() s'en charge.
+    if (wasShown && follow && camOnTraveler && !playing) {
+      map.easeTo({ padding: NO_PADDING, duration: REDUCED_MOTION ? 0 : 600 });
+    }
+    shownStop = null;
+    document.querySelectorAll('.vy-stop-btn.is-current').forEach(function (b) { b.classList.remove('is-current'); });
+    stopMarkers.forEach(function (m) { m.getElement().classList.remove('is-current'); });
+  }
+
+  /* ---------------------------------------------------------- commandes */
+  ui.play.addEventListener('click', function () { playing ? pause() : play(); });
+  ui.restart.addEventListener('click', function () { var was = playing; pause(); restart(); if (was) play(); });
+  ui.speeds.forEach(function (b) {
+    b.addEventListener('click', function () {
+      speed = +b.dataset.speed;
+      ui.speeds.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    });
+  });
+  ui.recenter.addEventListener('click', function () {
+    follow = true; ui.recenter.hidden = true; render(true);
+  });
+  ui.track.addEventListener('click', function (e) {
+    var r = ui.track.getBoundingClientRect();
+    seek((e.clientX - r.left) / r.width);
+  });
+  ui.track.addEventListener('keydown', function (e) {
+    if (!current) return;
+    var step = e.shiftKey ? 0.1 : 0.02, frac = u / current.totalU;
+    if (e.key === 'ArrowRight') { seek(frac + step); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { seek(frac - step); e.preventDefault(); }
+    else if (e.key === 'Home') { seek(0); e.preventDefault(); }
+    else if (e.key === 'End') { seek(1); e.preventDefault(); }
+  });
+  // Déplacer la carte à la main suspend le suivi de caméra.
+  map.on('dragstart', function (e) {
+    if (!current || !e.originalEvent) return;
+    follow = false;
+    ui.recenter.hidden = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!current || e.target.closest('input, textarea, select')) return;
+    if (e.key === ' ' && !e.target.closest('button, [role="slider"]')) {
+      e.preventDefault();
+      playing ? pause() : play();
+    } else if (e.key === 'Escape' && !ui.card.hidden) {
+      hideCard();
+    }
+  });
+
+  renderList();
+  ui.detail.hidden = true;
+  ui.hud.hidden = true;
+  ui.player.hidden = true;
+  ui.card.hidden = true;
+  ui.recenter.hidden = true;
+  } // start()
+})();

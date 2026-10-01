@@ -17,6 +17,8 @@
     "build:non-catalogues": "node scripts/build-non-catalogues.mjs",
     "build:fonds-complementaires": "node scripts/build-fonds-complementaires.mjs",
     "build:manifest-presse": "node scripts/build-manifest-presse.mjs",
+    "build:natural-earth": "node scripts/build-natural-earth.mjs",
+    "seed:voyageurs": "node scripts/seed-voyageurs.mjs",
     "upload:xml": "node scripts/upload-xml-to-r2.mjs",
     "upload:desherbage": "node scripts/upload-desherbage-to-r2.mjs",
     "upload:bib": "node scripts/upload-bib-to-r2.mjs",
