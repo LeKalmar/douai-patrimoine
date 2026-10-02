@@ -49,7 +49,7 @@
   var MODE_ZOOM = { bateau: 3.1, jonque: 7, attelage: 10, cheval: 11, pied: 6.2, civiere: 6.8, inconnu: 4 };
   // Rythme de lecture par moyen de transport : un tronçon en jonque (cabotage,
   // fleuves) défile deux fois moins vite que le même tronçon en bateau. Absent = 1.
-  var MODE_PACE = { jonque: 2 };
+  var MODE_PACE = { jonque: 2, cheval: 5 };
   // Moyens de transport dont le tronçon n'est pas tracé sur la carte publique.
   var HIDDEN_MODES = { inconnu: true };
   var MAX_ZOOM = 13;              // zoom maximal de la carte (et du champ `zoom` d'une étape)

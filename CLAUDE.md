@@ -1931,7 +1931,7 @@ des `CHECK` SQL) :
   MultiLineString, `hiddenRanges` rendus transparents dans le dégradé du
   tracé parcouru ; le voyageur y circule quand même, l'éditeur les affiche).
   `MODE_PACE` ralentit la
-  lecture d'un moyen de transport (jonque ×2) : la vitesse est calée sur
+  lecture d'un moyen de transport (jonque ×2, cheval ×5 — zoom 11, un tronçon à cheval défilait trop vite pour être lu) : la vitesse est calée sur
   `baseU` (somme sans ralentissement), donc un tronçon ralenti allonge le
   voyage au lieu d'accélérer les autres. Ajouter un moyen de transport =
   CHECK SQL, `MODES` de l'API, `MODE_*` des deux JS, icône dans `ICON_FILES`.
