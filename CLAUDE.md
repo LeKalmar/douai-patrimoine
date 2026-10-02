@@ -1942,10 +1942,12 @@ des `CHECK` SQL) :
   `zoomReachKm(z)` le long du tracé, puis son effet diminue de moitié à
   chaque rayon supplémentaire ; entre deux étapes à zoom imposé, fondu de
   l'une à l'autre. Zoom maximal de la carte publique : 13 (`MAX_ZOOM`, aussi
-  plafond du champ et de l'éditeur). À partir du zoom 10 (`OSM_ZOOM`, fondu
-  sur une demi-unité), des tuiles raster OpenStreetMap recouvrent tout le
-  fond vectoriel : Natural Earth y est trop grossier (côtes à ~1 km près,
-  ni villes ni routes). Seul élément du fond qui ne soit pas aux couleurs
+  plafond du champ et de l'éditeur). À partir du zoom 13 (`OSM_ZOOM`, fondu
+  sur une demi-unité ; 10 jusqu'au 2026-10-02, relevé pour garder le relief
+  visible plus longtemps), des tuiles raster OpenStreetMap recouvrent tout
+  le fond vectoriel, relief compris : Natural Earth y est trop grossier
+  (côtes à ~1 km près, ni villes ni routes) — entre les zooms 8 et 13 on
+  voit donc ses tuiles agrandies. Seul élément du fond qui ne soit pas aux couleurs
   du site ; tuiles `tile.openstreetmap.org` (politique d'usage OSM :
   attribution visible, trafic modéré — à revoir si l'exposition attire
   beaucoup de monde).

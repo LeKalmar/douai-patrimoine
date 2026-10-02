@@ -53,7 +53,7 @@
   // Moyens de transport dont le tronçon n'est pas tracé sur la carte publique.
   var HIDDEN_MODES = { inconnu: true };
   var MAX_ZOOM = 13;              // zoom maximal de la carte (et du champ `zoom` d'une étape)
-  var OSM_ZOOM = 10;              // à partir de ce zoom, OpenStreetMap remplace le fond vectoriel
+  var OSM_ZOOM = 13;              // à partir de ce zoom, OpenStreetMap remplace le fond vectoriel (et masque le relief)
   var MODE_LABEL = { bateau: 'En mer', jonque: 'En jonque', attelage: 'En voiture à cheval', cheval: 'À cheval', pied: 'À pied', civiere: 'Porté en civière', inconnu: 'Moyen de transport inconnu' };
   var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
               'août', 'septembre', 'octobre', 'novembre', 'décembre'];
