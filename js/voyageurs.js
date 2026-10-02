@@ -46,7 +46,7 @@
   var DAY = 86400000;
   var BASE_SECONDS = 50;          // durée d'un voyage complet à la vitesse 1×
   var DENSIFY_KM = 40;            // pas des points intermédiaires sur les grands cercles
-  var MODE_ZOOM = { bateau: 3.1, jonque: 7, attelage: 6, pied: 6.2, civiere: 6.8, inconnu: 4 };
+  var MODE_ZOOM = { bateau: 3.1, jonque: 7, attelage: 10, cheval: 11, pied: 6.2, civiere: 6.8, inconnu: 4 };
   // Rythme de lecture par moyen de transport : un tronçon en jonque (cabotage,
   // fleuves) défile deux fois moins vite que le même tronçon en bateau. Absent = 1.
   var MODE_PACE = { jonque: 2 };
@@ -54,7 +54,7 @@
   var HIDDEN_MODES = { inconnu: true };
   var MAX_ZOOM = 13;              // zoom maximal de la carte (et du champ `zoom` d'une étape)
   var OSM_ZOOM = 10;              // à partir de ce zoom, OpenStreetMap remplace le fond vectoriel
-  var MODE_LABEL = { bateau: 'En mer', jonque: 'En jonque', attelage: 'En voiture à cheval', pied: 'À pied', civiere: 'Porté en civière', inconnu: 'Moyen de transport inconnu' };
+  var MODE_LABEL = { bateau: 'En mer', jonque: 'En jonque', attelage: 'En voiture à cheval', cheval: 'À cheval', pied: 'À pied', civiere: 'Porté en civière', inconnu: 'Moyen de transport inconnu' };
   var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
               'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   var PRECISION_RANK = { annee: 0, mois: 1, jour: 2 };
@@ -70,6 +70,7 @@
     jonque: { src: 'images/voyageurs/transports/jonque.svg', facesLeft: false },
     inconnu: { src: 'images/voyageurs/transports/inconnu.svg', facesLeft: false },
     attelage: { src: 'images/voyageurs/transports/carriage-svgrepo-com.svg', facesLeft: true },
+    cheval: { src: 'images/voyageurs/transports/man-riding-a-horse-svgrepo-com.svg', facesLeft: true },
     pied: { src: 'images/voyageurs/transports/hiking-svgrepo-com.svg', facesLeft: false }
   };
   var ICONS = {

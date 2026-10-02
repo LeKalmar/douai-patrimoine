@@ -36,15 +36,16 @@
     ['jonque', '⛵ En jonque (plus lent)'],
     ['pied', '🚶 À pied'],
     ['attelage', '🐎 En voiture à cheval'],
+    ['cheval', '🏇 À cheval'],
     ['civiere', '🛏 Porté en civière'],
     ['inconnu', '🕊 Inconnu']
   ];
-  var MODE_SHORT = { bateau: '⛵ bateau', jonque: '⛵ jonque', pied: '🚶 à pied', attelage: '🐎 attelage', civiere: '🛏 civière', inconnu: '🕊 inconnu' };
-  var MODE_LABEL = { bateau: 'en bateau', jonque: 'en jonque', pied: 'à pied', attelage: 'en voiture à cheval', civiere: 'porté en civière', inconnu: 'moyen de transport inconnu' };
+  var MODE_SHORT = { bateau: '⛵ bateau', jonque: '⛵ jonque', pied: '🚶 à pied', attelage: '🐎 attelage', cheval: '🏇 à cheval', civiere: '🛏 civière', inconnu: '🕊 inconnu' };
+  var MODE_LABEL = { bateau: 'en bateau', jonque: 'en jonque', pied: 'à pied', attelage: 'en voiture à cheval', cheval: 'à cheval', civiere: 'porté en civière', inconnu: 'moyen de transport inconnu' };
   var DEFAULT_MODE = 'bateau'; // valeur prise par js/voyageurs.js quand la 1re étape n'en a pas
   // Zoom automatique de la caméra (MODE_ZOOM de js/voyageurs.js) et bornes du
   // zoom imposé d'une étape (CHECK SQL de 0010_voyageurs_zoom.sql).
-  var MODE_ZOOM = { bateau: 3.1, jonque: 7, attelage: 6, pied: 6.2, civiere: 6.8, inconnu: 4 };
+  var MODE_ZOOM = { bateau: 3.1, jonque: 7, attelage: 10, cheval: 11, pied: 6.2, civiere: 6.8, inconnu: 4 };
   var ZOOM_MIN = 1, ZOOM_MAX = 13;
   var PALETTE = ['#B4213C', '#2A3CD4', '#1B7F5B', '#C26A00', '#6B3FA0', '#0E7C86', '#8E1A30', '#3E3E52'];
   var ID_RE = /^[a-z0-9-]+$/;
