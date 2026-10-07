@@ -1804,6 +1804,21 @@ liste, marqué « plus scanné dans ce rayon ». Un livre non traité qui
 disparaît du récolement disparaît de la liste. Dernier rayon ouvert rouvert
 au chargement (`rp_rotobib_rayon`).
 
+Graphiques du rayon (`rayonStatsHtml()`) : **« Prêts par année »** — une
+colonne par année détaillée (`loansChartHtml()`, une seule série bleue), puis
+**« Avant <année> »** à part en grand chiffre (`cumules` − années détaillées) :
+sur le même axe, ce cumul écraserait les années. **L'export ne porte que AN à
+AN-3** (vérifié 2026-10-07, pas de « Nombre de prêts AN-4/AN-5 » dans
+`bib.xml`) ; `build-desherbage.mjs` lit AN-4/AN-5 s'ils apparaissent un jour
+(clé posée seulement si le champ existe) et `pretYearKeys()` les affiche alors
+sans autre changement. **« Avancement du traitement »** (`progressHtml()`) :
+barre empilée 100 % + légende avec effectifs. Couleurs et ordre validés au
+script `validate_palette` (skill dataviz) : Braderie passée de l'orange
+`#e65100` à l'ambre `#e8a200` sur toute la page (`--warn`), l'orange étant
+indiscernable du rouge Pilon, et du vert Conserver en protanopie ; ordre
+Conserver → Braderie → Relocalisation → Pilon. L'ambre est peu contrasté sur
+blanc : texte sombre posé dessus, `--warn-ink` pour le texte ambre.
+
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni
 stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de

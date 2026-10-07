@@ -15,7 +15,11 @@
 <link rel="stylesheet" href="style.css">
 <style>
   :root{
-    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
+    /* --warn = Braderie : ambre plutôt qu'orange (#e65100), indiscernable du
+       rouge Pilon et, en protanopie, du vert Conserver — voir progressHtml().
+       Peu contrasté sur blanc : texte sombre posé dessus, --warn-ink en texte. */
+    --red:#E8445A; --ok:#2e7d32; --warn:#e8a200; --warn-ink:#8a5f00; --danger:#c62828;
+    --blue:#2A3CD4; --todo:#e3e4ec;
     --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
   }
   body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
@@ -45,7 +49,7 @@
   .stat-card-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#2A3CD4}
   .stat-card.st-conserver .stat-card-val{color:var(--ok)}
   .stat-card.st-pilon .stat-card-val{color:var(--danger)}
-  .stat-card.st-braderie .stat-card-val{color:var(--warn)}
+  .stat-card.st-braderie .stat-card-val{color:var(--warn-ink)}
   .stat-card.st-relocalisation .stat-card-val{color:#2A3CD4}
 
   .form-card{background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
@@ -73,7 +77,7 @@
   .roto-badge-statut{color:#fff}
   .roto-badge-statut.conserver{background:var(--ok)}
   .roto-badge-statut.pilon{background:var(--danger)}
-  .roto-badge-statut.braderie{background:var(--warn)}
+  .roto-badge-statut.braderie{background:var(--warn);color:#2b1d00}
   .roto-badge-statut.relocalisation{background:#2A3CD4}
 
   .roto-date-box{background:#2A3CD4;color:#fff;border-radius:10px;padding:.85rem 1.25rem;display:inline-block;margin:1rem 0 .25rem}
@@ -96,7 +100,7 @@
   .roto-btn.active{color:#fff;border-color:transparent}
   .roto-btn[data-statut="conserver"].active{background:var(--ok)}
   .roto-btn[data-statut="pilon"].active{background:var(--danger)}
-  .roto-btn[data-statut="braderie"].active{background:var(--warn)}
+  .roto-btn[data-statut="braderie"].active{background:var(--warn);color:#2b1d00}
   .roto-btn[data-statut="relocalisation"].active{background:#2A3CD4}
   .roto-undo-row{margin-top:.6rem}
   .roto-undo{font-size:.78rem;color:#888;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0}
@@ -161,6 +165,51 @@
   .mini-btn.active[data-statut="pilon"]{background:var(--danger);border-color:var(--danger)}
   .mini-btn.active[data-statut="braderie"]{background:var(--warn);border-color:var(--warn)}
   .mini-btn.active[data-statut="relocalisation"]{background:#2A3CD4;border-color:#2A3CD4}
+  /* ── Graphiques du rayon ── */
+  .viz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-bottom:1.5rem}
+  .viz-card{position:relative;background:#fff;border:1px solid #e6e7f0;border-radius:var(--radius-lg);padding:1.1rem 1.25rem 1.2rem}
+  .viz-title{font-family:'Moret','DM Serif Display',serif;font-size:1.1rem;color:#1a1a1a;margin-bottom:.2rem}
+  .viz-sub{font-size:.72rem;color:#888;line-height:1.5;margin-bottom:.9rem}
+  .viz-tip{position:absolute;pointer-events:none;background:#1a1a1a;color:#fff;font-size:.72rem;line-height:1.4;padding:.4rem .6rem;border-radius:6px;max-width:240px;opacity:0;transition:opacity .1s;z-index:2}
+  .viz-tip.show{opacity:1}
+
+  .vb-wrap{display:flex;gap:1.25rem;align-items:stretch;flex-wrap:wrap}
+  .vb-chart{flex:1 1 220px;display:flex;align-items:stretch}
+  .vb-col{flex:1;display:flex;flex-direction:column;align-items:center;outline:none;cursor:default;border-radius:6px}
+  .vb-col:hover,.vb-col:focus-visible{background:#f5f6fd}
+  .vb-plot{height:150px;width:100%;border-bottom:1px solid #d9dbe6;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+  .vb-val{font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.3rem;font-variant-numeric:tabular-nums}
+  .vb-bar{width:100%;max-width:24px;background:var(--blue);border-radius:4px 4px 0 0}
+  .vb-bar.empty{height:0}
+  .vb-x{font-size:.75rem;color:#555;margin-top:.45rem;font-variant-numeric:tabular-nums}
+  .vb-x.current{font-weight:700;color:#1a1a1a}
+
+  .vb-sub{font-size:.66rem;color:#999;margin:.1rem 0 .5rem}
+  .vb-rest{flex:0 1 150px;border-left:1px solid #e3e4ec;padding-left:1.1rem;display:flex;flex-direction:column;justify-content:center}
+  .vb-rest-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#888}
+  .vb-rest-val{font-family:'Moret','DM Serif Display',serif;font-size:2.3rem;line-height:1.1;color:#1a1a1a;font-variant-numeric:tabular-nums}
+  .vb-rest-sub{font-size:.7rem;color:#999;line-height:1.45}
+  @media (max-width:520px){ .vb-rest{border-left:none;padding-left:0;border-top:1px solid #e3e4ec;padding-top:.8rem;flex-basis:100%} }
+
+  .pg-head{display:flex;align-items:baseline;gap:.6rem;margin:.3rem 0 .8rem;flex-wrap:wrap}
+  .pg-big{font-family:'Moret','DM Serif Display',serif;font-size:2.6rem;line-height:1;color:#1a1a1a;font-variant-numeric:tabular-nums}
+  .pg-head-sub{font-size:.8rem;color:#777}
+  .pg-bar{display:flex;gap:2px;height:22px;margin-bottom:1rem}
+  .pg-seg{min-width:4px;outline:none}
+  .pg-seg:first-child{border-radius:4px 0 0 4px}
+  .pg-seg:last-child{border-radius:0 4px 4px 0}
+  .pg-seg:only-child{border-radius:4px}
+  .pg-seg:hover,.pg-seg:focus-visible{filter:brightness(.9)}
+  .pg-conserver{background:var(--ok)} .pg-braderie{background:var(--warn)}
+  .pg-relocalisation{background:var(--blue)} .pg-pilon{background:var(--danger)} .pg-todo{background:var(--todo)}
+  .pg-legend{display:grid;gap:.15rem}
+  .pg-leg{display:grid;grid-template-columns:12px 1fr auto 3.2rem;gap:.6rem;align-items:center;font-size:.8rem;color:#333;padding:.3rem 0;border-bottom:1px solid #f2f2f6}
+  .pg-leg:last-child{border-bottom:none}
+  .pg-leg.zero{color:#aaa}
+  .pg-sw{width:12px;height:12px;border-radius:3px}
+  .pg-leg-n{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+  .pg-leg-pct{color:#888;font-variant-numeric:tabular-nums;text-align:right}
+
   .rayon-table .log-body{max-height:560px}
   .rayon-table td:nth-child(3){min-width:220px}
 
@@ -275,7 +324,7 @@
       <div class="rayon-panel" id="rayon-panel">
         <h2 id="rayon-title"></h2>
         <p class="rayon-sub" id="rayon-sub"></p>
-        <div class="stats-row rayon-stats" id="rayon-stats"></div>
+        <div id="rayon-stats"></div>
         <div class="log-wrap rayon-table">
           <div class="log-header">
             <div class="rayon-filters">
@@ -810,6 +859,7 @@ function importRayon(id, col){
       parutionYear: yearOf(rec['210$d']),
       saisie: rec.dateSaisie || '',
       saisieKey: saisieKey(rec.dateSaisie),
+      prets: absent ? null : p,
       an: absent ? null : (p.an || 0),
       avant: absent ? null : pretsAvant(p),
       cumules: absent ? null : (p.cumules || 0),
@@ -841,32 +891,131 @@ async function refreshRayonFromRecolement(){
 }
 setInterval(() => { if(!document.hidden && RAYON_CURRENT) refreshRayonFromRecolement(); }, 60000);
 
+/* Années de prêt détaillées disponibles : AN…AN-3 dans le profil d'export
+   actuel ; AN-4/AN-5 apparaîtront d'eux-mêmes si un futur export les porte
+   (voir build-desherbage.mjs — clé posée seulement si le champ existe). */
+const PRET_YEAR_KEYS = ['an','an1','an2','an3','an4','an5'];
+function pretYearKeys(rows){
+  return PRET_YEAR_KEYS.filter((k, i) => i < 4 || rows.some(r => r.prets && k in r.prets));
+}
+const fmt = n => n.toLocaleString('fr-FR');
+const pctOf = (n, total) => total ? Math.round(n * 100 / total) : 0;
+
+// Ordre ET couleurs validés pour le daltonisme (dataviz validate_palette :
+// rouge et orange côte à côte étaient indiscernables, vert/orange aussi en
+// protanopie) — d'où l'ambre pour Braderie et cet ordre précis.
+const PROGRESS_ORDER = ['conserver','braderie','relocalisation','pilon'];
+const STATUT_ICON = { conserver:'✓', pilon:'🗑️', braderie:'🏷️', relocalisation:'📦' };
+
 function rayonStatsHtml(rows){
   const Y = REFERENCE_YEAR;
   const known = rows.filter(r => !r.absent);
   const absents = rows.length - known.length;
-  const sumAn = known.reduce((t,r) => t + r.an, 0);
-  const sumAvant = known.reduce((t,r) => t + r.avant, 0);
-  const empruntesAn = known.filter(r => r.an > 0).length;
-  const zeroAn = known.filter(r => r.an === 0).length;
   const jamais = known.filter(r => r.cumules === 0).length;
+  const zeroAn = known.filter(r => r.an === 0).length;
   const medParution = median(rows.map(r => r.parutionYear));
   const minParution = rows.reduce((m,r) => r.parutionYear != null && (m == null || r.parutionYear < m) ? r.parutionYear : m, null);
   const medSaisie = median(rows.map(r => r.saisieKey ? parseInt(r.saisieKey.slice(0,4),10) : null));
-  const treated = rows.filter(r => TRAITEMENTS[r.bc]).length;
-  const pct = n => known.length ? Math.round(n * 100 / known.length) + ' %' : '—';
   const card = (label, val, sub) => `<div class="stat-card"><div class="stat-card-label">${label}</div><div class="stat-card-val">${val}</div>${sub ? `<div class="stat-card-sub">${sub}</div>` : ''}</div>`;
-  return [
+  const cards = [
     card('Livres', rows.length, absents ? `dont ${absents} absent${absents>1?'s':''} de l'export` : 'tous trouvés dans l\'export'),
-    card(`Prêts ${Y}`, sumAn, `${empruntesAn} livre${empruntesAn>1?'s':''} emprunté${empruntesAn>1?'s':''} cette année`),
-    card(`Prêts avant ${Y}`, sumAvant, known.length ? `${(sumAvant/known.length).toFixed(1).replace('.',',')} par livre en moyenne` : ''),
-    card(`0 prêt en ${Y}`, zeroAn, pct(zeroAn) + ' du rayon'),
-    card('Jamais empruntés', jamais, pct(jamais) + ' du rayon'),
+    card(`0 prêt en ${Y}`, zeroAn, `${pctOf(zeroAn, known.length)} % du rayon`),
+    card('Jamais empruntés', jamais, `${pctOf(jamais, known.length)} % du rayon`),
     card('Parution médiane', medParution ?? '—', minParution != null ? `plus ancien : ${minParution}` : ''),
     card('Catalogage médian', medSaisie ?? '—', 'année de saisie Syracuse'),
-    card('Traités', `${treated}/${rows.length}`, ''),
   ].join('');
+  return `<div class="stats-row rayon-stats">${cards}</div>
+    <div class="viz-grid">${loansChartHtml(known)}${progressHtml(rows)}</div>`;
 }
+
+/* Prêts par année : une colonne par année détaillée (une seule série, une
+   seule teinte, pas de légende), puis « tout le reste » À PART, en grand
+   chiffre — sur le même axe, ce cumul de toutes les années antérieures
+   écraserait les années détaillées (241 prêts contre 5 sur un rayon test). */
+function loansChartHtml(known){
+  const keys = pretYearKeys(known);
+  const years = keys.map((k, i) => {
+    const prets = known.reduce((t,r) => t + ((r.prets && r.prets[k]) || 0), 0);
+    const livres = known.filter(r => r.prets && r.prets[k] > 0).length;
+    return { label: String(REFERENCE_YEAR - i), current: i === 0, prets, livres };
+  });
+  const oldest = REFERENCE_YEAR - (keys.length - 1);
+  const resteOf = r => Math.max(0, (r.prets.cumules || 0) - keys.reduce((t,k) => t + (r.prets[k] || 0), 0));
+  const reste = known.reduce((t,r) => t + resteOf(r), 0);
+  const resteLivres = known.filter(r => resteOf(r) > 0).length;
+  const max = Math.max(1, ...years.map(y => y.prets));
+  const cols = years.slice().reverse().map(y => {
+    const tip = `${y.label}${y.current ? ' (année en cours)' : ''} : ${fmt(y.prets)} prêt${y.prets>1?'s':''} · ${y.livres} livre${y.livres>1?'s':''} emprunté${y.livres>1?'s':''} sur ${known.length} (${pctOf(y.livres, known.length)} %)`;
+    return `<div class="vb-col" tabindex="0" data-tip="${esc(tip)}">
+      <div class="vb-plot"><div class="vb-val">${fmt(y.prets)}</div>
+        <div class="vb-bar ${y.prets ? '' : 'empty'}" style="height:${y.prets ? Math.max(2, y.prets / max * 100) : 0}%"></div></div>
+      <div class="vb-x ${y.current ? 'current' : ''}">${y.label}</div>
+      <div class="vb-sub">${y.livres} livre${y.livres>1?'s':''}</div>
+    </div>`;
+  }).join('');
+  return `<div class="viz-card">
+    <div class="viz-title">Prêts par année</div>
+    <div class="viz-sub">Total des prêts des ${known.length} livres du rayon trouvés dans l'export · sous chaque année, le nombre de livres empruntés au moins une fois · ${REFERENCE_YEAR} (en gras) = année en cours</div>
+    <div class="vb-wrap">
+      <div class="vb-chart">${cols}</div>
+      <div class="vb-rest">
+        <div class="vb-rest-label">Avant ${oldest}</div>
+        <div class="vb-rest-val">${fmt(reste)}</div>
+        <div class="vb-rest-sub">prêts sur toutes les années antérieures, depuis l'acquisition · ${resteLivres} livre${resteLivres>1?'s':''}</div>
+      </div>
+    </div>
+    <div class="viz-tip" role="tooltip"></div>
+  </div>`;
+}
+
+/* Avancement du traitement : barre empilée 100 % (une part par décision +
+   « non traité » en gris), grand pourcentage traité, légende complète avec
+   effectifs (l'ambre est peu contrasté sur blanc : chaque part a donc
+   toujours son libellé et son nombre en légende). */
+function progressHtml(rows){
+  const total = rows.length;
+  const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
+  rows.forEach(r => { const t = TRAITEMENTS[r.bc]; if(t && counts[t.statut] !== undefined) counts[t.statut]++; });
+  const treated = PROGRESS_ORDER.reduce((t,s) => t + counts[s], 0);
+  const parts = [...PROGRESS_ORDER.map(s => ({ key:s, label:STATUT_LABEL[s], icon:STATUT_ICON[s], n:counts[s] })),
+                 { key:'todo', label:'Non traité', icon:'○', n: total - treated }];
+  const segs = parts.filter(p => p.n > 0).map(p =>
+    `<div class="pg-seg pg-${p.key}" style="flex-grow:${p.n}" tabindex="0" data-tip="${esc(`${p.label} : ${p.n} livre${p.n>1?'s':''} (${pctOf(p.n, total)} %)`)}"></div>`
+  ).join('');
+  const legend = parts.map(p => `<div class="pg-leg ${p.n ? '' : 'zero'}">
+      <span class="pg-sw pg-${p.key}"></span><span class="pg-leg-lbl">${p.icon} ${p.label}</span>
+      <span class="pg-leg-n">${p.n}</span><span class="pg-leg-pct">${pctOf(p.n, total)} %</span>
+    </div>`).join('');
+  return `<div class="viz-card">
+    <div class="viz-title">Avancement du traitement</div>
+    <div class="pg-head"><span class="pg-big">${pctOf(treated, total)} %</span>
+      <span class="pg-head-sub">${treated} livre${treated>1?'s':''} traité${treated>1?'s':''} sur ${total}</span></div>
+    <div class="pg-bar">${segs || '<div class="pg-seg pg-todo" style="flex-grow:1"></div>'}</div>
+    <div class="pg-legend">${legend}</div>
+    <div class="viz-tip" role="tooltip"></div>
+  </div>`;
+}
+
+// Infobulle partagée des deux graphiques (survol + focus clavier).
+function showVizTip(target){
+  const card = target.closest('.viz-card'); if(!card) return;
+  const tip = card.querySelector('.viz-tip');
+  tip.textContent = target.dataset.tip;
+  tip.classList.add('show');
+  const cr = card.getBoundingClientRect(), tr = target.getBoundingClientRect();
+  const left = Math.min(Math.max(8, tr.left - cr.left + tr.width / 2 - tip.offsetWidth / 2), cr.width - tip.offsetWidth - 8);
+  tip.style.left = left + 'px';
+  tip.style.top = Math.max(4, tr.top - cr.top - tip.offsetHeight - 8) + 'px';
+}
+function hideVizTip(target){
+  const card = target.closest('.viz-card');
+  if(card) card.querySelector('.viz-tip').classList.remove('show');
+}
+const rayonStatsEl = document.getElementById('rayon-stats');
+rayonStatsEl.addEventListener('mouseover', e => { const t = e.target.closest('[data-tip]'); if(t) showVizTip(t); });
+rayonStatsEl.addEventListener('mouseout', e => { const t = e.target.closest('[data-tip]'); if(t) hideVizTip(t); });
+rayonStatsEl.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if(t) showVizTip(t); });
+rayonStatsEl.addEventListener('focusout', e => { const t = e.target.closest('[data-tip]'); if(t) hideVizTip(t); });
 
 const RAYON_COLS = [
   { key:'empl',    label:'Empl.' },

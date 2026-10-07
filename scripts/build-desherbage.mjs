@@ -140,6 +140,14 @@ async function buildItems(path) {
       an3: parseCount(props['Nombre de prêts AN-3']),
       cumules: parseCount(props['Nombre de prêts cumulés']),
     };
+    // AN-4/AN-5 : absents du profil d'export actuel (seuls AN…AN-3 existent,
+    // vérifié 2026-10-07). Lus s'ils apparaissent un jour, et seulement dans
+    // ce cas — une clé absente n'est pas « 0 prêt » : rotobib.html n'affiche
+    // une année que si sa clé existe, et compte le reste dans « avant ».
+    for (const k of [4, 5]) {
+      const v = props[`Nombre de prêts AN-${k}`];
+      if (v !== undefined) prets[`an${k}`] = parseCount(v);
+    }
     const reservations = {
       an:  parseCount(props['Nombre de réservations AN']),
       an1: parseCount(props['Nombre de réservations AN-1']),
