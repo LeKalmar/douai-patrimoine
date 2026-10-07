@@ -386,7 +386,9 @@ const selLocType = document.getElementById('sel-loctype');
 const locEnabled = document.getElementById('loc-enabled');
 const locBlock = document.getElementById('loc-block');
 
-RESERVES.filter(r => r.id !== 'horsreserve').forEach(r => {
+// 'rayons' exclu : leurs définitions (créées à la volée dans recolement.html)
+// ne sont pas chargées sur cette page.
+RESERVES.filter(r => r.id !== 'horsreserve' && r.id !== 'rayons').forEach(r => {
   const o = document.createElement('option'); o.value = r.id; o.textContent = r.label;
   selReserve.appendChild(o);
 });

@@ -1,8 +1,10 @@
 /**
  * État partagé du récolement, stocké dans R2 sous la clé "recolement.json"
  * (même forme que l'export de recolement.html : {scans, nonCatalogues,
- * videShelves, nonRangeShelves, lastShelves, noBarcodeCotes}, chaque valeur
- * un tableau).
+ * videShelves, nonRangeShelves, lastShelves, noBarcodeCotes, rayons}, chaque
+ * valeur un tableau). `rayons` = définitions des rayons en libre accès créés
+ * à la volée depuis recolement.html ({id, label, colEtages, ts, deleted?},
+ * voir TRAVEES_RAYONS dans js/reserve-shared.js).
  *
  * GET  → l'état courant (accessible sans authentification : mêmes données
  *        que celles déjà lisibles via data/recolement.json committé).
@@ -22,7 +24,7 @@ class BadRequest extends Error {
 }
 
 function emptyState() {
-  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], noBarcodeCotes: [] };
+  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], noBarcodeCotes: [], rayons: [] };
 }
 
 function locKey(row) {
@@ -44,6 +46,16 @@ function coteKey(row) {
   return (row.cote || '').trim().toUpperCase();
 }
 
+// Rayons : un enregistrement par rayon, le plus récent (`ts`) l'emporte. Une
+// suppression est un enregistrement `deleted:true` plus récent, jamais un
+// retrait de la liste : sinon un poste resté hors ligne ou un import de
+// sauvegarde ancienne ferait réapparaître le rayon.
+function mergeRayon(rayons, r) {
+  if (!r || typeof r.id !== 'string' || !r.id.startsWith('RY-')) return;
+  const existing = rayons[r.id];
+  if (!existing || !existing.ts || (r.ts || 0) >= existing.ts) rayons[r.id] = r;
+}
+
 function toMap(arr, keyFn) {
   const m = {};
   (arr || []).forEach(r => {
@@ -59,7 +71,7 @@ function fromMap(m) {
 // tirées de l'état courant) — factorisé pour être rejoué plusieurs fois de
 // suite par le cas 'batch' ci-dessous sans relire/réécrire R2 à chaque fois.
 function applyOne(maps, patch) {
-  const { scans, nonCat, vide, nonrange, lastShelf, nobarcode } = maps;
+  const { scans, nonCat, vide, nonrange, lastShelf, nobarcode, rayons } = maps;
   switch (patch.type) {
     case 'scan':
       if (!patch.record || !patch.record.barcode) throw new BadRequest('scan : record.barcode requis.');
@@ -98,6 +110,15 @@ function applyOne(maps, patch) {
       if (patch.record) nobarcode[patch.key] = patch.record;
       else delete nobarcode[patch.key];
       break;
+    case 'rayon':
+      if (!patch.record || typeof patch.record.id !== 'string' || !patch.record.id.startsWith('RY-')) {
+        throw new BadRequest('rayon : record.id (préfixé "RY-") requis.');
+      }
+      if (!patch.record.deleted && (!Array.isArray(patch.record.colEtages) || !patch.record.colEtages.length)) {
+        throw new BadRequest('rayon : record.colEtages (tableau non vide) requis.');
+      }
+      mergeRayon(rayons, patch.record);
+      break;
     case 'bulkMerge': {
       // Fusionne un lot entier (import d'une sauvegarde JSON) dans l'état
       // partagé — jamais un écrasement : chaque entrée est ajoutée ou mise à
@@ -111,6 +132,8 @@ function applyOne(maps, patch) {
       const incomingNonRange = Array.isArray(patch.data.nonRangeShelves) ? patch.data.nonRangeShelves : [];
       const incomingLastShelves = Array.isArray(patch.data.lastShelves) ? patch.data.lastShelves : [];
       const incomingNoBarcode = Array.isArray(patch.data.noBarcodeCotes) ? patch.data.noBarcodeCotes : [];
+      const incomingRayons = Array.isArray(patch.data.rayons) ? patch.data.rayons : [];
+      incomingRayons.forEach(r => mergeRayon(rayons, r));
 
       incomingScans.forEach(r => {
         if (!r.barcode) return;
@@ -149,6 +172,7 @@ function applyPatch(state, patch) {
     nonrange: toMap(state.nonRangeShelves, locKey),
     lastShelf: toMap(state.lastShelves, colKey),
     nobarcode: toMap(state.noBarcodeCotes, coteKey),
+    rayons: toMap(state.rayons, r => r.id),
   };
 
   if (patch.type === 'batch') {
@@ -168,6 +192,7 @@ function applyPatch(state, patch) {
     nonRangeShelves: fromMap(maps.nonrange),
     lastShelves: fromMap(maps.lastShelf),
     noBarcodeCotes: fromMap(maps.nobarcode),
+    rayons: fromMap(maps.rayons),
   };
 }
 

@@ -92,6 +92,7 @@
     .tv-slot{border-radius:1px;transition:transform .1s,outline-color .1s}
     .tv-slot:hover{outline:2px solid #1a1a1a;outline-offset:-1px;position:relative;z-index:2;transform:scale(1.1)}
     .tv-label{font-size:11px;font-weight:600;color:#555;text-align:center;white-space:nowrap;line-height:1.3}
+    .tv-label.rayon{white-space:normal;max-width:120px;margin:0 auto}
     .tv-sublabel{font-size:9.5px;color:#888;text-align:center;white-space:nowrap;line-height:1.3}
     .tv-col-lbl{font-size:8px;color:#aaa;text-align:center;white-space:nowrap;line-height:1;margin-top:3px}
     .vsep{width:1px;background:#ddd;min-height:60px;margin:0 .4rem;align-self:center;flex-shrink:0}
@@ -276,6 +277,15 @@
         </div>
       </div>
 
+      <div class="room-group">
+        <h2 class="room-group-title">Rayons (libre accès)</h2>
+        <div class="room-section">
+          <div class="room-plan">
+            <div class="room-inner" id="room-travees-rayons"></div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </main>
@@ -328,6 +338,7 @@ const TRAVEE_REF_MAXET=DEFAULT_MAX_ETAGE;
 function travTitle(tid){
   if(tid==='ARMOIRE') return 'Armoires (bois)';
   if(tid==='TIROIR') return 'Armoires à tiroirs';
+  if(isRayonTravee(tid)) return 'Rayon '+rayonLabelOf(tid);
   return 'Travée '+tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'').replace(/^M6-/,'');
 }
 function etageWordFor(tid){
@@ -349,6 +360,10 @@ function applyRecolementData(data){
   const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
   const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
   const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
+  // Rayons en libre accès créés à la volée dans recolement.html : leur
+  // géométrie arrive avec les données (voir TRAVEES_RAYONS dans
+  // js/reserve-shared.js) et doit être posée avant de dessiner le plan.
+  applyRayonRecords(Array.isArray(data) ? [] : (data.rayons||[]));
   parseVide(videRows);
   parseNonCat(nonCatRows);
   parseNonRange(nonRangeRows);
@@ -420,8 +435,10 @@ function parseLastShelf(rows){
 
 // Travées de magasin d'étage (préfixe M2-/M5-/M6-) — voir isMagasinTravee()
 // juste en dessous pour pourquoi leur dédoublonnage diffère de la réserve.
+// Les rayons en libre accès (RY-) suivent la même règle : cotes littérales
+// partagées par de nombreux livres différents.
 function isMagasinTravee(t){
-  return t.startsWith('M2-') || t.startsWith('M5-') || t.startsWith('M6-');
+  return t.startsWith('M2-') || t.startsWith('M5-') || t.startsWith('M6-') || isRayonTravee(t);
 }
 
 function parseRecolement(rows){
@@ -654,7 +671,7 @@ function colsOf(tDef){
 function maxEtageOf(tid,col){
   const d=GEO_DEF[tid] || LOCATIONS_ALL.find(x=>x.id===tid);
   const marked=parseInt(LASTSHELF[`${tid}|${col}`],10);
-  let m=!isNaN(marked)?marked:defaultMaxEtageOf(d);
+  let m=!isNaN(marked)?marked:defaultMaxEtageOf(d, col);
   const seen=GEO_MAXET[`${tid}|${col}`];
   if(seen!==undefined && seen>m) m=seen;
   return m;
@@ -671,6 +688,7 @@ function allDrawnDefs(){
     ...TRAVEES_DOUAISIENNE,
     EMPLACEMENTS_ARMOIRE[0], EMPLACEMENTS_TIROIR[0],
     ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5, ...TRAVEES_MAGASIN6,
+    ...TRAVEES_RAYONS,
   ].filter(Boolean);
 }
 
@@ -682,7 +700,8 @@ function allDrawnDefs(){
 function planStructureSignature(){
   return allDrawnDefs().map(tDef=>{
     const cols=colsOf(tDef);
-    return tDef.id+':'+cols.map(c=>c+'#'+maxEtageOf(tDef.id,c)).join(',');
+    // label : un rayon renommé dans recolement.html doit être redessiné.
+    return tDef.id+(tDef.label||'')+':'+cols.map(c=>c+'#'+maxEtageOf(tDef.id,c)).join(',');
   }).join('|');
 }
 
@@ -691,7 +710,7 @@ let planSignature=null;
 function buildPlan(){
   rebuildGeometryIndex();
   buildTravees(); buildTraveesDouaisienne(); buildArmoires(); buildTiroirs();
-  buildMagasin2(); buildMagasin5(); buildMagasin6();
+  buildMagasin2(); buildMagasin5(); buildMagasin6(); buildRayons();
   planSignature=planStructureSignature();
   updateStats();
 }
@@ -780,6 +799,18 @@ function buildMagasin6(){
   });
 }
 
+function buildRayons(){
+  const room=document.getElementById('room-travees-rayons');
+  room.innerHTML='';
+  if(!TRAVEES_RAYONS.length){
+    room.innerHTML='<p class="room-placeholder">Aucun rayon pour l\'instant — ils se créent depuis l\'outil Récolement (« Rayons (libre accès) » → « + Nouveau rayon »).</p>';
+    return;
+  }
+  TRAVEES_RAYONS.forEach(tDef=>{
+    room.appendChild(makeTraveeEl(tDef.id,tDef,colsOf(tDef)));
+  });
+}
+
 function buildArmoires(){
   const room=document.getElementById('room-armoires');
   room.innerHTML='';
@@ -846,7 +877,8 @@ function makeTraveeEl(tid,tDef,cols){
   });
   wrap.appendChild(box);
   const lbl=document.createElement('div');lbl.className='tv-label';
-  lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'').replace(/^M6-/,'');
+  if(isRayonTravee(tid)){ lbl.classList.add('rayon'); lbl.textContent=rayonLabelOf(tid); }
+  else lbl.textContent=(tid==='ARMOIRE'||tid==='TIROIR')?'Toutes':tid.replace(/^RD-/,'').replace(/^M2-/,'').replace(/^M5-/,'').replace(/^M6-/,'');
   wrap.appendChild(lbl);
   if(csvLoaded){
     const sub=document.createElement('div');sub.className='tv-sublabel';
@@ -1145,7 +1177,7 @@ document.getElementById('sq').addEventListener('input',function(){
     const magasin2=t.id.startsWith('M2-');
     const magasin5=t.id.startsWith('M5-');
     const magasin6=t.id.startsWith('M6-');
-    const suffix=douaisienne?' — Réserve Douaisienne':(magasin2?' — Magasin 2e étage':(magasin5?' — Magasin 5e étage':(magasin6?' — Magasin 6e étage':'')));
+    const suffix=douaisienne?' — Réserve Douaisienne':(magasin2?' — Magasin 2e étage':(magasin5?' — Magasin 5e étage':(magasin6?' — Magasin 6e étage':(isRayonTravee(t.id)?' — Rayons (libre accès)':''))));
     hits.push({type:'travee',label:travTitle(t.id),sub:(hasData(t.id)?'':'non inventorié')+suffix,tid:t.id});
   });
 

@@ -92,6 +92,28 @@
   .vide-btn.lastshelf.active{background:#455A64;border-color:#455A64;color:#fff}
   .vide-note{font-size:.75rem;color:#888;flex-basis:100%}
   .horsreserve-note{font-size:.8rem;color:#7a4a00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;line-height:1.5}
+
+  /* Rayons (libre accès) créés à la volée — voir section "RAYONS" du script */
+  .loc-btn{font-family:inherit;font-size:.8rem;padding:.4rem .75rem;border:1px solid #2A3CD4;border-radius:8px;background:#fff;color:#2A3CD4;cursor:pointer;white-space:nowrap}
+  .loc-btn:hover{background:#eef0ff}
+  #rayon-actions{display:inline-flex;gap:.4rem;flex-wrap:wrap}
+  .rayon-editor{background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1.1rem 1.25rem;margin-bottom:1.25rem}
+  .rayon-editor h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.25rem;color:#2A3CD4;margin:0 0 .85rem}
+  .rayon-form-row{display:flex;flex-wrap:wrap;gap:.75rem 1rem;align-items:flex-end;margin-bottom:.9rem}
+  .rayon-form-row label{display:flex;flex-direction:column;gap:.25rem;font-size:.75rem;color:#555;font-weight:600}
+  .rayon-form-row input{font-family:inherit;font-size:.9rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:8px}
+  .rayon-form-row input[type=text]{min-width:220px}
+  .rayon-form-row input[type=number]{width:80px}
+  .rayon-cols-label{font-size:.75rem;color:#555;font-weight:600;margin-bottom:.4rem}
+  .rayon-cols{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.9rem}
+  .rayon-col{display:flex;flex-direction:column;align-items:center;gap:.2rem;font-size:.75rem;font-weight:700;color:#2A3CD4}
+  .rayon-col input{width:52px;text-align:center;font-family:inherit;font-size:.9rem;padding:.35rem .2rem;border:1px solid #ccc;border-radius:6px}
+  .rayon-preview{display:flex;justify-content:flex-start;margin-bottom:.9rem;overflow-x:auto}
+  .rayon-editor-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+  .rayon-editor-actions button{font-family:inherit;font-size:.85rem;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#333;cursor:pointer}
+  .rayon-editor-actions button.primary{background:#2A3CD4;border-color:#2A3CD4;color:#fff}
+  .rayon-editor-actions button.danger{margin-left:auto;color:#c62828;border-color:#f0b4b4}
+  .rayon-editor-msg{font-size:.8rem;color:#c62828;margin:.6rem 0 0;min-height:1em}
   #noncat-mode-zone{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0}
   .noncat-label{font-size:.9rem;color:#333}
   #stp-noncat-wrap{padding:.15rem .3rem}
@@ -267,6 +289,11 @@
       <span id="val-travee">I</span>
       <button type="button" data-step="travee" data-dir="1">+</button>
     </div>
+    <select class="loc-sel" id="sel-rayon" aria-label="Rayon" style="display:none"></select>
+    <span id="rayon-actions" style="display:none">
+      <button type="button" class="loc-btn" id="btn-rayon-new">+ Nouveau rayon</button>
+      <button type="button" class="loc-btn" id="btn-rayon-edit">✎ Modifier ce rayon</button>
+    </span>
     <div class="stepper" id="stp-colonne-wrap">
       <button type="button" data-step="colonne" data-dir="-1">−</button>
       <span id="val-colonne">1</span>
@@ -285,6 +312,35 @@
 <main>
   <div class="section">
     <div class="container">
+
+      <div class="rayon-editor" id="rayon-editor" style="display:none">
+        <h2 id="rayon-editor-title">Nouveau rayon</h2>
+        <div class="rayon-form-row">
+          <label>Nom du rayon
+            <input type="text" id="rayon-label" maxlength="60" placeholder="ex. Romans adultes A–F" autocomplete="off">
+          </label>
+          <label>Nombre de colonnes
+            <input type="number" id="rayon-nbcols" min="1" max="26" step="1" value="4" inputmode="numeric">
+          </label>
+          <label>Étagères par colonne
+            <input type="number" id="rayon-default-et" min="1" max="30" step="1" value="6" inputmode="numeric">
+          </label>
+          <button type="button" class="loc-btn" id="rayon-apply-all">Appliquer à toutes les colonnes</button>
+        </div>
+        <div class="rayon-cols-label">Nombre d'étagères de chaque colonne (à ajuster si une colonne en a plus ou moins) :</div>
+        <div class="rayon-cols" id="rayon-cols"></div>
+        <div class="rayon-preview" id="rayon-preview"></div>
+        <div class="rayon-editor-actions">
+          <button type="button" class="primary" id="rayon-save">Enregistrer le rayon</button>
+          <button type="button" id="rayon-cancel">Annuler</button>
+          <button type="button" class="danger" id="rayon-delete">Supprimer ce rayon</button>
+        </div>
+        <p class="rayon-editor-msg" id="rayon-editor-msg"></p>
+      </div>
+
+      <div class="horsreserve-note" id="rayon-empty-note" style="display:none">
+        Aucun rayon pour l'instant. Créez-en un avec « + Nouveau rayon » : donnez-lui un nom, indiquez son nombre de colonnes et le nombre d'étagères de chaque colonne. Il apparaîtra aussitôt pour tous les collègues, ici et sur le plan des magasins.
+      </div>
 
       <div class="notice-progress-block shelf-bar-block">
         <div class="shelf-bar-heading">
@@ -460,6 +516,7 @@ const LS_VIDE   = 'rp_recolement_vide';
 const LS_NONRANGE = 'rp_recolement_nonrange';
 const LS_LASTSHELF = 'rp_recolement_lastshelf';
 const LS_NOBARCODE = 'rp_recolement_nobarcode';
+const LS_RAYONS = 'rp_recolement_rayons';
 const LS_PENDING = 'rp_recolement_pending_sync';
 const IDB_NAME = 'rp_recolement_idb';
 const IDB_VERSION = 1;
@@ -492,6 +549,12 @@ let nonRangeShelves = loadJSON(LS_NONRANGE, {}); // "travee|colonne|etage" -> {t
 let lastShelves = loadJSON(LS_LASTSHELF, {});  // "travee|colonne" -> {travee,colonne,etage,ts} (dernière étagère réelle de la colonne)
 let noBarcodeCotes = loadJSON(LS_NOBARCODE, {}); // cote normalisée -> {cote,travee,colonne,etage,ts} — voir "LIVRES SANS CODE-BARRE"
 let pendingSync = loadJSON(LS_PENDING, []);   // patches en attente d'envoi à /api/recolement
+// Rayons en libre accès créés à la volée (voir "RAYONS" plus bas et
+// TRAVEES_RAYONS dans js/reserve-shared.js) : id -> {id,label,colEtages,ts,deleted?}.
+// Injectés tout de suite dans la géométrie partagée, avant que la section
+// EMPLACEMENT ne lise loc.travee.
+let rayonRecords = loadJSON(LS_RAYONS, {});
+applyRayonRecords(rayonRecords);
 
 function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -533,6 +596,7 @@ function saveVideShelves(){ safeSetLocal(LS_VIDE, JSON.stringify(videShelves)); 
 function saveNonRangeShelves(){ safeSetLocal(LS_NONRANGE, JSON.stringify(nonRangeShelves)); }
 function saveLastShelves(){ safeSetLocal(LS_LASTSHELF, JSON.stringify(lastShelves)); }
 function saveNoBarcodeCotes(){ safeSetLocal(LS_NOBARCODE, JSON.stringify(noBarcodeCotes)); }
+function saveRayons(){ safeSetLocal(LS_RAYONS, JSON.stringify(rayonRecords)); }
 function savePendingSync(){ safeSetLocal(LS_PENDING, JSON.stringify(pendingSync)); }
 function normalizeCote(s){ return (s||'').trim().toUpperCase(); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -1400,8 +1464,13 @@ const ADV_GROUPS = [
   { id:'magasin-2e', label:'Magasin — 2e étage', catalogGroup:'magasin' },
   { id:'magasin-5e', label:'Magasin — 5e étage', catalogGroup:'magasin' },
   { id:'magasin-6e', label:'Magasin — 6e étage', catalogGroup:'magasin' },
+  // Rayons en libre accès (travées "RY-", créées à la volée — voir "RAYONS"
+  // plus bas). Même catalogue de reconnaissance que les magasins
+  // (data/magasins.json couvre toute la bibliothèque), mais PAS un magasin :
+  // d'où MAGASIN_ADV_GROUPS filtré sur l'id plutôt que sur catalogGroup.
+  { id:'rayons', label:'Rayons (libre accès)', catalogGroup:'magasin' },
 ];
-const MAGASIN_ADV_GROUPS = ADV_GROUPS.filter(g=>g.catalogGroup==='magasin');
+const MAGASIN_ADV_GROUPS = ADV_GROUPS.filter(g=>g.id.startsWith('magasin-'));
 const ADV_GROUP_BY_ID = {};
 ADV_GROUPS.forEach(g=>{ ADV_GROUP_BY_ID[g.id] = g; });
 function catalogGroupOf(advGroupId){ return (ADV_GROUP_BY_ID[advGroupId]||{}).catalogGroup || 'reserve'; }
@@ -1523,12 +1592,7 @@ function updateMagasinEtageStats(only){
    réserve (patrimoniale + Douaisienne + armoires/tiroirs + hors-réserve,
    qui partagent un seul catalogByGroup.reserve non scindé), même calcul
    que l'ancien code de mise à jour de "Progression"/"Notices récolées". */
-function currentStatsGroup(){
-  if(loc.reserve==='magasin2') return 'magasin-2e';
-  if(loc.reserve==='magasin5') return 'magasin-5e';
-  if(loc.reserve==='magasin6') return 'magasin-6e';
-  return 'reserve';
-}
+function currentStatsGroup(){ return advGroupIdForReserve(loc.reserve); }
 
 function catalogStatsForGroup(group){
   if(group==='reserve'){
@@ -1540,6 +1604,20 @@ function catalogStatsForGroup(group){
     return { scanned: noticesScanned.size, total: catalogNoticeCountByGroup.reserve };
   }
   if(!catalogByGroup.magasin) return null;
+  if(group==='rayons'){
+    // Pas de « total attendu » pour des rayons créés à la volée : rien dans
+    // le catalogue ne dit quel exemplaire devrait s'y trouver. On ne compte
+    // que les notices distinctes déjà récolées dans un rayon (total = récolé,
+    // donc « Jamais récolées » reste à 0 plutôt que d'afficher un faux reste).
+    const cat = catalogByGroup.magasin;
+    const seen = new Set();
+    Object.values(scans).forEach(r=>{
+      if(traveeGroupOf(r.travee)!=='rayons') return;
+      const entry = cat[r.barcode];
+      if(entry) seen.add(entry.noticeId);
+    });
+    return { scanned: seen.size, total: seen.size };
+  }
   return magasinFloorStats(group);
 }
 
@@ -1733,6 +1811,7 @@ function advGroupIdForReserve(reserveId){
   if(reserveId==='magasin2') return 'magasin-2e';
   if(reserveId==='magasin5') return 'magasin-5e';
   if(reserveId==='magasin6') return 'magasin-6e';
+  if(reserveId==='rayons') return 'rayons';
   return 'reserve';
 }
 function applyAdvGroupVisibility(){
@@ -1754,6 +1833,7 @@ const scanInput = document.getElementById('scan-input');
 const damagedToggle = document.getElementById('damaged-toggle');
 const noncatInput = document.getElementById('noncat-input');
 const selReserve=document.getElementById('sel-reserve'), selLocType=document.getElementById('sel-loctype');
+const selRayon=document.getElementById('sel-rayon');
 
 RESERVES.forEach(r=>{
   const o=document.createElement('option'); o.value=r.id; o.textContent=r.label;
@@ -1763,7 +1843,12 @@ selReserve.value = loc.reserve;
 selLocType.value = loc.locType;
 
 function activeTravees(){ return traveesOfReserve(loc.reserve); }
+// undefined possible pour "Rayons" tant qu'aucun rayon n'a été créé — les
+// appelants qui en dépendent (setLocType, mini-plan, steppers) le testent.
 function currentTraveeDef(){ const list=activeTravees(); return list.find(t=>t.id===loc.travee) || list[0]; }
+// Mode "Rayons" sans aucun rayon créé : pas d'emplacement possible, on ne
+// montre que l'invitation à en créer un (voir applyReserveVisibility()).
+function noRayonYet(){ return loc.reserve==='rayons' && !TRAVEES_RAYONS.length; }
 function currentLocDef(){
   if(loc.locType==='armoire') return EMPLACEMENTS_ARMOIRE[0];
   if(loc.locType==='tiroir')  return EMPLACEMENTS_TIROIR[0];
@@ -1783,19 +1868,33 @@ function setLocType(type, skipRefresh){
     return;
   }
   loc.locType = type;
-  document.getElementById('stp-travee-wrap').style.display = type==='etagere' ? '' : 'none';
+  // Un rayon se choisit par son nom (menu #sel-rayon), pas au stepper.
+  document.getElementById('stp-travee-wrap').style.display = (type==='etagere' && loc.reserve!=='rayons') ? '' : 'none';
   const def = currentLocDef();
+  if(!def){ if(!skipRefresh) refreshLoc(); return; }   // "Rayons" sans rayon créé
+  if(loc.reserve==='rayons') loc.travee = def.id;
   loc.colonne = Math.min(def.nbCols, Math.max(1, loc.colonne||1));
   // Les travées n'ont pas de plafond fixe (voir DEFAULT_MAX_ETAGE côté
   // reserve-shared.js) : seules les armoires/tiroirs, à capacité physique
-  // réellement fixe, sont bornées ici.
-  loc.etage = type==='etagere' ? Math.max(1, loc.etage||1) : Math.min(def.maxEt, Math.max(1, loc.etage||1));
+  // réellement fixe, sont bornées ici — et les rayons, dont le nombre
+  // d'étagères de chaque colonne a été saisi à leur création.
+  loc.etage = Math.min(maxEtageForStepper(), Math.max(1, loc.etage||1));
   if(!skipRefresh) refreshLoc();
+}
+// Plafond du stepper "étage" à l'emplacement courant (voir setLocType()).
+function maxEtageForStepper(){
+  const def = currentLocDef();
+  if(!def) return 1;
+  if(loc.locType!=='etagere') return def.maxEt;
+  if(isRayonTravee(def.id)) return defaultMaxEtageOf(def, loc.colonne);
+  return Infinity;
 }
 selLocType.addEventListener('change', ()=>setLocType(selLocType.value));
 
 function applyReserveVisibility(){
   const isHorsReserve = loc.reserve === 'horsreserve';
+  const isRayons = loc.reserve === 'rayons';
+  const noRayon = noRayonYet();
   // Les armoires et tiroirs sont physiquement dans la réserve patrimoniale uniquement.
   const hasArmoires = loc.reserve === 'patrimoniale';
   [...selLocType.options].forEach(o=>{ if(o.value!=='etagere') o.disabled = !hasArmoires; });
@@ -1815,6 +1914,24 @@ function applyReserveVisibility(){
   document.querySelector('.expected-panel').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
   updateVideRowVisibility();
+  // Rayons : choix du rayon par son nom + boutons de création/modification ;
+  // sans aucun rayon, plus rien à scanner tant qu'il n'en existe pas un.
+  if(isRayons){
+    document.getElementById('stp-travee-wrap').style.display = 'none';
+    selLocType.style.display = 'none';
+  }
+  selRayon.style.display = (isRayons && !noRayon) ? '' : 'none';
+  document.getElementById('rayon-actions').style.display = isRayons ? '' : 'none';
+  document.getElementById('btn-rayon-edit').style.display = (isRayons && !noRayon) ? '' : 'none';
+  document.getElementById('stp-colonne-wrap').style.display = (isHorsReserve || noRayon) ? 'none' : '';
+  document.getElementById('stp-etage-wrap').style.display = (isHorsReserve || noRayon) ? 'none' : '';
+  document.querySelector('.scan-layout').style.display = noRayon ? 'none' : '';
+  document.getElementById('rayon-empty-note').style.display = noRayon ? '' : 'none';
+  // Le nombre d'étagères de chaque colonne d'un rayon est saisi à sa
+  // création : "dernière étagère de cette colonne" ferait doublon.
+  document.getElementById('btn-lastshelf').style.display = isRayons ? 'none' : '';
+  if(!isRayons) closeRayonEditor();
+  refreshRayonSelect();
   applyAdvGroupVisibility();
 }
 
@@ -1826,9 +1943,18 @@ selReserve.addEventListener('change', ()=>{
     refreshLoc();
   } else {
     const list = activeTravees();
-    loc.travee = list[0].id; loc.colonne = 1; loc.etage = 1;
+    loc.travee = list.length ? list[0].id : null; loc.colonne = 1; loc.etage = 1;
+    if(loc.reserve==='rayons') loc.locType = 'etagere';
     setLocType(loc.locType);
   }
+  // Premier passage en "Rayons" sans rayon existant : on ouvre directement
+  // le formulaire de création.
+  if(noRayonYet()) openRayonEditor(null);
+});
+selRayon.addEventListener('change', ()=>{
+  loc.travee = selRayon.value; loc.colonne = 1; loc.etage = 1;
+  closeRayonEditor();
+  refreshLoc();
 });
 
 document.querySelectorAll('[data-step]').forEach(btn=>{
@@ -1839,14 +1965,16 @@ document.querySelectorAll('[data-step]').forEach(btn=>{
       const idx = Math.min(list.length-1, Math.max(0, list.findIndex(t=>t.id===loc.travee) + dir));
       loc.travee = list[idx].id; loc.colonne = 1; loc.etage = 1;
     } else if(field==='colonne'){
-      const max = currentLocDef().nbCols;
-      loc.colonne = Math.min(max, Math.max(1, loc.colonne + dir));
+      const def = currentLocDef(); if(!def) return;
+      loc.colonne = Math.min(def.nbCols, Math.max(1, loc.colonne + dir));
+      // Rayon : chaque colonne a son propre nombre d'étagères.
+      loc.etage = Math.min(maxEtageForStepper(), loc.etage);
     } else if(field==='etage'){
       // Pas de plafond pour les travées (nombre d'étagères variable, voir
       // DEFAULT_MAX_ETAGE / bouton "dernière étagère de cette colonne") ;
-      // seules les armoires/tiroirs ont une capacité physique réellement fixe.
-      const max = loc.locType==='etagere' ? Infinity : currentLocDef().maxEt;
-      loc.etage = Math.min(max, Math.max(1, loc.etage + dir));
+      // seules les armoires/tiroirs et les rayons ont un nombre d'étagères
+      // fixé (voir maxEtageForStepper()).
+      loc.etage = Math.min(maxEtageForStepper(), Math.max(1, loc.etage + dir));
     }
     refreshLoc();
   });
@@ -1865,11 +1993,13 @@ function displayTraveeId(t){
   if(t==='HORS-RESERVE') return 'Non rangé (hors réserve)';
   if(t==='ARMOIRE') return 'Armoire (bois)';
   if(t==='TIROIR') return 'Armoire à tiroirs';
+  if(isRayonTravee(t)) return rayonLabelOf(t);
   return (t||'').replace(/^RD-/, '').replace(/^M2-/, '').replace(/^M5-/, '').replace(/^M6-/, '');
 }
 
 function locLabel(t){
   if(t==='HORS-RESERVE' || t==='ARMOIRE' || t==='TIROIR') return displayTraveeId(t);
+  if(isRayonTravee(t)) return 'Rayon '+displayTraveeId(t);
   return 'Travée '+displayTraveeId(t);
 }
 
@@ -1890,6 +2020,8 @@ function refreshLoc(){
   const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
   let readout;
   if(loc.reserve==='horsreserve') readout = reserveLabel;
+  else if(noRayonYet()) readout = `${reserveLabel} · aucun rayon créé`;
+  else if(loc.reserve==='rayons') readout = `${reserveLabel} · ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étagère ${loc.etage}`;
   else if(loc.locType==='armoire') readout = `${reserveLabel} · Armoire (bois) · Meuble ${colLetter(loc.colonne)} · Niveau ${loc.etage}`;
   else if(loc.locType==='tiroir') readout = `${reserveLabel} · Armoire à tiroirs · Meuble ${colLetter(loc.colonne)} · Tiroir ${loc.etage}`;
   else readout = `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
@@ -1904,6 +2036,184 @@ function refreshLoc(){
   buildMiniPlan();
   scanInput.focus();
 }
+/* ════════════ RAYONS (libre accès, créés à la volée) ════════════
+   Plutôt que d'écrire la géométrie de chaque rayon en dur dans
+   js/reserve-shared.js (comme les travées de la réserve et des magasins),
+   l'équipe la saisit ici : nom, nombre de colonnes, nombre d'étagères de
+   chaque colonne. La définition est un enregistrement de la catégorie
+   `rayons` de recolement.json ({id:"RY-…", label, colEtages, ts}), envoyé
+   par le patch 'rayon' — même file d'attente/synchro que les scans, donc
+   visible des autres postes et de reserve.html au prochain sondage. Une
+   suppression est un enregistrement `deleted:true` plus récent (voir
+   api/recolement.mjs), refusée tant que le rayon porte des données. */
+let rayonEditingId = null;   // null = création, sinon id du rayon modifié
+
+function currentRayonDef(){ return TRAVEES_RAYONS.find(t=>t.id===loc.travee) || null; }
+
+function refreshRayonSelect(){
+  const want = loc.reserve==='rayons' ? loc.travee : null;
+  selRayon.innerHTML = TRAVEES_RAYONS.map(t=>
+    `<option value="${esc(t.id)}">${esc(t.label)} (${t.nbCols} col.)</option>`).join('');
+  if(want && TRAVEES_RAYONS.some(t=>t.id===want)) selRayon.value = want;
+}
+
+// Appelée quand la liste des rayons change (création, modification,
+// suppression, ou arrivée depuis un autre poste via syncFromServer()).
+function onRayonsChanged(){
+  if(loc.reserve!=='rayons'){ refreshRayonSelect(); return; }
+  if(!TRAVEES_RAYONS.some(t=>t.id===loc.travee)){
+    loc.travee = TRAVEES_RAYONS.length ? TRAVEES_RAYONS[0].id : null;
+    loc.colonne = 1; loc.etage = 1;
+  }
+  if(rayonEditingId && !TRAVEES_RAYONS.some(t=>t.id===rayonEditingId)) closeRayonEditor();
+  applyReserveVisibility();
+  setLocType('etagere');
+}
+
+function rayonColInputs(){ return [...document.querySelectorAll('#rayon-cols input')]; }
+function clampInt(v, min, max, fallback){
+  const n = parseInt(v, 10);
+  return isNaN(n) ? fallback : Math.min(max, Math.max(min, n));
+}
+
+// (Re)dessine une case par colonne en conservant les valeurs déjà saisies ;
+// les nouvelles colonnes prennent la valeur « Étagères par colonne ».
+function renderRayonCols(values){
+  const nb = clampInt(document.getElementById('rayon-nbcols').value, 1, RAYON_MAX_COLS, 1);
+  const def = clampInt(document.getElementById('rayon-default-et').value, 1, RAYON_MAX_ETAGES, 6);
+  const prev = values || rayonColInputs().map(i=>i.value);
+  const box = document.getElementById('rayon-cols');
+  box.innerHTML = '';
+  for(let i=0;i<nb;i++){
+    const lbl = document.createElement('label'); lbl.className = 'rayon-col';
+    lbl.innerHTML = `<span>${colLetter(i+1)}</span>`;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = '1'; inp.max = String(RAYON_MAX_ETAGES); inp.step = '1'; inp.inputMode = 'numeric';
+    inp.value = prev[i]!=null && prev[i]!=='' ? prev[i] : def;
+    inp.setAttribute('aria-label', `Étagères de la colonne ${colLetter(i+1)}`);
+    inp.addEventListener('input', renderRayonPreview);
+    lbl.appendChild(inp);
+    box.appendChild(lbl);
+  }
+  renderRayonPreview();
+}
+
+// Aperçu schématique (mêmes cases grises que le mini-plan) pour vérifier
+// d'un coup d'œil la forme du rayon avant de l'enregistrer.
+function renderRayonPreview(){
+  const counts = rayonColInputs().map(i=>clampInt(i.value, 1, RAYON_MAX_ETAGES, 1));
+  const maxE = Math.max(1, ...counts);
+  const GAP=2, targetH = Math.max(60, maxE*10 + (maxE-1)*GAP);
+  const box = document.createElement('div'); box.className = 'mp-box';
+  counts.forEach((n, i)=>{
+    const cd = document.createElement('div'); cd.className = 'mp-col';
+    const h = Math.max(5, (targetH-(n-1)*GAP)/n);
+    for(let e=1;e<=n;e++){
+      const s = document.createElement('div'); s.className = 'mp-slot';
+      s.style.cssText = `width:14px;height:${h}px;background:var(--plan-unknown)`;
+      cd.appendChild(s);
+    }
+    const l = document.createElement('div'); l.className = 'mp-collbl'; l.textContent = colLetter(i+1);
+    cd.appendChild(l);
+    box.appendChild(cd);
+  });
+  const prev = document.getElementById('rayon-preview');
+  prev.innerHTML = ''; prev.appendChild(box);
+}
+
+function openRayonEditor(def){
+  rayonEditingId = def ? def.id : null;
+  document.getElementById('rayon-editor-title').textContent = def ? `Modifier le rayon « ${def.label} »` : 'Nouveau rayon';
+  document.getElementById('rayon-label').value = def ? def.label : '';
+  document.getElementById('rayon-nbcols').value = def ? def.nbCols : 4;
+  document.getElementById('rayon-default-et').value = def ? def.colEtages[0] : 6;
+  document.getElementById('rayon-delete').style.display = def ? '' : 'none';
+  document.getElementById('rayon-editor-msg').textContent = '';
+  document.getElementById('rayon-cols').innerHTML = '';
+  renderRayonCols(def ? def.colEtages.map(String) : []);
+  document.getElementById('rayon-editor').style.display = '';
+  document.getElementById('rayon-label').focus();
+}
+function closeRayonEditor(){
+  rayonEditingId = null;
+  document.getElementById('rayon-editor').style.display = 'none';
+}
+
+// Emplacements d'un rayon qui portent des données (scans, comptages,
+// marquages vide/non rangé, cotes sans code-barre).
+function rayonDataRows(id){
+  return [
+    ...Object.values(scans), ...Object.values(nonCat), ...Object.values(videShelves),
+    ...Object.values(nonRangeShelves), ...Object.values(noBarcodeCotes),
+  ].filter(r=>r && r.travee===id);
+}
+
+function commitRayonRecord(record){
+  rayonRecords[record.id] = record;
+  saveRayons();
+  applyRayonRecords(rayonRecords);
+  queuePatch({type:'rayon', record});
+}
+
+document.getElementById('btn-rayon-new').addEventListener('click', ()=>openRayonEditor(null));
+document.getElementById('btn-rayon-edit').addEventListener('click', ()=>{
+  const def = currentRayonDef();
+  if(def) openRayonEditor(def);
+});
+document.getElementById('rayon-nbcols').addEventListener('input', ()=>renderRayonCols());
+document.getElementById('rayon-apply-all').addEventListener('click', ()=>{
+  const v = String(clampInt(document.getElementById('rayon-default-et').value, 1, RAYON_MAX_ETAGES, 6));
+  rayonColInputs().forEach(i=>{ i.value = v; });
+  renderRayonPreview();
+});
+document.getElementById('rayon-cancel').addEventListener('click', ()=>{ closeRayonEditor(); scanInput.focus(); });
+
+document.getElementById('rayon-save').addEventListener('click', ()=>{
+  const msg = document.getElementById('rayon-editor-msg');
+  const label = document.getElementById('rayon-label').value.trim().replace(/\s+/g,' ');
+  if(!label){ msg.textContent = 'Donnez un nom au rayon.'; document.getElementById('rayon-label').focus(); return; }
+  const clash = TRAVEES_RAYONS.find(t=>t.id!==rayonEditingId && t.label.localeCompare(label,'fr',{sensitivity:'base'})===0);
+  if(clash){ msg.textContent = `Un rayon s'appelle déjà « ${clash.label} » — choisissez un autre nom.`; return; }
+  const colEtages = rayonColInputs().map(i=>clampInt(i.value, 1, RAYON_MAX_ETAGES, 1));
+  if(!colEtages.length){ msg.textContent = 'Il faut au moins une colonne.'; return; }
+
+  if(rayonEditingId){
+    // Rétrécir un rayon ne supprime rien : les données au-delà restent
+    // enregistrées et continuent de s'afficher (le plan s'étend toujours
+    // jusqu'aux données réelles), mais autant prévenir.
+    const beyond = rayonDataRows(rayonEditingId).filter(r=>{
+      const ci = String(r.colonne||'').charCodeAt(0)-64;
+      return ci > colEtages.length || parseInt(r.etage,10) > (colEtages[ci-1]||0);
+    });
+    if(beyond.length && !confirm(`${beyond.length} donnée(s) déjà saisie(s) dans ce rayon se trouvent au-delà des nouvelles dimensions. Elles ne seront pas effacées et resteront visibles sur le plan. Continuer ?`)) return;
+  }
+
+  const id = rayonEditingId || (RAYON_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2,6));
+  const isNew = !rayonEditingId;
+  commitRayonRecord({ id, label, colEtages, ts:Date.now() });
+  closeRayonEditor();
+  loc.reserve = 'rayons'; selReserve.value = 'rayons';
+  loc.travee = id;
+  if(isNew){ loc.colonne = 1; loc.etage = 1; }
+  beep(660,.1);
+  onRayonsChanged();
+});
+
+document.getElementById('rayon-delete').addEventListener('click', ()=>{
+  const def = TRAVEES_RAYONS.find(t=>t.id===rayonEditingId);
+  if(!def) return;
+  const n = rayonDataRows(def.id).length;
+  if(n){
+    document.getElementById('rayon-editor-msg').textContent =
+      `Impossible de supprimer « ${def.label} » : ${n} donnée(s) y sont enregistrées (scans, comptages, marquages). Supprimez-les d'abord, ou renommez simplement le rayon.`;
+    return;
+  }
+  if(!confirm(`Supprimer le rayon « ${def.label} » pour tous les postes ?`)) return;
+  commitRayonRecord({ id:def.id, label:def.label, colEtages:def.colEtages, deleted:true, ts:Date.now() });
+  closeRayonEditor();
+  onRayonsChanged();
+});
+
 applyReserveVisibility();
 setLocType(loc.locType, true);
 refreshLoc();
@@ -1955,6 +2265,7 @@ scanInput.addEventListener('keydown', e=>{
     // catalogue" (bug observé le 2026-09-01, cause exacte de l'exception
     // encore à identifier via le console.error ci-dessous).
     try{
+      if(noRayonYet()){ beepError(); return; }   // aucun emplacement où enregistrer
       if(loc.reserve==='horsreserve') handleScanHorsReserve(scanInput.value.trim(), damagedToggle.checked);
       else handleScan(scanInput.value.trim(), damagedToggle.checked);
     }catch(err){
@@ -1989,8 +2300,10 @@ function handleScan(barcode, damaged, opts){
   // catalogue. Le scan est enregistré normalement, titre/cote affichés.
   // Avant 2026-09-02 ce cas se détectait via un second catalogue complet
   // (magasinWideCatalog) ; il se lit maintenant sur l'entrée elle-même.
+  // Pas dans les rayons en libre accès : ils contiennent justement des
+  // documents d'autres sections que Magasin/Magasin Jeunesse.
   let horsSection = false;
-  if(cat && group==='magasin' && !inGroupScope(cat)){
+  if(cat && group==='magasin' && loc.reserve!=='rayons' && !inGroupScope(cat)){
     horsSection = true;
   }
   const prev = scans[barcode];
@@ -2478,7 +2791,7 @@ function travMiniTitle(tid){
   if(tid==='ARMOIRE') return 'Armoires (bois)';
   if(tid==='TIROIR') return 'Armoires à tiroirs';
   const reserveLabel = (RESERVES.find(r=>r.id===loc.reserve) || {}).label || '';
-  return `${reserveLabel} · Travée ${displayTraveeId(tid)}`;
+  return `${reserveLabel} · ${locLabel(tid)}`;
 }
 
 // Reconstruit, pour la seule travée tid, les mêmes maps que CNT/NONCAT/VIDE/
@@ -2540,7 +2853,7 @@ function miniColsOf(tDef, maps){
 function miniMaxEtageOf(tDef, col, maps){
   const rec=lastShelves[`${tDef.id}|${col}`];
   const marked=rec?parseInt(rec.etage,10):NaN;
-  let m=!isNaN(marked)?marked:defaultMaxEtageOf(tDef);
+  let m=!isNaN(marked)?marked:defaultMaxEtageOf(tDef, col);
   [maps.cnt,maps.manuel,maps.nc,maps.vide,maps.nonrange].forEach(dict=>{
     Object.keys(dict).forEach(k=>{
       const parts=k.split('|');
@@ -2622,6 +2935,16 @@ function buildMiniPlan(){
         room=document.getElementById('mp-room'), legend=document.getElementById('mp-legend'),
         hintEl=document.getElementById('mp-hint'), actionsEl=document.getElementById('mp-actions');
 
+  if(noRayonYet()){
+    titleEl.textContent='Rayons (libre accès)';
+    occEl.textContent='';
+    room.innerHTML='';
+    legend.style.display='none';
+    hintEl.style.display='';
+    hintEl.textContent='Aucun rayon pour l\'instant.';
+    if(actionsEl) actionsEl.style.display='none';
+    return;
+  }
   if(loc.reserve==='horsreserve'){
     titleEl.textContent='Non rangé (hors réserve)';
     occEl.textContent='';
@@ -2829,6 +3152,7 @@ function visibleAdvGroupId(){ return advGroupIdForReserve(loc.reserve); }
 // pas scindé par étage). Sert à scinder "Statistiques avancées" par groupe
 // (voir ADV_GROUPS plus haut).
 function traveeGroupOf(travee){
+  if(isRayonTravee(travee)) return 'rayons';
   if(travee && travee.startsWith('M2-')) return 'magasin-2e';
   if(travee && travee.startsWith('M5-')) return 'magasin-5e';
   if(travee && travee.startsWith('M6-')) return 'magasin-6e';
@@ -2844,6 +3168,8 @@ function traveeGroupOf(travee){
 // défaut compte quand même intégralement grâce au Math.max() dans
 // computeShelfBreakdown() ci-dessous.
 function totalSlotsForGroup(group){
+  // Rayons : nombre d'étagères saisi colonne par colonne à leur création.
+  if(group==='rayons') return TRAVEES_RAYONS.reduce((s,def)=>s + def.colEtages.reduce((a,b)=>a+b,0), 0);
   const defs = group==='magasin-2e' ? TRAVEES_MAGASIN2
     : group==='magasin-5e' ? TRAVEES_MAGASIN5
     : group==='magasin-6e' ? TRAVEES_MAGASIN6
@@ -2997,16 +3323,19 @@ function manualCoteList(group){
   // inGroupScope plutôt qu'une simple présence dans `cat` : le catalogue
   // magasins couvre toute la bibliothèque, un exemplaire d'une autre section
   // doit rester compté ici comme il l'était quand ce catalogue était filtré.
-  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode]))
+  return Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inAdvGroupScope(group, cat[r.barcode]))
     .sort((a,b)=>b.ts-a.ts);
 }
+// Rayons : tout exemplaire présent dans le catalogue (n'importe quelle
+// section) est « catalogué » ; ailleurs, inGroupScope() comme avant.
+function inAdvGroupScope(group, entry){ return group==='rayons' ? !!entry : inGroupScope(entry); }
 function manualCoteCount(group){
   const cat = catalogByGroup[catalogGroupOf(group)];
   if(!cat) return 0;
   let n=0;
   for(const bc in scans){
     const r=scans[bc];
-    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inGroupScope(cat[r.barcode])) n++;
+    if(traveeGroupOf(r.travee)===group && !r.manuel && r.cote && !inAdvGroupScope(group, cat[r.barcode])) n++;
   }
   return n;
 }
@@ -3240,7 +3569,7 @@ function advDetailsTemplate(id, spec, opts){
 
 function advGroupTemplate(g){
   const gid = g.id;
-  const isMagasin = g.catalogGroup==='magasin';
+  const isMagasin = gid.startsWith('magasin-');
   return `
     <h3 class="adv-group-title">${esc(g.label)}</h3>
 
@@ -3428,7 +3757,7 @@ ADV_GROUPS.forEach(g=>{
     // ignore volontairement la recherche en cours de CE groupe précis (le
     // résultat mélange les 3 étages, garder un seul filtre n'aurait pas de
     // sens univoque).
-    if(g.catalogGroup==='magasin'){
+    if(g.id.startsWith('magasin-')){
       const allBtn = document.getElementById(id+'-export-all');
       if(allBtn) allBtn.addEventListener('click', ()=>{
         const onlyNew = uncorrectedOnlyFilter(id, spec);
@@ -3471,7 +3800,8 @@ function exportPayload(){
     videShelves: Object.values(videShelves),
     nonRangeShelves: Object.values(nonRangeShelves),
     lastShelves: Object.values(lastShelves),
-    noBarcodeCotes: Object.values(noBarcodeCotes)
+    noBarcodeCotes: Object.values(noBarcodeCotes),
+    rayons: Object.values(rayonRecords)
   };
 }
 function downloadJSON(data, prefix){
@@ -3568,6 +3898,21 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   const nonRangeRows = Array.isArray(data) ? [] : (data.nonRangeShelves||[]);
   const lastShelfRows = Array.isArray(data) ? [] : (data.lastShelves||[]);
   const noBarcodeRows = Array.isArray(data) ? [] : (data.noBarcodeCotes||[]);
+  const rayonRows = Array.isArray(data) ? [] : (data.rayons||[]);
+
+  // Rayons d'abord : les rendus plus bas en dépendent (libellés, géométrie).
+  // Le plus récent (ts) l'emporte, suppressions comprises (deleted:true).
+  let rayonsChanged = false;
+  rayonRows.forEach(r=>{
+    if(!r || !isRayonTravee(r.id)) return;
+    const cur = rayonRecords[r.id];
+    if(!cur || !cur.ts || (r.ts||0) > cur.ts){ rayonRecords[r.id] = r; rayonsChanged = true; }
+  });
+  if(rayonsChanged){
+    saveRayons();
+    applyRayonRecords(rayonRecords);
+    onRayonsChanged();
+  }
 
   // N'écrit dans IndexedDB que ce qui a réellement changé (changedScans),
   // pas tout l'objet scans à chaque appel : mergeIncomingData() est aussi
@@ -3606,8 +3951,8 @@ function mergeIncomingData(data, { syncToServer = false } = {}){
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats();
   updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
 
-  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || noBarcodeRows.length)){
-    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, noBarcodeCotes:noBarcodeRows } });
+  if(syncToServer && (scanRows.length || nonCatRows.length || videRows.length || nonRangeRows.length || lastShelfRows.length || noBarcodeRows.length || rayonRows.length)){
+    queuePatch({ type:'bulkMerge', data:{ scans:scanRows, nonCatalogues:nonCatRows, videShelves:videRows, nonRangeShelves:nonRangeRows, lastShelves:lastShelfRows, noBarcodeCotes:noBarcodeRows, rayons:rayonRows } });
   }
 
   return { added, updated, nonCat: nonCatRows.length, vide: videRows.length, nonrange: nonRangeRows.length, lastShelf: lastShelfRows.length, noBarcode: noBarcodeRows.length };

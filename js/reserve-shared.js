@@ -154,6 +154,24 @@ const TRAVEES_MAGASIN6 = [
   {id:'M6-XV',    nbCols:11, maxEt:6},
 ];
 
+/* Rayons (libre accès) : contrairement à toutes les travées ci-dessus, leur
+   géométrie n'est PAS écrite ici en dur mais créée à la volée par l'équipe
+   depuis recolement.html (bouton « + Nouveau rayon » : nom, nombre de
+   colonnes, nombre d'étagères de CHAQUE colonne). Les définitions vivent
+   dans l'état partagé du récolement (catégorie `rayons` de recolement.json,
+   voir api/recolement.mjs) et sont injectées dans ce tableau — le même
+   objet, rempli sur place — par applyRayonRecords(), aussi bien par
+   recolement.html que par reserve.html. Identifiants préfixés "RY-" (jamais
+   affichés : c'est `label` qui l'est), même principe de non-collision que
+   RD-/M2-/M5-/M6-. `colEtages[i]` = nombre d'étagères de la colonne i+1 ;
+   `maxEt` = le plus grand, pour les rares endroits qui ne raisonnent pas
+   colonne par colonne. */
+const TRAVEES_RAYONS = [];
+const RAYON_PREFIX = 'RY-';
+const RAYON_MAX_COLS = 26;     // colonnes nommées A..Z (colLetter)
+const RAYON_MAX_ETAGES = 30;
+function isRayonTravee(id){ return typeof id==='string' && id.startsWith(RAYON_PREFIX); }
+
 const TRAVEES_ALL = [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...TRAVEES_MAGASIN2, ...TRAVEES_MAGASIN5, ...TRAVEES_MAGASIN6];
 
 /* "horsreserve" est une pseudo-réserve sans travées : sert uniquement à
@@ -177,6 +195,9 @@ const RESERVES = [
   {id:'magasin2',     label:'Magasin — 2e étage',   travees:TRAVEES_MAGASIN2, catalogGroup:'magasin'},
   {id:'magasin5',     label:'Magasin — 5e étage',   travees:TRAVEES_MAGASIN5, catalogGroup:'magasin'},
   {id:'magasin6',     label:'Magasin — 6e étage',   travees:TRAVEES_MAGASIN6, catalogGroup:'magasin'},
+  // Catalogue "magasin" : data/magasins.json couvre TOUTE la bibliothèque de
+  // Douai (voir CLAUDE.md), donc aussi les sections en libre accès.
+  {id:'rayons',       label:'Rayons (libre accès)', travees:TRAVEES_RAYONS, catalogGroup:'magasin'},
   {id:'horsreserve',  label:'Non rangé (hors réserve)', travees:[], catalogGroup:'reserve'},
 ];
 function traveesOfReserve(reserveId){
@@ -204,7 +225,55 @@ const LOCATIONS_ALL = [...TRAVEES_ALL, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_
 
 /* maxEt par défaut d'un emplacement : la valeur propre au meuble si elle
    existe (armoires/tiroirs), sinon DEFAULT_MAX_ETAGE pour une travée. */
-function defaultMaxEtageOf(def){ return (def && def.maxEt!=null) ? def.maxEt : DEFAULT_MAX_ETAGE; }
+function defaultMaxEtageOf(def, col){
+  // `col` (lettre "A", "B"… ou numéro 1, 2…, facultatif) : pour un rayon,
+  // dont chaque colonne a son propre nombre d'étagères (colEtages), renvoie
+  // celui de cette colonne.
+  if(def && Array.isArray(def.colEtages) && col!=null){
+    const i = typeof col==='number' ? col-1 : String(col).toUpperCase().charCodeAt(0)-65;
+    const n = def.colEtages[i];
+    if(n>0) return n;
+  }
+  return (def && def.maxEt!=null) ? def.maxEt : DEFAULT_MAX_ETAGE;
+}
+
+/* Normalise une définition de rayon telle que stockée dans recolement.json
+   ({id, label, colEtages:[...], ts, deleted?}) en définition de travée
+   utilisable partout ailleurs ({id, label, nbCols, maxEt, colEtages}).
+   null si l'enregistrement est invalide ou supprimé (`deleted:true` — une
+   suppression est un enregistrement plus récent, pas un retrait, pour
+   qu'elle se propage aux autres postes par la même fusion « le plus récent
+   gagne » que tout le reste). */
+function rayonDefFromRecord(r){
+  if(!r || !isRayonTravee(r.id) || r.deleted) return null;
+  const colEtages = (Array.isArray(r.colEtages) ? r.colEtages : [])
+    .slice(0, RAYON_MAX_COLS)
+    .map(n=>Math.min(RAYON_MAX_ETAGES, Math.max(1, parseInt(n,10)||1)));
+  if(!colEtages.length) return null;
+  return { id:r.id, label:String(r.label||'').trim() || r.id.slice(RAYON_PREFIX.length),
+           nbCols:colEtages.length, maxEt:Math.max(...colEtages), colEtages };
+}
+
+/* Remplace sur place le contenu de TRAVEES_RAYONS — et sa part dans
+   TRAVEES_ALL/LOCATIONS_ALL, eux aussi mis à jour sur place : ce sont des
+   `const` déjà référencés partout — par les rayons non supprimés de
+   `records` (tableau ou objet id → enregistrement), triés par nom. */
+function applyRayonRecords(records){
+  const list = (Array.isArray(records) ? records : Object.values(records||{}))
+    .map(rayonDefFromRecord).filter(Boolean)
+    .sort((a,b)=>a.label.localeCompare(b.label,'fr',{numeric:true,sensitivity:'base'}));
+  TRAVEES_RAYONS.length = 0;
+  TRAVEES_RAYONS.push(...list);
+  [TRAVEES_ALL, LOCATIONS_ALL].forEach(arr=>{
+    for(let i=arr.length-1;i>=0;i--) if(isRayonTravee(arr[i].id)) arr.splice(i,1);
+    arr.push(...list);
+  });
+  return TRAVEES_RAYONS;
+}
+function rayonLabelOf(id){
+  const d = TRAVEES_RAYONS.find(t=>t.id===id);
+  return d ? d.label : String(id||'').slice(RAYON_PREFIX.length);
+}
 
 /* ════════════ TRI DES COTES (ex. "D104214" < "D104273") ════════════ */
 function parseCote(cote){
