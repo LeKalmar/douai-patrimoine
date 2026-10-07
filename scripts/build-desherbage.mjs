@@ -159,6 +159,12 @@ async function buildItems(path) {
       '700$a': props['Auteur'] || null,
       '210$c': props['Editeur'] || null,
       '210$d': props['Publié le'] || null,
+      // « Date de saisie » Syracuse (JJ/MM/AAAA) : création de l'exemplaire
+      // dans le SIGB — sert de date de catalogage dans rotobib.html. Vérifié
+      // sur l'export du 2026-09-09 : renseignée pour ~90 % des exemplaires,
+      // étalée de 1986 à aujourd'hui (pas une date de migration unique).
+      dateSaisie: props['Date de saisie'] || null,
+      derniereAnneePret: props['Dernière année de prêt'] || null,
       lien_num: `${CONFIG.vignetteBaseUrl}${barcode}.jpg`,
       titrePartie: props['Titre de partie et N° de partie'] || null,
       titreSerie: props['Titre de série'] || null,

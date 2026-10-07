@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="fonts.css">
 <script src="js/columnar.js"></script>
 <script src="js/sync-queue.js"></script>
+<script src="js/reserve-shared.js"></script>
 <link rel="stylesheet" href="style.css">
 <style>
   :root{
@@ -120,6 +121,49 @@
   .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
   .log-bc{font-family:monospace;color:#888}
 
+  .roto-dates{display:flex;gap:.75rem;flex-wrap:wrap}
+  .roto-date-box.secondary{background:#F5F5FF;color:#2A3CD4;border:1px solid #dfe2fb}
+  .roto-split{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem}
+  .roto-split-card{flex:1;min-width:160px;border:1px solid #e0e0e0;border-radius:8px;padding:.6rem .85rem}
+  .roto-split-card .lbl{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#888}
+  .roto-split-card .val{font-family:'Moret','DM Serif Display',serif;font-size:1.5rem;color:#2A3CD4;line-height:1.2}
+  .roto-split-card .sub{font-size:.72rem;color:#999}
+
+  /* ── Import d'un rayon du récolement ── */
+  .rayon-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+  .rayon-row select{font-family:inherit;font-size:.9rem;padding:.55rem .7rem;border:1px solid #ccc;border-radius:8px;background:#fff;min-width:200px}
+  .rayon-btn{font-family:inherit;font-size:.85rem;padding:.55rem 1rem;border-radius:8px;border:1px solid #2A3CD4;background:#2A3CD4;color:#fff;cursor:pointer}
+  .rayon-btn.ghost{background:#fff;color:#2A3CD4}
+  .rayon-btn:disabled{opacity:.5;cursor:default}
+  .rayon-msg{font-size:.8rem;color:#888;margin:.6rem 0 0}
+  .rayon-panel{display:none;margin-bottom:1.5rem}
+  .rayon-panel.show{display:block}
+  .rayon-panel h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.3rem;color:#2A3CD4;margin:0 0 .25rem}
+  .rayon-sub{font-size:.8rem;color:#888;margin:0 0 1rem}
+  .rayon-stats .stat-card-sub{font-size:.7rem;color:#999;margin-top:.3rem}
+  .rayon-filters{display:flex;gap:.9rem;flex-wrap:wrap;align-items:center;font-size:.78rem;color:#555}
+  .rayon-filters label{display:flex;gap:.3rem;align-items:center;cursor:pointer}
+  .rayon-table td.num,.rayon-table th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .rayon-table th[data-sort]{cursor:pointer;user-select:none}
+  .rayon-table th[data-sort]:hover{color:#2A3CD4}
+  .rayon-table th.sorted{color:#2A3CD4}
+  .rayon-table .zero{color:#c62828;font-weight:600}
+  .rayon-table .pos{color:#2e7d32;font-weight:600}
+  .rayon-table .ttl{background:none;border:none;padding:0;font:inherit;color:#1a1a1a;text-align:left;cursor:pointer}
+  .rayon-table .ttl:hover{color:#2A3CD4;text-decoration:underline}
+  .rayon-table .aut{font-size:.7rem;color:#999}
+  .rayon-table .absent{font-size:.68rem;color:#e65100}
+  .rayon-table tr.treated td{background:#fafafa;color:#999}
+  .mini-btns{display:flex;gap:3px;white-space:nowrap}
+  .mini-btn{font-size:.72rem;width:26px;height:24px;border:1px solid #ddd;background:#fff;border-radius:5px;cursor:pointer;padding:0}
+  .mini-btn:hover{border-color:#999}
+  .mini-btn.active[data-statut="conserver"]{background:var(--ok);border-color:var(--ok)}
+  .mini-btn.active[data-statut="pilon"]{background:var(--danger);border-color:var(--danger)}
+  .mini-btn.active[data-statut="braderie"]{background:var(--warn);border-color:var(--warn)}
+  .mini-btn.active[data-statut="relocalisation"]{background:#2A3CD4;border-color:#2A3CD4}
+  .rayon-table .log-body{max-height:560px}
+  .rayon-table td:nth-child(3){min-width:220px}
+
   footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
   footer a{color:#c9a96e;text-decoration:none}
 </style>
@@ -134,7 +178,7 @@
 <section class="page-hero">
   <div class="container">
     <div>
-      <nav class="breadcrumb">Espace professionnel · Magasins 2e/5e étage</nav>
+      <nav class="breadcrumb">Espace professionnel · Magasins et rayons en libre accès</nav>
       <h1 class="page-title">Rotobib</h1>
       <p class="page-lead">Scannez un code-barre pour voir sa fiche et ses statistiques de prêt, puis décidez : conserver, pilon, braderie ou relocalisation.</p>
     </div>
@@ -157,6 +201,10 @@
         s'affichent. Choisissez ensuite un traitement — les décisions sont partagées entre collègues (comme le
         récolement) et s'exportent en .txt pour ajout panier dans le SIGB. Pour une vue d'ensemble sur tout le
         catalogue (pas seulement les magasins), voir <a href="desherbage-stats.html">Statistiques de prêt</a>.
+        <br><strong>Rayons en libre accès :</strong> importez un rayon créé dans le récolement pour voir tous ses
+        livres d'un coup (parution, date de catalogage, prêts de l'année en cours / des années précédentes) et
+        décider livre par livre. La liste se complète d'elle-même au fil du récolement ; un livre déjà traité y
+        reste même s'il n'est plus scanné dans le rayon.
       </p>
 
       <div class="stats-row" id="stats-row"></div>
@@ -166,6 +214,17 @@
         <div class="roto-scan-row">
           <input type="text" id="roto-scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
         </div>
+      </div>
+
+      <div class="form-card">
+        <h2>Importer un rayon du récolement</h2>
+        <div class="rayon-row">
+          <select id="rayon-select"><option value="">Chargement des rayons…</option></select>
+          <select id="rayon-col-select" disabled><option value="">Toutes les colonnes</option></select>
+          <button type="button" class="rayon-btn" id="rayon-import-btn" disabled>Importer</button>
+          <button type="button" class="rayon-btn ghost" id="rayon-refresh-btn" title="Relire le récolement (nouveaux scans, nouveaux rayons)">↻</button>
+        </div>
+        <p class="rayon-msg" id="rayon-msg">Les rayons sont ceux créés dans <a href="recolement.html">le récolement</a> (« Rayons (libre accès) »). Tous les livres scannés dans le rayon sont importés avec leurs statistiques de prêt.</p>
       </div>
 
       <div class="roto-flash" id="roto-flash"></div>
@@ -183,10 +242,18 @@
           </div>
         </div>
 
-        <div class="roto-date-box">
-          <div class="roto-date-label">Date de parution</div>
-          <div class="roto-date-val" id="roto-date"></div>
+        <div class="roto-dates">
+          <div class="roto-date-box">
+            <div class="roto-date-label">Date de parution</div>
+            <div class="roto-date-val" id="roto-date"></div>
+          </div>
+          <div class="roto-date-box secondary">
+            <div class="roto-date-label">Catalogué le</div>
+            <div class="roto-date-val" id="roto-date-saisie"></div>
+          </div>
         </div>
+
+        <div class="roto-split" id="roto-split"></div>
 
         <div class="roto-hist-wrap">
           <div class="roto-hist-title">Prêts par année</div>
@@ -202,6 +269,31 @@
         </div>
         <div class="roto-undo-row" id="roto-undo-row" style="display:none">
           <button type="button" class="roto-undo" id="roto-undo">↺ Annuler le traitement</button>
+        </div>
+      </div>
+
+      <div class="rayon-panel" id="rayon-panel">
+        <h2 id="rayon-title"></h2>
+        <p class="rayon-sub" id="rayon-sub"></p>
+        <div class="stats-row rayon-stats" id="rayon-stats"></div>
+        <div class="log-wrap rayon-table">
+          <div class="log-header">
+            <div class="rayon-filters">
+              <input type="text" class="log-search" id="rayon-search" placeholder="Filtrer (titre, auteur, cote…)">
+              <label><input type="checkbox" id="rayon-hide-treated"> Masquer les traités</label>
+              <label><input type="checkbox" id="rayon-only-zero"> <span id="rayon-only-zero-label">Aucun prêt cette année</span></label>
+            </div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              <button type="button" class="export-btn" id="rayon-export-csv">Exporter le rayon (.csv)</button>
+              <button type="button" class="export-btn" id="rayon-close">Fermer</button>
+            </div>
+          </div>
+          <div class="log-body">
+            <table class="log-table">
+              <thead id="rayon-thead"></thead>
+              <tbody id="rayon-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -261,8 +353,19 @@ let DESHERB = [];
 let BY_BC = new Map();
 let REFERENCE_YEAR = new Date().getFullYear();
 let currentRecord = null;
+/* Conteneur brut + index code-barre → ligne sur TOUTE la bibliothèque : le
+   scan reste borné aux magasins (BY_BC), mais un rayon en libre accès importé
+   du récolement (voir « IMPORT D'UN RAYON » plus bas) contient justement des
+   livres hors magasin — relus à la demande par columnar.readRow(). */
+let RAW = null;
+let IDX_ALL = new Map();
+function recordOf(bc){
+  if(BY_BC.has(bc)) return BY_BC.get(bc);
+  const i = IDX_ALL.get(bc);
+  return (RAW && i !== undefined) ? columnar.readRow(RAW, i) : null;
+}
 
-Promise.all([
+const desherbReady = Promise.all([
   fetch('data/desherbage.json').then(r => r.ok ? r.json() : []),
   fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : {}),
 ]).then(([data, report]) => {
@@ -276,7 +379,12 @@ Promise.all([
   // ~291 000 lignes brutes pour n'en garder ensuite que les ~68 000 de
   // magasin.
   DESHERB = [];
-  columnar.forEachRow(data, r => { if (r._isMagasin) DESHERB.push(r); });
+  RAW = data;
+  IDX_ALL = new Map();
+  columnar.forEachRow(data, (r, i) => {
+    IDX_ALL.set(r._barcode, i);
+    if (r._isMagasin) DESHERB.push(r);
+  });
   BY_BC = new Map(DESHERB.map(r => [r._barcode, r]));
   if (report && report.stats && report.stats.referenceYear) REFERENCE_YEAR = report.stats.referenceYear;
   updateStats();
@@ -335,13 +443,14 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFro
 function updateStats(){
   const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
   let treated = 0;
-  DESHERB.forEach(r => {
-    const t = TRAITEMENTS[r._barcode];
-    if(t && counts[t.statut] !== undefined){ counts[t.statut]++; treated++; }
-  });
+  // Compteurs par traitement : toutes les décisions (magasins ET rayons en
+  // libre accès importés du récolement) ; « non traités » reste rapporté au
+  // seul périmètre magasins.
+  Object.values(TRAITEMENTS).forEach(t => { if(counts[t.statut] !== undefined) counts[t.statut]++; });
+  DESHERB.forEach(r => { if(TRAITEMENTS[r._barcode]) treated++; });
   const nonTraites = DESHERB.length - treated;
   document.getElementById('stats-row').innerHTML = `
-    <div class="stat-card"><div class="stat-card-label">Total export</div><div class="stat-card-val">${DESHERB.length}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Total magasins</div><div class="stat-card-val">${DESHERB.length}</div></div>
     <div class="stat-card st-conserver"><div class="stat-card-label">Conservés</div><div class="stat-card-val">${counts.conserver}</div></div>
     <div class="stat-card st-pilon"><div class="stat-card-label">Pilon</div><div class="stat-card-val">${counts.pilon}</div></div>
     <div class="stat-card st-braderie"><div class="stat-card-label">Braderie</div><div class="stat-card-val">${counts.braderie}</div></div>
@@ -371,10 +480,15 @@ function auteurComplet(rec){
   return rec['700$a'] || null;
 }
 
+/* Prêts de toutes les années précédant l'année en cours (AN) : le cumul
+   depuis l'acquisition moins AN — le cumul inclut aussi les prêts antérieurs
+   aux 4 années détaillées (voir build-desherbage.mjs). */
+function pretsAvant(p){ return Math.max(0, ((p && p.cumules) || 0) - ((p && p.an) || 0)); }
+
 function handleScanLookup(raw){
   const bc = String(raw||'').trim();
   if(!bc) return;
-  const rec = BY_BC.get(bc);
+  const rec = BY_BC.get(bc) || RAYON_BY_BC.get(bc);
   document.getElementById('roto-flash').classList.remove('show');
   if(!rec){
     currentRecord = null;
@@ -432,8 +546,14 @@ function showDetail(rec){
   document.getElementById('roto-meta').innerHTML = metaParts.join(' &nbsp;·&nbsp; ');
 
   document.getElementById('roto-date').textContent = rec['210$d'] || '—';
+  document.getElementById('roto-date-saisie').textContent = rec.dateSaisie || '—';
 
   const p = rec.prets || { an3:0, an2:0, an1:0, an:0, cumules:0 };
+  const avant = pretsAvant(p);
+  document.getElementById('roto-split').innerHTML = `
+    <div class="roto-split-card"><div class="lbl">Prêts ${REFERENCE_YEAR}</div><div class="val">${p.an||0}</div><div class="sub">année en cours</div></div>
+    <div class="roto-split-card"><div class="lbl">Prêts avant ${REFERENCE_YEAR}</div><div class="val">${avant}</div><div class="sub">toutes les années précédentes, depuis l'acquisition</div></div>
+    <div class="roto-split-card"><div class="lbl">Dernier prêt</div><div class="val">${esc(rec.derniereAnneePret || '—')}</div><div class="sub">année</div></div>`;
   const years = [REFERENCE_YEAR-3, REFERENCE_YEAR-2, REFERENCE_YEAR-1, REFERENCE_YEAR];
   const values = [p.an3, p.an2, p.an1, p.an];
   const max = Math.max(1, ...values);
@@ -466,31 +586,36 @@ function highlightButtons(){
 /* ════════════════════════════════════════════════════════════
    TRAITEMENT (conserver / pilon / braderie / relocalisation)
    ════════════════════════════════════════════════════════════ */
-document.querySelectorAll('.roto-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if(!currentRecord) return;
-    const statut = btn.dataset.statut;
-    const bc = currentRecord._barcode;
-    const record = { barcode: bc, statut, ts: new Date().toISOString() };
-    TRAITEMENTS[bc] = record;
-    saveLocal();
-    queuePatch({ type:'set', record });
-    updateStats();
-    highlightButtons();
-    renderLog();
-    flashTreated(currentRecord, statut);
-  });
-});
-
-document.getElementById('roto-undo').addEventListener('click', () => {
-  if(!currentRecord) return;
-  const bc = currentRecord._barcode;
+function setTraitement(bc, statut){
+  const record = { barcode: bc, statut, ts: new Date().toISOString() };
+  TRAITEMENTS[bc] = record;
+  saveLocal();
+  queuePatch({ type:'set', record });
+  updateStats();
+  highlightButtons();
+  renderLog();
+}
+function clearTraitement(bc){
   delete TRAITEMENTS[bc];
   saveLocal();
   queuePatch({ type:'clear', barcode: bc });
   updateStats();
   highlightButtons();
   renderLog();
+}
+
+document.querySelectorAll('.roto-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if(!currentRecord) return;
+    const statut = btn.dataset.statut;
+    setTraitement(currentRecord._barcode, statut);
+    flashTreated(currentRecord, statut);
+  });
+});
+
+document.getElementById('roto-undo').addEventListener('click', () => {
+  if(!currentRecord) return;
+  clearTraitement(currentRecord._barcode);
 });
 
 function flashTreated(rec, statut){
@@ -509,7 +634,7 @@ function flashTreated(rec, statut){
 function renderLog(){
   const q = (document.getElementById('log-search').value || '').toLowerCase();
   const rows = Object.values(TRAITEMENTS)
-    .map(t => ({ t, rec: BY_BC.get(t.barcode) }))
+    .map(t => ({ t, rec: recordOf(t.barcode) }))
     .filter(({t, rec}) => {
       if(!q) return true;
       const titre = rec ? titreComplet(rec).toLowerCase() : '';
@@ -519,6 +644,7 @@ function renderLog(){
     .slice(0, 200);
 
   const tbody = document.getElementById('log-tbody');
+  renderRayon(); // une décision prise ici ou ailleurs se reflète dans le rayon importé
   if(!rows.length){
     tbody.innerHTML = `<tr><td colspan="5" class="log-empty">Aucun traitement enregistré.</td></tr>`;
     return;
@@ -545,6 +671,359 @@ function renderLog(){
   });
 }
 document.getElementById('log-search').addEventListener('input', renderLog);
+
+/* ════════════════════════════════════════════════════════════
+   IMPORT D'UN RAYON DU RÉCOLEMENT
+   ────────────────────────────────────────────────────────────
+   Les rayons en libre accès sont créés à la volée dans recolement.html
+   (catégorie `rayons` de l'état partagé, identifiants "RY-…") et leurs livres
+   y sont scannés (travee = id du rayon). On relit cet état en lecture seule
+   via GET /api/recolement (public), on prend les codes-barres scannés dans
+   le rayon choisi (± une colonne) et on les joint à data/desherbage.json —
+   toute la bibliothèque, pas seulement les magasins : c'est le seul endroit
+   de Rotobib où un livre hors magasin peut recevoir une décision, demande
+   explicite (désherbage des rayons). Rien n'est écrit dans le récolement.
+   ════════════════════════════════════════════════════════════ */
+const LS_RAYON = 'rp_rotobib_rayon';
+const LS_RAYON_SEEN = 'rp_rotobib_rayon_vus'; // { [rayonId]: { [barcode]: {barcode,colonne,etage,cote,titre,auteur} } }
+let RECOL = null;               // { rayons:[defs], scans:[records] }
+let RAYON_ROWS = [];            // lignes du rayon importé
+let RAYON_BY_BC = new Map();    // code-barre → enregistrement (scan pendant l'import)
+let RAYON_CURRENT = null;       // { id, col }
+let rayonSort = { key:'empl', dir:1 };
+
+const rayonSelect = document.getElementById('rayon-select');
+const rayonColSelect = document.getElementById('rayon-col-select');
+const rayonImportBtn = document.getElementById('rayon-import-btn');
+const rayonMsg = document.getElementById('rayon-msg');
+
+function yearOf(s){
+  const m = String(s||'').match(/\b(1[0-9]{3}|20[0-9]{2})\b/);
+  return m ? parseInt(m[1], 10) : null;
+}
+// "JJ/MM/AAAA" → "AAAAMMJJ" (tri) ; null si absent/illisible.
+function saisieKey(s){
+  const m = String(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? m[3] + m[2] + m[1] : null;
+}
+function median(nums){
+  const a = nums.filter(n => n != null).sort((x,y) => x-y);
+  if(!a.length) return null;
+  return a[Math.floor((a.length-1)/2)];
+}
+
+async function loadRecolement(){
+  rayonSelect.disabled = true;
+  rayonImportBtn.disabled = true;
+  try{
+    const res = await fetch('/api/recolement', { cache:'no-cache' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const state = await res.json();
+    RECOL = {
+      rayons: applyRayonRecords(state.rayons || []).slice(),
+      scans: (state.scans || []).filter(s => s && isRayonTravee(s.travee)),
+    };
+  }catch(e){
+    RECOL = null;
+    rayonSelect.innerHTML = '<option value="">Récolement indisponible</option>';
+    rayonMsg.textContent = 'Impossible de lire le récolement partagé (/api/recolement) — vérifiez la connexion puis ↻.';
+    return;
+  }
+  const counts = {};
+  RECOL.scans.forEach(s => { counts[s.travee] = (counts[s.travee]||0) + 1; });
+  if(!RECOL.rayons.length){
+    rayonSelect.innerHTML = '<option value="">Aucun rayon créé dans le récolement</option>';
+    return;
+  }
+  const prev = RAYON_CURRENT ? RAYON_CURRENT.id : (loadSavedRayon() || {}).id;
+  rayonSelect.innerHTML = '<option value="">Choisir un rayon…</option>' + RECOL.rayons.map(r =>
+    `<option value="${esc(r.id)}"${r.id===prev?' selected':''}>${esc(r.label)} — ${counts[r.id]||0} livre${(counts[r.id]||0)>1?'s':''}</option>`
+  ).join('');
+  rayonSelect.disabled = false;
+  fillColSelect();
+}
+
+function fillColSelect(){
+  const def = RECOL && RECOL.rayons.find(r => r.id === rayonSelect.value);
+  if(!def){
+    rayonColSelect.innerHTML = '<option value="">Toutes les colonnes</option>';
+    rayonColSelect.disabled = true; rayonImportBtn.disabled = true;
+    return;
+  }
+  const cols = new Set();
+  for(let i=1;i<=def.nbCols;i++) cols.add(String.fromCharCode(64+i));
+  RECOL.scans.forEach(s => { if(s.travee === def.id && s.colonne != null) cols.add(String(s.colonne)); });
+  const sorted = [...cols].sort((a,b) => a.localeCompare(b,'fr',{numeric:true}));
+  const prevCol = RAYON_CURRENT && RAYON_CURRENT.id === def.id ? RAYON_CURRENT.col : '';
+  rayonColSelect.innerHTML = '<option value="">Toutes les colonnes</option>' +
+    sorted.map(c => `<option value="${esc(c)}"${c===prevCol?' selected':''}>Colonne ${esc(c)}</option>`).join('');
+  rayonColSelect.disabled = false;
+  rayonImportBtn.disabled = false;
+}
+
+function loadSavedRayon(){ try { return JSON.parse(localStorage.getItem(LS_RAYON)); } catch(e) { return null; } }
+
+function importRayon(id, col){
+  if(!RECOL) return;
+  const def = RECOL.rayons.find(r => r.id === id);
+  if(!def) return;
+  const inCol = s => !col || String(s.colonne) === col;
+  const scans = RECOL.scans.filter(s => s.travee === id && inCol(s));
+  /* Réimport = fusion, pas remplacement (demande explicite : le désherbage
+     avance en même temps que le récolement). Les décisions vivent dans
+     TRAITEMENTS, indépendamment de cette liste ; ce qu'il faut préserver,
+     c'est la PRÉSENCE dans la liste d'un livre déjà traité dont le scan a
+     disparu du rayon entre-temps (scan supprimé, livre retiré de l'étagère
+     après un pilon…). Chaque livre vu dans un rayon est donc mémorisé sur ce
+     poste (LS_RAYON_SEEN) ; au réimport, les scans actuels sont complétés
+     par les livres déjà vus ET traités. */
+  const seen = loadSeen();
+  const seenRayon = seen[id] || {};
+  const current = new Set(scans.map(s => s.barcode));
+  const kept = Object.values(seenRayon).filter(s => !current.has(s.barcode) && TRAITEMENTS[s.barcode] && inCol(s));
+  scans.forEach(s => { seenRayon[s.barcode] = { barcode:s.barcode, colonne:s.colonne, etage:s.etage, cote:s.cote||'', titre:s.titre||'', auteur:s.auteur||'' }; });
+  seen[id] = seenRayon;
+  try { localStorage.setItem(LS_RAYON_SEEN, JSON.stringify(seen)); } catch(e) {}
+  const before = new Set(RAYON_CURRENT && RAYON_CURRENT.id === id && RAYON_CURRENT.col === (col||'') ? RAYON_ROWS.map(r => r.bc) : []);
+  const wasOpen = before.size > 0;
+  RAYON_CURRENT = { id, col: col || '' };
+  try { localStorage.setItem(LS_RAYON, JSON.stringify(RAYON_CURRENT)); } catch(e) {}
+  RAYON_BY_BC = new Map();
+  RAYON_ROWS = [...scans, ...kept.map(s => ({ ...s, horsRayon:true }))].map(s => {
+    let rec = recordOf(s.barcode);
+    const absent = !rec;
+    if(!rec){
+      // Code-barre scanné mais absent de l'export bib.xml (acquisition plus
+      // récente que l'export, ou code-barre d'une autre bibliothèque) : fiche
+      // minimale à partir de ce que le récolement a enregistré au scan.
+      rec = { _barcode: s.barcode, '200$a': s.titre || null, '700$a': s.auteur || null, coteAffichee: s.cote || null };
+    }
+    RAYON_BY_BC.set(s.barcode, rec);
+    const p = rec.prets || {};
+    return {
+      bc: s.barcode, rec, absent, horsRayon: !!s.horsRayon,
+      colonne: s.colonne, etage: s.etage,
+      cote: rec.coteAffichee || s.cote || '',
+      titre: rec['200$a'] || s.titre || '',
+      auteur: rec['700$a'] || s.auteur || '',
+      parution: rec['210$d'] || '',
+      parutionYear: yearOf(rec['210$d']),
+      saisie: rec.dateSaisie || '',
+      saisieKey: saisieKey(rec.dateSaisie),
+      an: absent ? null : (p.an || 0),
+      avant: absent ? null : pretsAvant(p),
+      cumules: absent ? null : (p.cumules || 0),
+      dernier: rec.derniereAnneePret || '',
+    };
+  });
+  document.getElementById('rayon-title').textContent = def.label + (col ? ` — colonne ${col}` : '');
+  document.getElementById('rayon-panel').classList.add('show');
+  if(wasOpen){
+    const added = RAYON_ROWS.filter(r => !before.has(r.bc)).length;
+    rayonMsg.textContent = added
+      ? `↻ ${added} nouveau${added>1?'x':''} livre${added>1?'s':''} ajouté${added>1?'s':''} depuis le récolement (${new Date().toLocaleTimeString('fr-FR')}). Les livres déjà traités sont conservés.`
+      : `↻ Rayon à jour (${new Date().toLocaleTimeString('fr-FR')}) — aucun nouveau livre scanné.`;
+  }
+  renderRayon();
+}
+function loadSeen(){ try { return JSON.parse(localStorage.getItem(LS_RAYON_SEEN)) || {}; } catch(e) { return {}; } }
+
+/* Le récolement avance pendant le désherbage : tant qu'un rayon est ouvert
+   et l'onglet visible, on relit /api/recolement (ETag/304 : quasi gratuit
+   quand rien n'a changé) et on refusionne. Le bouton ↻ fait la même chose
+   immédiatement. */
+async function refreshRayonFromRecolement(){
+  await loadRecolement();
+  if(RAYON_CURRENT && RECOL && RECOL.rayons.some(r => r.id === RAYON_CURRENT.id)){
+    await desherbReady;
+    importRayon(RAYON_CURRENT.id, RAYON_CURRENT.col);
+  }
+}
+setInterval(() => { if(!document.hidden && RAYON_CURRENT) refreshRayonFromRecolement(); }, 60000);
+
+function rayonStatsHtml(rows){
+  const Y = REFERENCE_YEAR;
+  const known = rows.filter(r => !r.absent);
+  const absents = rows.length - known.length;
+  const sumAn = known.reduce((t,r) => t + r.an, 0);
+  const sumAvant = known.reduce((t,r) => t + r.avant, 0);
+  const empruntesAn = known.filter(r => r.an > 0).length;
+  const zeroAn = known.filter(r => r.an === 0).length;
+  const jamais = known.filter(r => r.cumules === 0).length;
+  const medParution = median(rows.map(r => r.parutionYear));
+  const minParution = rows.reduce((m,r) => r.parutionYear != null && (m == null || r.parutionYear < m) ? r.parutionYear : m, null);
+  const medSaisie = median(rows.map(r => r.saisieKey ? parseInt(r.saisieKey.slice(0,4),10) : null));
+  const treated = rows.filter(r => TRAITEMENTS[r.bc]).length;
+  const pct = n => known.length ? Math.round(n * 100 / known.length) + ' %' : '—';
+  const card = (label, val, sub) => `<div class="stat-card"><div class="stat-card-label">${label}</div><div class="stat-card-val">${val}</div>${sub ? `<div class="stat-card-sub">${sub}</div>` : ''}</div>`;
+  return [
+    card('Livres', rows.length, absents ? `dont ${absents} absent${absents>1?'s':''} de l'export` : 'tous trouvés dans l\'export'),
+    card(`Prêts ${Y}`, sumAn, `${empruntesAn} livre${empruntesAn>1?'s':''} emprunté${empruntesAn>1?'s':''} cette année`),
+    card(`Prêts avant ${Y}`, sumAvant, known.length ? `${(sumAvant/known.length).toFixed(1).replace('.',',')} par livre en moyenne` : ''),
+    card(`0 prêt en ${Y}`, zeroAn, pct(zeroAn) + ' du rayon'),
+    card('Jamais empruntés', jamais, pct(jamais) + ' du rayon'),
+    card('Parution médiane', medParution ?? '—', minParution != null ? `plus ancien : ${minParution}` : ''),
+    card('Catalogage médian', medSaisie ?? '—', 'année de saisie Syracuse'),
+    card('Traités', `${treated}/${rows.length}`, ''),
+  ].join('');
+}
+
+const RAYON_COLS = [
+  { key:'empl',    label:'Empl.' },
+  { key:'cote',    label:'Cote' },
+  { key:'titre',   label:'Titre' },
+  { key:'parution',label:'Parution' },
+  { key:'saisie',  label:'Catalogué le' },
+  { key:'an',      label:'Prêts AN', num:true },
+  { key:'avant',   label:'Prêts avant', num:true },
+  { key:'dernier', label:'Dernier prêt', num:true },
+  { key:'statut',  label:'Décision' },
+];
+function rayonSortValue(r, key){
+  switch(key){
+    case 'empl': return [String(r.colonne||''), Number(r.etage)||0];
+    case 'parution': return r.parutionYear;
+    case 'saisie': return r.saisieKey;
+    case 'dernier': return yearOf(r.dernier);
+    case 'statut': return TRAITEMENTS[r.bc] ? STATUTS.indexOf(TRAITEMENTS[r.bc].statut) : -1;
+    default: return r[key];
+  }
+}
+function compareRayonRows(a, b){
+  const k = rayonSort.key, d = rayonSort.dir;
+  const va = rayonSortValue(a, k), vb = rayonSortValue(b, k);
+  // Valeurs inconnues toujours en fin de liste, quel que soit le sens.
+  const na = va == null || va === '', nb = vb == null || vb === '';
+  if(na || nb) return na === nb ? 0 : (na ? 1 : -1);
+  let c;
+  if(k === 'empl'){
+    c = va[0].localeCompare(vb[0],'fr',{numeric:true}) || (va[1]-vb[1]) || compareCotes(a.cote, b.cote);
+  }else if(k === 'cote'){
+    c = compareCotes(va, vb);
+  }else if(typeof va === 'number' && typeof vb === 'number'){
+    c = va - vb;
+  }else{
+    c = String(va).localeCompare(String(vb),'fr',{numeric:true,sensitivity:'base'});
+  }
+  return c * d;
+}
+
+function renderRayon(){
+  if(!RAYON_CURRENT || !document.getElementById('rayon-panel').classList.contains('show')) return;
+  const Y = REFERENCE_YEAR;
+  document.getElementById('rayon-only-zero-label').textContent = `Aucun prêt en ${Y}`;
+  document.getElementById('rayon-stats').innerHTML = rayonStatsHtml(RAYON_ROWS);
+  const scanned = RAYON_ROWS.length;
+  document.getElementById('rayon-sub').textContent = scanned
+    ? `${scanned} livre${scanned>1?'s':''} scanné${scanned>1?'s':''} dans le récolement · statistiques de prêt de l'export Syracuse (année en cours : ${Y}). Cliquez sur un titre pour la fiche détaillée.`
+    : 'Aucun livre scanné dans ce rayon pour l\'instant.';
+
+  document.getElementById('rayon-thead').innerHTML = '<tr>' + RAYON_COLS.map(c => {
+    const lbl = c.key === 'an' ? `Prêts ${Y}` : c.key === 'avant' ? `Prêts avant ${Y}` : c.label;
+    const arrow = rayonSort.key === c.key ? (rayonSort.dir > 0 ? ' ▲' : ' ▼') : '';
+    return `<th data-sort="${c.key}" class="${c.num?'num':''} ${rayonSort.key===c.key?'sorted':''}">${lbl}${arrow}</th>`;
+  }).join('') + '</tr>';
+
+  const q = (document.getElementById('rayon-search').value || '').toLowerCase().trim();
+  const hideTreated = document.getElementById('rayon-hide-treated').checked;
+  const onlyZero = document.getElementById('rayon-only-zero').checked;
+  const rows = RAYON_ROWS.filter(r => {
+    if(hideTreated && TRAITEMENTS[r.bc]) return false;
+    if(onlyZero && r.an !== 0) return false;
+    if(q && !(`${r.bc} ${r.cote} ${r.titre} ${r.auteur}`.toLowerCase().includes(q))) return false;
+    return true;
+  }).sort(compareRayonRows);
+
+  const tbody = document.getElementById('rayon-tbody');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="${RAYON_COLS.length}" class="log-empty">${scanned ? 'Aucun livre ne correspond aux filtres.' : 'Aucun livre.'}</td></tr>`;
+    return;
+  }
+  const numCell = v => v == null ? '<td class="num">—</td>' : `<td class="num ${v===0?'zero':'pos'}">${v}</td>`;
+  tbody.innerHTML = rows.map(r => {
+    const t = TRAITEMENTS[r.bc];
+    const btns = STATUTS.map(s => `<button type="button" class="mini-btn ${t && t.statut===s ? 'active' : ''}" data-statut="${s}" data-bc="${esc(r.bc)}" title="${STATUT_LABEL[s]}${t && t.statut===s ? ' (cliquer pour annuler)' : ''}">${{conserver:'✓',pilon:'🗑️',braderie:'🏷️',relocalisation:'📦'}[s]}</button>`).join('');
+    return `<tr class="${t?'treated':''}">
+      <td class="log-bc">${esc(r.colonne ?? '')}${r.etage != null ? '-' + esc(r.etage) : ''}</td>
+      <td class="log-bc">${esc(r.cote)}</td>
+      <td><button type="button" class="ttl" data-open="${esc(r.bc)}">${esc(r.titre || '(titre inconnu)')}</button>
+        ${r.auteur ? `<div class="aut">${esc(r.auteur)}</div>` : ''}
+        ${r.absent ? `<div class="absent">absent de l'export Syracuse — pas de statistiques</div>` : ''}
+        ${r.horsRayon ? `<div class="absent">plus scanné dans ce rayon — gardé car déjà traité</div>` : ''}</td>
+      <td>${esc(r.parution || '—')}</td>
+      <td>${esc(r.saisie || '—')}</td>
+      ${numCell(r.an)}
+      ${numCell(r.avant)}
+      <td class="num">${esc(r.dernier || '—')}</td>
+      <td><div class="mini-btns">${btns}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('rayon-thead').addEventListener('click', e => {
+  const th = e.target.closest('th[data-sort]');
+  if(!th) return;
+  const key = th.dataset.sort;
+  // Prêts : du moins emprunté au plus emprunté d'abord (candidats au désherbage).
+  rayonSort = rayonSort.key === key ? { key, dir: -rayonSort.dir } : { key, dir: 1 };
+  renderRayon();
+});
+document.getElementById('rayon-tbody').addEventListener('click', e => {
+  const mini = e.target.closest('.mini-btn');
+  if(mini){
+    const bc = mini.dataset.bc, statut = mini.dataset.statut;
+    const t = TRAITEMENTS[bc];
+    if(t && t.statut === statut) clearTraitement(bc); else setTraitement(bc, statut);
+    return;
+  }
+  const open = e.target.closest('[data-open]');
+  if(open){
+    const rec = RAYON_BY_BC.get(open.dataset.open);
+    if(!rec) return;
+    document.getElementById('roto-flash').classList.remove('show');
+    document.getElementById('roto-notfound').classList.remove('show');
+    showDetail(rec);
+    document.getElementById('roto-detail').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+});
+['rayon-search','rayon-hide-treated','rayon-only-zero'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderRayon);
+});
+rayonSelect.addEventListener('change', fillColSelect);
+rayonImportBtn.addEventListener('click', async () => {
+  await desherbReady;
+  importRayon(rayonSelect.value, rayonColSelect.value);
+});
+document.getElementById('rayon-refresh-btn').addEventListener('click', refreshRayonFromRecolement);
+document.getElementById('rayon-close').addEventListener('click', () => {
+  RAYON_CURRENT = null;
+  RAYON_ROWS = [];
+  RAYON_BY_BC = new Map();
+  try { localStorage.removeItem(LS_RAYON); } catch(e) {}
+  document.getElementById('rayon-panel').classList.remove('show');
+});
+document.getElementById('rayon-export-csv').addEventListener('click', () => {
+  if(!RAYON_ROWS.length) return;
+  const Y = REFERENCE_YEAR;
+  const q = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
+  const head = ['Code-barre','Colonne','Étagère','Cote','Titre','Auteur','Parution','Catalogué le',`Prêts ${Y}`,`Prêts avant ${Y}`,'Prêts cumulés','Dernière année de prêt','Décision'];
+  const lines = [...RAYON_ROWS].sort(compareRayonRows).map(r => [
+    r.bc, r.colonne, r.etage, r.cote, r.titre, r.auteur, r.parution, r.saisie,
+    r.an, r.avant, r.cumules, r.dernier, TRAITEMENTS[r.bc] ? STATUT_LABEL[TRAITEMENTS[r.bc].statut] : '',
+  ].map(q).join(';'));
+  const label = document.getElementById('rayon-title').textContent.replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'');
+  // BOM : Excel ouvre ainsi le fichier en UTF-8 (accents).
+  downloadTxt('﻿' + [head.map(q).join(';'), ...lines].join('\r\n') + '\r\n', `rotobib-rayon-${label}.csv`);
+});
+
+// Réimporte au chargement le dernier rayon ouvert sur ce poste.
+loadRecolement().then(async () => {
+  const saved = loadSavedRayon();
+  if(saved && RECOL && RECOL.rayons.some(r => r.id === saved.id)){
+    await desherbReady;
+    importRayon(saved.id, saved.col);
+  }
+});
 
 /* ════════════════════════════════════════════════════════════
    EXPORT .TXT PAR TYPE DE TRAITEMENT

@@ -1775,6 +1775,35 @@ l'avancement de la campagne. Quatre boutons d'export `.txt` (un code-barre
 par ligne, même convention que les autres exports du projet) — un par
 traitement, y compris « Conserver » — pour ajout panier dans le SIGB.
 
+**Import d'un rayon du récolement (2026-10-07).** Panneau « Importer un
+rayon du récolement » de `rotobib.html` : liste les rayons en libre accès
+(`RY-…`, voir « Rayons en libre accès créés à la volée ») lus en lecture
+seule via `GET /api/recolement`, ± une colonne, et joint les codes-barres
+scannés dans ce rayon à `data/desherbage.json`. **Seule exception au
+périmètre magasins de Rotobib** (demande explicite : désherbage des rayons) —
+le scan direct reste borné à `_isMagasin`, sauf pour un livre du rayon
+importé. D'où `RAW` + `IDX_ALL` (code-barre → index de ligne sur toute la
+bibliothèque, `columnar.readRow()` à la demande, `recordOf()`) à côté de
+`BY_BC`. Statistiques du rayon et tableau triable livre par livre : date de
+parution, **date de catalogage** (`dateSaisie` = « Date de saisie » de
+`bib.xml`, JJ/MM/AAAA, ~90 % renseignée, étalée de 1986 à aujourd'hui),
+**prêts de l'année en cours** (`prets.an`) vs **prêts de toutes les années
+précédentes** (`pretsAvant()` = `cumules − an`, inclut donc les prêts plus
+anciens que AN-3), dernière année de prêt (`derniereAnneePret`), et une
+décision par ligne (mêmes `TRAITEMENTS`/`/api/desherbage`). Export .csv du
+rayon. Les compteurs Conservés/Pilon/… du bandeau comptent désormais toutes
+les décisions (magasins + rayons), « Non traités » reste rapporté aux magasins.
+
+**Réimport = fusion, jamais remplacement** (demande explicite : le
+désherbage se fait pendant que le récolement avance). Le rayon ouvert est
+relu toutes les 60 s (onglet visible) et par le bouton ↻ ; les nouveaux
+scans s'ajoutent. Chaque livre vu dans un rayon est mémorisé sur le poste
+(`localStorage` `rp_rotobib_rayon_vus`) : un livre **déjà traité** dont le
+scan a disparu du rayon (supprimé, livre retiré après pilon…) reste dans la
+liste, marqué « plus scanné dans ce rayon ». Un livre non traité qui
+disparaît du récolement disparaît de la liste. Dernier rayon ouvert rouvert
+au chargement (`rp_rotobib_rayon`).
+
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni
 stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
@@ -2475,6 +2504,44 @@ fonctions `magasinEtageGroupOfDigitRun()`/`magasinFloorStats()`/
 `updateMagasinEtageStats()`/`catalogGroupOf()` sont déclarées tôt dans le
 script, au même endroit et pour la même raison que `ADV_GROUPS`/`ADV_CATS`
 ci-dessus (temporal dead zone).
+
+### Rayons en libre accès créés à la volée (2026-10-07)
+
+Le menu « Réserve » de `recolement.html` propose aussi **« Rayons (libre
+accès) »**. Contrairement aux travées de la réserve et des magasins (écrites
+en dur dans `js/reserve-shared.js`), la géométrie de chaque rayon est saisie
+par l'équipe dans la page : bouton « + Nouveau rayon » → nom, nombre de
+colonnes (1–26, lettres A–Z), nombre d'étagères de **chaque** colonne (1–30,
+avec « Appliquer à toutes les colonnes » et un aperçu). « ✎ Modifier ce
+rayon » renomme/redimensionne ; la suppression est refusée tant que le rayon
+porte des données (scans, comptages, marquages). Demande explicite : ne plus
+avoir à relever les dimensions sur le terrain puis à les faire coder.
+
+- **Stockage** : catégorie `rayons` de `recolement.json`
+  (`{id:"RY-…", label, colEtages:[…], ts, deleted?}`), patch `rayon` dans
+  `api/recolement.mjs`, aussi accepté par `bulkMerge`, inclus dans l'export
+  JSON ; cache local `rp_recolement_rayons`. Le plus récent (`ts`) l'emporte.
+  **Une suppression est un enregistrement `deleted:true`, jamais un retrait**
+  — sinon un poste hors ligne ou l'import d'une vieille sauvegarde ferait
+  revenir le rayon. Aucune nouvelle fonction Vercel (plafond de 12 atteint).
+- **Géométrie** : `applyRayonRecords()` (`js/reserve-shared.js`) remplit sur
+  place `TRAVEES_RAYONS` et la part « RY- » de `TRAVEES_ALL`/`LOCATIONS_ALL`.
+  `defaultMaxEtageOf(def, col)` a gagné un 2ᵉ paramètre facultatif : la
+  colonne, pour lire `colEtages`. Dans `recolement.html`, le stepper étage
+  d'un rayon est **borné** au nombre d'étagères de la colonne (le bouton
+  « dernière étagère » est masqué, il ferait doublon).
+- **Catalogue** : `catalogGroup:'magasin'` (`data/magasins.json` couvre toute
+  la bibliothèque). Pas d'anomalie de classement (`horsSection`) dans les
+  rayons : ils contiennent justement d'autres sections. Groupe de stats
+  avancées `rayons` (`traveeGroupOf()` → préfixe `RY-`) ; « Jamais scannés »
+  et « Probablement perdus » y restent à 0 (aucun total attendu connu), la
+  progression ne compte que les notices récolées. `MAGASIN_ADV_GROUPS` est
+  désormais filtré sur l'id `magasin-*`, plus sur `catalogGroup`.
+- **Plan** : `reserve.html` dessine un groupe « Rayons (libre accès) »
+  (`buildRayons()`) depuis `/api/recolement` ; pas de dédoublonnage par cote
+  (`isMagasinTravee()` inclut `RY-`). Le repli `data/recolement.json` ne
+  contient pas de rayons. `exemplarisation.html` n'affiche pas « Rayons »
+  (définitions non chargées sur cette page).
 
 ### Livres sans code-barre
 
