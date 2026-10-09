@@ -123,6 +123,7 @@
   .roto-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.25rem;padding-top:1.1rem;border-top:1px dashed #e0e0e0}
   .roto-btn{font-family:inherit;font-size:.88rem;padding:.7rem 1rem;border-radius:8px;cursor:pointer;border:1px solid #ccc;background:#fff;color:#333;transition:all .15s;flex:1;min-width:135px;text-align:center}
   .roto-btn:hover{background:#f5f5f5}
+  .roto-btn kbd{font-family:inherit;font-size:.7rem;border:1px solid currentColor;border-radius:4px;padding:0 .3rem;margin-left:.3rem;opacity:.55}
   .roto-btn.active{color:#fff;border-color:transparent}
   .roto-btn[data-statut="conserver"].active{background:var(--ok)}
   .roto-btn[data-statut="pilon"].active{background:var(--danger)}
@@ -448,10 +449,10 @@
         </div>
 
         <div class="roto-actions">
-          <button type="button" class="roto-btn" data-statut="conserver">✓ Conserver</button>
-          <button type="button" class="roto-btn" data-statut="pilon">🗑️ Pilon</button>
-          <button type="button" class="roto-btn" data-statut="braderie">🏷️ Braderie</button>
-          <button type="button" class="roto-btn" data-statut="relocalisation">📦 Relocalisation</button>
+          <button type="button" class="roto-btn" data-statut="conserver" title="Raccourci : C">✓ Conserver <kbd>C</kbd></button>
+          <button type="button" class="roto-btn" data-statut="pilon" title="Raccourci : P">🗑️ Pilon <kbd>P</kbd></button>
+          <button type="button" class="roto-btn" data-statut="braderie" title="Raccourci : B">🏷️ Braderie <kbd>B</kbd></button>
+          <button type="button" class="roto-btn" data-statut="relocalisation" title="Raccourci : R">📦 Relocalisation <kbd>R</kbd></button>
         </div>
         <div class="roto-undo-row" id="roto-undo-row" style="display:none">
           <button type="button" class="roto-undo" id="roto-undo">↺ Annuler le traitement</button>
@@ -912,18 +913,30 @@ function navAfterDecision(rec, statut){
 }
 document.getElementById('roto-prev').addEventListener('click', () => { if(NAV) showNavAt(NAV.index - 1); });
 document.getElementById('roto-next').addEventListener('click', () => { if(NAV) showNavAt(NAV.index + 1); });
-// Flèches ← → : seulement si aucun champ de saisie n'est en cours d'usage —
-// le champ de scan garde le focus en permanence, on l'accepte s'il est vide.
-// (Pas de raccourcis chiffrés pour les décisions : une scannette tape des
-// chiffres dans ce même champ.)
+// Raccourcis clavier, actifs seulement si aucun champ de saisie n'est en cours
+// d'usage — le champ de scan garde le focus en permanence, on l'accepte s'il
+// est vide. Flèches ← → : livre précédent/suivant (navigation dans un rayon).
+// C / P / B / R : décision sur le livre affiché (même effet qu'un clic sur le
+// bouton). Des lettres et pas des chiffres : une scannette tape des chiffres
+// dans ce même champ (tous les codes-barres de data/desherbage.json sont
+// numériques, vérifié le 2026-10-09).
+const DECISION_KEYS = { c:'conserver', p:'pilon', b:'braderie', r:'relocalisation' };
 document.addEventListener('keydown', e => {
-  if(!NAV || !document.getElementById('roto-detail').classList.contains('show')) return;
-  if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if(!document.getElementById('roto-detail').classList.contains('show')) return;
+  if(e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
   const t = e.target;
   const typing = t && t.matches && t.matches('input:not([type=checkbox]),select,textarea');
   if(typing && !(t === scanInput && !scanInput.value)) return;
-  e.preventDefault();
-  showNavAt(NAV.index + (e.key === 'ArrowRight' ? 1 : -1));
+  if(NAV && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')){
+    e.preventDefault();
+    showNavAt(NAV.index + (e.key === 'ArrowRight' ? 1 : -1));
+    return;
+  }
+  const statut = DECISION_KEYS[e.key.toLowerCase()];
+  if(statut && currentRecord){
+    e.preventDefault(); // sinon la lettre atterrit dans le champ de scan
+    document.querySelector(`.roto-btn[data-statut="${statut}"]`).click();
+  }
 });
 
 // ── Agrandissement de la couverture ──

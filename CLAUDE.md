@@ -1840,8 +1840,12 @@ connu le plus proche. Ajouter un libellé = une ligne dans ce fichier. L'export
 **Navigation livre par livre** (2026-10-09) : une fiche ouverte depuis le
 tableau du rayon affiche une barre « ◀ Précédent · Livre i / n · Suivant ▶ »
 (flèches ← → aussi, acceptées quand le champ de scan a le focus mais est
-vide ; volontairement pas de raccourcis chiffrés pour les décisions, une
-scannette tape des chiffres dans ce champ). L'ordre suivi est celui du
+vide). Décisions au clavier (2026-10-09) : **C** Conserver, **P** Pilon,
+**B** Braderie, **R** Relocalisation, sur le livre affiché, mêmes conditions
+(champ de scan vide, pas de modificateur) — des lettres et jamais des
+chiffres, qu'une scannette tape dans ce champ ; tous les codes-barres de
+`data/desherbage.json` sont numériques (vérifié), donc aucun scan ne
+déclenche de décision. L'ordre suivi est celui du
 tableau au moment du clic (tri, filtres, thème Dewey) et reste **figé**
 (`NAV.order`) : avec « Masquer les traités », le livre traité disparaît du
 tableau et un ordre recalculé décalerait la position ; recliquer un titre
