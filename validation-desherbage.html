@@ -4,216 +4,339 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<!-- Contrôle d'accès de l'espace pro (gate localStorage — voir « Sécurité »
+     dans CLAUDE.md). En tête de <head> pour rediriger avant tout rendu. -->
+<script>
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+</script>
 <title>Validation du désherbage — Réserve patrimoniale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts.css">
 <script src="js/columnar.js"></script>
 <script src="js/sync-queue.js"></script>
 <script src="js/reserve-shared.js"></script>
 <script src="js/selections-desherbage.js"></script>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/admin.css">
 <style>
+  /* Mise en page propre à cette page (préfixe vd-). Les composants (en-tête,
+     boutons, pastilles, graphiques, toasts, confirmation) viennent de
+     css/admin.css. */
   :root{
-    /* Mêmes couleurs de traitement que rotobib.html (Braderie en ambre,
-       --warn-ink pour du texte ambre sur blanc). */
-    --ok:#2e7d32; --warn:#e8a200; --warn-ink:#8a5f00; --danger:#c62828;
-    --blue:#2A3CD4; --todo:#e3e4ec;
-    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
-  }
-  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
-  .page-hero{background:#2A3CD4;color:#fff;padding:1.75rem 1.5rem}
-  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
-  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
-  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
-  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-  .hero-actions a,.hero-actions button{font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:.4rem .9rem;text-decoration:none;cursor:pointer}
-  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
-  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);white-space:nowrap}
-  .sync-status.pending{color:#ffcc80}
-  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
-  main{padding:1.5rem 0 2rem}
-
-  .vd-bar{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.85rem}
-  .vd-bar label{display:flex;gap:.4rem;align-items:center}
-  .vd-bar input[type=text]{font-family:inherit;font-size:.85rem;padding:.35rem .6rem;border:1px solid #ccc;border-radius:6px;width:180px}
-  .vd-live{margin-left:auto;color:#777;font-size:.78rem}
-  .vd-live .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:.35rem;vertical-align:middle}
-  .vd-live.err .dot{background:var(--danger)}
-  .vd-msg{color:#665c00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;display:none}
-  .vd-msg.show{display:block}
-
-  h2.vd-h{font-family:'Moret','DM Serif Display',serif;font-weight:400;color:#2A3CD4;font-size:1.35rem;margin:0 0 .75rem}
-
-  /* ── Tableau récapitulatif par rayon ── */
-  .vd-sum{width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:1.75rem}
-  .vd-sum th{background:#F5F5FF;padding:.5rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:#777;border-bottom:1px solid #e8e8f0;white-space:nowrap}
-  .vd-sum td{padding:.55rem .7rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-  .vd-sum td.num,.vd-sum th.num{text-align:right;font-variant-numeric:tabular-nums}
-  .vd-sum tr.clickable{cursor:pointer}
-  .vd-sum tr.clickable:hover td{background:#fafaff}
-  .vd-sum tr.sel td{background:#eef0ff}
-  .vd-sum .rname{font-weight:600;color:#2A3CD4}
-  .vd-progress{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--todo);min-width:120px}
-  .vd-progress span{display:block;height:100%}
-  .pill{display:inline-block;font-size:.7rem;padding:1px 8px;border-radius:20px;font-weight:600;margin:1px 2px 1px 0;white-space:nowrap}
-  .pill.conserver{background:var(--ok);color:#fff}
-  .pill.pilon{background:var(--danger);color:#fff}
-  .pill.braderie{background:var(--warn);color:#2b1d00}
-  .pill.relocalisation{background:#2A3CD4;color:#fff}
-  .pill.todo{background:#fff3e0;color:#8a5f00;border:1px solid #ffe0a3}
-  .pill.ok{background:#e8f5e9;color:var(--ok);border:1px solid #c8e6c9}
-  .pill.disagree{background:#fdecea;color:var(--danger);border:1px solid #f5c6cb}
-  .pill.stale{background:#fff8e1;color:#8a5f00;border:1px solid #ffe0a3}
-
-  /* ── Détail d'un rayon ── */
-  .vd-panel{display:none;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
-  .vd-panel.show{display:block}
-  .vd-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:.75rem}
-  .vd-panel-sub{font-size:.8rem;color:#777;margin:.15rem 0 0}
-  .vd-tools{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;font-size:.82rem;margin-bottom:1rem}
-  .vd-tools select,.vd-tools input[type=search]{font-family:inherit;font-size:.82rem;padding:.35rem .55rem;border:1px solid #ccc;border-radius:6px}
-  .vd-tools input[type=search]{min-width:200px}
-  .btn{font-family:inherit;font-size:.8rem;padding:.4rem .85rem;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer}
-  .btn:hover{border-color:#888}
-  .btn.primary{background:var(--ok);border-color:var(--ok);color:#fff}
-  .btn.primary:hover{filter:brightness(1.08)}
-  .btn:disabled{opacity:.5;cursor:default}
-
-  .vd-book{display:grid;grid-template-columns:auto 1fr minmax(260px,330px);gap:1rem;padding:1rem 0;border-top:1px solid #eee}
-  .vd-book:first-child{border-top:none}
-  .vd-thumb{width:56px;height:76px;object-fit:cover;border-radius:4px;border:1px solid #ddd;background:#f2f2f5;cursor:zoom-in;transition:width .15s,height .15s}
-  .vd-thumb.big{width:220px;height:auto;max-height:320px;object-fit:contain;cursor:zoom-out}
-  .vd-thumb-ph{width:56px;height:76px;border-radius:4px;background:#f2f2f5;border:1px dashed #ddd}
-  .vd-title{font-weight:600;color:#1a1a1a;margin:0 0 .15rem;line-height:1.3}
-  .vd-author{font-size:.85rem;color:#444;margin:0 0 .35rem}
-  .vd-meta{font-size:.76rem;color:#777;line-height:1.7}
-  .vd-meta b{color:#555;font-weight:600}
-  .vd-team{margin-top:.45rem;font-size:.8rem}
-  .vd-review{background:#fafafa;border:1px solid #eee;border-radius:var(--radius-md);padding:.65rem .75rem;font-size:.8rem}
-  .vd-review.done{background:#f3faf3;border-color:#d6ecd7}
-  .vd-review.disagree{background:#fff6f5;border-color:#f5d0cc}
-  .vd-review.stale{background:#fffbea;border-color:#ffe0a3}
-  .vd-avis{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.5rem}
-  .avis-btn{font-family:inherit;font-size:.74rem;padding:.3rem .55rem;border-radius:5px;border:1px solid #ccc;background:#fff;cursor:pointer;white-space:nowrap}
-  .avis-btn:hover{border-color:#888}
-  .avis-btn.valide.active{background:var(--ok);border-color:var(--ok);color:#fff}
-  .avis-btn.conserver.active{background:var(--ok);border-color:var(--ok);color:#fff}
-  .avis-btn.pilon.active{background:var(--danger);border-color:var(--danger);color:#fff}
-  .avis-btn.braderie.active{background:var(--warn);border-color:var(--warn);color:#2b1d00}
-  .avis-btn.relocalisation.active{background:#2A3CD4;border-color:#2A3CD4;color:#fff}
-  .avis-sep{font-size:.7rem;color:#999;align-self:center;margin:0 2px}
-  .vd-review textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:.8rem;padding:.4rem .5rem;border:1px solid #ccc;border-radius:5px;resize:vertical;min-height:44px}
-  .vd-review-foot{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.35rem;font-size:.7rem;color:#888}
-  .vd-review-foot .saved{color:var(--ok)}
-  .vd-review-foot .unsaved{color:#8a5f00}
-  .vd-stale{font-size:.74rem;color:#8a5f00;margin-bottom:.4rem}
-  .vd-empty{color:#888;font-size:.85rem;padding:1rem 0}
-  .vd-more{text-align:center;margin-top:1rem}
-
-  @media (max-width:760px){
-    .vd-book{grid-template-columns:auto 1fr}
-    .vd-review{grid-column:1 / -1}
-    .vd-sum .hide-sm{display:none}
-    .vd-live{margin-left:0}
+    /* Palette des AVIS du validateur : volontairement distincte de celle des
+       décisions (vert / ambre / bleu / rouge). « À revoir » est hachuré carmin
+       pour ne jamais se confondre avec le rouge plein de Pilon. */
+    --vd-valide:#3E3E52; --vd-contre:#8E24AA; --vd-revoir:#B4213C; --vd-avalider:#E3DED4;
   }
 
-  footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
-  footer a{color:#c9a96e;text-decoration:none}
+  /* ── En-tête : champ « Validé par », témoins ── */
+  .vd-by{display:flex;align-items:center;gap:.6rem;margin:0}
+  .vd-by__l{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--pro-rose);white-space:nowrap}
+  .vd-by input{width:160px;max-width:100%;height:44px;margin:0;border-radius:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);color:#fff;padding:0 .8rem;font:600 .9rem var(--pro-font-body)}
+  .vd-by input::placeholder{color:rgba(255,255,255,.55);font-weight:400}
+  .vd-by input:focus-visible{outline:2px solid var(--pro-rose);outline-offset:2px}
+  #vd-sync:has(.pending) .pro-sync__dot{background:var(--pro-ambre)}
+  #vd-sync .pending{color:#FFE0A3}
+
+  /* ── Vue campagne ── */
+  .vd-camp{display:flex;flex-wrap:wrap;gap:.875rem;align-items:stretch}
+  .vd-camp__main{flex:1.55 1 520px;display:flex;flex-direction:column;gap:.875rem;min-width:0}
+  .vd-camp__side{flex:1 1 340px;display:flex;flex-direction:column;gap:.875rem;min-width:0}
+  .vd-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap;margin-bottom:.9rem}
+  .vd-card-head .pro-card__title{margin:0}
+  .vd-note{font-size:.78rem;color:var(--pro-texte-doux)}
+  .vd-note strong{color:var(--pro-bleu)}
+  .vd-funnel{display:flex;flex-wrap:wrap;gap:.4rem .25rem}
+  .vd-step{flex:1 1 130px;display:flex;align-items:flex-start;gap:.3rem;min-width:0}
+  .vd-step__body{flex:1;min-width:0}
+  .vd-step__track{height:44px;display:flex;align-items:center}
+  .vd-step__block{display:block;height:100%;min-width:6px;background:var(--c)}
+  .vd-step__block--hatch{background:repeating-linear-gradient(45deg,var(--vd-revoir) 0 3px,#fff 3px 6px);box-shadow:inset 0 0 0 1px var(--vd-revoir)}
+  .vd-step__n{font-family:var(--pro-font-display);font-weight:700;font-size:1.9rem;line-height:1;color:var(--pro-bleu);margin-top:.55rem}
+  .vd-step__l{margin-top:.3rem;color:var(--pro-texte)}
+  .vd-step__sub{font-size:.72rem;color:var(--pro-texte-doux);margin-top:.15rem;line-height:1.4}
+  .vd-step__arrow{flex:none;color:#9A9AA8;margin-top:14px}
+  .vd-step:last-child .vd-step__arrow{display:none}
+  .vd-agree{background:var(--pro-bleu);color:#fff;padding:1.25rem 1.375rem;display:flex;gap:1.1rem;align-items:center;flex-wrap:wrap}
+  .vd-agree .pro-label{color:rgba(255,255,255,.6)}
+  .vd-agree__big{font-family:var(--pro-font-display);font-weight:700;font-size:2.875rem;line-height:1;margin-top:.4rem}
+  .vd-agree p{flex:1 1 160px;margin:0;font-size:.78rem;line-height:1.55;color:rgba(255,255,255,.82)}
+  .vd-agree p em{font-style:normal;color:var(--pro-rose)}
+  .vd-mx{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;font-size:.76rem}
+  .vd-mx thead tr{background:none}
+  .vd-mx th{font-weight:700;color:var(--pro-texte);text-align:center;padding:0 0 .2rem;font-size:.76rem;text-transform:none;letter-spacing:0;white-space:normal}
+  .vd-mx thead tr:first-child th{font-size:.62rem;font-weight:400;letter-spacing:.14em;text-transform:uppercase;color:var(--pro-texte-doux);border:0;white-space:nowrap}
+  .vd-mx thead th[scope=col]{border-bottom:3px solid var(--c)}
+  .vd-mx tbody th{text-align:left;border-left:3px solid var(--c);padding:0 0 0 .45rem;line-height:1.2}
+  .vd-mx tbody th small{display:block;font-weight:400;font-size:.66rem;color:var(--pro-texte-doux)}
+  .vd-mx td{height:44px;text-align:center;font-variant-numeric:tabular-nums;font-weight:700;padding:0}
+  .vd-mx td.is-zero{font-weight:400;color:#A9A9B6;background:var(--pro-papier)}
+  .vd-mx col.vd-mx__c0{width:5.6rem}
+  .vd-key{display:flex;gap:.4rem 1.1rem;flex-wrap:wrap;font-size:.7rem;color:var(--pro-texte-doux);margin-top:.7rem}
+  .vd-key span{display:inline-flex;align-items:center;gap:.4rem}
+  .vd-key i{width:12px;height:12px;display:inline-block}
+
+  /* ── Liste des rayons ── */
+  .vd-legend{display:flex;gap:.4rem 1.5rem;flex-wrap:wrap;padding:.8rem 1.1rem;background:var(--pro-papier-ombre);border-bottom:1px solid var(--pro-trait);font-size:.72rem}
+  .vd-legend span{display:inline-flex;align-items:center;gap:.35rem}
+  .vd-legend i{width:11px;height:11px;display:inline-block;background:var(--c)}
+  .vd-legend .pro-label{align-self:center}
+  .vd-legend__sep{width:1px;background:var(--pro-trait-fort);align-self:stretch}
+  .vd-ray{display:flex;align-items:center;gap:.8rem 1.4rem;flex-wrap:wrap;width:100%;margin:0;padding:.85rem 1.1rem;background:#fff;border:0;border-bottom:1px solid var(--pro-filet);border-left:4px solid transparent;border-radius:0;text-align:left;font:inherit;color:inherit;cursor:pointer}
+  .vd-ray:hover{background:var(--pro-papier)}
+  .vd-ray[aria-current="true"]{background:var(--pro-bleu-pale);border-left-color:var(--pro-bleu)}
+  .vd-ray:focus-visible{outline-offset:-3px}
+  .vd-ray__name{flex:1 1 180px;min-width:0}
+  .vd-ray__name b{display:block;font-family:var(--pro-font-display);font-weight:600;font-size:1.05rem;line-height:1.2;color:var(--pro-bleu)}
+  .vd-ray__name small{display:block;font-size:.74rem;color:var(--pro-texte-doux);margin-top:.15rem}
+  .vd-ray__bar{flex:2 1 200px;min-width:0}
+  .vd-ray__bar small{display:block;font-size:.7rem;color:var(--pro-texte-doux);margin-top:.3rem}
+  .vd-bar{display:flex;height:14px;background:var(--pro-dec-todo)}
+  .vd-bar--val{background:var(--vd-avalider)}
+  .vd-bar span{display:block;height:100%;background:var(--c)}
+  .vd-bar .is-hatch,.vd-sw-revoir{background:repeating-linear-gradient(45deg,var(--vd-revoir) 0 2px,#fff 2px 4px)}
+  .vd-ray__todo{flex:0 0 104px;text-align:right;line-height:1.1}
+  .vd-ray__todo b{display:block;font-family:var(--pro-font-display);font-weight:700;font-size:1.6rem;color:var(--pro-carmin)}
+  .vd-ray__todo b.is-zero{color:var(--pro-ok)}
+  .vd-ray__todo small{font-size:.7rem;color:var(--pro-texte-doux)}
+  .vd-ray__chev{flex:none;color:var(--pro-bleu)}
+  .vd-sw-valide{background:var(--vd-valide)}
+  .vd-sw-disagree{background:var(--vd-contre)}
+  .vd-sw-todo{background:var(--vd-avalider);border-color:#C9C4B8}
+
+  /* ── Revue d'un livre ── */
+  .vd-rv-top{display:flex;align-items:center;justify-content:space-between;gap:.4rem 1rem;flex-wrap:wrap;padding:.5rem 1.375rem;border-bottom:1px solid var(--pro-carte-bord);background:#FBFAF7;font-size:.8rem}
+  .vd-rv-top strong{color:var(--pro-bleu)}
+  .vd-rv-body{display:flex;flex-wrap:wrap}
+  .vd-rv-main{flex:1 1 540px;padding:1.4rem 1.375rem;display:flex;gap:1.5rem;flex-wrap:wrap;min-width:0}
+  .vd-cover{flex:0 0 190px;max-width:100%}
+  .vd-cover.is-zoom{flex-basis:min(100%,380px)}
+  .vd-cover img,.vd-cover__ph{display:block;width:100%;aspect-ratio:190/268;object-fit:contain;background:var(--pro-papier-ombre);border:1px solid var(--pro-trait);cursor:zoom-in}
+  .vd-cover.is-zoom img{aspect-ratio:auto;height:auto;max-height:560px;cursor:zoom-out}
+  .vd-cover__ph{cursor:default;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;border-style:dashed;color:var(--pro-texte-faible);font-size:.72rem;text-align:center;padding:1rem}
+  .vd-cover__hint{font-size:.66rem;color:var(--pro-texte-faible);margin-top:.3rem}
+  .vd-info{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:.9rem}
+  .vd-cote{display:inline-block;font:700 .78rem var(--pro-font-mono);color:var(--pro-bleu);background:#F1EDE4;border:1px solid var(--pro-trait);padding:.15rem .6rem;border-radius:20px}
+  .vd-ttl{font-family:var(--pro-font-display);font-weight:600;font-size:1.65rem;line-height:1.1;color:var(--pro-bleu);margin:.55rem 0 .3rem;overflow-wrap:anywhere}
+  .vd-auth{font-size:.88rem}
+  .vd-meta{font-size:.76rem;color:var(--pro-texte-doux);margin-top:.15rem}
+  .vd-decision{display:flex;align-items:center;gap:.9rem;flex-wrap:wrap}
+  .vd-bigdec{display:inline-flex;align-items:center;gap:.6rem;padding:.55rem 1.1rem;font-family:var(--pro-font-display);font-weight:700;font-size:1.5rem;line-height:1}
+  .vd-bigdec--conserver{background:var(--pro-dec-conserver);color:#fff}
+  .vd-bigdec--braderie{background:var(--pro-dec-braderie);color:var(--pro-dec-braderie-on)}
+  .vd-bigdec--relocalisation{background:var(--pro-dec-reloc);color:#fff}
+  .vd-bigdec--pilon{background:var(--pro-dec-pilon);color:#fff}
+  .vd-decision small{font-size:.78rem;line-height:1.4;color:var(--pro-texte)}
+  .vd-decision small span{color:var(--pro-texte-doux)}
+  .vd-stale{background:var(--pro-ko-fond);border-left:3px solid var(--pro-carmin);color:#5c0f1e;font-size:.8rem;padding:.5rem .75rem;line-height:1.45}
+  .vd-stats{display:flex;gap:1.2rem 2rem;flex-wrap:wrap;border-top:1px solid var(--pro-trait);padding-top:.9rem}
+  .vd-stats__bars{flex:0 1 250px;min-width:0}
+  .vd-stats__bars .pro-chart-vbars{padding-top:1.1rem;gap:0}
+  .vd-stats__rest{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:.85rem}
+  .vd-big{font-family:var(--pro-font-display);font-weight:700;font-size:1.5rem;color:var(--pro-bleu);line-height:1.1}
+  .vd-cmp{position:relative;height:12px;background:var(--pro-papier-ombre);margin:.6rem 0 .3rem}
+  .vd-cmp__v{position:absolute;left:0;top:0;bottom:0;background:var(--pro-prets)}
+  .vd-cmp__m{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed var(--pro-carmin)}
+  .vd-cmp__t{display:flex;justify-content:space-between;gap:.6rem;font-size:.72rem;flex-wrap:wrap}
+  .vd-cmp__t em{font-style:normal;color:var(--pro-carmin);font-weight:700}
+
+  .vd-aside{flex:0 1 330px;min-width:min(280px,100%);margin-left:auto;background:var(--pro-papier);border-left:1px solid var(--pro-carte-bord);padding:1.4rem 1.2rem;display:flex;flex-direction:column;gap:.7rem}
+  .vd-act{display:flex;align-items:center;justify-content:space-between;gap:.5rem;width:100%;margin:0;border-radius:0;cursor:pointer;font:700 .84rem var(--pro-font-body);color:var(--pro-texte);background:#fff;border:2px solid var(--c,var(--pro-trait-fort));padding:0 .75rem;min-height:56px}
+  .vd-act > span{display:inline-flex;align-items:center;gap:.45rem}
+  .vd-act:hover:not(:disabled){background:var(--pro-bleu-pale)}
+  .vd-act:disabled{background:var(--pro-dec-todo);border-style:dashed;color:var(--pro-texte-doux);cursor:not-allowed}
+  .vd-act--valide{min-height:64px;background:var(--pro-bleu);border-color:var(--pro-bleu);color:#fff;font:600 1.35rem var(--pro-font-display);padding:0 1.1rem}
+  .vd-act--valide > span{gap:.7rem}
+  .vd-act--valide:hover:not(:disabled){background:var(--pro-bleu-fonce);border-color:var(--pro-bleu-fonce)}
+  .vd-act--valide[aria-pressed="true"]{background:var(--vd-valide);border-color:var(--vd-valide)}
+  .vd-act--valide .pro-kbd{background:transparent;color:#fff;border-color:rgba(255,255,255,.55)}
+  .vd-act--alt[aria-pressed="true"]{background:var(--c);color:var(--ink,#fff)}
+  .vd-act--alt[aria-pressed="true"] svg{color:inherit !important}
+  .vd-act--comment{--c:var(--pro-trait-fort);min-height:48px;font-weight:600;font-size:.82rem}
+  .vd-alts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+  .vd-alts .vd-act{padding:0 .6rem}
+  .vd-cm textarea{display:block;width:100%;min-height:5.5rem;margin:0;padding:.6rem .7rem;border:1px solid var(--pro-trait-fort);border-radius:0;background:#fff;color:var(--pro-texte);font:400 .84rem/1.5 var(--pro-font-body);resize:vertical}
+  .vd-cm textarea:focus{border-color:var(--pro-bleu)}
+  .vd-cm__foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem .6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.7rem;color:var(--pro-texte-doux)}
+  .vd-cm__foot .unsaved{color:var(--pro-dec-braderie-ink);font-weight:600}
+  .vd-cm__foot .saved{color:var(--pro-ok)}
+  .vd-hint{font-size:.7rem;color:var(--pro-texte-doux);line-height:1.6;margin:0}
+  .vd-rv-nav{display:flex;align-items:center;justify-content:space-between;gap:.8rem 1.2rem;flex-wrap:wrap;padding:.8rem 1.375rem;border-top:1px solid var(--pro-carte-bord);background:#FBFAF7}
+  .vd-rv-nav .pro-btn{min-height:48px;background:#fff;border:1px solid var(--pro-trait-fort);font-size:.82rem}
+  .vd-rv-nav .pro-btn:hover:not(:disabled){background:var(--pro-bleu-pale)}
+  .vd-rv-pos{flex:1 1 160px;max-width:340px;text-align:center}
+  .vd-rv-pos b{display:block;font-family:var(--pro-font-display);font-weight:700;font-size:1.25rem;line-height:1;color:var(--pro-bleu)}
+  .vd-rv-pos i{display:block;height:5px;background:var(--pro-carte-bord);margin-top:.45rem}
+  .vd-rv-pos i span{display:block;height:100%;background:var(--pro-bleu)}
+  .vd-rv-empty{padding:1.5rem}
+
+  /* ── File des livres ── */
+  .vd-tools{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;padding:.85rem 1.1rem;background:var(--pro-papier-ombre);border-bottom:1px solid var(--pro-trait)}
+  .vd-tools .pro-input{width:auto;min-width:0;max-width:100%}
+  .vd-tools .pro-search{flex:1 1 220px;max-width:340px}
+  .vd-tools .pro-search .pro-input{width:100%}
+  .vd-tools__f{display:flex;align-items:center;gap:.4rem}
+  .vd-tools__f .pro-label{margin:0}
+  .vd-chips{display:flex;flex-wrap:wrap;gap:.4rem;padding:.55rem 1.1rem 0}
+  .vd-chips:empty{display:none}
+  .vd-tools__count{font-size:.78rem;color:var(--pro-texte-doux);margin-left:auto}
+  .vd-tools__count strong{color:var(--pro-bleu)}
+  .vd-q{display:grid;grid-template-columns:2.2rem 36px minmax(0,1fr) 9.5rem 8rem 8.6rem;align-items:center;gap:.4rem .8rem;width:100%;margin:0;padding:.5rem 1.1rem;background:#fff;border:0;border-bottom:1px solid var(--pro-filet);border-left:4px solid transparent;border-radius:0;text-align:left;font:inherit;color:inherit;cursor:pointer}
+  .vd-q:hover{background:var(--pro-papier)}
+  .vd-q.is-current{background:var(--pro-bleu-pale);border-left-color:var(--pro-bleu)}
+  .vd-q:focus-visible{outline-offset:-3px}
+  .vd-q__n{font-family:var(--pro-font-display);font-weight:700;font-size:.95rem;color:var(--pro-bleu)}
+  .vd-q__thumb img,.vd-q__thumb i{display:block;width:36px;height:50px;object-fit:cover;background:var(--pro-papier-ombre);border:1px solid var(--pro-trait)}
+  .vd-q__thumb i{border-style:dashed}
+  .vd-q__title{display:block;font-family:var(--pro-font-display);font-weight:600;font-size:.98rem;line-height:1.2;color:var(--pro-bleu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vd-q__sub{display:block;font-size:.74rem;color:var(--pro-texte-doux);margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vd-q__sub b{font:700 .74rem var(--pro-font-mono);color:var(--pro-bleu)}
+  .vd-q__prets{font-size:.76rem;line-height:1.35}
+  .vd-listhead{display:grid;grid-template-columns:2.2rem 36px minmax(0,1fr) 9.5rem 8rem 8.6rem;gap:.4rem .8rem;padding:.45rem 1.1rem .45rem calc(1.1rem + 4px);border-bottom:1px solid var(--pro-trait);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--pro-texte-doux)}
+  .vd-foot{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;padding:.9rem 1.1rem;font-size:.78rem;color:var(--pro-texte-doux)}
+  .vd-empty{padding:1.25rem 1.1rem;color:var(--pro-texte-doux);font-size:.85rem}
+  .vd-sync-note{padding:.2rem 0 0}
+
+  @media (max-width:60rem){
+    .vd-aside{flex-basis:100%;margin-left:0;border-left:0;border-top:1px solid var(--pro-carte-bord)}
+  }
+  @media (max-width:40rem){
+    .vd-step__arrow{display:none}
+    .vd-by input{width:120px}
+    .vd-ray__todo{flex-basis:auto;text-align:left;display:flex;align-items:baseline;gap:.4rem}
+    .vd-ray__chev{display:none}
+    .vd-listhead{display:none}
+    .vd-q{grid-template-columns:2rem 36px minmax(0,1fr)}
+    .vd-q__prets,.vd-q__dec,.vd-q__avis{grid-column:3}
+    .vd-q__prets{order:3}
+    .vd-q__dec{grid-column:3}
+    .vd-rv-main{padding:1.1rem 1rem}
+    .vd-cover{flex-basis:140px}
+    .vd-ttl{font-size:1.35rem}
+    .vd-bigdec{font-size:1.25rem}
+    .vd-tools__count{margin-left:0;flex-basis:100%}
+    .vd-tools .pro-search{max-width:none;flex-basis:100%}
+    .vd-mx col.vd-mx__c0{width:4.6rem}
+    .vd-mx tbody th small{display:none}
+  }
 </style>
-  <!-- Publication en iframe : voir js/parent-page-height.js (sans defer). -->
-  <script src="js/parent-page-height.js"></script>
+<!-- Publication en iframe : voir js/parent-page-height.js (sans defer). -->
+<script src="js/parent-page-height.js"></script>
 </head>
-<body>
+<body class="pro">
 
-<section class="page-hero">
-  <div class="container">
-    <div>
-      <nav class="breadcrumb">Espace professionnel · Désherbage</nav>
-      <h1 class="page-title">Validation du désherbage</h1>
-      <p class="page-lead">Compte rendu en direct des décisions prises dans Rotobib, rayon par rayon. Pour chaque livre : validez la décision, proposez-en une autre, et laissez un commentaire à l'équipe si besoin.</p>
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace professionnel</a> · Désherbage</p>
+      <h1 class="pro-head__h1">Validation du désherbage</h1>
     </div>
-    <div class="hero-actions">
-      <span class="sync-status" id="sync-status" title="Envoi de vos avis (via R2)"></span>
-      <a href="rotobib.html">Rotobib</a>
-      <a href="admin.html">← Espace professionnel</a>
-      <button type="button" id="logout-btn">Se déconnecter</button>
+    <div class="pro-head__actions">
+      <label class="vd-by"><span class="vd-by__l">Validé par</span><input type="text" id="vd-name" placeholder="ex. Jean D." maxlength="80" autocomplete="off" title="Affiché à l'équipe à côté de vos avis"></label>
+      <span class="pro-sync pro-sync--wait" id="vd-live" role="status"><span class="pro-sync__dot" aria-hidden="true"></span><span id="vd-live-text">Chargement…</span></span>
+      <span class="pro-sync" id="vd-sync" title="Envoi de vos avis (via R2)"><span class="pro-sync__dot" aria-hidden="true"></span><span id="sync-status"></span></span>
+      <a class="pro-btn pro-btn--ghost" href="rotobib.html">Rotobib</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="logout-btn">Déconnexion</button>
     </div>
   </div>
-</section>
+</header>
 
-<main>
-  <div class="container">
-    <div class="vd-bar">
-      <label>Votre nom : <input type="text" id="vd-name" placeholder="ex. Jean D." maxlength="80"></label>
-      <span style="color:#888;font-size:.78rem">Affiché à l'équipe à côté de vos avis.</span>
-      <span class="vd-live" id="vd-live"><span class="dot"></span>Chargement…</span>
+<main id="contenu" class="pro-main">
+
+  <!-- ── Vue campagne ── -->
+  <section class="pro-wrap pro-section" aria-labelledby="h-camp" style="padding-top:1.75rem">
+    <div class="pro-section-head">
+      <h2 class="pro-eyebrow" id="h-camp">Vue campagne</h2>
+      <span class="pro-rule" aria-hidden="true"></span>
+      <span class="pro-section-note" id="vd-camp-note">Toutes décisions confondues</span>
     </div>
-    <div class="vd-msg" id="vd-msg"></div>
+    <div id="vd-campaign"><div class="pro-skeleton" style="height:14rem"></div></div>
+  </section>
 
-    <h2 class="vd-h">Avancement par rayon</h2>
-    <table class="vd-sum">
-      <thead>
-        <tr>
-          <th>Rayon</th>
-          <th class="num hide-sm">Livres scannés</th>
-          <th>Décisions de l'équipe</th>
-          <th class="hide-sm">Traités</th>
-          <th>Votre validation</th>
-        </tr>
-      </thead>
-      <tbody id="vd-sum-body"><tr><td colspan="5" class="vd-empty">Chargement…</td></tr></tbody>
-    </table>
+  <!-- ── Par rayon ── -->
+  <section class="pro-wrap pro-section" aria-labelledby="h-ray">
+    <div class="pro-section-head">
+      <h2 class="pro-eyebrow" id="h-ray">Par rayon</h2>
+      <span class="pro-rule" aria-hidden="true"></span>
+      <span class="pro-section-note" id="vd-ray-note"></span>
+    </div>
+    <div class="pro-card" style="border-top:3px solid var(--pro-bleu)">
+      <div id="vd-rayons"><p class="vd-empty">Chargement…</p></div>
+    </div>
+  </section>
 
-    <section class="vd-panel" id="vd-panel">
-      <div class="vd-panel-head">
-        <div>
-          <h2 class="vd-h" id="vd-panel-title" style="margin:0"></h2>
-          <p class="vd-panel-sub" id="vd-panel-sub"></p>
-        </div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <button type="button" class="btn" id="vd-export">⬇ Exporter (.csv)</button>
-          <button type="button" class="btn" id="vd-close">Fermer</button>
-        </div>
+  <!-- ── Revue d'un rayon ── -->
+  <section class="pro-wrap pro-section" id="vd-panel" aria-labelledby="vd-panel-title" hidden>
+    <div class="pro-section-head">
+      <h2 class="pro-eyebrow" id="vd-panel-title">Revue</h2>
+      <span class="pro-rule" aria-hidden="true"></span>
+      <button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" id="vd-export">⬇ Exporter (.csv)</button>
+      <button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" id="vd-close">Fermer la revue ✕</button>
+    </div>
+    <p class="vd-note" id="vd-panel-sub" style="margin:0 0 .75rem"></p>
+
+    <section class="pro-card" style="padding:0" aria-label="Revue d'un livre">
+      <div class="vd-rv-top">
+        <span id="vd-rv-info"></span>
+        <label class="pro-check"><input type="checkbox" id="vd-auto" checked>Passer au suivant après un avis</label>
       </div>
-      <div class="vd-tools">
-        <select id="vd-f-statut">
-          <option value="">Toutes les décisions</option>
-          <option value="pilon">Pilon</option>
-          <option value="braderie">Braderie</option>
-          <option value="relocalisation">Relocalisation</option>
-          <option value="conserver">Conserver</option>
-        </select>
-        <select id="vd-f-avis">
-          <option value="todo">À valider</option>
-          <option value="">Tous les livres</option>
-          <option value="valide">Validés</option>
-          <option value="disagree">Contre-propositions</option>
-          <option value="comment">Avec commentaire</option>
-        </select>
-        <input type="search" id="vd-f-q" placeholder="Titre, auteur, cote, code-barre…">
-        <button type="button" class="btn primary" id="vd-bulk" title="Valide la décision de l'équipe pour chaque livre affiché qui n'a pas encore d'avis">✓ Valider tous les livres affichés</button>
-      </div>
-      <div id="vd-books"></div>
-      <div class="vd-more" id="vd-more"></div>
+      <div id="vd-review"></div>
     </section>
-  </div>
+
+    <div class="pro-section-head" style="margin-top:1.75rem">
+      <h2 class="pro-eyebrow">File des livres</h2>
+      <span class="pro-rule" aria-hidden="true"></span>
+      <span class="pro-section-note" id="vd-queue-note"></span>
+    </div>
+    <section class="pro-card" style="border-top:3px solid var(--pro-bleu)" aria-label="File des livres du rayon">
+      <div class="vd-tools" id="vd-tools">
+        <label class="vd-tools__f"><span class="pro-label">Décision</span>
+          <select class="pro-input" id="vd-f-statut" aria-label="Filtrer par décision">
+            <option value="">Toutes</option>
+            <option value="pilon">Pilon</option>
+            <option value="braderie">Braderie</option>
+            <option value="relocalisation">Relocalisation</option>
+            <option value="conserver">Conserver</option>
+          </select></label>
+        <label class="vd-tools__f"><span class="pro-label">Avis</span>
+          <select class="pro-input" id="vd-f-avis" aria-label="Filtrer par avis">
+            <option value="todo">À valider</option>
+            <option value="">Tous les livres</option>
+            <option value="valide">Validés</option>
+            <option value="disagree">Contre-propositions</option>
+            <option value="stale">À revoir</option>
+            <option value="comment">Avec commentaire</option>
+          </select></label>
+        <label class="pro-search">
+          <span class="pro-sr">Rechercher dans le rayon</span>
+          <span aria-hidden="true" style="position:absolute;left:.8rem;top:13px;color:var(--pro-texte-doux);pointer-events:none;display:inline-flex" id="vd-search-ico"></span>
+          <input type="search" class="pro-input" id="vd-f-q" placeholder="Titre, auteur, cote, code-barre…" autocomplete="off">
+        </label>
+        <span class="vd-tools__count" id="vd-count"></span>
+        <button type="button" class="pro-btn pro-btn--primary" id="vd-bulk" title="Valide la décision de l'équipe pour chaque livre affiché qui n'a pas encore d'avis"></button>
+      </div>
+      <div class="vd-chips" id="vd-chips"></div>
+      <div class="vd-listhead" aria-hidden="true"><span>N°</span><span></span><span>Titre · cote</span><span>Prêts</span><span>Décision</span><span>Avis</span></div>
+      <div id="vd-books"></div>
+      <div class="vd-foot" id="vd-more"></div>
+    </section>
+  </section>
 </main>
 
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+<footer class="pro-foot">
+  <div class="pro-foot__inner">
+    <span>Bibliothèques de Douai — Réserve patrimoniale</span>
+    <a href="admin.html">← Espace professionnel</a>
   </div>
 </footer>
 
+<script src="js/admin-ui.js"></script>
+<script src="js/admin-charts.js"></script>
 <script>
-(function() {
-  if (localStorage.getItem('rp_admin_auth') !== '1') {
-    window.location.href = 'index.html';
-  }
-})();
 document.getElementById('logout-btn').addEventListener('click', function() {
   localStorage.removeItem('rp_admin_auth');
   localStorage.removeItem('rp_admin_token');
@@ -235,16 +358,29 @@ document.getElementById('logout-btn').addEventListener('click', function() {
    Fiches (titre, auteur, prêts…) : data/desherbage.json, comme Rotobib.
    Écriture : patchs `review`/`reviewMany` vers /api/desherbage, via la file
    commune js/sync-queue.js (hors ligne toléré, rejouée à la reconnexion).
+
+   Interface : vue campagne (toutes décisions confondues) → liste des rayons →
+   revue d'un rayon (une fiche à la fois, raccourcis clavier) + file compacte.
+   Le rafraîchissement automatique (30 s) ne reconstruit que ce qui a changé
+   et ne touche jamais à une fiche dont le commentaire est en cours de saisie.
    ════════════════════════════════════════════════════════════ */
-function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+const esc = rpUI.esc, fmtN = rpUI.fmt.n;
 
 const STATUTS = ['conserver','pilon','braderie','relocalisation'];
 const STATUT_LABEL = { conserver:'Conserver', pilon:'Pilon', braderie:'Braderie', relocalisation:'Relocalisation' };
-const STATUT_COLOR = { conserver:'var(--ok)', pilon:'var(--danger)', braderie:'var(--warn)', relocalisation:'#2A3CD4' };
-// Pilon / braderie d'abord : ce sont les décisions qui engagent le plus.
+const STATUT_SHORT = { conserver:'Conserver', pilon:'Pilon', braderie:'Braderie', relocalisation:'Reloc.' };
+const STATUT_ICON = { conserver:'check', pilon:'x', braderie:'tag', relocalisation:'arrow' };
+const STATUT_KEY = { conserver:'C', braderie:'B', relocalisation:'R', pilon:'P' };
+const KEY_STATUT = { c:'conserver', b:'braderie', r:'relocalisation', p:'pilon' };
+// Ordre des piles et des matrices : celui du kit (palette validée).
+const DEC_ORDER = ['conserver','braderie','relocalisation','pilon'];
+const DC = rpCharts.DECISION;
+// Pilon / braderie d'abord dans les listes : ce sont les décisions qui engagent le plus.
 const STATUT_ORDER = { pilon:0, braderie:1, relocalisation:2, conserver:3 };
 const HORS_RAYON = '_hors';
 const PAGE_SIZE = 40;
+const AVIS_COLOR = { valide:'#3E3E52', disagree:'#8E24AA', stale:'#B4213C', todo:'#E3DED4' };
+const PRET_YEAR_KEYS = ['an','an1','an2','an3','an4','an5'];
 
 let TRAITEMENTS = {};          // état serveur + avis locaux non encore envoyés
 let RAYONS = [];               // rayons du récolement + rayons fictifs des magasins ({id, label})
@@ -252,15 +388,34 @@ let RAYON_OF = new Map();      // code-barre → { id, colonne, etage, cote, tit
 let REFERENCE_YEAR = new Date().getFullYear();
 let RAW = null;
 let IDX = new Map();           // code-barre → ligne de data/desherbage.json
+const REC_CACHE = new Map();   // code-barre → ligne décodée (les lignes ne changent pas)
 let current = null;            // id du rayon ouvert
 let shown = PAGE_SIZE;
-let lastOk = null, lastErr = false;
+let lastOk = null, lastErr = false, wasErr = false;
+let REVIEW = { order: [], bc: null, lastPos: 0, commentFor: null };
 
-const nameInput = document.getElementById('vd-name');
+const $ = id => document.getElementById(id);
+const nameInput = $('vd-name');
 try { nameInput.value = localStorage.getItem('rp_desherbage_validateur') || ''; } catch(e) {}
 nameInput.addEventListener('input', () => {
   try { localStorage.setItem('rp_desherbage_validateur', nameInput.value.trim()); } catch(e) {}
 });
+const autoNext = $('vd-auto');
+try { autoNext.checked = localStorage.getItem('rp_validation_auto_next') !== '0'; } catch(e) {}
+autoNext.addEventListener('change', () => {
+  try { localStorage.setItem('rp_validation_auto_next', autoNext.checked ? '1' : '0'); } catch(e) {}
+});
+$('vd-search-ico').innerHTML = rpUI.icon('search', { size: 18 });
+$('vd-bulk').innerHTML = rpUI.icon('check', { size: 16, stroke: 2.6 }) + '<span id="vd-bulk-t">Valider les affichés</span>';
+
+/* innerHTML seulement si le contenu change : un rafraîchissement qui ne
+   change rien ne touche pas au DOM (focus, survol, défilement conservés). */
+function setHtml(el, html){
+  if(el.__html === html) return false;
+  el.__html = html;
+  el.innerHTML = html;
+  return true;
+}
 
 /* ── Synchronisation des avis ── */
 const syncQueue = createSyncQueue({
@@ -285,7 +440,7 @@ const RECENT = new Map();      // code-barre → { validation, at }
 const RECENT_MS = 120000;
 function setLocalReview(bc, validation){
   const t = TRAITEMENTS[bc];
-  if(!t) return;
+  if(!t) return;   // décision annulée entre-temps : l'avis est ignoré, sans erreur
   if(validation && (validation.avis || validation.commentaire)) t.validation = validation;
   else delete t.validation;
 }
@@ -302,8 +457,11 @@ const dataReady = Promise.all([
   if(report && report.stats && report.stats.referenceYear) REFERENCE_YEAR = report.stats.referenceYear;
 }).catch(() => {});
 function recordOf(bc){
+  if(REC_CACHE.has(bc)) return REC_CACHE.get(bc);
   const i = IDX.get(bc);
-  return (RAW && i !== undefined) ? columnar.readRow(RAW, i) : null;
+  const rec = (RAW && i !== undefined) ? columnar.readRow(RAW, i) : null;
+  if(rec) REC_CACHE.set(bc, rec);
+  return rec;
 }
 
 async function loadDecisions(){
@@ -347,6 +505,13 @@ async function loadRecolement(){
   });
 }
 
+let toastRef = null;
+function flash(msg, opts){
+  // Un seul message court à la fois : les validations en série ne les empilent pas.
+  if(toastRef) toastRef.close();
+  toastRef = rpUI.toast(msg, Object.assign({ type:'ok', timeout:2200 }, opts));
+}
+
 async function refresh(){
   try{
     await Promise.all([loadDecisions(), loadRecolement()]);
@@ -355,15 +520,18 @@ async function refresh(){
     lastErr = true;
   }
   updateLive();
-  renderSummary();
-  if(current) renderBooks(false);
+  if(lastErr && !wasErr) rpUI.toast('Connexion impossible : les données affichées peuvent être en retard. Nouvel essai dans 30 s.', { type:'warn', timeout:6000 });
+  else if(!lastErr && wasErr) rpUI.toast('Connexion rétablie.', { type:'ok', timeout:2500 });
+  wasErr = lastErr;
+  renderAll(false);
 }
 function updateLive(){
-  const el = document.getElementById('vd-live');
-  el.classList.toggle('err', lastErr);
-  el.innerHTML = '<span class="dot"></span>' + (lastErr
-    ? 'Connexion impossible — nouvel essai dans 30 s' + (lastOk ? ` (dernière mise à jour ${lastOk.toLocaleTimeString('fr-FR')})` : '')
-    : `En direct · mis à jour à ${lastOk.toLocaleTimeString('fr-FR')}`);
+  const el = $('vd-live');
+  el.classList.toggle('pro-sync--off', lastErr);
+  el.classList.remove('pro-sync--wait');
+  $('vd-live-text').textContent = lastErr
+    ? 'Hors connexion' + (lastOk ? ` · dernière mise à jour à ${rpUI.fmt.time(lastOk)}` : '')
+    : `En direct · mis à jour à ${rpUI.fmt.time(lastOk)}`;
 }
 
 /* ── Modèle : livres décidés, groupés par rayon ── */
@@ -373,6 +541,7 @@ function reviewState(t){
   if(v.statutVu && v.statutVu !== t.statut) return 'stale';
   return v.avis === 'valide' || v.avis === t.statut ? 'valide' : 'disagree';
 }
+const isActionable = st => st === 'todo' || st === 'comment' || st === 'stale';
 function decidedBooks(){
   return Object.values(TRAITEMENTS).filter(t => t && STATUTS.includes(t.statut));
 }
@@ -386,7 +555,105 @@ function groupLabel(id){
   return def ? def.label : id.replace(/^RY-/, '');
 }
 
-function renderSummary(){
+/* ════ Vue campagne ════ */
+function campaignStats(){
+  const books = decidedBooks();
+  const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
+  const rv = { todo:0, valide:0, disagree:0, stale:0, comment:0 };
+  const mx = {};
+  STATUTS.forEach(s => { mx[s] = { conserver:0, pilon:0, braderie:0, relocalisation:0 }; });
+  let hors = 0;
+  books.forEach(t => {
+    counts[t.statut]++;
+    const st = reviewState(t);
+    rv[st]++;
+    if(!RAYON_OF.has(t.barcode)) hors++;
+    if(st === 'valide') mx[t.statut][t.statut]++;
+    else if(st === 'disagree' && mx[t.statut][t.validation.avis] != null) mx[t.statut][t.validation.avis]++;
+  });
+  return { n: books.length, counts, rv, mx, hors, scanned: RAYON_OF.size + hors };
+}
+const pctText = (a, b) => b ? rpUI.fmt.pct(a / b) : '—';
+
+function funnelHtml(S){
+  const max = Math.max(S.scanned, 1);
+  const w = n => Math.max(S.scanned ? 1.5 : 0, Math.min(100, n / max * 100));
+  const steps = [
+    { n:S.scanned, l:'Scannés', c:'#C9CEF3', sub:`${fmtN(RAYON_OF.size)} dans les rayons` + (S.hors ? ` · ${fmtN(S.hors)} décidés hors rayon` : '') },
+    { n:S.n, l:'Décidés', c:'#2A3CD4', sub:`${pctText(S.n, S.scanned)} des scannés` },
+    { n:S.rv.valide, l:'Validés', c:AVIS_COLOR.valide, sub:`${pctText(S.rv.valide, S.n)} des décidés` + (S.rv.disagree ? ` · + ${fmtN(S.rv.disagree)} contre-proposition${S.rv.disagree>1?'s':''}` : '') },
+    { n:S.rv.stale, l:'À revoir', hatch:true, sub:'décision changée depuis l\'avis' },
+  ];
+  return '<div class="vd-funnel">' + steps.map((s, i) =>
+    `<div class="vd-step"><div class="vd-step__body">
+       <div class="vd-step__track" aria-hidden="true">${s.n ? `<span class="vd-step__block${s.hatch?' vd-step__block--hatch':''}" style="width:${w(s.n).toFixed(1)}%;--c:${s.c||'transparent'}"></span>` : ''}</div>
+       <div class="vd-step__n">${fmtN(s.n)}</div>
+       <div class="pro-label vd-step__l">${s.l}</div>
+       <div class="vd-step__sub">${esc(s.sub)}</div>
+     </div><span class="vd-step__arrow" aria-hidden="true">${rpUI.icon('arrow', { size:18, stroke:2.5 })}</span></div>`).join('') + '</div>';
+}
+
+function matrixHtml(S){
+  const rows = DEC_ORDER;
+  let dMax = 0, oMax = 0;
+  rows.forEach(r => rows.forEach(c => { if(r === c) dMax = Math.max(dMax, S.mx[r][c]); else oMax = Math.max(oMax, S.mx[r][c]); }));
+  const totalOf = r => rows.reduce((a, c) => a + S.mx[r][c], 0);
+  let h = `<table class="vd-mx"><colgroup><col class="vd-mx__c0"><col><col><col><col></colgroup><thead>
+    <tr><th></th><th colspan="4">Proposition du validateur</th></tr>
+    <tr><th><span class="pro-sr">Décision de l'équipe</span></th>${rows.map(c => `<th scope="col" style="--c:${DC[c].color}">${STATUT_SHORT[c]}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r => {
+    h += `<tr><th scope="row" style="--c:${DC[r].color}">${STATUT_SHORT[r]}<small>${fmtN(totalOf(r))} avis</small></th>`;
+    rows.forEach(c => {
+      const n = S.mx[r][c], diag = r === c, m = diag ? dMax : oMax;
+      const label = `Équipe : ${STATUT_LABEL[r]}, validateur : ${diag ? 'validé tel quel' : STATUT_LABEL[c]} — ${n} avis`;
+      if(!n){ h += `<td class="is-zero" title="${esc(label)}" aria-label="${esc(label)}">0</td>`; return; }
+      const a = 0.14 + 0.66 * (m ? n / m : 0);
+      const bg = diag ? `rgba(42,60,212,${a.toFixed(2)})` : `rgba(180,33,60,${a.toFixed(2)})`;
+      h += `<td style="background:${bg};color:${a > 0.5 ? '#fff' : 'var(--pro-texte)'}" title="${esc(label)}" aria-label="${esc(label)}">${fmtN(n)}</td>`;
+    });
+    h += '</tr>';
+  });
+  return h + `</tbody></table>
+    <div class="vd-key"><span><i style="background:rgba(42,60,212,.8)"></i>Diagonale : validé tel quel</span><span><i style="background:rgba(180,33,60,.5)"></i>Hors diagonale : contre-proposition</span></div>`;
+}
+
+function renderCampaign(){
+  const S = campaignStats();
+  const el = $('vd-campaign');
+  if(!S.n && !S.scanned){
+    $('vd-camp-note').textContent = '';
+    setHtml(el, `<div class="pro-empty"><div class="pro-empty__title">${lastErr && !lastOk ? 'Données partagées indisponibles' : 'Aucune décision pour l\'instant'}</div>
+      <p class="pro-empty__text">${lastErr && !lastOk ? 'Impossible de lire les données partagées. Nouvel essai automatique dans 30 s.' : 'Les décisions prises dans Rotobib apparaîtront ici en direct.'}</p></div>`);
+    return;
+  }
+  const avis = S.rv.valide + S.rv.disagree;
+  const decSegs = DEC_ORDER.map(s => ({ label:DC[s].label, value:S.counts[s], color:DC[s].color, ink:DC[s].ink }));
+  const note = `<span class="vd-note"><strong>${fmtN(S.n)}</strong> livre${S.n>1?'s':''} décidé${S.n>1?'s':''} sur ${fmtN(S.scanned)} scanné${S.scanned>1?'s':''}</span>`;
+  $('vd-camp-note').textContent = S.rv.stale ? `${fmtN(S.rv.stale)} avis à revoir (décision changée)` : '';
+  const html = `<div class="vd-camp">
+    <div class="vd-camp__main">
+      <div class="pro-card pro-card--pad"><div class="vd-card-head"><h3 class="pro-card__title">Avancement</h3><span class="vd-note">De l'inventaire en rayon à la validation de chaque décision.</span></div>${funnelHtml(S)}</div>
+      <div class="pro-card pro-card--pad"><div class="vd-card-head"><h3 class="pro-card__title">Décisions de l'équipe</h3>${note}</div>
+        ${S.n ? rpCharts.stacked(decSegs, { height:40, legend:true, title:'Décisions de l\'équipe' }) : '<p class="vd-note">Aucune décision.</p>'}</div>
+    </div>
+    <div class="vd-camp__side">
+      <div class="vd-agree"><div><div class="pro-label">Taux d'accord</div><div class="vd-agree__big">${avis ? rpUI.fmt.pct(S.rv.valide / avis) : '—'}</div></div>
+        <p>${avis ? `${fmtN(S.rv.valide)} validation${S.rv.valide>1?'s':''} telle${S.rv.valide>1?'s':''} quelle${S.rv.valide>1?'s':''} sur ${fmtN(avis)} avis ; <em>${fmtN(S.rv.disagree)} contre-proposition${S.rv.disagree>1?'s':''}</em> du validateur.` : 'Aucun avis rendu pour l\'instant.'}${S.rv.stale ? ` ${fmtN(S.rv.stale)} avis à revoir non comptés.` : ''}</p></div>
+      <div class="pro-card pro-card--pad" style="flex:1"><h3 class="pro-card__title" style="margin-bottom:.2rem">Où l'on n'est pas d'accord</h3>
+        <p class="vd-note" style="margin:0 0 .8rem">Avis rendus : décision de l'équipe en lignes, proposition du validateur en colonnes.</p>${matrixHtml(S)}</div>
+    </div></div>`;
+  setHtml(el, html);
+}
+
+/* ════ Liste des rayons ════ */
+function legendHtml(){
+  const dec = DEC_ORDER.map(s => `<span><i style="--c:${DC[s].color}"></i>${DC[s].label}</span>`).join('') +
+    '<span><i style="--c:#E3E4EC;border:1px solid #C9CAD6"></i>Non traité</span>';
+  return `<div class="vd-legend"><span class="pro-label">Décisions</span>${dec}<span class="vd-legend__sep"></span><span class="pro-label">Validation</span>
+    <span><i style="--c:${AVIS_COLOR.valide}"></i>Validé</span><span><i style="--c:${AVIS_COLOR.disagree}"></i>Contre-proposition</span>
+    <span><i class="vd-sw-revoir" style="border:1px solid var(--vd-revoir)"></i>À revoir</span><span><i style="--c:${AVIS_COLOR.todo}"></i>À valider</span></div>`;
+}
+function renderRayons(){
   // Seuls les rayons ayant au moins une décision dans Rotobib sont listés.
   const groups = new Map();
   decidedBooks().forEach(t => {
@@ -398,95 +665,84 @@ function renderSummary(){
   RAYON_OF.forEach(r => { scanned[r.id] = (scanned[r.id] || 0) + 1; });
   const list = [...groups.values()]
     .sort((a, b) => (a.id === HORS_RAYON) - (b.id === HORS_RAYON) || groupLabel(a.id).localeCompare(groupLabel(b.id), 'fr', { numeric:true }));
-  const tbody = document.getElementById('vd-sum-body');
+  const el = $('vd-rayons');
   if(!list.length){
-    tbody.innerHTML = `<tr><td colspan="5" class="vd-empty">${lastErr && !lastOk ? 'Impossible de lire les données partagées.' : 'Aucune décision de désherbage pour l\'instant.'}</td></tr>`;
+    $('vd-ray-note').textContent = '';
+    setHtml(el, `<p class="vd-empty">${lastErr && !lastOk ? 'Impossible de lire les données partagées.' : 'Aucune décision de désherbage pour l\'instant.'}</p>`);
     return;
   }
-  tbody.innerHTML = list.map(g => {
+  let totalTodo = 0;
+  const rows = list.map(g => {
     const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
     const rv = { todo:0, valide:0, disagree:0, stale:0, comment:0 };
     g.books.forEach(t => { counts[t.statut]++; rv[reviewState(t)]++; });
     const n = g.books.length;
     const total = g.id === HORS_RAYON ? null : (scanned[g.id] || 0);
-    const pills = STATUTS.filter(s => counts[s]).sort((a,b) => STATUT_ORDER[a]-STATUT_ORDER[b])
-      .map(s => `<span class="pill ${s}">${STATUT_LABEL[s]} ${counts[s]}</span>`).join('') || '<span style="color:#aaa">—</span>';
-    // Barre : part de livres scannés déjà traités (rayons uniquement).
-    let bar = '<span style="color:#aaa">—</span>';
-    if(total){
-      const seg = STATUTS.map(s => counts[s] ? `<span style="width:${counts[s]/Math.max(total,n)*100}%;background:${STATUT_COLOR[s]}" title="${STATUT_LABEL[s]} : ${counts[s]}"></span>` : '').join('');
-      bar = `<div class="vd-progress" title="${n} traité${n>1?'s':''} sur ${total} scanné${total>1?'s':''}">${seg}</div><div style="font-size:.7rem;color:#888;margin-top:2px">${n} / ${total}</div>`;
-    }
-    const todo = rv.todo + rv.comment + rv.stale;
-    const valid = [
-      todo ? `<span class="pill todo">${todo} à valider</span>` : (n ? '<span class="pill ok">✓ tout validé</span>' : ''),
-      rv.valide && todo ? `<span class="pill ok">${rv.valide} validé${rv.valide>1?'s':''}</span>` : '',
-      rv.disagree ? `<span class="pill disagree">${rv.disagree} contre-proposition${rv.disagree>1?'s':''}</span>` : '',
-      rv.stale ? `<span class="pill stale" title="La décision a changé depuis votre avis">${rv.stale} à revoir</span>` : '',
-    ].join('');
-    return `<tr class="clickable ${g.id===current?'sel':''}" data-g="${esc(g.id)}">
-      <td><span class="rname">${esc(groupLabel(g.id))}</span></td>
-      <td class="num hide-sm">${total == null ? '—' : total}</td>
-      <td>${pills}</td>
-      <td class="hide-sm">${bar}</td>
-      <td>${valid || '<span style="color:#aaa">—</span>'}</td>
-    </tr>`;
+    const todo = rv.todo + rv.comment + rv.stale;     // tout ce que le validateur doit encore traiter
+    totalTodo += todo;
+    const denom = Math.max(total || 0, n) || 1;
+    const decSegs = DEC_ORDER.filter(s => counts[s]).map(s => `<span style="width:${counts[s]/denom*100}%;--c:${DC[s].color}" title="${DC[s].label} : ${counts[s]}"></span>`).join('');
+    const aval = rv.todo + rv.comment;
+    const valSegs = [['valide', rv.valide, 'Validés'], ['disagree', rv.disagree, 'Contre-propositions'], ['stale', rv.stale, 'À revoir'], ['todo', aval, 'À valider']]
+      .filter(x => x[1]).map(x => `<span${x[0]==='stale'?' class="is-hatch"':''} style="width:${x[1]/n*100}%;--c:${AVIS_COLOR[x[0]]}" title="${x[2]} : ${x[1]}"></span>`).join('');
+    const valText = [rv.valide ? `${rv.valide} validé${rv.valide>1?'s':''}` : '', rv.disagree ? `${rv.disagree} contre-proposition${rv.disagree>1?'s':''}` : '', rv.stale ? `${rv.stale} à revoir` : '']
+      .filter(Boolean).join(' · ') || 'Aucun avis rendu';
+    const decText = total ? `${n} décidé${n>1?'s':''} sur ${total}` : `${n} décidé${n>1?'s':''}`;
+    const aria = `${groupLabel(g.id)} : ${decText}, ${todo} à valider`;
+    return `<button type="button" class="vd-ray" data-g="${esc(g.id)}" aria-current="${g.id===current}" aria-label="${esc(aria)}">
+      <span class="vd-ray__name"><b>${esc(groupLabel(g.id))}</b><small>${total == null ? 'Décisions prises hors rayon' : fmtN(total) + ' livre' + (total>1?'s':'') + ' scanné' + (total>1?'s':'')}</small></span>
+      <span class="vd-ray__bar"><span class="vd-bar" role="img" aria-label="Décisions de l'équipe">${decSegs}</span><small>${decText}</small></span>
+      <span class="vd-ray__bar"><span class="vd-bar vd-bar--val" role="img" aria-label="Validation">${valSegs}</span><small>${esc(valText)}</small></span>
+      <span class="vd-ray__todo"><b class="${todo?'':'is-zero'}">${todo ? fmtN(todo) : '✓'}</b><small>${todo ? 'à valider' : 'tout validé'}</small></span>
+      <span class="vd-ray__chev" aria-hidden="true">${rpUI.icon('chevRight', { size:18, stroke:2.5 })}</span>
+    </button>`;
   }).join('');
+  $('vd-ray-note').textContent = `${fmtN(totalTodo)} livre${totalTodo>1?'s':''} à valider au total`;
+  setHtml(el, legendHtml() + rows);
 }
-document.getElementById('vd-sum-body').addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-g]');
-  if(!tr) return;
-  openGroup(tr.dataset.g);
+$('vd-rayons').addEventListener('click', e => {
+  const b = e.target.closest('.vd-ray');
+  if(b) openGroup(b.dataset.g);
 });
 
-/* ── Détail d'un rayon ── */
-async function openGroup(id){
-  current = id;
-  shown = PAGE_SIZE;
-  document.getElementById('vd-panel').classList.add('show');
-  renderSummary();
-  await dataReady;
-  renderBooks(true);
-  document.getElementById('vd-panel').scrollIntoView({ behavior:'smooth', block:'start' });
-}
-document.getElementById('vd-close').addEventListener('click', () => {
-  current = null;
-  document.getElementById('vd-panel').classList.remove('show');
-  renderSummary();
-});
-
+/* ════ Données d'un livre ════ */
 function bookInfo(t){
   const rec = recordOf(t.barcode);
   const scan = RAYON_OF.get(t.barcode) || {};
   const p = (rec && rec.prets) || null;
   return {
-    t, rec, scan,
+    t, rec, scan, prets: p,
     cote: (rec && rec.coteAffichee) || scan.cote || '',
     titre: (rec && rec['200$a']) || scan.titre || '(titre inconnu)',
     auteur: (rec && rec['700$a']) || scan.auteur || '',
+    editeur: (rec && rec['210$c']) || '',
     parution: (rec && rec['210$d']) || '',
+    saisie: (rec && rec.dateSaisie) || '',
     an: p ? (p.an || 0) : null,
     avant: p ? Math.max(0, (p.cumules || 0) - (p.an || 0)) : null,
+    cumules: p ? (p.cumules || 0) : null,
     dernier: (rec && rec.derniereAnneePret) || '',
     imagette: rec && rec.imagette,
   };
 }
 
+function filters(){
+  return { statut: $('vd-f-statut').value, avis: $('vd-f-avis').value, q: $('vd-f-q').value.toLowerCase().trim() };
+}
 function filteredBooks(){
-  const fs = document.getElementById('vd-f-statut').value;
-  const fa = document.getElementById('vd-f-avis').value;
-  const q = document.getElementById('vd-f-q').value.toLowerCase().trim();
+  const f = filters();
   return decidedBooks()
     .filter(t => groupOf(t.barcode) === current)
     .map(bookInfo)
     .filter(b => {
-      if(fs && b.t.statut !== fs) return false;
+      if(f.statut && b.t.statut !== f.statut) return false;
       const st = reviewState(b.t);
-      if(fa === 'todo' && !(st === 'todo' || st === 'comment' || st === 'stale')) return false;
-      if(fa === 'valide' && st !== 'valide') return false;
-      if(fa === 'disagree' && st !== 'disagree') return false;
-      if(fa === 'comment' && !(b.t.validation && b.t.validation.commentaire)) return false;
-      if(q && !`${b.t.barcode} ${b.cote} ${b.titre} ${b.auteur}`.toLowerCase().includes(q)) return false;
+      if(f.avis === 'todo' && !isActionable(st)) return false;
+      if(f.avis === 'valide' && st !== 'valide') return false;
+      if(f.avis === 'disagree' && st !== 'disagree') return false;
+      if(f.avis === 'stale' && st !== 'stale') return false;
+      if(f.avis === 'comment' && !(b.t.validation && b.t.validation.commentaire)) return false;
+      if(f.q && !`${b.t.barcode} ${b.cote} ${b.titre} ${b.auteur}`.toLowerCase().includes(f.q)) return false;
       return true;
     })
     .sort((a, b) => STATUT_ORDER[a.t.statut] - STATUT_ORDER[b.t.statut]
@@ -497,85 +753,319 @@ function filteredBooks(){
 
 function fmtDate(iso){
   const d = new Date(iso);
-  return isNaN(d) ? '' : d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+  return isNaN(d) ? '' : rpUI.fmt.date(d) + ' ' + rpUI.fmt.time(d);
 }
 
-function bookHtml(b){
-  const t = b.t, v = t.validation || null, st = reviewState(t);
+/* Prêts cumulés des livres du rayon (médiane, rang) — mis en cache. */
+let STATS_CACHE = { key:'', vals:[] };
+function groupLoanStats(){
+  const decided = decidedBooks().filter(t => groupOf(t.barcode) === current);
+  const key = current + '|' + RAYON_OF.size + '|' + decided.length + '|' + (RAW ? 1 : 0);
+  if(STATS_CACHE.key === key) return STATS_CACHE.vals;
+  const bcs = current === HORS_RAYON ? decided.map(t => t.barcode) : [...RAYON_OF].filter(([, r]) => r.id === current).map(([bc]) => bc);
+  const vals = [];
+  bcs.forEach(bc => { const r = recordOf(bc); if(r && r.prets) vals.push(r.prets.cumules || 0); });
+  vals.sort((a, b) => a - b);
+  STATS_CACHE = { key, vals };
+  return vals;
+}
+function compareHtml(b){
+  const vals = groupLoanStats();
+  if(b.cumules == null) return '<div class="pro-label">Prêts cumulés</div><div class="vd-meta">Statistiques de prêt indisponibles.</div>';
+  const label = current === HORS_RAYON ? 'des livres décidés hors rayon' : 'du rayon';
+  if(vals.length < 5) return `<div class="pro-label">Prêts cumulés</div><div class="vd-big">${fmtN(b.cumules)}</div><div class="vd-meta">Trop peu de livres pour comparer ${label}.</div>`;
+  const med = vals[Math.floor((vals.length - 1) / 2)];
+  const less = vals.filter(v => v < b.cumules).length / vals.length;
+  const more = vals.filter(v => v > b.cumules).length / vals.length;
+  const scale = Math.max(b.cumules, med, 1) * 1.3;
+  const txt = b.cumules < med ? `Moins emprunté que ${rpUI.fmt.pct(more)} des livres ${label}`
+    : b.cumules > med ? `Plus emprunté que ${rpUI.fmt.pct(less)} des livres ${label}` : `Dans la médiane des livres ${label}`;
+  return `<div class="pro-label">Prêts cumulés · comparé au rayon</div>
+    <div class="vd-cmp" role="img" aria-label="${b.cumules} prêts cumulés, médiane ${med}"><span class="vd-cmp__v" style="width:${(b.cumules/scale*100).toFixed(1)}%"></span><span class="vd-cmp__m" style="left:${(med/scale*100).toFixed(1)}%"></span></div>
+    <div class="vd-cmp__t"><span><strong style="color:var(--pro-bleu)">${fmtN(b.cumules)}</strong> prêt${b.cumules>1?'s':''}</span><em>médiane ${label} : ${fmtN(med)}</em></div>
+    <div class="vd-meta" style="margin-top:.5rem">${txt} (${fmtN(vals.length)} livres comparés)</div>`;
+}
+function loansHtml(b){
+  const p = b.prets;
+  if(!p) return '<div class="vd-stats__bars"><div class="pro-label">Prêts par année</div><div class="vd-meta">Statistiques de prêt indisponibles.</div></div>';
   const Y = REFERENCE_YEAR;
-  const empl = b.scan.id ? `${b.scan.travee ? esc(selectionsDesherbage.traveeName(b.scan.travee)) + ', ' : ''}${b.scan.colonne != null ? 'colonne ' + esc(b.scan.colonne) : ''}${b.scan.etage != null ? ', étagère ' + esc(b.scan.etage) : ''}` : '';
-  const meta = [
-    b.cote ? `<b>Cote</b> ${esc(b.cote)}` : '',
-    b.parution ? `<b>Parution</b> ${esc(b.parution)}` : '',
-    b.an != null ? `<b>Prêts ${Y}</b> ${b.an}` : '',
-    b.avant != null ? `<b>Prêts avant ${Y}</b> ${b.avant}` : '',
-    b.dernier ? `<b>Dernier prêt</b> ${esc(b.dernier)}` : '',
-    empl ? `<b>Emplacement</b> ${empl}` : '',
-    `<b>Code-barre</b> ${esc(t.barcode)}`,
-  ].filter(Boolean).join(' &nbsp;·&nbsp; ');
-  const avisBtns =
-    `<button type="button" class="avis-btn valide ${st==='valide'?'active':''}" data-avis="valide">✓ Valider</button>` +
-    `<span class="avis-sep">ou plutôt :</span>` +
-    STATUTS.filter(s => s !== t.statut).map(s =>
-      `<button type="button" class="avis-btn ${s} ${v && v.avis===s && st!=='stale' ? 'active' : ''}" data-avis="${s}">${STATUT_LABEL[s]}</button>`
-    ).join('');
-  const cls = st === 'valide' ? 'done' : st === 'disagree' ? 'disagree' : st === 'stale' ? 'stale' : '';
+  const keys = PRET_YEAR_KEYS.filter((k, i) => i < 4 || k in p).reverse();   // du plus ancien au plus récent
+  const items = keys.map(k => {
+    const i = PRET_YEAR_KEYS.indexOf(k);
+    return { label:String(Y - i), value:p[k] || 0, color:rpCharts.PRETS, hatched: k === 'an',
+      tip: `${Y - i}${k === 'an' ? ' (année en cours, incomplète)' : ''}\n${p[k] || 0} prêt${(p[k]||0)>1?'s':''}` };
+  });
+  const detailed = keys.reduce((a, k) => a + (p[k] || 0), 0);
+  const avant = Math.max(0, (p.cumules || 0) - detailed);
+  const oldest = Y - PRET_YEAR_KEYS.indexOf(keys[0]);
+  return `<div class="vd-stats__bars"><div class="pro-label">Prêts par année</div>${rpCharts.bars(items, { height:84, axis:false, title:'Prêts par année' })}
+    <div class="vd-meta" style="margin-top:.4rem"><strong>Avant ${oldest}</strong> : ${fmtN(avant)} prêt${avant>1?'s':''} · hachuré : année en cours</div></div>`;
+}
+
+function decPill(t){
+  return `<span class="pro-pill pro-pill--${t.statut}">${rpUI.icon(STATUT_ICON[t.statut], { size:12, stroke:3 })}${STATUT_LABEL[t.statut]}</span>`;
+}
+function avisPill(t){
+  const st = reviewState(t), v = t.validation || {};
+  const sw = k => `<span class="pro-pill__swatch ${k==='stale'?'vd-sw-revoir':'vd-sw-'+k}" style="--swb:${k==='stale'?'var(--vd-revoir)':'transparent'}"></span>`;
+  const label = st === 'valide' ? 'Validé' : st === 'disagree' ? 'Plutôt ' + (STATUT_LABEL[v.avis] || '—')
+    : st === 'stale' ? 'À revoir' : st === 'comment' ? 'À valider · note' : 'À valider';
+  return `<span class="pro-pill pro-pill--plan">${sw(st === 'comment' ? 'todo' : st)}${esc(label)}</span>`;
+}
+
+/* ════ Revue d'un livre ════ */
+function currentBc(){ return REVIEW.bc; }
+function posInOrder(){ return REVIEW.order.indexOf(REVIEW.bc); }
+
+function reviewHtml(b){
+  const t = b.t, v = t.validation || null, st = reviewState(t);
+  const pos = posInOrder(), total = REVIEW.order.length;
+  const scan = b.scan;
+  const empl = scan.id ? [scan.travee ? selectionsDesherbage.traveeName(scan.travee) : '', scan.colonne != null ? 'colonne ' + scan.colonne : '', scan.etage != null ? 'étagère ' + scan.etage : ''].filter(Boolean).join(', ') : '';
+  const metaLine = [ [b.editeur, b.parution].filter(Boolean).join(', '),
+    b.saisie ? 'catalogué le ' + b.saisie : '', empl, 'code-barre ' + t.barcode ].filter(Boolean).join(' · ');
+  const cover = b.imagette
+    ? `<div class="vd-cover" id="vd-cover"><img src="${esc(b.imagette)}" alt="Couverture de « ${esc(b.titre)} »" onerror="this.parentNode.innerHTML='<div class=&quot;vd-cover__ph&quot;>Couverture indisponible</div>'"><div class="vd-cover__hint">Cliquer pour agrandir</div></div>`
+    : `<div class="vd-cover" id="vd-cover"><div class="vd-cover__ph">${rpUI.icon('book', { size:28, stroke:1.6 })}Pas de couverture</div></div>`;
   const stale = st === 'stale'
-    ? `<div class="vd-stale">⚠ L'équipe a changé sa décision depuis votre avis (vous aviez vu « ${STATUT_LABEL[v.statutVu]} », votre avis : ${v.avis === 'valide' ? 'validé' : STATUT_LABEL[v.avis] || '—'}).</div>` : '';
-  const who = v ? `${v.par ? esc(v.par) + ' · ' : ''}${fmtDate(v.ts)}` : '';
-  return `<div class="vd-book" data-bc="${esc(t.barcode)}">
-    <div>${b.imagette ? `<img class="vd-thumb" src="${esc(b.imagette)}" alt="Couverture" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'vd-thumb-ph'}))">` : '<div class="vd-thumb-ph"></div>'}</div>
-    <div>
-      <p class="vd-title">${esc(b.titre)}</p>
-      ${b.auteur ? `<p class="vd-author">${esc(b.auteur)}</p>` : ''}
-      <div class="vd-meta">${meta}</div>
-      <div class="vd-team">Décision de l'équipe : <span class="pill ${t.statut}">${STATUT_LABEL[t.statut]}</span> <span style="color:#999;font-size:.72rem">${fmtDate(t.ts)}</span></div>
-    </div>
-    <div class="vd-review ${cls}">
-      ${stale}
-      <div class="vd-avis">${avisBtns}</div>
-      <textarea placeholder="Commentaire pour l'équipe (facultatif)…" maxlength="2000">${esc(v ? v.commentaire : '')}</textarea>
-      <div class="vd-review-foot">
-        <span class="state">${who ? 'Enregistré · ' + who : ''}</span>
-        <button type="button" class="btn save-comment" style="padding:.25rem .6rem;font-size:.72rem">Enregistrer le commentaire</button>
+    ? `<div class="vd-stale" role="status">⚠ L'équipe a changé sa décision depuis votre avis (vous aviez vu « ${esc(STATUT_LABEL[v.statutVu] || '—')} », votre avis : ${v.avis === 'valide' ? 'validé' : esc(STATUT_LABEL[v.avis] || '—')}).</div>` : '';
+  const who = v && (v.avis || v.commentaire) ? `${v.par ? esc(v.par) + ' · ' : ''}${fmtDate(v.ts)}` : '';
+  const hasComment = !!(v && v.commentaire);
+  const commentOpen = hasComment || REVIEW.commentFor === t.barcode;
+  const valPressed = st === 'valide';
+  const alts = DEC_ORDER.map(s => {
+    const own = s === t.statut;
+    const pressed = !own && v && v.avis === s && st !== 'stale';
+    return `<button type="button" class="vd-act vd-act--alt" data-act="${s}" style="--c:${DC[s].color};--ink:${DC[s].ink}" aria-pressed="${pressed}" aria-keyshortcuts="${STATUT_KEY[s]}" ${own ? 'disabled title="Décision actuelle de l\'équipe"' : ''}>
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:${DC[s].textOnWhite}"><path d="${rpUI.icons[STATUT_ICON[s]]}"/></svg>${STATUT_SHORT[s]}</span><span class="pro-kbd">${STATUT_KEY[s]}</span></button>`;
+  }).join('');
+  return `<div class="vd-rv-body" data-bc="${esc(t.barcode)}">
+    <div class="vd-rv-main">
+      ${cover}
+      <div class="vd-info">
+        <div><span class="vd-cote">${esc(b.cote || '—')}</span>
+          <h3 class="vd-ttl">${esc(b.titre)}</h3>
+          ${b.auteur ? `<div class="vd-auth">${esc(b.auteur)}</div>` : ''}
+          <div class="vd-meta">${esc(metaLine)}</div></div>
+        ${stale}
+        <div class="vd-decision"><span class="vd-bigdec vd-bigdec--${t.statut}">${rpUI.icon(STATUT_ICON[t.statut], { size:22, stroke:3 })}${STATUT_LABEL[t.statut]}</span>
+          <small>Décision de l'équipe<br><span>proposée le ${rpUI.fmt.date(t.ts)}</span></small>
+          <span>${avisPill(t)}</span></div>
+        <div class="vd-stats">${loansHtml(b)}
+          <div class="vd-stats__rest"><div><div class="pro-label">Dernier prêt</div><div class="vd-big">${esc(b.dernier || '—')}</div></div><div>${compareHtml(b)}</div></div></div>
       </div>
     </div>
+    <aside class="vd-aside" aria-label="Actions">
+      <button type="button" class="vd-act vd-act--valide" data-act="valide" aria-pressed="${valPressed}" aria-keyshortcuts="V"><span>${rpUI.icon('check', { size:22, stroke:3 })}${valPressed ? 'Validé' : 'Valider'}</span><span class="pro-kbd">V</span></button>
+      <div class="pro-label" style="margin-top:.3rem">Ou contre-proposer</div>
+      <div class="vd-alts">${alts}</div>
+      <button type="button" class="vd-act vd-act--comment" data-act="comment" aria-expanded="${commentOpen}" aria-keyshortcuts="K"><span>${rpUI.icon('edit', { size:16 })}Commenter${hasComment ? ' (1)' : ''}</span><span class="pro-kbd">K</span></button>
+      <div class="vd-cm" id="vd-cm" ${commentOpen ? '' : 'hidden'}>
+        <textarea id="vd-comment" maxlength="2000" aria-label="Commentaire pour l'équipe" placeholder="Commentaire pour l'équipe (facultatif)…">${esc(v ? v.commentaire : '')}</textarea>
+        <div class="vd-cm__foot"><span class="vd-cm__state ${who ? 'saved' : ''}">${who ? 'Enregistré · ' + who : ''}</span>
+          <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-act="save">Enregistrer</button></div>
+        <p class="vd-hint" style="margin-top:.4rem"><span class="pro-kbd">Ctrl</span> <span class="pro-kbd">Entrée</span> enregistre · <span class="pro-kbd">Échap</span> quitte le champ</p>
+      </div>
+      <p class="vd-hint">Raccourcis : <span class="pro-kbd">V</span> valider · <span class="pro-kbd">C</span> <span class="pro-kbd">B</span> <span class="pro-kbd">R</span> <span class="pro-kbd">P</span> contre-proposer · <span class="pro-kbd">K</span> commenter · <span class="pro-kbd">←</span> <span class="pro-kbd">→</span> naviguer</p>
+    </aside>
+  </div>
+  <div class="vd-rv-nav">
+    <button type="button" class="pro-btn" data-nav="-1" ${pos <= 0 ? 'disabled' : ''} aria-keyshortcuts="ArrowLeft">${rpUI.icon('chevLeft', { size:14, stroke:3 })}Précédent <span class="pro-kbd">←</span></button>
+    <div class="vd-rv-pos" role="status"><b>${pos + 1} / ${total}</b><i><span style="width:${total ? ((pos + 1) / total * 100).toFixed(1) : 0}%"></span></i></div>
+    <button type="button" class="pro-btn" data-nav="1" ${pos >= total - 1 ? 'disabled' : ''} aria-keyshortcuts="ArrowRight"><span class="pro-kbd">→</span>Suivant${rpUI.icon('chevRight', { size:14, stroke:3 })}</button>
   </div>`;
 }
 
-/* `full` = reconstruire tout le panneau. Au rafraîchissement automatique
-   (toutes les 30 s), on ne reconstruit pas si une saisie est en cours dans
-   un commentaire : on perdrait le texte et le focus. */
-function renderBooks(full){
+function commentBox(){ return $('vd-comment'); }
+function commentDirty(){ const c = commentBox(); return !!(c && c.classList.contains('dirty')); }
+
+/* `force` = reconstruire la fiche même si rien n'a changé. Au rafraîchissement
+   automatique (toutes les 30 s), on ne reconstruit pas si un commentaire est
+   en cours de saisie (texte et focus perdus) ni si la fiche est inchangée. */
+function renderReview(force){
   if(!current) return;
-  const active = document.activeElement;
-  if(!full && active && active.tagName === 'TEXTAREA' && active.closest('#vd-books')) return;
-  if(!full && document.querySelector('#vd-books textarea.dirty')) return;
-  const books = filteredBooks();
-  const all = decidedBooks().filter(t => groupOf(t.barcode) === current);
-  document.getElementById('vd-panel-title').textContent = groupLabel(current);
-  const total = current === HORS_RAYON ? null : [...RAYON_OF.values()].filter(r => r.id === current).length;
-  document.getElementById('vd-panel-sub').textContent =
-    `${all.length} décision${all.length>1?'s':''}` + (total != null ? ` sur ${total} livre${total>1?'s':''} scanné${total>1?'s':''} dans ce rayon` : ' prises hors rayon (scan direct dans Rotobib)') +
-    ` · ${books.length} affiché${books.length>1?'s':''} avec les filtres.`;
-  const el = document.getElementById('vd-books');
-  if(!books.length){
-    el.innerHTML = `<p class="vd-empty">${all.length ? 'Aucun livre ne correspond aux filtres.' : 'Aucune décision dans ce rayon pour l\'instant.'}</p>`;
-    document.getElementById('vd-more').innerHTML = '';
+  const el = $('vd-review');
+  const c = commentBox();
+  if(!force && c && (c.classList.contains('dirty') || document.activeElement === c)) return;
+  const t = REVIEW.bc && TRAITEMENTS[REVIEW.bc];
+  const info = $('vd-rv-info');
+  const todo = decidedBooks().filter(x => groupOf(x.barcode) === current && isActionable(reviewState(x))).length;
+  info.innerHTML = `<strong>${fmtN(todo)} livre${todo>1?'s':''}</strong> à valider dans ce rayon · revue de ${fmtN(REVIEW.order.length)} selon les filtres · ordre figé`;
+  if(!t || !STATUTS.includes(t.statut)){
+    const f = filters();
+    const filtered = f.statut || f.q || f.avis !== '';
+    el.__sig = null;
+    setHtml(el, `<div class="vd-rv-empty"><div class="pro-empty"><div class="pro-empty__title">${f.avis === 'todo' && !f.statut && !f.q ? 'Tous les livres de ce rayon sont traités' : 'Aucun livre à revoir avec ces filtres'}</div>
+      <p class="pro-empty__text">${filtered ? 'Modifiez ou retirez les filtres de la file ci-dessous pour revoir d\'autres livres.' : 'Aucune décision dans ce rayon pour l\'instant.'}</p>
+      ${filtered ? '<button type="button" class="pro-btn pro-btn--secondary" data-act="showall">Afficher tous les livres du rayon</button>' : ''}</div></div>`);
     return;
   }
-  el.innerHTML = books.slice(0, shown).map(bookHtml).join('');
-  document.getElementById('vd-more').innerHTML = books.length > shown
-    ? `<button type="button" class="btn" id="vd-more-btn">Afficher ${Math.min(PAGE_SIZE, books.length - shown)} livres de plus (${books.length - shown} restants)</button>` : '';
-  document.getElementById('vd-bulk').disabled = !books.some(b => reviewState(b.t) === 'todo' || reviewState(b.t) === 'stale');
+  const b = bookInfo(t);
+  const pos = posInOrder();
+  const sig = [t.barcode, t.statut, t.ts, t.validation ? t.validation.ts + '|' + t.validation.avis + '|' + t.validation.commentaire : '', pos, REVIEW.order.length, REVIEW.commentFor === t.barcode, REFERENCE_YEAR, b.rec ? 1 : 0, groupLoanStats().length].join('~');
+  if(!force && el.__sig === sig) return;
+  el.__sig = sig;
+  el.__html = null;
+  el.innerHTML = reviewHtml(b);
 }
-document.getElementById('vd-more').addEventListener('click', e => {
-  if(e.target.id === 'vd-more-btn'){ shown += PAGE_SIZE; renderBooks(true); }
-});
-['vd-f-statut','vd-f-avis','vd-f-q'].forEach(id =>
-  document.getElementById(id).addEventListener('input', () => { shown = PAGE_SIZE; renderBooks(true); }));
 
-/* ── Saisie d'un avis ── */
+/* Ordre de la revue : figé à l'ouverture / au changement de filtre, puis
+   seulement épuré (livres qui ne sont plus décidés dans ce rayon) et complété
+   (nouvelles décisions à la fin) — la position ne saute jamais. */
+function freezeOrder(keepBc){
+  REVIEW.order = filteredBooks().map(b => b.t.barcode);
+  REVIEW.bc = keepBc && REVIEW.order.includes(keepBc) ? keepBc : (REVIEW.order[0] || null);
+  REVIEW.lastPos = Math.max(0, REVIEW.order.indexOf(REVIEW.bc));
+  REVIEW.commentFor = null;
+}
+function syncOrder(){
+  const valid = new Set(decidedBooks().filter(t => groupOf(t.barcode) === current).map(t => t.barcode));
+  const fresh = filteredBooks().map(b => b.t.barcode);
+  const had = new Set(REVIEW.order);
+  const before = REVIEW.order.slice();
+  REVIEW.order = REVIEW.order.filter(bc => valid.has(bc));
+  fresh.forEach(bc => { if(!had.has(bc)) REVIEW.order.push(bc); });
+  if(REVIEW.bc && !REVIEW.order.includes(REVIEW.bc)){
+    // Le livre affiché n'est plus décidé (décision annulée) : on passe à celui qui a pris sa place.
+    const i = Math.min(Math.max(0, before.indexOf(REVIEW.bc)), REVIEW.order.length - 1);
+    REVIEW.bc = REVIEW.order[i] || null;
+  } else if(!REVIEW.bc){
+    REVIEW.bc = REVIEW.order[0] || null;
+  }
+}
+
+function goTo(bc, opts){
+  flushComment();
+  REVIEW.bc = bc;
+  REVIEW.commentFor = null;
+  renderReview(true);
+  renderQueue();
+  if(opts && opts.scroll) $('vd-review').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function step(d){
+  const i = posInOrder() + d;
+  if(i < 0 || i >= REVIEW.order.length) return false;
+  goTo(REVIEW.order[i]);
+  return true;
+}
+
+/* ════ File des livres ════ */
+function queueRow(b, i){
+  const t = b.t, cur = t.barcode === REVIEW.bc;
+  const thumb = b.imagette ? `<img src="${esc(b.imagette)}" alt="" loading="lazy" onerror="this.replaceWith(document.createElement('i'))">` : '<i></i>';
+  const prets = b.prets ? `${fmtN(b.an)} en ${REFERENCE_YEAR} · ${fmtN(b.avant)} avant` : '—';
+  return `<button type="button" class="vd-q${cur ? ' is-current' : ''}" data-bc="${esc(t.barcode)}" aria-current="${cur}">
+    <span class="vd-q__n">${i + 1}</span><span class="vd-q__thumb">${thumb}</span>
+    <span><span class="vd-q__title">${esc(b.titre)}</span><span class="vd-q__sub">${b.auteur ? esc(b.auteur) + ' · ' : ''}<b>${esc(b.cote || '—')}</b></span></span>
+    <span class="vd-q__prets">${prets}</span><span class="vd-q__dec">${decPill(t)}</span><span class="vd-q__avis">${avisPill(t)}</span></button>`;
+}
+let queueBooks = [];
+function renderQueue(){
+  if(!current) return;
+  const f = filters();
+  const all = decidedBooks().filter(t => groupOf(t.barcode) === current);
+  queueBooks = filteredBooks();
+  $('vd-panel-title').textContent = 'Revue · ' + groupLabel(current);
+  const total = current === HORS_RAYON ? null : [...RAYON_OF.values()].filter(r => r.id === current).length;
+  $('vd-panel-sub').textContent = `${all.length} décision${all.length>1?'s':''}` +
+    (total != null ? ` sur ${total} livre${total>1?'s':''} scanné${total>1?'s':''} dans ce rayon` : ' prises hors rayon (scan direct dans Rotobib)') + '.';
+  $('vd-queue-note').textContent = groupLabel(current);
+  $('vd-count').innerHTML = `<strong>${fmtN(queueBooks.length)}</strong> sur ${fmtN(all.length)}`;
+  // Filtres actifs en pastilles supprimables.
+  const chips = [];
+  if(f.statut) chips.push(['statut', 'Décision : ' + STATUT_LABEL[f.statut]]);
+  if(f.avis !== 'todo') chips.push(['avis', 'Avis : ' + ($('vd-f-avis').selectedOptions[0] || {}).textContent]);
+  if(f.q) chips.push(['q', 'Recherche : ' + f.q]);
+  setHtml($('vd-chips'), chips.map(c => `<span class="pro-chip">${esc(c[1])}<button type="button" data-clear="${c[0]}" aria-label="Retirer le filtre ${esc(c[1])}">${rpUI.icon('x', { size:14, stroke:2.6 })}</button></span>`).join(''));
+  const targets = queueBooks.filter(b => isActionable(reviewState(b.t)));
+  $('vd-bulk').disabled = !targets.length;
+  $('vd-bulk-t').textContent = targets.length ? `Valider les ${fmtN(targets.length)} affiché${targets.length>1?'s':''}` : 'Rien à valider';
+  const el = $('vd-books');
+  const active = document.activeElement;
+  const focusBc = active && active.classList && active.classList.contains('vd-q') && el.contains(active) ? active.dataset.bc : null;
+  let changed;
+  if(!queueBooks.length){
+    changed = setHtml(el, `<p class="vd-empty">${all.length ? 'Aucun livre ne correspond aux filtres.' : 'Aucune décision dans ce rayon pour l\'instant.'}</p>`);
+    setHtml($('vd-more'), '');
+  } else {
+    changed = setHtml(el, queueBooks.slice(0, shown).map(queueRow).join(''));
+    setHtml($('vd-more'), `<span>${fmtN(Math.min(shown, queueBooks.length))} livre${queueBooks.length>1?'s':''} affiché${queueBooks.length>1?'s':''} sur ${fmtN(queueBooks.length)}</span>` +
+      (queueBooks.length > shown ? `<button type="button" class="pro-btn pro-btn--secondary" id="vd-more-btn">Afficher ${Math.min(PAGE_SIZE, queueBooks.length - shown)} livres de plus</button>` : ''));
+  }
+  if(changed && focusBc){
+    const again = [...el.querySelectorAll('.vd-q')].find(n => n.dataset.bc === focusBc);
+    if(again) again.focus({ preventScroll:true });
+  }
+}
+$('vd-more').addEventListener('click', e => {
+  if(e.target.id === 'vd-more-btn'){ shown += PAGE_SIZE; renderQueue(); }
+});
+$('vd-books').addEventListener('click', e => {
+  const row = e.target.closest('.vd-q');
+  if(!row) return;
+  flushComment();
+  // Un clic reprend l'ordre courant de la file (comme dans Rotobib).
+  freezeOrder(row.dataset.bc);
+  REVIEW.bc = row.dataset.bc;
+  renderReview(true);
+  renderQueue();
+  $('vd-review').scrollIntoView({ behavior:'smooth', block:'start' });
+});
+function onFilterChange(){
+  flushComment();
+  shown = PAGE_SIZE;
+  freezeOrder(REVIEW.bc);
+  renderReview(true);
+  renderQueue();
+}
+['vd-f-statut','vd-f-avis','vd-f-q'].forEach(id => $(id).addEventListener('input', onFilterChange));
+$('vd-chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-clear]');
+  if(!b) return;
+  const k = b.dataset.clear;
+  if(k === 'statut') $('vd-f-statut').value = '';
+  if(k === 'avis') $('vd-f-avis').value = 'todo';
+  if(k === 'q') $('vd-f-q').value = '';
+  onFilterChange();
+});
+
+/* ── Rayon ouvert / fermé ── */
+async function openGroup(id){
+  flushComment();
+  if(current !== id){
+    $('vd-f-statut').value = ''; $('vd-f-avis').value = 'todo'; $('vd-f-q').value = '';
+  }
+  current = id;
+  shown = PAGE_SIZE;
+  $('vd-panel').hidden = false;
+  renderRayons();
+  await dataReady;
+  freezeOrder(null);
+  renderReview(true);
+  renderQueue();
+  $('vd-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+$('vd-close').addEventListener('click', () => {
+  flushComment();
+  current = null;
+  REVIEW = { order: [], bc: null, lastPos: 0, commentFor: null };
+  $('vd-panel').hidden = true;
+  $('vd-review').__sig = null;
+  renderRayons();
+  $('h-ray').scrollIntoView({ behavior:'smooth', block:'start' });
+});
+
+function renderAll(full){
+  renderCampaign();
+  renderRayons();
+  if(current){
+    syncOrder();
+    renderQueue();
+    renderReview(!!full);
+  }
+}
+
+/* ════ Saisie d'un avis ════ */
 function makeValidation(t, avis, commentaire){
   return {
     avis: avis || null,
@@ -591,84 +1081,138 @@ function sendReview(bc, validation){
   syncQueue.queue({ type:'review', barcode: bc, validation });
 }
 
-document.getElementById('vd-books').addEventListener('click', e => {
-  const thumb = e.target.closest('.vd-thumb');
-  if(thumb){ thumb.classList.toggle('big'); return; }
-  const card = e.target.closest('.vd-book');
-  if(!card) return;
-  const bc = card.dataset.bc, t = TRAITEMENTS[bc];
+function decide(avis){
+  const bc = currentBc(), t = bc && TRAITEMENTS[bc];
   if(!t) return;
-  const textarea = card.querySelector('textarea');
-  const avisBtn = e.target.closest('.avis-btn');
-  if(avisBtn){
-    const v = t.validation;
-    const st = reviewState(t);
-    let avis = avisBtn.dataset.avis;
-    // Recliquer l'avis actif le retire (le commentaire reste).
-    const isActive = avisBtn.classList.contains('active');
-    if(isActive && st !== 'stale') avis = null;
-    sendReview(bc, makeValidation(t, avis, textarea.value.trim()));
-    textarea.classList.remove('dirty');
-    afterChange(card, bc);
-    return;
+  const c = commentBox();
+  const st = reviewState(t), v = t.validation;
+  const txt = c ? c.value.trim() : (v ? v.commentaire : '');
+  // Recliquer l'avis actif le retire (le commentaire reste).
+  const active = avis === 'valide' ? st === 'valide' : (v && v.avis === avis && st !== 'stale');
+  const next = active ? null : avis;
+  sendReview(bc, makeValidation(t, next, txt));
+  if(c) c.classList.remove('dirty');
+  renderCampaign(); renderRayons(); renderQueue();
+  const pos = posInOrder();
+  if(next && autoNext.checked && pos < REVIEW.order.length - 1){
+    flash(`${next === 'valide' ? 'Validé' : 'Contre-proposition : ' + STATUT_LABEL[next]} · ${pos + 1} / ${REVIEW.order.length}`);
+    goTo(REVIEW.order[pos + 1]);
+  } else {
+    flash(next ? (next === 'valide' ? 'Décision validée.' : 'Contre-proposition : ' + STATUT_LABEL[next] + '.') + (pos >= REVIEW.order.length - 1 ? ' Dernier livre de la revue.' : '') : 'Avis retiré.');
+    renderReview(true);
   }
-  if(e.target.closest('.save-comment')){
-    saveComment(card);
-  }
-});
-function saveComment(card){
-  const bc = card.dataset.bc, t = TRAITEMENTS[bc];
-  if(!t) return;
-  const textarea = card.querySelector('textarea');
-  const txt = textarea.value.trim();
+}
+function saveComment(){
+  const bc = currentBc(), t = bc && TRAITEMENTS[bc], c = commentBox();
+  if(!t || !c) return;
+  const txt = c.value.trim();
   const v = t.validation;
-  if((v ? v.commentaire : '') === txt){ textarea.classList.remove('dirty'); return; }
+  if((v ? v.commentaire : '') === txt){ c.classList.remove('dirty'); return; }
   // On garde l'avis existant, sauf s'il portait sur une ancienne décision.
   const avis = v && v.avis && reviewState(t) !== 'stale' ? v.avis : null;
   sendReview(bc, makeValidation(t, avis, txt));
-  textarea.classList.remove('dirty');
-  afterChange(card, bc);
+  c.classList.remove('dirty');
+  renderCampaign(); renderRayons(); renderQueue();
+  renderReview(true);
+  flash(txt ? 'Commentaire enregistré.' : 'Commentaire effacé.');
 }
-document.getElementById('vd-books').addEventListener('input', e => {
-  if(e.target.tagName !== 'TEXTAREA') return;
-  e.target.classList.add('dirty');
-  const s = e.target.closest('.vd-book').querySelector('.state');
-  s.className = 'state unsaved';
-  s.textContent = 'Commentaire non enregistré';
-});
-// Enregistrement automatique en quittant le champ.
-document.getElementById('vd-books').addEventListener('focusout', e => {
-  if(e.target.tagName === 'TEXTAREA' && e.target.classList.contains('dirty')) saveComment(e.target.closest('.vd-book'));
-});
-function afterChange(card, bc){
-  // Remplace la carte seule (garde la position de lecture), puis le récap.
-  const b = bookInfo(TRAITEMENTS[bc]);
-  const tmp = document.createElement('div');
-  tmp.innerHTML = bookHtml(b);
-  const fresh = tmp.firstElementChild;
-  fresh.querySelector('.state').className = 'state saved';
-  card.replaceWith(fresh);
-  renderSummary();
+function flushComment(){ if(commentDirty()) saveComment(); }
+function toggleComment(){
+  const bc = currentBc(), t = bc && TRAITEMENTS[bc];
+  const box = $('vd-cm'), c = commentBox();
+  if(!t || !box) return;
+  const btn = document.querySelector('#vd-review [data-act="comment"]');
+  const hasComment = !!(t.validation && t.validation.commentaire);
+  if(box.hidden){
+    box.hidden = false; REVIEW.commentFor = bc;
+    if(btn) btn.setAttribute('aria-expanded', 'true');
+    c.focus();
+  } else if(document.activeElement !== c){
+    c.focus();
+  } else if(!hasComment && !c.value.trim()){
+    box.hidden = true; REVIEW.commentFor = null;
+    if(btn) btn.setAttribute('aria-expanded', 'false');
+    btn && btn.focus();
+  }
 }
 
-document.getElementById('vd-bulk').addEventListener('click', () => {
-  const targets = filteredBooks().filter(b => { const s = reviewState(b.t); return s === 'todo' || s === 'stale' || s === 'comment'; });
+$('vd-review').addEventListener('click', e => {
+  const zoom = e.target.closest('.vd-cover img');
+  if(zoom){ zoom.parentNode.classList.toggle('is-zoom'); return; }
+  const nav = e.target.closest('[data-nav]');
+  if(nav){ step(+nav.dataset.nav); return; }
+  const act = e.target.closest('[data-act]');
+  if(!act || act.disabled) return;
+  const a = act.dataset.act;
+  if(a === 'comment') toggleComment();
+  else if(a === 'save') saveComment();
+  else if(a === 'showall'){ $('vd-f-statut').value = ''; $('vd-f-q').value = ''; $('vd-f-avis').value = ''; onFilterChange(); }
+  else decide(a);
+});
+$('vd-review').addEventListener('input', e => {
+  if(e.target.id !== 'vd-comment') return;
+  e.target.classList.add('dirty');
+  const s = document.querySelector('#vd-review .vd-cm__state');
+  s.className = 'vd-cm__state unsaved';
+  s.textContent = 'Commentaire non enregistré';
+});
+$('vd-review').addEventListener('keydown', e => {
+  if(e.target.id !== 'vd-comment') return;
+  if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); saveComment(); }
+  else if(e.key === 'Escape'){ e.target.blur(); }
+});
+// Enregistrement automatique en quittant le champ — sauf pour passer à un
+// bouton de la fiche : l'avis ou la navigation qui suit enregistre déjà le
+// texte, et reconstruire la fiche ici ferait perdre le clic.
+$('vd-review').addEventListener('focusout', e => {
+  if(e.target.id !== 'vd-comment' || !e.target.classList.contains('dirty')) return;
+  if(e.relatedTarget && $('vd-review').contains(e.relatedTarget)) return;
+  saveComment();
+});
+
+/* ── Raccourcis clavier (jamais de chiffres : la scannette en tape) ── */
+document.addEventListener('keydown', e => {
+  if(!current || !REVIEW.bc || e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tg = e.target;
+  if(tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if(k === 'ArrowLeft'){ e.preventDefault(); step(-1); }
+  else if(k === 'ArrowRight'){ e.preventDefault(); step(1); }
+  else if(k === 'v'){ e.preventDefault(); decide('valide'); }
+  else if(k === 'k'){ e.preventDefault(); toggleComment(); }
+  else if(KEY_STATUT[k]){
+    const t = TRAITEMENTS[REVIEW.bc];
+    if(t && t.statut !== KEY_STATUT[k]){ e.preventDefault(); decide(KEY_STATUT[k]); }
+  }
+});
+
+/* ── Validation en lot (confirmation en ligne) ── */
+$('vd-bulk').addEventListener('click', async () => {
+  flushComment();
+  const targets = filteredBooks().filter(b => isActionable(reviewState(b.t))).map(b => b.t.barcode);
   if(!targets.length) return;
-  if(!confirm(`Valider la décision de l'équipe pour ${targets.length} livre${targets.length>1?'s':''} affiché${targets.length>1?'s':''} (y compris ceux des pages suivantes) ? Les commentaires déjà écrits sont conservés.`)) return;
-  const items = targets.map(b => ({
-    barcode: b.t.barcode,
-    validation: makeValidation(b.t, 'valide', b.t.validation ? b.t.validation.commentaire : ''),
+  const n = targets.length;
+  const ok = await rpUI.confirmInline($('vd-tools'),
+    `Valider la décision de l'équipe pour ${n} livre${n>1?'s':''} affiché${n>1?'s':''} (y compris ceux des pages suivantes) ? Les commentaires déjà écrits sont conservés.`,
+    { okLabel: `Oui, valider les ${n}`, cancelLabel:'Annuler' });
+  $('vd-bulk').focus({ preventScroll:true });
+  if(!ok) return;
+  // Un livre dont la situation a changé pendant la confirmation (rafraîchissement) n'est plus validé à l'aveugle.
+  const items = targets.filter(bc => TRAITEMENTS[bc] && isActionable(reviewState(TRAITEMENTS[bc]))).map(bc => ({
+    barcode: bc,
+    validation: makeValidation(TRAITEMENTS[bc], 'valide', TRAITEMENTS[bc].validation ? TRAITEMENTS[bc].validation.commentaire : ''),
   }));
+  if(!items.length) return;
   const now = Date.now();
   items.forEach(it => { setLocalReview(it.barcode, it.validation); RECENT.set(it.barcode, { validation: it.validation, at: now }); });
   // Lots de 200 : un seul aller-retour (et une seule réécriture R2) par lot.
   for(let i = 0; i < items.length; i += 200) syncQueue.queue({ type:'reviewMany', items: items.slice(i, i + 200) });
-  renderSummary();
-  renderBooks(true);
+  flash(`${items.length} livre${items.length>1?'s validés':' validé'}.`, { timeout:3500 });
+  renderCampaign(); renderRayons(); renderQueue(); renderReview(true);
 });
 
 /* ── Export ── */
-document.getElementById('vd-export').addEventListener('click', () => {
+$('vd-export').addEventListener('click', () => {
   if(!current) return;
   const Y = REFERENCE_YEAR;
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
@@ -687,9 +1231,11 @@ document.getElementById('vd-export').addEventListener('click', () => {
   a.download = `validation-desherbage-${groupLabel(current).replace(/[^\p{L}\p{N}]+/gu, '-')}-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
+  flash(`Export de ${rows.length} ligne${rows.length>1?'s':''} téléchargé.`, { timeout:3000 });
 });
 
 /* ── Démarrage + direct ── */
+rpCharts.attachTooltips(document.getElementById('contenu'));
 syncQueue.updateIndicator();
 syncQueue.flush();
 refresh();

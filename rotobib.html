@@ -4,10 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<!-- Contrôle d'accès de l'espace pro (gate localStorage, voir « Sécurité » dans
+     CLAUDE.md) : en tête de <head> pour rediriger avant tout rendu. -->
+<script>
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+</script>
 <title>Rotobib — Réserve patrimoniale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts.css">
 <script src="js/columnar.js"></script>
 <script src="js/sync-queue.js"></script>
@@ -15,300 +20,266 @@
 <script src="js/selections-desherbage.js"></script>
 <script src="js/dewey-labels.js"></script>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/admin.css">
 <style>
-  :root{
-    /* --warn = Braderie : ambre plutôt qu'orange (#e65100), indiscernable du
-       rouge Pilon et, en protanopie, du vert Conserver — voir progressHtml().
-       Peu contrasté sur blanc : texte sombre posé dessus, --warn-ink en texte. */
-    --red:#E8445A; --ok:#2e7d32; --warn:#e8a200; --warn-ink:#8a5f00; --danger:#c62828;
-    --blue:#2A3CD4; --todo:#e3e4ec;
-    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
-  }
-  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
-  .page-hero{background:#2A3CD4;color:#fff;padding:1.75rem 1.5rem}
-  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
-  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
-  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
-  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-  .hero-actions a,.hero-actions button{
-    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
-    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
-    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
-  }
-  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
-  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
-  .sync-status.pending{color:#ffcc80}
-  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+  /* Composants propres à Rotobib, préfixés « rb- ». Le reste vient du kit
+     (css/admin.css, js/admin-ui.js, js/admin-charts.js). */
 
-  .section{padding:1.5rem 0 3rem}
-  .ex-note{font-size:.8rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
-  .ex-note strong{color:#665c00}
+  /* Indicateur de synchro : le texte est posé par js/sync-queue.js */
+  #sync-status.pro-sync { font-size: .75rem; }
+  #sync-status.pending { color: var(--pro-ambre); font-weight: 600; }
 
-  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:1.5rem}
-  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
-  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
-  .stat-card-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#2A3CD4}
-  .stat-card.st-conserver .stat-card-val{color:var(--ok)}
-  .stat-card.st-pilon .stat-card-val{color:var(--danger)}
-  .stat-card.st-braderie .stat-card-val{color:var(--warn-ink)}
-  .stat-card.st-relocalisation .stat-card-val{color:#2A3CD4}
+  /* ── Barre de contexte persistante ── */
+  .rb-ctx { background: var(--pro-papier-ombre); border-bottom: 1px solid var(--pro-trait); }
+  .rb-ctx__inner { display: flex; align-items: center; flex-wrap: wrap; gap: .8rem 1.75rem; padding-top: .8rem; padding-bottom: .8rem; }
+  .rb-ctx__rayon { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; min-width: 0; }
+  .rb-ctx__title { font-family: var(--pro-font-display); font-weight: 600; font-size: 1.1rem; line-height: 1.25; color: var(--pro-bleu); overflow-wrap: anywhere; }
+  .rb-ctx__prog { flex: 1 1 280px; min-width: min(100%, 240px); }
+  .rb-ctx__hint { font-size: .8rem; color: var(--pro-texte-doux); }
+  .rb-prog__top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .2rem 1rem; margin-bottom: .35rem; font-size: .85rem; }
+  .rb-prog__top strong { font-family: var(--pro-font-display); font-size: 1.1rem; color: var(--pro-bleu); }
+  .rb-prog__leg { display: flex; flex-wrap: wrap; gap: .1rem .8rem; font-size: .72rem; }
+  .rb-prog__leg span { display: inline-flex; align-items: center; gap: .3rem; }
+  .rb-sw { display: inline-block; width: 10px; height: 10px; flex: none; border: 1px solid rgba(0,0,0,.15); }
+  .rb-ctx .pro-chart-stack__seg { font-size: 0; border-right-width: 1px; }
+  .rb-scan { display: flex; flex-direction: column; gap: .2rem; margin: 0; }
+  .rb-scan .pro-input { width: 220px; max-width: 100%; font-family: var(--pro-font-mono); font-size: .88rem; }
+  .rb-picker { padding: 1rem 0 1.1rem; border-top: 1px solid var(--pro-trait); }
+  .rb-picker[hidden] { display: none; }
+  .rb-picker__row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  .rb-picker select { height: 44px; padding: 0 .7rem; border: 1px solid var(--pro-trait-fort); border-radius: 0; background: #fff; color: var(--pro-texte); font: 400 .88rem var(--pro-font-body); min-width: 200px; max-width: 100%; }
+  .rb-picker select:disabled { background: var(--pro-papier-ombre); color: var(--pro-texte-faible); }
+  .rb-msg { font-size: .8rem; color: var(--pro-texte-doux); margin: .6rem 0 0; }
 
-  .form-card{background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
-  .form-card h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 1rem;color:#2A3CD4}
-  .roto-scan-row{display:flex;gap:.75rem;align-items:center}
-  #roto-scan-input{flex:1;min-width:220px;font-size:1.2rem;font-family:'DM Mono',monospace,inherit;padding:.75rem 1rem;border:1px solid #ccc;border-radius:8px;outline:none}
-  #roto-scan-input:focus{border-color:#2A3CD4;box-shadow:0 0 0 3px rgba(42,60,212,.12)}
+  .rb-help { margin-top: 1.25rem; }
+  .rb-help ul { margin: 0; padding-left: 1.1rem; }
+  .rb-help .pro-kbd { margin: 0 .1rem; }
 
-  .roto-notfound{background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:1rem;color:#665c00;display:none;margin-bottom:1.5rem}
-  .roto-notfound.show{display:block}
+  .rb-main { padding-top: 1.25rem; }
 
-  .roto-detail{display:none;background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem}
-  .roto-detail.show{display:block}
-  .roto-head{display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:.5rem}
-  .roto-cover{width:88px;height:118px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f2f2f5;flex-shrink:0;cursor:zoom-in}
-  .roto-cover:hover{border-color:#2A3CD4}
-  /* Agrandissement de la couverture (clic sur la vignette). */
-  .roto-zoom{position:fixed;inset:0;z-index:1000;background:rgba(20,20,30,.82);display:none;align-items:center;justify-content:center;flex-direction:column;gap:.75rem;padding:1.5rem;cursor:zoom-out}
-  .roto-zoom.show{display:flex}
-  .roto-zoom img{max-width:min(92vw,700px);max-height:80vh;min-width:280px;object-fit:contain;border-radius:6px;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.4)}
-  .roto-zoom-cap{color:#fff;font-size:.9rem;text-align:center;max-width:700px}
-  .roto-zoom-hint{color:#bbb;font-size:.75rem}
-  .roto-zoom-close{position:absolute;top:.75rem;right:1rem;background:none;border:none;color:#fff;font-size:2rem;line-height:1;cursor:pointer}
+  /* ── Onglet Décider ── */
+  .rb-flash { display: none; margin: 0 auto 1rem; max-width: 40rem; padding: .8rem 1rem; background: var(--pro-ok-fond); border-left: 4px solid var(--pro-ok); color: var(--pro-ok-encre); font-size: .88rem; text-align: left; }
+  .rb-flash.show { display: block; }
+  .rb-notfound { display: none; margin: 0 auto 1rem; max-width: 40rem; padding: .8rem 1rem; background: var(--pro-ko-fond); border-left: 4px solid var(--pro-carmin); color: var(--pro-texte); font-size: .88rem; text-align: left; }
+  .rb-notfound.show { display: block; }
+
+  .rb-decide { display: none; gap: 1.25rem; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+  .rb-decide.show { display: grid; }
+  .rb-fiche { border-top: 3px solid var(--pro-bleu); padding: 1.5rem; min-width: 0; }
+  .rb-fiche__top { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .roto-cover { width: 112px; height: 150px; object-fit: cover; border: 1px solid var(--pro-trait); background: var(--pro-papier-ombre); flex: none; cursor: zoom-in; }
+  .roto-cover:hover { border-color: var(--pro-bleu); }
+  .rb-fiche__id { flex: 1 1 280px; min-width: 0; }
+  .rb-titre { margin: .3rem 0 .25rem; font-family: var(--pro-font-display); font-weight: 700; font-size: 1.75rem; line-height: 1.15; color: var(--pro-bleu); overflow-wrap: anywhere; }
+  .rb-soustitre { margin: 0 0 .3rem; font-style: italic; color: var(--pro-texte-doux); }
+  .rb-auteur { margin: 0; font-size: 1rem; }
+  .rb-editeur { margin: .1rem 0 0; font-size: .85rem; color: var(--pro-texte-doux); }
+  .rb-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; align-items: center; }
+  .rb-dl { display: flex; flex-wrap: wrap; gap: .8rem 2rem; margin: 1.25rem 0 0; padding: .8rem 0; border-top: 1px solid var(--pro-papier-ombre); border-bottom: 1px solid var(--pro-papier-ombre); }
+  .rb-dl > div { min-width: 0; }
+  .rb-dl dt { font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; color: var(--pro-texte-doux); }
+  .rb-dl dd { margin: .1rem 0 0; font-size: .9rem; font-weight: 600; overflow-wrap: anywhere; }
+  .rb-verdict { margin-top: 1.25rem; padding: 1rem 1.25rem; background: var(--pro-bleu-pale); border-left: 4px solid var(--pro-carmin); }
+  .rb-verdict__p { margin: .4rem 0 0; font-family: var(--pro-font-display); font-weight: 600; font-size: 1.3rem; line-height: 1.3; color: var(--pro-bleu); }
+  .rb-verdict__p .is-bad { color: var(--pro-carmin); }
+  .rb-verdict__p .sep { color: var(--pro-texte-doux); }
+  .rb-verdict__sub { margin: .5rem 0 0; font-size: .82rem; }
+  .rb-charts { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 1.25rem; }
+  .rb-chartcard { flex: 1 1 320px; min-width: 0; border: 1px solid var(--pro-carte-bord); padding: 1rem; }
+  .rb-chartcard--pos { flex: 0 1 260px; }
+  .rb-chartcard__head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: .4rem .9rem; margin-bottom: .6rem; }
+  .rb-leg { display: flex; flex-wrap: wrap; gap: .2rem .9rem; font-size: .72rem; }
+  .rb-leg span { display: inline-flex; align-items: center; gap: .35rem; }
+  .rb-leg .dash { width: 16px; border-top: 2px dashed var(--pro-texte); }
+  .rb-note { margin: .6rem 0 0; font-size: .75rem; color: var(--pro-texte-doux); }
+
+  /* Prêts de ce livre : colonnes + médiane du rayon en pointillé */
+  .rb-yb { display: flex; gap: 1rem; padding-top: 1.3rem; }
+  .rb-yb__years { flex: 4 1 0; min-width: 0; }
+  .rb-yb__avant { flex: 1.4 1 0; min-width: 0; border-left: 1px dashed #C8C4B8; padding-left: .6rem; }
+  .rb-yb__grp { display: flex; gap: .4rem; }
+  .rb-yb__axis { position: relative; flex: none; width: 24px; height: 130px; font-size: .7rem; color: var(--pro-texte-doux); }
+  .rb-yb__axis span { position: absolute; right: 0; transform: translateY(50%); line-height: 1; }
+  .rb-yb__body { flex: 1; min-width: 0; }
+  .rb-yb__plot { position: relative; display: flex; gap: .5rem; height: 130px; border-bottom: 1px solid #C8C4B8; }
+  .rb-yb__grid { position: absolute; left: 0; right: 0; border-top: 1px solid var(--pro-papier-ombre); }
+  .rb-yb__col { position: relative; flex: 1 1 0; min-width: 0; }
+  .rb-yb__bar { position: absolute; left: 18%; right: 18%; bottom: 0; min-height: 2px; background: var(--pro-prets); }
+  .rb-yb__bar--cur { background: repeating-linear-gradient(135deg, var(--pro-prets) 0 5px, rgba(255,255,255,.55) 5px 8px); }
+  .rb-yb__val { position: absolute; left: 0; right: 0; text-align: center; font-size: .78rem; font-weight: 700; color: var(--pro-bleu); line-height: 1; }
+  .rb-yb__med { position: absolute; left: 2%; right: 2%; border-top: 2px dashed var(--pro-texte); }
+  .rb-yb__labs { display: flex; gap: .5rem; margin-top: .35rem; }
+  .rb-yb__labs > div { flex: 1 1 0; min-width: 0; text-align: center; font-size: .8rem; font-weight: 700; line-height: 1.25; }
+  .rb-yb__labs small { display: block; font-weight: 400; font-size: .66rem; color: var(--pro-texte-doux); }
+  .rb-yb__own { font-size: .64rem; color: var(--pro-texte-doux); margin-bottom: .2rem; height: .9rem; }
+  .rb-fig { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: .4rem; }
+  .rb-fig > div { flex: 1 1 70px; }
+  .rb-fig b { display: block; font-family: var(--pro-font-display); font-size: 1.6rem; line-height: 1; color: var(--pro-bleu); }
+  .rb-fig b.is-bad { color: var(--pro-carmin); }
+  .rb-fig span { display: block; margin-top: .25rem; font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; color: var(--pro-texte-doux); }
+
+  /* Colonne de décision */
+  .rb-dec { position: sticky; top: 1rem; border-top: 3px solid var(--pro-carmin); padding: 1.25rem; min-width: 0; }
+  html.rp-embedded .rb-dec { position: static; }
+  .rb-cur { margin-top: .8rem; padding: .8rem .9rem; background: var(--pro-papier); border: 1px solid var(--pro-carte-bord); }
+  .rb-cur__row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-top: .4rem; font-size: .74rem; color: var(--pro-texte-doux); }
+  .rb-decbtns { display: flex; flex-direction: column; gap: 12px; margin-top: 1.1rem; }
+  .rb-dbig { display: flex; align-items: center; gap: .8rem; width: 100%; height: 56px; padding: 0 1rem; margin: 0; border: 0; border-radius: 0; font: 700 1rem var(--pro-font-body); text-align: left; cursor: pointer; color: #fff; transition: filter var(--pro-ease); }
+  .rb-dbig:hover { filter: brightness(1.08); }
+  .rb-dbig > span:first-of-type { flex: 1; }
+  .rb-dbig .rb-kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border: 1px solid currentColor; font: 700 .74rem var(--pro-font-body); }
+  .rb-dbig .rb-chosen { display: none; align-items: center; gap: .25rem; font-size: .72rem; margin-right: .3rem; }
+  .rb-dbig[data-statut="conserver"] { background: var(--pro-dec-conserver); }
+  .rb-dbig[data-statut="braderie"] { background: var(--pro-dec-braderie); color: var(--pro-dec-braderie-on); }
+  .rb-dbig[data-statut="relocalisation"] { background: var(--pro-dec-reloc); }
+  .rb-dbig[data-statut="pilon"] { background: var(--pro-dec-pilon); }
+  .rb-dbig.active { box-shadow: 0 0 0 3px #fff, 0 0 0 5px currentColor; }
+  .rb-dbig.active .rb-chosen { display: inline-flex; }
+  .rb-dec__row { display: flex; align-items: center; justify-content: space-between; gap: .5rem .75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .rb-dec__row .pro-btn { color: var(--pro-carmin); padding: 0; }
+  .rb-dec__row .pro-btn:disabled { background: none; border-color: transparent; }
+  .rb-dec__row .pro-check { font-size: .8rem; min-height: 44px; }
+  .rb-nav { margin-top: .4rem; padding-top: 1rem; border-top: 1px solid var(--pro-papier-ombre); }
+  .rb-nav__pos { display: flex; align-items: baseline; justify-content: center; gap: .6rem; margin-bottom: .6rem; }
+  .rb-nav__pos b { font-family: var(--pro-font-display); font-size: 1.5rem; color: var(--pro-bleu); }
+  .rb-nav__sub { text-align: center; font-size: .72rem; color: var(--pro-texte-doux); margin: -.3rem 0 .6rem; }
+  .rb-nav__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .rb-nav__btns .pro-btn { border: 1px solid var(--pro-trait-fort); background: #fff; }
+  .rb-nav__btns .pro-btn:hover:not(:disabled) { background: var(--pro-bleu-pale); }
+  .rb-nav__none { font-size: .75rem; color: var(--pro-texte-doux); margin: 0; }
+  .rb-avis { margin-top: 1.1rem; padding: .85rem .95rem; background: var(--pro-papier); border: 1px solid var(--pro-carte-bord); border-left: 4px solid var(--pro-bleu); font-size: .82rem; }
+  .rb-avis--stale { background: #FFF8E1; border-color: #F0DDA0; border-left-color: var(--pro-dec-braderie); }
+  .rb-avis--valide { border-left-color: var(--pro-ok); }
+  .rb-avis--disagree { border-left-color: var(--pro-bleu); }
+  .rb-avis__head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+  .rb-avis__q { margin: .5rem 0 0; font-family: var(--pro-font-display); font-style: italic; font-size: 1rem; line-height: 1.35; white-space: pre-wrap; }
+  .rb-avis__by { font-size: .7rem; color: var(--pro-texte-doux); margin-top: .35rem; }
+  .rb-avis .pro-btn { margin-top: .6rem; width: 100%; }
+  .avis-line { font-size: .7rem; margin-top: 2px; font-weight: 600; }
+  .avis-line.valide { color: var(--pro-ok); }
+  .avis-line.disagree { color: var(--pro-bleu); }
+  .avis-line.stale, .avis-line.comment { color: var(--pro-dec-braderie-ink); }
+
+  .rb-next { margin-top: 2rem; }
+  .rb-next__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .75rem; }
+  .rb-next__card { display: flex; flex-direction: column; gap: .3rem; align-items: flex-start; padding: .8rem; background: #fff; border: 1px solid var(--pro-carte-bord); text-align: left; min-height: 44px; font: inherit; color: var(--pro-texte); cursor: pointer; }
+  .rb-next__card:hover { border-color: var(--pro-bleu); }
+  .rb-next__t { font-weight: 600; font-size: .85rem; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .roto-zoom { position: fixed; inset: 0; z-index: 1000; background: rgba(20,20,30,.82); display: none; align-items: center; justify-content: center; flex-direction: column; gap: .75rem; padding: 1.5rem; cursor: zoom-out; }
+  .roto-zoom.show { display: flex; }
+  .roto-zoom img { max-width: min(92vw, 700px); max-height: 80vh; min-width: 280px; object-fit: contain; background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  .roto-zoom-cap { color: #fff; font-size: .9rem; text-align: center; max-width: 700px; }
+  .roto-zoom-hint { color: #bbb; font-size: .75rem; }
+  .roto-zoom-close { position: absolute; top: .75rem; right: 1rem; background: none; border: none; color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; }
   /* En iframe, position:fixed se cale sur l'iframe entière (voir CLAUDE.md,
      « Publication en iframe ») : surcouche ancrée au niveau de la fiche. */
-  html.rp-embedded .roto-zoom{position:absolute;top:var(--zoom-top,0);bottom:auto;min-height:620px}
-  html.rp-embedded .roto-zoom img{max-height:540px}
-  .roto-headcol{flex:1;min-width:240px}
-  .roto-titre{font-family:'Moret','DM Serif Display',serif;font-size:1.35rem;color:#2A3CD4;margin:0 0 .25rem;line-height:1.25}
-  .roto-soustitre{font-size:.85rem;color:#777;margin:0 0 .5rem;font-style:italic}
-  .roto-auteur{font-size:.95rem;color:#333;margin:0 0 .5rem}
-  .roto-meta{font-size:.78rem;color:#888;line-height:1.8}
-  .roto-meta b{color:#555;font-weight:600}
-  .roto-badge{display:inline-block;font-size:.68rem;padding:2px 9px;border-radius:20px;margin-right:.35rem;font-weight:600}
-  .roto-badge-cote{background:#F5F5FF;color:#2A3CD4;font-family:monospace}
-  .roto-badge-excl{background:#ffebee;color:#c62828;border:1px solid #ffcdd2}
-  /* Avis du validateur (validation-desherbage.html). */
-  .roto-avis{margin-top:.6rem;padding:.5rem .7rem;border-radius:8px;background:#fafafa;border:1px solid #eee;font-size:.8rem}
-  .avis-tag{display:inline-block;font-weight:600;font-size:.75rem;padding:1px 8px;border-radius:20px;margin-right:.4rem}
-  .avis-tag.valide{background:#e8f5e9;color:var(--ok)}
-  .avis-tag.disagree{background:#fdecea;color:var(--danger)}
-  .avis-tag.stale,.avis-tag.comment{background:#fff8e1;color:var(--warn-ink)}
-  .avis-by{font-size:.72rem;color:#888}
-  .avis-comment{margin-top:.35rem;color:#333;white-space:pre-wrap;font-style:italic}
-  .avis-line{font-size:.7rem;margin-top:2px;font-weight:600}
-  .avis-line.valide{color:var(--ok)}
-  .avis-line.disagree{color:var(--danger)}
-  .avis-line.stale,.avis-line.comment{color:var(--warn-ink)}
-  .roto-badge-statut{color:#fff}
-  .roto-badge-statut.conserver{background:var(--ok)}
-  .roto-badge-statut.pilon{background:var(--danger)}
-  .roto-badge-statut.braderie{background:var(--warn);color:#2b1d00}
-  .roto-badge-statut.relocalisation{background:#2A3CD4}
+  html.rp-embedded .roto-zoom { position: absolute; top: var(--zoom-top, 0); bottom: auto; min-height: 620px; }
+  html.rp-embedded .roto-zoom img { max-height: 540px; }
 
-  .roto-date-box{background:#2A3CD4;color:#fff;border-radius:10px;padding:.85rem 1.25rem;display:inline-block;margin:1rem 0 .25rem}
-  .roto-date-label{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;opacity:.75}
-  .roto-date-val{font-family:'Moret','DM Serif Display',serif;font-size:1.9rem;line-height:1.15}
+  /* ── Onglet Rayon ── */
+  .rb-sec { margin-top: 2.25rem; }
+  .rb-sec:first-child { margin-top: 0; }
+  .rb-sec__title { margin: 0 0 .9rem; font-family: var(--pro-font-display); font-weight: 600; font-size: 1.4rem; color: var(--pro-bleu); }
+  .rb-sec__sub { margin: -.5rem 0 .9rem; font-size: .8rem; color: var(--pro-texte-doux); }
+  .rb-kpis__ring { flex: 2 1 340px; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
+  .rb-kpis__legend { flex: 1 1 180px; display: grid; gap: .35rem; font-size: .8rem; }
+  .rb-kpis__legend div { display: flex; align-items: center; gap: .5rem; }
+  .rb-kpis__legend strong { color: var(--pro-bleu); min-width: 2.2rem; }
+  .rb-kpis__legend small { color: var(--pro-texte-doux); margin-left: auto; }
+  .rb-loans { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: stretch; }
+  .rb-loans__chart { flex: 1 1 320px; min-width: 0; }
+  .rb-loans__rest { flex: 0 1 190px; border-left: 1px solid var(--pro-carte-bord); padding-left: 1.2rem; display: flex; flex-direction: column; justify-content: center; }
+  .rb-loans__rest b { font-family: var(--pro-font-display); font-size: 2.2rem; line-height: 1.1; color: var(--pro-bleu); }
+  .rb-loans__rest small { font-size: .7rem; color: var(--pro-texte-doux); line-height: 1.45; }
+  .rb-scatter .pro-chart-scatter__pt { cursor: pointer; }
+  .rb-scatter .pro-chart-scatter__pt.is-hi { background: var(--c, var(--pro-bleu)); }
+  .rb-ctrl { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
 
-  .roto-hist-wrap{margin-top:1.25rem;padding-top:1rem;border-top:1px dashed #e0e0e0}
-  .roto-hist-title{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.6rem}
-  .roto-hist{display:flex;align-items:flex-end;gap:1rem;height:120px;padding:0 .25rem}
-  .roto-hist-col{flex:1;max-width:90px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
-  .roto-hist-val{font-size:.8rem;font-weight:600;color:#2A3CD4;margin-bottom:.25rem}
-  .roto-hist-bar{width:100%;max-width:46px;background:#c9cdf0;border-radius:4px 4px 0 0;min-height:3px;transition:height .2s}
-  .roto-hist-bar.nonzero{background:#2A3CD4}
-  .roto-hist-label{font-size:.7rem;color:#888;margin-top:.4rem}
-  .roto-cumul{font-size:.8rem;color:#666;margin-top:.6rem}
-
-  .roto-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.25rem;padding-top:1.1rem;border-top:1px dashed #e0e0e0}
-  .roto-btn{font-family:inherit;font-size:.88rem;padding:.7rem 1rem;border-radius:8px;cursor:pointer;border:1px solid #ccc;background:#fff;color:#333;transition:all .15s;flex:1;min-width:135px;text-align:center}
-  .roto-btn:hover{background:#f5f5f5}
-  .roto-btn kbd{font-family:inherit;font-size:.7rem;border:1px solid currentColor;border-radius:4px;padding:0 .3rem;margin-left:.3rem;opacity:.55}
-  .roto-btn.active{color:#fff;border-color:transparent}
-  .roto-btn[data-statut="conserver"].active{background:var(--ok)}
-  .roto-btn[data-statut="pilon"].active{background:var(--danger)}
-  .roto-btn[data-statut="braderie"].active{background:var(--warn);color:#2b1d00}
-  .roto-btn[data-statut="relocalisation"].active{background:#2A3CD4}
-  .roto-undo-row{margin-top:.6rem}
-  .roto-nav{display:flex;align-items:center;gap:.75rem;margin:-.25rem 0 1.1rem;padding-bottom:.9rem;border-bottom:1px dashed #e0e0e0}
-  .roto-nav-btn{font-family:inherit;font-size:.85rem;padding:.55rem 1rem;border-radius:8px;border:1px solid #2A3CD4;background:#fff;color:#2A3CD4;cursor:pointer;white-space:nowrap}
-  .roto-nav-btn:hover:not(:disabled){background:#eceefe}
-  .roto-nav-btn:disabled{opacity:.35;cursor:default}
-  .roto-nav-mid{flex:1;text-align:center;min-width:0}
-  .roto-nav-pos{font-size:.85rem;color:#333;font-weight:600}
-  .roto-nav-pos small{display:block;font-weight:400;color:#888;font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .roto-nav-auto{font-size:.72rem;color:#666;display:inline-flex;gap:.3rem;align-items:center;margin-top:.25rem;cursor:pointer}
-  @media (max-width:520px){ .roto-nav-btn{padding:.55rem .6rem;font-size:.78rem} }
-  .rayon-table tr.current td{background:#eceefe !important;color:#1a1a1a}
-  .rayon-table tr.current td:first-child{box-shadow:inset 3px 0 0 #2A3CD4}
-  .roto-undo{font-size:.78rem;color:#888;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0}
-
-  .roto-flash{display:none;margin-bottom:1.5rem;border-radius:var(--radius-md);padding:.9rem 1rem;background:#e8f5e9;border:1px solid #c8e6c9;color:#1b5e20;font-size:.88rem}
-  .roto-flash.show{display:block}
-
-  .export-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.5rem}
-  .export-btn{font-family:inherit;font-size:.78rem;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;color:#555;transition:all .15s}
-  .export-btn:hover{background:#f5f5f5;border-color:#999}
-
-  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.5rem}
-  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
-  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
-  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:180px}
-  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
-  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0;white-space:nowrap}
-  .log-table td{padding:.4rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
-  .log-table tr:hover td{background:#fafafa}
-  .log-body{max-height:360px;overflow-y:auto}
-  .log-del{background:none;border:none;color:#2A3CD4;cursor:pointer;font-size:.78rem;padding:2px 6px;text-decoration:underline}
-  .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
-  .log-bc{font-family:monospace;color:#888}
-
-  .roto-dates{display:flex;gap:.75rem;flex-wrap:wrap}
-  .roto-date-box.secondary{background:#F5F5FF;color:#2A3CD4;border:1px solid #dfe2fb}
-  .roto-split{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem}
-  .roto-split-card{flex:1;min-width:160px;border:1px solid #e0e0e0;border-radius:8px;padding:.6rem .85rem}
-  .roto-split-card .lbl{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#888}
-  .roto-split-card .val{font-family:'Moret','DM Serif Display',serif;font-size:1.5rem;color:#2A3CD4;line-height:1.2}
-  .roto-split-card .sub{font-size:.72rem;color:#999}
-
-  /* ── Import d'un rayon du récolement ── */
-  .rayon-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
-  .rayon-row select{font-family:inherit;font-size:.9rem;padding:.55rem .7rem;border:1px solid #ccc;border-radius:8px;background:#fff;min-width:200px}
-  .rayon-btn{font-family:inherit;font-size:.85rem;padding:.55rem 1rem;border-radius:8px;border:1px solid #2A3CD4;background:#2A3CD4;color:#fff;cursor:pointer}
-  .rayon-btn.ghost{background:#fff;color:#2A3CD4}
-  .rayon-btn:disabled{opacity:.5;cursor:default}
-  .rayon-msg{font-size:.8rem;color:#888;margin:.6rem 0 0}
-  /* Éditeur de rayon fictif (zones de magasin). */
-  .sel-editor{display:none;margin-top:1rem;padding:1rem;border:1px dashed #b8bff0;border-radius:var(--radius-md);background:#f8f9ff}
-  .sel-editor.show{display:block}
-  .sel-editor h3{font-size:.95rem;margin:0 0 .75rem;color:#2A3CD4;font-weight:600}
-  .sel-field{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.7rem;font-size:.85rem}
-  .sel-field > span:first-child{min-width:90px;color:#555;font-weight:600}
-  .sel-field input[type=text]{font-family:inherit;font-size:.9rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:6px;min-width:260px}
-  .sel-field select,.sel-field input[type=number]{font-family:inherit;font-size:.85rem;padding:.4rem .5rem;border:1px solid #ccc;border-radius:6px;background:#fff}
-  .sel-field input[type=number]{width:64px}
-  .sel-cols{display:flex;flex-wrap:wrap;gap:3px}
-  .sel-col{font-family:inherit;font-size:.78rem;width:30px;height:28px;border:1px solid #ccc;background:#fff;border-radius:5px;cursor:pointer;padding:0}
-  .sel-col.on{background:#2A3CD4;border-color:#2A3CD4;color:#fff}
-  .sel-hint{font-size:.72rem;color:#888}
-  .sel-parts{list-style:none;margin:.25rem 0 .75rem;padding:0}
-  .sel-parts li{display:flex;justify-content:space-between;align-items:center;gap:.5rem;background:#fff;border:1px solid #e3e5f5;border-radius:6px;padding:.4rem .6rem;margin-bottom:4px;font-size:.82rem}
-  .sel-parts li .n{color:#888;font-size:.75rem;white-space:nowrap}
-  .sel-parts button{background:none;border:none;color:#c62828;cursor:pointer;font-size:1rem}
-  .sel-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-  .sel-actions .danger{border-color:#c62828;color:#c62828;background:#fff;margin-left:auto}
-  .sel-err{color:#c62828;font-size:.8rem;margin-top:.5rem}
-  .rayon-panel{display:none;margin-bottom:1.5rem}
-  .rayon-panel.show{display:block}
-  .rayon-panel h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.3rem;color:#2A3CD4;margin:0 0 .25rem}
-  .rayon-sub{font-size:.8rem;color:#888;margin:0 0 1rem}
-  .rayon-stats .stat-card-sub{font-size:.7rem;color:#999;margin-top:.3rem}
-  .rayon-filters{display:flex;gap:.9rem;flex-wrap:wrap;align-items:center;font-size:.78rem;color:#555}
-  .rayon-filters label{display:flex;gap:.3rem;align-items:center;cursor:pointer}
-  .rayon-table td.num,.rayon-table th.num{text-align:right;font-variant-numeric:tabular-nums}
-  .rayon-table th[data-sort]{cursor:pointer;user-select:none}
-  .rayon-table th[data-sort]:hover{color:#2A3CD4}
-  .rayon-table th.sorted{color:#2A3CD4}
-  .rayon-table .zero{color:#c62828;font-weight:600}
-  .rayon-table .pos{color:#2e7d32;font-weight:600}
-  .rayon-table .ttl{background:none;border:none;padding:0;font:inherit;color:#1a1a1a;text-align:left;cursor:pointer}
-  .rayon-table .ttl:hover{color:#2A3CD4;text-decoration:underline}
-  .rayon-table .aut{font-size:.7rem;color:#999}
-  .rayon-table .absent{font-size:.68rem;color:#e65100}
-  .rayon-table tr.treated td{background:#fafafa;color:#999}
-  .mini-btns{display:flex;gap:3px;white-space:nowrap}
-  .mini-btn{font-size:.72rem;width:26px;height:24px;border:1px solid #ddd;background:#fff;border-radius:5px;cursor:pointer;padding:0}
-  .mini-btn:hover{border-color:#999}
-  .mini-btn.active[data-statut="conserver"]{background:var(--ok);border-color:var(--ok)}
-  .mini-btn.active[data-statut="pilon"]{background:var(--danger);border-color:var(--danger)}
-  .mini-btn.active[data-statut="braderie"]{background:var(--warn);border-color:var(--warn)}
-  .mini-btn.active[data-statut="relocalisation"]{background:#2A3CD4;border-color:#2A3CD4}
-  /* ── Graphiques du rayon ── */
-  .viz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-bottom:1.5rem}
-  .viz-card{position:relative;background:#fff;border:1px solid #e6e7f0;border-radius:var(--radius-lg);padding:1.1rem 1.25rem 1.2rem}
-  .viz-title{font-family:'Moret','DM Serif Display',serif;font-size:1.1rem;color:#1a1a1a;margin-bottom:.2rem}
-  .viz-sub{font-size:.72rem;color:#888;line-height:1.5;margin-bottom:.9rem}
-  .viz-tip{position:absolute;pointer-events:none;background:#1a1a1a;color:#fff;font-size:.72rem;line-height:1.4;padding:.4rem .6rem;border-radius:6px;max-width:240px;opacity:0;transition:opacity .1s;z-index:2}
-  .viz-tip.show{opacity:1}
-
-  .vb-wrap{display:flex;gap:1.25rem;align-items:stretch;flex-wrap:wrap}
-  .vb-chart{flex:1 1 220px;display:flex;align-items:stretch}
-  .vb-col{flex:1;display:flex;flex-direction:column;align-items:center;outline:none;cursor:default;border-radius:6px}
-  .vb-col:hover,.vb-col:focus-visible{background:#f5f6fd}
-  .vb-plot{height:150px;width:100%;border-bottom:1px solid #d9dbe6;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
-  .vb-val{font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.3rem;font-variant-numeric:tabular-nums}
-  .vb-bar{width:100%;max-width:24px;background:var(--blue);border-radius:4px 4px 0 0}
-  .vb-bar.empty{height:0}
-  .vb-x{font-size:.75rem;color:#555;margin-top:.45rem;font-variant-numeric:tabular-nums}
-  .vb-x.current{font-weight:700;color:#1a1a1a}
-
-  .vb-sub{font-size:.66rem;color:#999;margin:.1rem 0 .5rem}
-  .vb-rest{flex:0 1 150px;border-left:1px solid #e3e4ec;padding-left:1.1rem;display:flex;flex-direction:column;justify-content:center}
-  .vb-rest-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#888}
-  .vb-rest-val{font-family:'Moret','DM Serif Display',serif;font-size:2.3rem;line-height:1.1;color:#1a1a1a;font-variant-numeric:tabular-nums}
-  .vb-rest-sub{font-size:.7rem;color:#999;line-height:1.45}
-  @media (max-width:520px){ .vb-rest{border-left:none;padding-left:0;border-top:1px solid #e3e4ec;padding-top:.8rem;flex-basis:100%} }
-
-  .pg-head{display:flex;align-items:baseline;gap:.6rem;margin:.3rem 0 .8rem;flex-wrap:wrap}
-  .pg-big{font-family:'Moret','DM Serif Display',serif;font-size:2.6rem;line-height:1;color:#1a1a1a;font-variant-numeric:tabular-nums}
-  .pg-head-sub{font-size:.8rem;color:#777}
-  .pg-bar{display:flex;gap:2px;height:22px;margin-bottom:1rem}
-  .pg-seg{min-width:4px;outline:none}
-  .pg-seg:first-child{border-radius:4px 0 0 4px}
-  .pg-seg:last-child{border-radius:0 4px 4px 0}
-  .pg-seg:only-child{border-radius:4px}
-  .pg-seg:hover,.pg-seg:focus-visible{filter:brightness(.9)}
-  .pg-conserver{background:var(--ok)} .pg-braderie{background:var(--warn)}
-  .pg-relocalisation{background:var(--blue)} .pg-pilon{background:var(--danger)} .pg-todo{background:var(--todo)}
-  .pg-legend{display:grid;gap:.15rem}
-  .pg-leg{display:grid;grid-template-columns:12px 1fr auto 3.2rem;gap:.6rem;align-items:center;font-size:.8rem;color:#333;padding:.3rem 0;border-bottom:1px solid #f2f2f6}
-  .pg-leg:last-child{border-bottom:none}
-  .pg-leg.zero{color:#aaa}
-  .pg-sw{width:12px;height:12px;border-radius:3px}
-  .pg-leg-n{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
-  .pg-leg-pct{color:#888;font-variant-numeric:tabular-nums;text-align:right}
-
-  /* ── Répartition par thème (Dewey) ── bleu = livres, teal = prêts */
-  .dw-card{margin-bottom:1.5rem;--dw-livres:#2A3CD4;--dw-prets:#0f9d8a}
-  .dw-top{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:flex-start}
-  .dw-top .viz-sub{max-width:460px}
-  .dw-controls{display:flex;flex-direction:column;gap:.4rem;align-items:flex-end}
-  .dw-segs{display:inline-flex;border:1px solid #d9dbe6;border-radius:8px;overflow:hidden}
-  .dw-seg{font-family:inherit;font-size:.72rem;padding:.35rem .65rem;border:none;background:#fff;color:#555;cursor:pointer;border-right:1px solid #e6e7f0}
-  .dw-seg:last-child{border-right:none}
-  .dw-seg.on{background:#2A3CD4;color:#fff}
-  .dw-legend{display:flex;gap:1.2rem;flex-wrap:wrap;font-size:.74rem;color:#555;margin:.2rem 0 .6rem}
-  .dw-legend span{display:inline-flex;align-items:center;gap:.4rem}
-  .dw-sw{display:inline-block;width:12px;height:12px;border-radius:3px}
-  .dw-livres{background:var(--dw-livres)} .dw-prets{background:var(--dw-prets)}
-  .dw-list{display:flex;flex-direction:column}
-  .dw-row{display:grid;grid-template-columns:4.2rem minmax(120px,1.3fr) minmax(120px,2fr) 5.6rem 5.6rem 4.4rem;gap:.75rem;align-items:center;
-    font-family:inherit;text-align:left;background:none;border:none;border-bottom:1px solid #f0f0f5;padding:.45rem .4rem;cursor:pointer;color:#1a1a1a;border-radius:6px}
-  .dw-row:hover,.dw-row:focus-visible{background:#f5f6fd;outline:none}
-  .dw-row.active{background:#eceefe;box-shadow:inset 3px 0 0 #2A3CD4}
-  .dw-row.none .dw-label{color:#888;font-style:italic}
-  .dw-code{font-family:monospace;font-size:.82rem;color:#555}
-  .dw-label{font-size:.82rem;line-height:1.3}
-  .dw-bars{display:flex;flex-direction:column;gap:3px}
-  .dw-bar{display:block;height:8px;border-radius:0 4px 4px 0;min-width:2px}
-  .dw-num{font-size:.78rem;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .dw-num b{font-weight:600}
-  .dw-num small{display:block;color:#888;font-size:.68rem}
-  .dw-ratio{color:#333}
-  .dw-more{font-family:inherit;font-size:.78rem;margin-top:.6rem;background:none;border:none;color:#2A3CD4;cursor:pointer;text-decoration:underline;padding:0}
-  .dw-chip{font-family:inherit;font-size:.74rem;background:#eceefe;color:#2A3CD4;border:1px solid #c9cdf0;border-radius:20px;padding:.2rem .7rem;cursor:pointer}
-  @media (max-width:640px){
-    .dw-controls{align-items:flex-start}
-    .dw-row{grid-template-columns:3.4rem 1fr 4.6rem 4.6rem;row-gap:.3rem}
-    .dw-bars{grid-column:1 / -1;order:5}
-    .dw-ratio{display:none}
+  .rb-dw { --dw-livres: #2A3CD4; --dw-prets: #0f9d8a; }
+  .rb-dw__top { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+  .rb-dw__sub { font-size: .78rem; color: var(--pro-texte-doux); max-width: 460px; margin: 0; }
+  .rb-dw__legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: .74rem; margin: .8rem 0 .5rem; }
+  .rb-dw__legend span { display: inline-flex; align-items: center; gap: .4rem; }
+  .rb-dw__row { display: grid; grid-template-columns: 4.2rem minmax(120px, 1.3fr) minmax(120px, 2fr) 5.6rem 5.6rem 4.4rem; gap: .75rem; align-items: center; width: 100%; margin: 0; padding: .45rem .4rem; background: none; border: 0; border-bottom: 1px solid var(--pro-filet); border-radius: 0; font: inherit; text-align: left; color: var(--pro-texte); cursor: pointer; min-height: 44px; }
+  .rb-dw__row:hover { background: var(--pro-papier-ombre); }
+  .rb-dw__row.active { background: var(--pro-bleu-pale); box-shadow: inset 3px 0 0 var(--pro-bleu); }
+  .rb-dw__row.none .rb-dw__label { color: var(--pro-texte-doux); font-style: italic; }
+  .rb-dw__code { font-family: var(--pro-font-mono); font-size: .82rem; color: var(--pro-bleu); font-weight: 600; }
+  .rb-dw__label { font-size: .82rem; line-height: 1.3; }
+  .rb-dw__bars { display: flex; flex-direction: column; gap: 3px; }
+  .rb-dw__bar { display: block; height: 8px; min-width: 2px; }
+  .rb-dw__num { font-size: .78rem; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rb-dw__num small { display: block; color: var(--pro-texte-doux); font-size: .68rem; }
+  .rb-dw__more { margin-top: .6rem; }
+  @media (max-width: 40rem) {
+    .rb-dw__row { grid-template-columns: 3.4rem 1fr 4.6rem 4.6rem; row-gap: .3rem; }
+    .rb-dw__bars { grid-column: 1 / -1; order: 5; }
+    .rb-dw__ratio { display: none; }
   }
 
-  .rayon-table .log-body{max-height:560px}
-  .rayon-table td:nth-child(3){min-width:220px}
+  /* Tableau de travail */
+  .rb-tbl { overflow-x: auto; }
+  @media (min-width: 70rem) { .rb-tbl { overflow: visible; } }
+  .rb-tbl .pro-table th { padding: .5rem .5rem; }
+  .rb-tbl .pro-table td { padding: .45rem .5rem; }
+  .rb-tbl .pro-table { font-size: .8rem; }
+  .rb-tbl td:nth-child(3) { min-width: 200px; }
+  .rb-ttl { display: inline; margin: 0; padding: 0; background: none; border: 0; border-radius: 0; font: 600 .82rem var(--pro-font-body); color: var(--pro-texte); text-align: left; cursor: pointer; }
+  .rb-ttl:hover { color: var(--pro-bleu); text-decoration: underline; }
+  .rb-aut { font-size: .7rem; color: var(--pro-texte-doux); }
+  .rb-absent { font-size: .68rem; color: var(--pro-carmin-fonce); }
+  .rb-zero { color: var(--pro-carmin-fonce); font-weight: 600; }
+  .rb-pos { color: var(--pro-ok); font-weight: 600; }
+  .rb-tbl tr.is-treated td { color: var(--pro-texte-doux); }
+  .rb-dbtns { display: inline-flex; gap: 4px; white-space: nowrap; }
+  .rb-dbtn { width: 36px; height: 36px; margin: 0; padding: 0; border: 1.5px solid var(--pro-trait-fort); border-radius: 0; background: #fff; color: var(--pro-texte); font: 700 .8rem var(--pro-font-body); cursor: pointer; }
+  .rb-dbtn:hover { border-color: var(--pro-texte-faible); background: var(--pro-papier-ombre); }
+  .rb-dbtn[aria-pressed="true"] { border-color: transparent; color: #fff; }
+  .rb-dbtn--conserver[aria-pressed="true"] { background: var(--pro-dec-conserver); }
+  .rb-dbtn--braderie[aria-pressed="true"] { background: var(--pro-dec-braderie); color: var(--pro-dec-braderie-on); }
+  .rb-dbtn--relocalisation[aria-pressed="true"] { background: var(--pro-dec-reloc); }
+  .rb-dbtn--pilon[aria-pressed="true"] { background: var(--pro-dec-pilon); }
+  .rb-fbtn { display: inline-flex; align-items: center; min-height: 34px; padding: 0 .75rem; margin: 0; border: 1px solid var(--pro-trait-fort); border-radius: 0; background: #fff; color: var(--pro-bleu); font: 600 .75rem var(--pro-font-body); cursor: pointer; }
+  .rb-fbtn:hover { background: var(--pro-bleu-pale); }
+  .rb-fbtn[aria-pressed="true"] { background: var(--pro-bleu); border-color: var(--pro-bleu); color: #fff; }
+  .rb-fbtn[aria-pressed="true"]::after { content: "✕"; margin-left: .45rem; font-size: .7rem; }
+  .rb-toolbar-r { display: flex; gap: .5rem; flex-wrap: wrap; margin-left: auto; }
 
-  footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
-  footer a{color:#c9a96e;text-decoration:none}
+  /* Éditeur de rayon fictif (zones de magasin) */
+  .sel-field { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .8rem 0; font-size: .85rem; }
+  .sel-field > .pro-label { min-width: 5.5rem; }
+  .sel-field select, .sel-field input[type=number] { height: 44px; padding: 0 .6rem; border: 1px solid var(--pro-trait-fort); border-radius: 0; background: #fff; color: var(--pro-texte); font: 400 .88rem var(--pro-font-body); }
+  .sel-field input[type=number] { width: 72px; }
+  .sel-cols { display: flex; flex-wrap: wrap; gap: 3px; }
+  .sel-col { width: 36px; height: 36px; margin: 0; padding: 0; border: 1px solid var(--pro-trait-fort); border-radius: 0; background: #fff; color: var(--pro-texte); font: 600 .78rem var(--pro-font-body); cursor: pointer; }
+  .sel-col.on { background: var(--pro-bleu); border-color: var(--pro-bleu); color: #fff; }
+  .sel-hint { font-size: .75rem; color: var(--pro-texte-doux); }
+  .sel-parts { list-style: none; margin: .25rem 0 .9rem; padding: 0; }
+  .sel-parts li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; background: var(--pro-papier); border: 1px solid var(--pro-carte-bord); padding: .4rem .7rem; margin-bottom: 4px; font-size: .82rem; }
+  .sel-parts li .n { color: var(--pro-texte-doux); font-size: .75rem; white-space: nowrap; display: inline-flex; align-items: center; gap: .4rem; }
+  .sel-parts button { width: 32px; height: 32px; background: none; border: 0; color: var(--pro-carmin); cursor: pointer; font-size: 1rem; }
+  .sel-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+  .sel-err { color: var(--pro-carmin-fonce); font-size: .8rem; font-weight: 600; margin-top: .5rem; }
+
+  /* ── Onglet Journal & exports ── */
+  .rb-exports { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .rb-log .pro-table td { padding: .45rem .7rem; }
+
+  @media (max-width: 60rem) {
+    .rb-decide { grid-template-columns: minmax(0, 1fr); }
+    .rb-dec { position: static; }
+  }
+  @media (max-width: 40rem) {
+    .rb-fiche { padding: 1rem; }
+    .rb-titre { font-size: 1.4rem; }
+    .rb-verdict__p { font-size: 1.1rem; }
+    .rb-yb { flex-wrap: wrap; }
+    .rb-yb__avant { flex-basis: 100%; border-left: 0; padding-left: 0; border-top: 1px dashed #C8C4B8; padding-top: .6rem; }
+    .rb-loans__rest { flex-basis: 100%; border-left: 0; padding-left: 0; border-top: 1px solid var(--pro-carte-bord); padding-top: .8rem; }
+    .rb-scan .pro-input { width: 100%; }
+    .rb-scan { flex: 1 1 100%; }
+  }
 </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
        qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
@@ -316,91 +287,118 @@
        rendu. Voir js/parent-page-height.js. -->
   <script src="js/parent-page-height.js"></script>
 </head>
-<body>
+<body class="pro">
 
-<section class="page-hero">
-  <div class="container">
-    <div>
-      <nav class="breadcrumb">Espace professionnel · Magasins et rayons en libre accès</nav>
-      <h1 class="page-title">Rotobib</h1>
-      <p class="page-lead">Scannez un code-barre pour voir sa fiche et ses statistiques de prêt, puis décidez : conserver, pilon, braderie ou relocalisation.</p>
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace professionnel</a> › Désherbage</p>
+      <h1 class="pro-head__h1">Rotobib</h1>
     </div>
-    <div class="hero-actions">
-      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
-      <a href="admin.html">← Espace professionnel</a>
-      <button type="button" id="logout-btn">Se déconnecter</button>
+    <div class="pro-tabs" role="tablist" aria-label="Sections de Rotobib" id="rb-tabs">
+      <button type="button" class="pro-tab" role="tab" data-tab="decider" aria-selected="true">Décider</button>
+      <button type="button" class="pro-tab" role="tab" data-tab="rayon" aria-selected="false">Rayon <span class="pro-tab__count" id="tab-rayon-count" hidden title="Livres restant à traiter dans le rayon"></span></button>
+      <button type="button" class="pro-tab" role="tab" data-tab="journal" aria-selected="false">Journal &amp; exports</button>
+    </div>
+    <div class="pro-head__actions">
+      <span class="pro-sync" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
+      <button type="button" class="pro-btn pro-btn--ghost" id="rb-help-btn">Raccourcis</button>
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="logout-btn">Déconnexion</button>
     </div>
   </div>
-</section>
+</header>
 
-<main>
-  <div class="section">
-    <div class="container">
-
-      <p class="ex-note">
-        <strong>Comment ça marche :</strong> cet outil porte sur les magasins 2e/5e/6e étage, à partir des
-        statistiques de prêt de <code>xml/bib.xml</code> (export complet de la bibliothèque). Scannez un code-barre :
-        sa fiche (titre, auteur, cote, date de parution) et son historique de prêts sur les 4 dernières années
-        s'affichent. Choisissez ensuite un traitement — les décisions sont partagées entre collègues (comme le
-        récolement) et s'exportent en .txt pour ajout panier dans le SIGB. Pour une vue d'ensemble sur tout le
-        catalogue (pas seulement les magasins), voir <a href="desherbage-stats.html">Statistiques de prêt</a>.
-        <br><strong>Rayons en libre accès :</strong> importez un rayon créé dans le récolement pour voir tous ses
-        livres d'un coup (parution, date de catalogage, prêts de l'année en cours / des années précédentes) et
-        décider livre par livre. La liste se complète d'elle-même au fil du récolement ; un livre déjà traité y
-        reste même s'il n'est plus scanné dans le rayon.
-      </p>
-
-      <div class="stats-row" id="stats-row"></div>
-
-      <div class="form-card">
-        <h2>Importer un rayon du récolement</h2>
-        <div class="rayon-row">
-          <select id="rayon-select"><option value="">Chargement des rayons…</option></select>
-          <select id="rayon-col-select" disabled><option value="">Toutes les colonnes</option></select>
-          <button type="button" class="rayon-btn" id="rayon-import-btn" disabled>Importer</button>
-          <button type="button" class="rayon-btn ghost" id="rayon-refresh-btn" title="Relire le récolement (nouveaux scans, nouveaux rayons)">↻</button>
-          <button type="button" class="rayon-btn ghost" id="sel-new-btn" title="Regrouper des étagères de magasin sous un nom (ex. les Que sais-je ? du 5e)">+ Rayon fictif (magasins)</button>
-          <button type="button" class="rayon-btn ghost" id="sel-edit-btn" style="display:none">✎ Modifier ce rayon fictif</button>
-        </div>
-        <p class="rayon-msg" id="rayon-msg">Rayons en libre accès créés dans <a href="recolement.html">le récolement</a>, et rayons fictifs des magasins (étagères choisies avec « + Rayon fictif »). Tous les livres scannés dans le rayon sont importés avec leurs statistiques de prêt.</p>
-        <div class="sel-editor" id="sel-editor">
-          <h3 id="sel-editor-title">Nouveau rayon fictif</h3>
-          <div class="sel-field"><span>Nom</span><input type="text" id="sel-name" maxlength="80" placeholder="ex. Que sais-je ? (5e)"></div>
-          <div class="sel-field">
-            <span>Zone</span>
-            <select id="sel-travee"></select>
-            <span class="sel-hint">étagères de</span>
-            <input type="number" id="sel-et-from" min="1" max="30" placeholder="1">
-            <span class="sel-hint">à</span>
-            <input type="number" id="sel-et-to" min="1" max="30" placeholder="6">
-            <span class="sel-hint">(vide = toutes)</span>
-          </div>
-          <div class="sel-field">
-            <span>Colonnes</span>
-            <div class="sel-cols" id="sel-cols"></div>
-            <span class="sel-hint">aucune cochée = toutes</span>
-          </div>
-          <div class="sel-field"><span></span><button type="button" class="rayon-btn ghost" id="sel-add-part">+ Ajouter cette zone</button><span class="sel-hint" id="sel-zone-count"></span></div>
-          <ul class="sel-parts" id="sel-parts"></ul>
-          <div class="sel-actions">
-            <button type="button" class="rayon-btn" id="sel-save">Enregistrer</button>
-            <button type="button" class="rayon-btn ghost" id="sel-cancel">Annuler</button>
-            <span class="sel-hint" id="sel-total"></span>
-            <button type="button" class="rayon-btn danger" id="sel-delete" style="display:none">Supprimer ce rayon fictif</button>
-          </div>
-          <div class="sel-err" id="sel-err"></div>
-        </div>
+<!-- Contexte persistant : rayon courant, progression, scan -->
+<div class="rb-ctx">
+  <div class="pro-wrap rb-ctx__inner">
+    <div class="rb-ctx__rayon">
+      <div>
+        <span class="pro-label">Rayon en cours</span>
+        <div class="rb-ctx__title" id="ctx-title">Aucun rayon importé</div>
       </div>
+      <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="rayon-picker-btn" aria-expanded="false" aria-controls="rayon-picker">Changer de rayon</button>
+    </div>
+    <div class="rb-ctx__prog" id="ctx-prog"></div>
+    <form class="rb-scan" onsubmit="return false">
+      <label class="pro-label" for="roto-scan-input">Scanner un livre</label>
+      <span class="pro-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14"/></svg>
+        <input type="text" class="pro-input" id="roto-scan-input" inputmode="numeric" placeholder="Code-barre…" autocomplete="off" autofocus>
+      </span>
+    </form>
+  </div>
 
-      <div class="form-card">
-        <h2>Scanner un exemplaire</h2>
-        <div class="roto-scan-row">
-          <input type="text" id="roto-scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
-        </div>
+  <div class="pro-wrap">
+    <div class="rb-picker" id="rayon-picker" hidden>
+      <div class="rb-picker__row">
+        <select id="rayon-select" aria-label="Rayon à importer"><option value="">Chargement des rayons…</option></select>
+        <select id="rayon-col-select" aria-label="Colonne" disabled><option value="">Toutes les colonnes</option></select>
+        <button type="button" class="pro-btn pro-btn--primary" id="rayon-import-btn" disabled>Importer</button>
+        <button type="button" class="pro-btn pro-btn--icon" id="rayon-refresh-btn" title="Relire le récolement (nouveaux scans, nouveaux rayons)" aria-label="Relire le récolement"></button>
+        <button type="button" class="pro-btn pro-btn--secondary" id="sel-new-btn" title="Regrouper des étagères de magasin sous un nom (ex. les Que sais-je ? du 5e)">+ Rayon fictif (magasins)</button>
+        <button type="button" class="pro-btn pro-btn--secondary" id="sel-edit-btn" style="display:none">✎ Modifier ce rayon fictif</button>
+        <button type="button" class="pro-btn pro-btn--ghost" id="rayon-close" style="display:none">Fermer le rayon</button>
       </div>
+      <p class="rb-msg" id="rayon-msg">Rayons en libre accès créés dans <a class="pro-link" href="recolement.html">le récolement</a>, et rayons fictifs des magasins (étagères choisies avec « + Rayon fictif »). Tous les livres scannés dans le rayon sont importés avec leurs statistiques de prêt.</p>
 
-      <div class="roto-flash" id="roto-flash"></div>
-      <div class="roto-notfound" id="roto-notfound"></div>
+      <div class="sel-editor pro-card pro-card--pad" id="sel-editor" hidden style="margin-top:1rem">
+        <h3 class="pro-h4" id="sel-editor-title">Nouveau rayon fictif</h3>
+        <div class="sel-field"><span class="pro-label">Nom</span><input type="text" class="pro-input" id="sel-name" maxlength="80" placeholder="ex. Que sais-je ? (5e)" style="max-width:22rem"></div>
+        <div class="sel-field">
+          <span class="pro-label">Zone</span>
+          <select id="sel-travee"></select>
+          <span class="sel-hint">étagères de</span>
+          <input type="number" id="sel-et-from" min="1" max="30" placeholder="1">
+          <span class="sel-hint">à</span>
+          <input type="number" id="sel-et-to" min="1" max="30" placeholder="6">
+          <span class="sel-hint">(vide = toutes)</span>
+        </div>
+        <div class="sel-field">
+          <span class="pro-label">Colonnes</span>
+          <div class="sel-cols" id="sel-cols"></div>
+          <span class="sel-hint">aucune cochée = toutes</span>
+        </div>
+        <div class="sel-field"><button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="sel-add-part">+ Ajouter cette zone</button><span class="sel-hint" id="sel-zone-count"></span></div>
+        <ul class="sel-parts" id="sel-parts"></ul>
+        <div class="sel-actions">
+          <button type="button" class="pro-btn pro-btn--primary" id="sel-save">Enregistrer</button>
+          <button type="button" class="pro-btn pro-btn--secondary" id="sel-cancel">Annuler</button>
+          <span class="sel-hint" id="sel-total"></span>
+          <button type="button" class="pro-btn pro-btn--danger" id="sel-delete" style="display:none;margin-left:auto">Supprimer ce rayon fictif</button>
+        </div>
+        <div id="sel-confirm"></div>
+        <div class="sel-err" id="sel-err" role="alert"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main id="contenu" class="pro-main rb-main">
+  <div class="pro-wrap">
+
+    <details class="pro-help rb-help" id="rb-help">
+      <summary><span>Comment ça marche ?</span><svg class="pro-help__chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+      <div class="pro-help__body">
+        <p>Cet outil porte sur les magasins 2e/5e/6e étage, à partir des statistiques de prêt de <code>xml/bib.xml</code> (export complet de la bibliothèque). Scannez un code-barre : sa fiche (titre, auteur, cote, dates) et son historique de prêts sur les 4 dernières années s'affichent. Choisissez ensuite un traitement — les décisions sont partagées entre collègues (comme le récolement) et s'exportent en .txt pour ajout panier dans le SIGB. Pour une vue d'ensemble sur tout le catalogue, voir <a class="pro-link" href="desherbage-stats.html">Statistiques de prêt</a>.</p>
+        <p><strong>Rayons en libre accès :</strong> importez un rayon créé dans le récolement (« Changer de rayon ») pour voir tous ses livres d'un coup et décider livre par livre. La liste se complète d'elle-même au fil du récolement ; un livre déjà traité y reste même s'il n'est plus scanné dans le rayon.</p>
+        <p><strong>Raccourcis</strong> (fiche affichée, champ de scan vide) :
+          <span class="pro-kbd">C</span> Conserver · <span class="pro-kbd">B</span> Braderie · <span class="pro-kbd">R</span> Relocalisation · <span class="pro-kbd">P</span> Pilon · <span class="pro-kbd">U</span> Annuler la décision · <span class="pro-kbd">←</span> <span class="pro-kbd">→</span> livre précédent / suivant (dans un rayon). Des lettres et jamais des chiffres : la scannette tape des chiffres.</p>
+      </div>
+    </details>
+
+    <!-- ═════════ Décider ═════════ -->
+    <section class="pro-tabpanel" id="panel-decider" data-tab="decider" style="margin-top:1.25rem" aria-label="Décider">
+
+      <div class="pro-empty" id="roto-empty">
+        <div class="rb-flash" id="roto-flash" role="status"></div>
+        <div class="rb-notfound" id="roto-notfound" role="alert"></div>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2 M17 3h2a2 2 0 0 1 2 2v2 M21 17v2a2 2 0 0 1-2 2h-2 M7 21H5a2 2 0 0 1-2-2v-2 M7 8v8 M11 8v8 M15 8v8 M18 8v8"/></svg>
+        <div class="pro-empty__title">Scannez un livre pour décider</div>
+        <p class="pro-empty__text">Le code-barre s'affiche ici avec ses statistiques de prêt. Dans un rayon importé, ouvrez un livre depuis l'onglet « Rayon » pour naviguer de l'un à l'autre.</p>
+      </div>
 
       <div class="roto-zoom" id="roto-zoom" role="dialog" aria-modal="true" aria-label="Couverture agrandie">
         <button type="button" class="roto-zoom-close" aria-label="Fermer">×</button>
@@ -408,131 +406,231 @@
         <div class="roto-zoom-cap" id="roto-zoom-cap"></div>
         <div class="roto-zoom-hint">Clic ou Échap pour fermer · ← → livre précédent / suivant</div>
       </div>
-      <div class="roto-detail" id="roto-detail">
-        <div class="roto-nav" id="roto-nav" style="display:none">
-          <button type="button" class="roto-nav-btn" id="roto-prev" title="Livre précédent (flèche ←)">◀ Précédent</button>
-          <div class="roto-nav-mid">
-            <div class="roto-nav-pos" id="roto-nav-pos"></div>
-            <label class="roto-nav-auto"><input type="checkbox" id="roto-auto-next"> Passer au suivant après une décision</label>
-          </div>
-          <button type="button" class="roto-nav-btn" id="roto-next" title="Livre suivant (flèche →)">Suivant ▶</button>
-        </div>
-        <div class="roto-head">
-          <img class="roto-cover" id="roto-cover" style="display:none" alt="Couverture" title="Cliquer pour agrandir">
-          <div class="roto-headcol">
-            <p class="roto-titre" id="roto-titre"></p>
-            <p class="roto-soustitre" id="roto-soustitre" style="display:none"></p>
-            <p class="roto-auteur" id="roto-auteur"></p>
-            <div id="roto-badges"></div>
-            <p class="roto-meta" id="roto-meta"></p>
-            <div class="roto-avis" id="roto-avis" style="display:none"></div>
-          </div>
-        </div>
 
-        <div class="roto-dates">
-          <div class="roto-date-box">
-            <div class="roto-date-label">Date de parution</div>
-            <div class="roto-date-val" id="roto-date"></div>
+      <div class="rb-decide" id="roto-detail">
+        <section class="pro-card rb-fiche" aria-label="Fiche du livre">
+          <div class="rb-fiche__top">
+            <img class="roto-cover" id="roto-cover" style="display:none" alt="Couverture" title="Cliquer pour agrandir">
+            <div class="rb-fiche__id">
+              <p class="pro-eyebrow">Exemplaire à décider</p>
+              <h2 class="rb-titre" id="roto-titre"></h2>
+              <p class="rb-soustitre" id="roto-soustitre" style="display:none"></p>
+              <p class="rb-auteur" id="roto-auteur"></p>
+              <p class="rb-editeur" id="roto-editeur"></p>
+              <div class="rb-badges" id="roto-badges"></div>
+            </div>
           </div>
-          <div class="roto-date-box secondary">
-            <div class="roto-date-label">Catalogué le</div>
-            <div class="roto-date-val" id="roto-date-saisie"></div>
+          <dl class="rb-dl" id="roto-meta"></dl>
+          <div class="rb-verdict" id="roto-verdict" aria-live="polite"></div>
+          <div class="rb-charts pro-chart" id="roto-charts"></div>
+        </section>
+
+        <aside class="pro-card rb-dec" aria-label="Décision">
+          <p class="pro-eyebrow">Votre décision</p>
+          <div class="rb-cur" id="rb-cur"></div>
+          <div class="rb-decbtns" role="group" aria-label="Décision pour ce livre" id="rb-decbtns"></div>
+          <div class="rb-dec__row">
+            <button type="button" class="pro-btn pro-btn--ghost" id="roto-undo" disabled aria-keyshortcuts="U"></button>
+            <label class="pro-check"><input type="checkbox" id="roto-auto-next"> Passer au suivant après une décision</label>
           </div>
-        </div>
-
-        <div class="roto-split" id="roto-split"></div>
-
-        <div class="roto-hist-wrap">
-          <div class="roto-hist-title">Prêts par année</div>
-          <div class="roto-hist" id="roto-hist"></div>
-          <p class="roto-cumul" id="roto-cumul"></p>
-        </div>
-
-        <div class="roto-actions">
-          <button type="button" class="roto-btn" data-statut="conserver" title="Raccourci : C">✓ Conserver <kbd>C</kbd></button>
-          <button type="button" class="roto-btn" data-statut="pilon" title="Raccourci : P">🗑️ Pilon <kbd>P</kbd></button>
-          <button type="button" class="roto-btn" data-statut="braderie" title="Raccourci : B">🏷️ Braderie <kbd>B</kbd></button>
-          <button type="button" class="roto-btn" data-statut="relocalisation" title="Raccourci : R">📦 Relocalisation <kbd>R</kbd></button>
-        </div>
-        <div class="roto-undo-row" id="roto-undo-row" style="display:none">
-          <button type="button" class="roto-undo" id="roto-undo">↺ Annuler le traitement</button>
-        </div>
+          <div class="rb-nav" id="roto-nav-wrap">
+            <div id="roto-nav" style="display:none">
+              <div class="rb-nav__pos" id="roto-nav-pos"></div>
+              <div class="rb-nav__sub" id="roto-nav-sub"></div>
+              <div class="rb-nav__btns">
+                <button type="button" class="pro-btn" id="roto-prev" title="Livre précédent (flèche ←)"></button>
+                <button type="button" class="pro-btn" id="roto-next" title="Livre suivant (flèche →)"></button>
+              </div>
+            </div>
+            <p class="rb-nav__none" id="roto-nav-none">Navigation ◀ ▶ disponible quand la fiche est ouverte depuis le tableau d'un rayon.</p>
+          </div>
+          <div id="roto-avis" style="display:none"></div>
+        </aside>
       </div>
 
-      <div class="rayon-panel" id="rayon-panel">
-        <h2 id="rayon-title"></h2>
-        <p class="rayon-sub" id="rayon-sub"></p>
-        <div id="rayon-stats"></div>
-        <div class="log-wrap rayon-table">
-          <div class="log-header">
-            <div class="rayon-filters">
-              <input type="text" class="log-search" id="rayon-search" placeholder="Filtrer (titre, auteur, cote…)">
-              <label><input type="checkbox" id="rayon-hide-treated"> Masquer les traités</label>
-              <label><input type="checkbox" id="rayon-only-zero"> <span id="rayon-only-zero-label">Aucun prêt cette année</span></label>
-              <span id="rayon-dewey-chip"></span>
+      <section class="rb-next" id="rb-next" aria-label="Prochains livres" hidden>
+        <div class="pro-section-head">
+          <h2 class="pro-eyebrow">À suivre</h2>
+          <span class="pro-rule" aria-hidden="true"></span>
+          <span class="pro-section-note">Ordre du tableau du rayon</span>
+        </div>
+        <div class="rb-next__grid" id="rb-next-grid"></div>
+      </section>
+    </section>
+
+    <!-- ═════════ Rayon ═════════ -->
+    <section class="pro-tabpanel" id="panel-rayon" data-tab="rayon" style="margin-top:1.25rem" aria-label="Rayon" hidden>
+      <div class="pro-empty" id="rayon-empty">
+        <div class="pro-empty__title">Aucun rayon importé</div>
+        <p class="pro-empty__text">Importez un rayon du récolement (ou créez un rayon fictif dans les magasins) pour voir ses statistiques et décider livre par livre.</p>
+        <button type="button" class="pro-btn pro-btn--primary" id="rayon-empty-btn">Choisir un rayon</button>
+      </div>
+
+      <div id="rayon-panel" hidden>
+        <div class="rb-sec">
+          <h2 class="rb-sec__title" id="rayon-title"></h2>
+          <p class="rb-sec__sub" id="rayon-sub"></p>
+          <div class="pro-kpis" id="rb-kpis"></div>
+        </div>
+
+        <div class="rb-sec pro-chart">
+          <h2 class="rb-sec__title">Âge et usage</h2>
+          <p class="rb-sec__sub">Chaque point est un livre : année de catalogage en abscisse, prêts cumulés en ordonnée (échelle racine carrée). Cliquez un point pour ouvrir sa fiche.</p>
+          <div class="pro-card pro-card--pad rb-scatter" id="rb-scatter"></div>
+        </div>
+
+        <div class="rb-sec">
+          <h2 class="rb-sec__title">Prêts par année</h2>
+          <div class="pro-card pro-card--pad" id="rb-loans"></div>
+        </div>
+
+        <div class="rb-sec">
+          <h2 class="rb-sec__title">Thèmes (Dewey)</h2>
+          <div class="pro-card pro-card--pad rb-dw pro-chart" id="rb-dewey"></div>
+        </div>
+
+        <div class="rb-sec">
+          <h2 class="rb-sec__title">Dernière année de prêt</h2>
+          <div class="pro-card pro-card--pad" id="rb-lastyear"></div>
+        </div>
+
+        <div class="rb-sec">
+          <h2 class="rb-sec__title">Tableau de travail</h2>
+          <div class="pro-card">
+            <div class="pro-toolbar">
+              <label class="pro-search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+                <input type="search" class="pro-input" id="rayon-search" placeholder="Filtrer (titre, auteur, cote…)" autocomplete="off" aria-label="Filtrer le tableau">
+              </label>
+              <div class="pro-toolbar__filters">
+                <button type="button" class="rb-fbtn" id="rayon-hide-treated" aria-pressed="false">Masquer les traités</button>
+                <button type="button" class="rb-fbtn" id="rayon-only-zero" aria-pressed="false"><span id="rayon-only-zero-label">Aucun prêt cette année</span></button>
+                <span id="rayon-dewey-chip"></span>
+              </div>
+              <div class="rb-toolbar-r">
+                <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="rayon-export-csv">Exporter le rayon (.csv)</button>
+              </div>
             </div>
-            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-              <button type="button" class="export-btn" id="rayon-export-csv">Exporter le rayon (.csv)</button>
-              <button type="button" class="export-btn" id="rayon-close">Fermer</button>
+            <div class="rb-tbl">
+              <table class="pro-table" aria-label="Livres du rayon">
+                <thead id="rayon-thead"></thead>
+                <tbody id="rayon-tbody"></tbody>
+              </table>
             </div>
+            <div class="pro-table-foot" id="rayon-foot"></div>
           </div>
-          <div class="log-body">
-            <table class="log-table">
-              <thead id="rayon-thead"></thead>
-              <tbody id="rayon-tbody"></tbody>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════ Journal & exports ═════════ -->
+    <section class="pro-tabpanel" id="panel-journal" data-tab="journal" style="margin-top:1.25rem" aria-label="Journal et exports" hidden>
+      <div class="rb-sec">
+        <div class="pro-section-head"><h2 class="pro-eyebrow">Avancement</h2><span class="pro-rule" aria-hidden="true"></span></div>
+        <div id="rb-stats"></div>
+      </div>
+
+      <div class="rb-sec">
+        <div class="pro-section-head"><h2 class="pro-eyebrow">Exports pour le SIGB</h2><span class="pro-rule" aria-hidden="true"></span><span class="pro-section-note">un code-barre par ligne, toutes décisions confondues</span></div>
+        <div class="rb-exports" id="rb-exports"></div>
+      </div>
+
+      <div class="rb-sec rb-log">
+        <div class="pro-section-head"><h2 class="pro-eyebrow">Traitements récents</h2><span class="pro-rule" aria-hidden="true"></span></div>
+        <div class="pro-card">
+          <div class="pro-toolbar">
+            <label class="pro-search">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+              <input type="search" class="pro-input" id="log-search" placeholder="Filtrer (titre, code-barre)…" autocomplete="off" aria-label="Filtrer le journal">
+            </label>
+          </div>
+          <div class="pro-table-wrap pro-table-wrap--free">
+            <table class="pro-table">
+              <thead><tr><th scope="col">Code-barre</th><th scope="col">Titre</th><th scope="col">Traitement</th><th scope="col">Le</th><th scope="col"><span class="pro-sr">Action</span></th></tr></thead>
+              <tbody id="log-tbody"></tbody>
             </table>
           </div>
+          <div class="pro-table-foot" id="log-foot"></div>
         </div>
       </div>
+    </section>
 
-      <div class="export-row">
-        <button type="button" class="export-btn" data-export="conserver">Exporter Conserver (.txt)</button>
-        <button type="button" class="export-btn" data-export="pilon">Exporter Pilon (.txt)</button>
-        <button type="button" class="export-btn" data-export="braderie">Exporter Braderie (.txt)</button>
-        <button type="button" class="export-btn" data-export="relocalisation">Exporter Relocalisation (.txt)</button>
-      </div>
-
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title">Traitements récents</span>
-          <input type="text" class="log-search" id="log-search" placeholder="Filtrer (titre, code-barre)…">
-        </div>
-        <div class="log-body">
-          <table class="log-table">
-            <thead>
-              <tr><th>Code-barre</th><th>Titre</th><th>Traitement</th><th>Le</th><th></th></tr>
-            </thead>
-            <tbody id="log-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
-    </div>
   </div>
 </main>
 
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+<footer class="pro-foot">
+  <div class="pro-foot__inner">
+    <span>Bibliothèques de Douai — Réserve patrimoniale</span>
+    <a href="admin.html">← Espace professionnel</a>
   </div>
 </footer>
 
+<script src="js/admin-ui.js"></script>
+<script src="js/admin-charts.js"></script>
 <script>
-(function() {
-  if (localStorage.getItem('rp_admin_auth') !== '1') {
-    window.location.href = 'index.html';
-  }
-})();
 document.getElementById('logout-btn').addEventListener('click', function() {
   localStorage.removeItem('rp_admin_auth');
   localStorage.removeItem('rp_admin_token');
   window.location.href = 'index.html';
 });
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+const $ = id => document.getElementById(id);
+const esc = rpUI.esc;
+const fmt = n => rpUI.fmt.n(n);
 
-const STATUTS = ['conserver','pilon','braderie','relocalisation'];
+const STATUTS = ['conserver','braderie','relocalisation','pilon'];       // ordre d'affichage
 const STATUT_LABEL = { conserver:'Conserver', pilon:'Pilon', braderie:'Braderie', relocalisation:'Relocalisation' };
+const STATUT_KEY = { conserver:'C', braderie:'B', relocalisation:'R', pilon:'P' };
+const DEC = rpCharts.DECISION;
+const DEC_ICON = {
+  conserver: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
+  braderie: '<path d="M3 12V4h8l9 9-8 8-9-9z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
+  relocalisation: '<path d="M4 8h14M14 4l4 4-4 4"/><path d="M20 16H6M10 12l-4 4 4 4"/>',
+  pilon: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+};
+function decIcon(s, size, stroke){
+  return `<svg width="${size||18}" height="${size||18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke||2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${DEC_ICON[s]}</svg>`;
+}
+const decPill = s => `<span class="pro-pill pro-pill--${s}">${decIcon(s, 14, 2.2)}${STATUT_LABEL[s]}</span>`;
+// Gris plus soutenu que celui des barres (#e3e4ec, invisible en points sur fond blanc).
+const TODO_POINT = '#9aa0bd';
+const colorOfStatut = s => s ? DEC[s].color : TODO_POINT;
+
+/* ════════════════════════════════════════════════════════════
+   ÉTAT DE L'INTERFACE (déclaré tôt : lu par des fonctions appelées à l'init)
+   ════════════════════════════════════════════════════════════ */
+let activeTab = 'decider';
+let tabsCtl = null;
+let currentRecord = null;
+let NAV = null;          // { order:[barcode], index }
+let RAYON_VIEW = [];     // codes-barres du tableau du rayon, dans l'ordre affiché
+let RAYON_ROWS = [];
+let RAYON_BY_BC = new Map();
+let RAYON_ROW_BY_BC = new Map();
+let RAYON_CURRENT = null;
+let RSTAT = null;        // médianes / répartition du rayon importé
+let rayonSort = { key:'empl', dir:1 };
+let rayonFullDirty = false;      // rayon rechargé alors que l'onglet est masqué
+const rayonTouched = new Set();  // décisions changées alors que l'onglet est masqué
+let journalDirty = true;
+let tblLimit = 300;
+let logLimit = 100;
+let lastRayonSig = '';
+let SC_ROWS = [], SC_PTS = [], SC_PT_BY_BC = new Map(), scCurrent = null;
+let deweyLevel = 'indice';       // 'division' | 'indice' | 'precis'
+let deweyMeasure = 'cumules';    // 'cumules' (toutes années) | 'an' (année en cours)
+let deweyShowAll = false;
+let deweyFilter = null;          // { level, key } — key '' = sans indice Dewey
+const DEWEY_TOP = 12;
+const DEWEY_LEVELS = [['division','Division (94x)'],['indice','Indice (944)'],['precis','Précis (944.04)']];
+const LS_RAYON = 'rp_rotobib_rayon';
+const LS_RAYON_SEEN = 'rp_rotobib_rayon_vus'; // { [rayonId]: { [barcode]: {…} } }
+const LS_AUTO_NEXT = 'rp_rotobib_auto_next';
+let RECOL = null;               // { rayons:[defs], selections:[defs], scans:[records] }
+const PRET_YEAR_KEYS = ['an','an1','an2','an3','an4','an5'];
+
+document.addEventListener('rp-tab-change', e => { activeTab = e.detail.id; onTabShown(activeTab); });
+function showTab(id){ if(tabsCtl && activeTab !== id) tabsCtl.select(id); }
 
 /* ════════════════════════════════════════════════════════════
    DONNÉES DÉSHERBAGE (data/desherbage.json + rapport de build)
@@ -540,11 +638,10 @@ const STATUT_LABEL = { conserver:'Conserver', pilon:'Pilon', braderie:'Braderie'
 let DESHERB = [];
 let BY_BC = new Map();
 let REFERENCE_YEAR = new Date().getFullYear();
-let currentRecord = null;
 /* Conteneur brut + index code-barre → ligne sur TOUTE la bibliothèque : le
    scan reste borné aux magasins (BY_BC), mais un rayon en libre accès importé
-   du récolement (voir « IMPORT D'UN RAYON » plus bas) contient justement des
-   livres hors magasin — relus à la demande par columnar.readRow(). */
+   du récolement contient justement des livres hors magasin — relus à la
+   demande par columnar.readRow(). */
 let RAW = null;
 let IDX_ALL = new Map();
 function recordOf(bc){
@@ -557,15 +654,9 @@ const desherbReady = Promise.all([
   fetch('data/desherbage.json').then(r => r.ok ? r.json() : []),
   fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : {}),
 ]).then(([data, report]) => {
-  // data/desherbage.json couvre désormais toute la bibliothèque de Douai
-  // (voir build-desherbage.mjs), pour que desherbage-stats.html puisse
-  // afficher des statistiques sur l'ensemble du catalogue — Rotobib, lui,
-  // reste volontairement borné aux magasins d'étage (pas de bouton
-  // pilon/braderie sur un document patrimonial ou en circulation active dans
-  // les rayons), d'où ce filtre côté client, même patron que magasins.html.
-  // forEachRow plutôt que decode() + filter() : évite de matérialiser les
-  // ~291 000 lignes brutes pour n'en garder ensuite que les ~68 000 de
-  // magasin.
+  // data/desherbage.json couvre toute la bibliothèque de Douai ; le scan
+  // direct reste borné aux magasins d'étage (_isMagasin). forEachRow évite de
+  // matérialiser les ~291 000 lignes pour n'en garder que ~88 000.
   DESHERB = [];
   RAW = data;
   IDX_ALL = new Map();
@@ -575,43 +666,42 @@ const desherbReady = Promise.all([
   });
   BY_BC = new Map(DESHERB.map(r => [r._barcode, r]));
   if (report && report.stats && report.stats.referenceYear) REFERENCE_YEAR = report.stats.referenceYear;
+  journalDirty = true;
   updateStats();
-  renderLog();
+  if(activeTab === 'journal') renderLog();
 }).catch(() => {});
 
 /* ════════════════════════════════════════════════════════════
    ÉTAT PARTAGÉ (R2 via /api/desherbage)
    ════════════════════════════════════════════════════════════ */
 const LS_KEY = 'rp_desherbage_traitements';
-let TRAITEMENTS = {}; // { [barcode]: {barcode,statut,ts} }
+let TRAITEMENTS = {}; // { [barcode]: {barcode,statut,ts,validation?} }
 function loadLocal(){ try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { return {}; } }
-function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(TRAITEMENTS)); }
+function saveLocal(){ try { localStorage.setItem(LS_KEY, JSON.stringify(TRAITEMENTS)); } catch(e) {} }
 TRAITEMENTS = loadLocal();
 
 const LS_PENDING = 'rp_desherbage_pending_sync';
-/* File de synchronisation : implémentation commune aux cinq pages qui
-   écrivent dans un état partagé R2 — voir js/sync-queue.js (localStorage
-   comme source de vérité locale, rejeu à la reconnexion, indicateur
-   #sync-status). Ce bloc était auparavant recopié à l'identique dans chacune.
-   Un patch de désherbage est envoyé tel quel ({type, record|barcode}). */
-const syncQueue = createSyncQueue({
-  storageKey: LS_PENDING,
-  endpoint: '/api/desherbage',
-});
-const authHeaders = syncAuthHeaders;
+/* File de synchronisation commune (js/sync-queue.js) : localStorage comme
+   source de vérité locale, rejeu à la reconnexion, indicateur #sync-status. */
+const syncQueue = createSyncQueue({ storageKey: LS_PENDING, endpoint: '/api/desherbage' });
 function queuePatch(item){ syncQueue.queue(item); }
-function flushPendingSync(){ return syncQueue.flush(); }
 function updateSyncIndicator(){ syncQueue.updateIndicator(); }
 
+/* Fusion d'un état venu du serveur : ne retient que les décisions réellement
+   changées (statut, avis, horodatage) pour ne mettre à jour que ce qui l'est —
+   un sondage de 45 s qui ne ramène rien ne reconstruit plus rien. */
 function mergeIncoming(serverState){
   const pendingBarcodes = new Set(syncQueue.items.map(p => p.record ? p.record.barcode : p.barcode));
+  const changed = [];
   Object.keys(serverState || {}).forEach(bc => {
-    if(!pendingBarcodes.has(bc)) TRAITEMENTS[bc] = serverState[bc];
+    if(pendingBarcodes.has(bc)) return;
+    const a = TRAITEMENTS[bc], b = serverState[bc];
+    if(!a || a.statut !== b.statut || a.ts !== b.ts || JSON.stringify(a.validation || null) !== JSON.stringify(b.validation || null)) changed.push(bc);
+    TRAITEMENTS[bc] = b;
   });
+  if(!changed.length) return;
   saveLocal();
-  updateStats();
-  renderLog();
-  if(currentRecord) highlightButtons();
+  onDecisionsChanged(changed);
 }
 
 async function syncFromServer(){
@@ -621,437 +711,12 @@ async function syncFromServer(){
     mergeIncoming(await res.json());
   }catch(e){ /* hors ligne : on reste sur le cache local */ }
 }
-
 setInterval(()=>{ if(!document.hidden) syncFromServer(); }, 45000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncFromServer(); });
 
 /* ════════════════════════════════════════════════════════════
-   STATISTIQUES
+   UTILITAIRES DE FORMAT
    ════════════════════════════════════════════════════════════ */
-function updateStats(){
-  const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
-  let treated = 0;
-  // Compteurs par traitement : toutes les décisions (magasins ET rayons en
-  // libre accès importés du récolement) ; « non traités » reste rapporté au
-  // seul périmètre magasins.
-  Object.values(TRAITEMENTS).forEach(t => { if(counts[t.statut] !== undefined) counts[t.statut]++; });
-  DESHERB.forEach(r => { if(TRAITEMENTS[r._barcode]) treated++; });
-  const nonTraites = DESHERB.length - treated;
-  document.getElementById('stats-row').innerHTML = `
-    <div class="stat-card"><div class="stat-card-label">Total magasins</div><div class="stat-card-val">${DESHERB.length}</div></div>
-    <div class="stat-card st-conserver"><div class="stat-card-label">Conservés</div><div class="stat-card-val">${counts.conserver}</div></div>
-    <div class="stat-card st-pilon"><div class="stat-card-label">Pilon</div><div class="stat-card-val">${counts.pilon}</div></div>
-    <div class="stat-card st-braderie"><div class="stat-card-label">Braderie</div><div class="stat-card-val">${counts.braderie}</div></div>
-    <div class="stat-card st-relocalisation"><div class="stat-card-label">Relocalisation</div><div class="stat-card-val">${counts.relocalisation}</div></div>
-    <div class="stat-card"><div class="stat-card-label">Non traités</div><div class="stat-card-val">${nonTraites}</div></div>
-  `;
-}
-
-/* ════════════════════════════════════════════════════════════
-   SCAN + AFFICHAGE DE LA FICHE
-   ════════════════════════════════════════════════════════════ */
-const scanInput = document.getElementById('roto-scan-input');
-
-function titreComplet(rec){
-  return rec['200$a'] || '(titre inconnu)';
-}
-function sousTitre(rec){
-  if(rec.titrePartie) return rec.titrePartie;
-  return null;
-}
-function auteurComplet(rec){
-  const noms = (rec['700$a']||'').split('§').map(s=>s.trim()).filter(Boolean);
-  const prenoms = (rec['700$b']||'').split('§').map(s=>s.trim());
-  if(noms.length){
-    return noms.map((n,i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ');
-  }
-  return rec['700$a'] || null;
-}
-
-/* Prêts de toutes les années précédant l'année en cours (AN) : le cumul
-   depuis l'acquisition moins AN — le cumul inclut aussi les prêts antérieurs
-   aux 4 années détaillées (voir build-desherbage.mjs). */
-function pretsAvant(p){ return Math.max(0, ((p && p.cumules) || 0) - ((p && p.an) || 0)); }
-
-function handleScanLookup(raw){
-  const bc = String(raw||'').trim();
-  if(!bc) return;
-  const rec = BY_BC.get(bc) || RAYON_BY_BC.get(bc);
-  document.getElementById('roto-flash').classList.remove('show');
-  if(!rec){
-    currentRecord = null;
-    document.getElementById('roto-detail').classList.remove('show');
-    const nf = document.getElementById('roto-notfound');
-    nf.innerHTML = `Code-barre <strong>${esc(bc)}</strong> introuvable parmi les ${DESHERB.length} exemplaires des magasins d'étage. Ce n'est peut-être pas un livre concerné par cette campagne (rayons, réserve patrimoniale…).`;
-    nf.classList.add('show');
-    scanInput.value = '';
-    scanInput.focus();
-    return;
-  }
-  document.getElementById('roto-notfound').classList.remove('show');
-  NAV = null; // un scan quitte la navigation dans le rayon
-  showDetail(rec);
-  updateNav();
-  scanInput.value = '';
-  scanInput.focus();
-}
-
-scanInput.addEventListener('keydown', e => {
-  if(e.key === 'Enter'){ e.preventDefault(); handleScanLookup(scanInput.value); }
-});
-document.addEventListener('click', e => {
-  if(!e.target.closest('input,select,button,a,.log-body')) scanInput.focus({ preventScroll: true });
-});
-
-function showDetail(rec){
-  currentRecord = rec;
-
-  const cover = document.getElementById('roto-cover');
-  if(rec.imagette){ cover.src = rec.imagette; cover.style.display = ''; cover.onerror = () => { cover.style.display = 'none'; }; }
-  else cover.style.display = 'none';
-  // Agrandissement ouvert pendant la navigation ← → : il suit le livre affiché.
-  if(document.getElementById('roto-zoom').classList.contains('show')){
-    if(rec.imagette) fillZoom(rec); else closeZoom();
-  }
-
-  document.getElementById('roto-titre').textContent = titreComplet(rec);
-  const st = sousTitre(rec);
-  const stEl = document.getElementById('roto-soustitre');
-  if(st){ stEl.textContent = st; stEl.style.display = ''; } else stEl.style.display = 'none';
-
-  const auteur = auteurComplet(rec);
-  document.getElementById('roto-auteur').textContent = auteur || '';
-
-  const badges = [];
-  if(rec.coteAffichee) badges.push(`<span class="roto-badge roto-badge-cote">${esc(rec.coteAffichee)}</span>`);
-  if(rec.exclusionPret) badges.push(`<span class="roto-badge roto-badge-excl">${esc(rec.exclusionPret)}</span>`);
-  const traitement = TRAITEMENTS[rec._barcode];
-  if(traitement) badges.push(`<span class="roto-badge roto-badge-statut ${traitement.statut}">${STATUT_LABEL[traitement.statut]}</span>`);
-  document.getElementById('roto-badges').innerHTML = badges.join(' ');
-
-  const metaParts = [];
-  if(rec['210$c']) metaParts.push(`<b>Éditeur</b> ${esc(rec['210$c'])}`);
-  if(rec.bibliotheque) metaParts.push(`<b>Bibliothèque</b> ${esc(rec.bibliotheque)}`);
-  if(rec.section) metaParts.push(`<b>Section</b> ${esc(rec.section)}`);
-  if(rec.etat) metaParts.push(`<b>État</b> ${esc(rec.etat)}`);
-  if(rec.isbn) metaParts.push(`<b>ISBN</b> ${esc(rec.isbn)}`);
-  if(rec.issn) metaParts.push(`<b>ISSN</b> ${esc(rec.issn)}`);
-  metaParts.push(`<b>Code-barre</b> ${esc(rec._barcode)}`);
-  document.getElementById('roto-meta').innerHTML = metaParts.join(' &nbsp;·&nbsp; ');
-
-  document.getElementById('roto-date').textContent = rec['210$d'] || '—';
-  document.getElementById('roto-date-saisie').textContent = rec.dateSaisie || '—';
-
-  const p = rec.prets || { an3:0, an2:0, an1:0, an:0, cumules:0 };
-  const avant = pretsAvant(p);
-  document.getElementById('roto-split').innerHTML = `
-    <div class="roto-split-card"><div class="lbl">Prêts ${REFERENCE_YEAR}</div><div class="val">${p.an||0}</div><div class="sub">année en cours</div></div>
-    <div class="roto-split-card"><div class="lbl">Prêts avant ${REFERENCE_YEAR}</div><div class="val">${avant}</div><div class="sub">toutes les années précédentes, depuis l'acquisition</div></div>
-    <div class="roto-split-card"><div class="lbl">Dernier prêt</div><div class="val">${esc(rec.derniereAnneePret || '—')}</div><div class="sub">année</div></div>`;
-  const years = [REFERENCE_YEAR-3, REFERENCE_YEAR-2, REFERENCE_YEAR-1, REFERENCE_YEAR];
-  const values = [p.an3, p.an2, p.an1, p.an];
-  const max = Math.max(1, ...values);
-  document.getElementById('roto-hist').innerHTML = values.map((v,i) => `
-    <div class="roto-hist-col">
-      <div class="roto-hist-val">${v}</div>
-      <div class="roto-hist-bar ${v>0?'nonzero':''}" style="height:${Math.max(3, (v/max)*100)}%"></div>
-      <div class="roto-hist-label">${years[i]}</div>
-    </div>
-  `).join('');
-  const r = rec.reservations || {};
-  const resaTotal = (r.an||0)+(r.an1||0)+(r.an2||0)+(r.an3||0);
-  document.getElementById('roto-cumul').textContent =
-    `${p.cumules} prêt${p.cumules>1?'s':''} au total depuis l'acquisition` +
-    (resaTotal ? ` · ${resaTotal} réservation${resaTotal>1?'s':''} sur les 4 dernières années` : '');
-
-  highlightButtons();
-  document.getElementById('roto-detail').classList.add('show');
-}
-
-function highlightButtons(){
-  if(!currentRecord) return;
-  const t = TRAITEMENTS[currentRecord._barcode];
-  document.querySelectorAll('.roto-btn').forEach(b => {
-    b.classList.toggle('active', !!t && b.dataset.statut === t.statut);
-  });
-  document.getElementById('roto-undo-row').style.display = t ? '' : 'none';
-  const avisEl = document.getElementById('roto-avis');
-  const avis = avisHtml(t);
-  avisEl.innerHTML = avis;
-  avisEl.style.display = avis ? '' : 'none';
-}
-
-/* Avis du collègue qui valide la campagne (validation-desherbage.html,
-   champ `validation` de la décision — voir api/desherbage.mjs). */
-function avisState(t){
-  const v = t && t.validation;
-  if(!v) return null;
-  if(!v.avis) return v.commentaire ? 'comment' : null;
-  if(v.statutVu && v.statutVu !== t.statut) return 'stale';
-  return v.avis === 'valide' || v.avis === t.statut ? 'valide' : 'disagree';
-}
-function avisHtml(t, compact){
-  const st = avisState(t);
-  if(!st) return '';
-  const v = t.validation;
-  const label = {
-    valide: '✓ Validé',
-    disagree: `↪ Propose : ${STATUT_LABEL[v.avis]}`,
-    stale: `⚠ Avis donné sur « ${STATUT_LABEL[v.statutVu] || '?'} », décision changée depuis`,
-    comment: '💬 Commentaire',
-  }[st];
-  const by = v.par ? ` — ${esc(v.par)}` : '';
-  if(compact){
-    return `<div class="avis-line ${st}" title="${esc(v.commentaire || '')}">${esc(label)}${v.commentaire && st !== 'comment' ? ' 💬' : ''}</div>`;
-  }
-  return `<span class="avis-tag ${st}">${esc(label)}</span><span class="avis-by">Validation${by}</span>` +
-    (v.commentaire ? `<div class="avis-comment">${esc(v.commentaire)}</div>` : '');
-}
-
-/* ════════════════════════════════════════════════════════════
-   TRAITEMENT (conserver / pilon / braderie / relocalisation)
-   ════════════════════════════════════════════════════════════ */
-function setTraitement(bc, statut){
-  const record = { barcode: bc, statut, ts: new Date().toISOString() };
-  // L'avis du validateur (validation-desherbage.html) survit à un changement
-  // de décision — le serveur le conserve aussi (patch `set`, api/desherbage.mjs).
-  if(TRAITEMENTS[bc] && TRAITEMENTS[bc].validation) record.validation = TRAITEMENTS[bc].validation;
-  TRAITEMENTS[bc] = record;
-  queuePatch({ type:'set', record: { barcode: bc, statut, ts: record.ts } });
-  saveLocal();
-  updateStats();
-  highlightButtons();
-  renderLog();
-}
-function clearTraitement(bc){
-  delete TRAITEMENTS[bc];
-  saveLocal();
-  queuePatch({ type:'clear', barcode: bc });
-  updateStats();
-  highlightButtons();
-  renderLog();
-}
-
-document.querySelectorAll('.roto-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if(!currentRecord) return;
-    const statut = btn.dataset.statut;
-    const rec = currentRecord;
-    setTraitement(rec._barcode, statut);
-    if(NAV) navAfterDecision(rec, statut);
-    else flashTreated(rec, statut);
-  });
-});
-
-/* ════════════════════════════════════════════════════════════
-   NAVIGATION LIVRE PAR LIVRE DANS UN RAYON IMPORTÉ
-   ────────────────────────────────────────────────────────────
-   Une fiche ouverte depuis le tableau du rayon garde l'ordre du tableau
-   (tri + filtres en cours, thème Dewey compris) pour passer au précédent /
-   suivant (boutons ou flèches ← →). Cet ordre est FIGÉ à l'ouverture
-   (NAV.order) : avec « Masquer les traités », le livre qu'on vient de
-   traiter disparaît du tableau, et un ordre recalculé décalerait la
-   position. Recliquer un titre du tableau reprend l'ordre courant.
-   Un scan de code-barre quitte ce mode (NAV = null).
-   ════════════════════════════════════════════════════════════ */
-let NAV = null;          // { order:[barcode], index }
-let RAYON_VIEW = [];     // codes-barres du tableau du rayon, dans l'ordre affiché
-const LS_AUTO_NEXT = 'rp_rotobib_auto_next';
-const autoNextBox = document.getElementById('roto-auto-next');
-try { autoNextBox.checked = localStorage.getItem(LS_AUTO_NEXT) !== '0'; } catch(e) { autoNextBox.checked = true; }
-autoNextBox.addEventListener('change', () => {
-  try { localStorage.setItem(LS_AUTO_NEXT, autoNextBox.checked ? '1' : '0'); } catch(e) {}
-});
-
-function openFromRayon(bc){
-  const order = RAYON_VIEW.includes(bc) ? RAYON_VIEW.slice() : [bc];
-  NAV = { order, index: order.indexOf(bc) };
-  showNavAt(NAV.index);
-}
-function showNavAt(i){
-  if(!NAV || i < 0 || i >= NAV.order.length) return;
-  NAV.index = i;
-  const bc = NAV.order[i];
-  const rec = RAYON_BY_BC.get(bc) || recordOf(bc);
-  if(!rec) return;
-  document.getElementById('roto-notfound').classList.remove('show');
-  showDetail(rec);
-  updateNav();
-  const detail = document.getElementById('roto-detail');
-  if(detail.getBoundingClientRect().top < 0) detail.scrollIntoView({ behavior:'smooth', block:'start' });
-}
-function updateNav(){
-  const bar = document.getElementById('roto-nav');
-  if(!NAV){ bar.style.display = 'none'; markCurrentRow(); return; }
-  bar.style.display = '';
-  const n = NAV.order.length, i = NAV.index;
-  const restants = NAV.order.filter(bc => !TRAITEMENTS[bc]).length;
-  const ctx = [document.getElementById('rayon-title').textContent];
-  if(deweyFilter) ctx.push('thème ' + (deweyFilter.key || 'sans indice'));
-  document.getElementById('roto-nav-pos').innerHTML =
-    `Livre ${i+1} / ${n}<small>${esc(ctx.join(' · '))} · ${restants} non traité${restants>1?'s':''} dans cette liste</small>`;
-  document.getElementById('roto-prev').disabled = i <= 0;
-  document.getElementById('roto-next').disabled = i >= n - 1;
-  markCurrentRow();
-}
-function markCurrentRow(){
-  const cur = NAV ? NAV.order[NAV.index] : null;
-  document.querySelectorAll('#rayon-tbody tr[data-bc]').forEach(tr => tr.classList.toggle('current', tr.dataset.bc === cur));
-}
-function navAfterDecision(rec, statut){
-  const fl = document.getElementById('roto-flash');
-  const last = NAV.index >= NAV.order.length - 1;
-  if(autoNextBox.checked && !last){
-    fl.textContent = `✓ « ${titreComplet(rec)} » marqué « ${STATUT_LABEL[statut]} ». Livre suivant affiché.`;
-    fl.classList.add('show');
-    showNavAt(NAV.index + 1);
-  }else{
-    fl.textContent = `✓ « ${titreComplet(rec)} » marqué « ${STATUT_LABEL[statut]} ».` + (last ? ' C\'était le dernier livre de la liste.' : '');
-    fl.classList.add('show');
-    updateNav();
-  }
-}
-document.getElementById('roto-prev').addEventListener('click', () => { if(NAV) showNavAt(NAV.index - 1); });
-document.getElementById('roto-next').addEventListener('click', () => { if(NAV) showNavAt(NAV.index + 1); });
-// Raccourcis clavier, actifs seulement si aucun champ de saisie n'est en cours
-// d'usage — le champ de scan garde le focus en permanence, on l'accepte s'il
-// est vide. Flèches ← → : livre précédent/suivant (navigation dans un rayon).
-// C / P / B / R : décision sur le livre affiché (même effet qu'un clic sur le
-// bouton). Des lettres et pas des chiffres : une scannette tape des chiffres
-// dans ce même champ (tous les codes-barres de data/desherbage.json sont
-// numériques, vérifié le 2026-10-09).
-const DECISION_KEYS = { c:'conserver', p:'pilon', b:'braderie', r:'relocalisation' };
-document.addEventListener('keydown', e => {
-  if(!document.getElementById('roto-detail').classList.contains('show')) return;
-  if(e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
-  const t = e.target;
-  const typing = t && t.matches && t.matches('input:not([type=checkbox]),select,textarea');
-  if(typing && !(t === scanInput && !scanInput.value)) return;
-  if(NAV && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')){
-    e.preventDefault();
-    showNavAt(NAV.index + (e.key === 'ArrowRight' ? 1 : -1));
-    return;
-  }
-  const statut = DECISION_KEYS[e.key.toLowerCase()];
-  if(statut && currentRecord){
-    e.preventDefault(); // sinon la lettre atterrit dans le champ de scan
-    document.querySelector(`.roto-btn[data-statut="${statut}"]`).click();
-  }
-});
-
-// ── Agrandissement de la couverture ──
-// Fonctions (hissées) plutôt que const : showDetail() les appelle.
-function fillZoom(rec){
-  document.getElementById('roto-zoom-img').src = rec.imagette;
-  document.getElementById('roto-zoom-cap').textContent = titreComplet(rec);
-}
-function openZoom(){
-  if(!currentRecord || !currentRecord.imagette) return;
-  const zoom = document.getElementById('roto-zoom');
-  fillZoom(currentRecord);
-  const embedded = document.documentElement.classList.contains('rp-embedded');
-  if(embedded){
-    const parent = zoom.offsetParent || document.body;
-    const top = document.getElementById('roto-detail').getBoundingClientRect().top - parent.getBoundingClientRect().top;
-    zoom.style.setProperty('--zoom-top', Math.max(0, top) + 'px');
-  }
-  zoom.classList.add('show');
-  if(embedded) zoom.scrollIntoView({ behavior:'smooth', block:'start' });
-}
-function closeZoom(){
-  document.getElementById('roto-zoom').classList.remove('show');
-  document.getElementById('roto-zoom-img').removeAttribute('src');
-}
-document.getElementById('roto-cover').addEventListener('click', openZoom);
-document.getElementById('roto-zoom').addEventListener('click', closeZoom);
-document.addEventListener('keydown', e => {
-  if(e.key === 'Escape' && document.getElementById('roto-zoom').classList.contains('show')) closeZoom();
-});
-
-document.getElementById('roto-undo').addEventListener('click', () => {
-  if(!currentRecord) return;
-  clearTraitement(currentRecord._barcode);
-});
-
-function flashTreated(rec, statut){
-  const fl = document.getElementById('roto-flash');
-  fl.textContent = `✓ « ${titreComplet(rec)} » marqué « ${STATUT_LABEL[statut]} ». Prêt pour le prochain scan.`;
-  fl.classList.add('show');
-  currentRecord = null;
-  document.getElementById('roto-detail').classList.remove('show');
-  scanInput.value = '';
-  scanInput.focus();
-}
-
-/* ════════════════════════════════════════════════════════════
-   JOURNAL DES TRAITEMENTS RÉCENTS
-   ════════════════════════════════════════════════════════════ */
-function renderLog(){
-  const q = (document.getElementById('log-search').value || '').toLowerCase();
-  const rows = Object.values(TRAITEMENTS)
-    .map(t => ({ t, rec: recordOf(t.barcode) }))
-    .filter(({t, rec}) => {
-      if(!q) return true;
-      const titre = rec ? titreComplet(rec).toLowerCase() : '';
-      return t.barcode.toLowerCase().includes(q) || titre.includes(q);
-    })
-    .sort((a,b) => (b.t.ts||'').localeCompare(a.t.ts||''))
-    .slice(0, 200);
-
-  const tbody = document.getElementById('log-tbody');
-  renderRayon(); // une décision prise ici ou ailleurs se reflète dans le rayon importé
-  if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="5" class="log-empty">Aucun traitement enregistré.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = rows.map(({t, rec}) => `
-    <tr>
-      <td class="log-bc">${esc(t.barcode)}</td>
-      <td>${rec ? esc(titreComplet(rec)) : '—'}</td>
-      <td><span class="roto-badge roto-badge-statut ${t.statut}">${STATUT_LABEL[t.statut]}</span></td>
-      <td>${t.ts ? esc(new Date(t.ts).toLocaleString('fr-FR')) : ''}</td>
-      <td><button type="button" class="log-del" data-undo="${esc(t.barcode)}">annuler</button></td>
-    </tr>
-  `).join('');
-  tbody.querySelectorAll('[data-undo]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const bc = btn.dataset.undo;
-      delete TRAITEMENTS[bc];
-      saveLocal();
-      queuePatch({ type:'clear', barcode: bc });
-      updateStats();
-      if(currentRecord && currentRecord._barcode === bc) highlightButtons();
-      renderLog();
-    });
-  });
-}
-document.getElementById('log-search').addEventListener('input', renderLog);
-
-/* ════════════════════════════════════════════════════════════
-   IMPORT D'UN RAYON DU RÉCOLEMENT
-   ────────────────────────────────────────────────────────────
-   Les rayons en libre accès sont créés à la volée dans recolement.html
-   (catégorie `rayons` de l'état partagé, identifiants "RY-…") et leurs livres
-   y sont scannés (travee = id du rayon). On relit cet état en lecture seule
-   via GET /api/recolement (public), on prend les codes-barres scannés dans
-   le rayon choisi (± une colonne) et on les joint à data/desherbage.json —
-   toute la bibliothèque, pas seulement les magasins : c'est le seul endroit
-   de Rotobib où un livre hors magasin peut recevoir une décision, demande
-   explicite (désherbage des rayons). Rien n'est écrit dans le récolement.
-   ════════════════════════════════════════════════════════════ */
-const LS_RAYON = 'rp_rotobib_rayon';
-const LS_RAYON_SEEN = 'rp_rotobib_rayon_vus'; // { [rayonId]: { [barcode]: {barcode,colonne,etage,cote,titre,auteur} } }
-let RECOL = null;               // { rayons:[defs], scans:[records] }
-let RAYON_ROWS = [];            // lignes du rayon importé
-let RAYON_BY_BC = new Map();    // code-barre → enregistrement (scan pendant l'import)
-let RAYON_CURRENT = null;       // { id, col }
-let rayonSort = { key:'empl', dir:1 };
-
-const rayonSelect = document.getElementById('rayon-select');
-const rayonColSelect = document.getElementById('rayon-col-select');
-const rayonImportBtn = document.getElementById('rayon-import-btn');
-const rayonMsg = document.getElementById('rayon-msg');
-
 function yearOf(s){
   const m = String(s||'').match(/\b(1[0-9]{3}|20[0-9]{2})\b/);
   return m ? parseInt(m[1], 10) : null;
@@ -1066,6 +731,669 @@ function median(nums){
   if(!a.length) return null;
   return a[Math.floor((a.length-1)/2)];
 }
+function fmtPct(n, total){
+  if(!total) return '0 %';
+  const v = n * 100 / total;
+  return (v > 0 && v < 10 ? v.toFixed(1).replace('.', ',') : Math.round(v)) + ' %';
+}
+const pctOf = (n, total) => total ? Math.round(n * 100 / total) : 0;
+const plural = (n, w) => `${fmt(n)} ${w}${n > 1 ? 's' : ''}`;
+/* Prêts de toutes les années précédant l'année en cours (AN) : le cumul
+   depuis l'acquisition moins AN (voir build-desherbage.mjs). */
+function pretsAvant(p){ return Math.max(0, ((p && p.cumules) || 0) - ((p && p.an) || 0)); }
+/* Années de prêt détaillées : AN…AN-3 dans l'export actuel ; AN-4/AN-5
+   apparaîtront d'elles-mêmes si un futur export les porte. */
+function pretYearKeys(rows){
+  return PRET_YEAR_KEYS.filter((k, i) => i < 4 || rows.some(r => r.prets && k in r.prets));
+}
+const resteOf = (p, keys) => Math.max(0, (p.cumules || 0) - keys.reduce((t,k) => t + (p[k] || 0), 0));
+const yearLabel = y => y === 2007 ? '2007 ou avant' : String(y);
+function tipAttr(text){
+  return ` data-tip="${esc(text).replace(/\n/g, '&#10;')}" tabindex="0" aria-label="${esc(String(text).replace(/\n/g, ', '))}"`;
+}
+
+function titreComplet(rec){ return rec['200$a'] || '(titre inconnu)'; }
+function sousTitre(rec){ return rec.titrePartie || null; }
+function auteurComplet(rec){
+  const noms = (rec['700$a']||'').split('§').map(s=>s.trim()).filter(Boolean);
+  const prenoms = (rec['700$b']||'').split('§').map(s=>s.trim());
+  if(noms.length){
+    return noms.map((n,i) => (n.toUpperCase() + (prenoms[i] ? ' ' + prenoms[i] : '')).trim()).join(', ');
+  }
+  return rec['700$a'] || null;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PROGRESSION, COMPTEURS (barre de contexte, onglet, journal)
+   ════════════════════════════════════════════════════════════ */
+function rayonCounts(){
+  const counts = { conserver:0, braderie:0, relocalisation:0, pilon:0 };
+  RAYON_ROWS.forEach(r => { const t = TRAITEMENTS[r.bc]; if(t && counts[t.statut] !== undefined) counts[t.statut]++; });
+  const treated = STATUTS.reduce((s,k) => s + counts[k], 0);
+  return { counts, treated, total: RAYON_ROWS.length };
+}
+function progSegments(c){
+  const segs = STATUTS.map(s => ({ key:s, label:STATUT_LABEL[s], value:c.counts[s], color:DEC[s].color, ink:DEC[s].ink }));
+  segs.push({ key:'todo', label:'Non traité', value:c.total - c.treated, color:DEC.todo.color, ink:DEC.todo.ink });
+  return segs;
+}
+function updateCtx(){
+  $('ctx-title').textContent = RAYON_CURRENT && RAYON_ROWS ? ($('rayon-title').textContent || 'Rayon') : 'Aucun rayon importé';
+  $('rayon-close').style.display = RAYON_CURRENT ? '' : 'none';
+  const host = $('ctx-prog');
+  const tabCount = $('tab-rayon-count');
+  if(!RAYON_CURRENT || !RAYON_ROWS.length){
+    host.innerHTML = `<span class="rb-ctx__hint">${RAYON_CURRENT ? 'Aucun livre scanné dans ce rayon pour l\'instant.' : 'Importez un rayon pour suivre sa progression. Le scan direct couvre les magasins d\'étage.'}</span>`;
+    tabCount.hidden = true;
+    return;
+  }
+  const c = rayonCounts();
+  const segs = progSegments(c);
+  const leg = segs.filter(s => s.key !== 'todo').map(s => `<span><i class="rb-sw" style="background:${s.color}"></i>${s.label} <strong>${s.value}</strong></span>`).join('');
+  host.innerHTML = `<div class="rb-prog__top"><span><strong>${fmt(c.treated)}</strong> / ${fmt(c.total)} traités</span><span class="rb-prog__leg">${leg}</span></div>` +
+    rpCharts.stacked(segs, { legend:false, height:10, total:c.total, title:'Décisions du rayon' });
+  const left = c.total - c.treated;
+  tabCount.textContent = fmt(left);
+  tabCount.hidden = left <= 0;
+}
+
+/* Bandeau global (onglet Journal) — « décisions prises » (tous périmètres) et
+   « non traités » (magasins seuls) sont deux chiffres distincts, dits tels. */
+function renderStats(){
+  const counts = { conserver:0, braderie:0, relocalisation:0, pilon:0 };
+  let total = 0, magTreated = 0;
+  Object.keys(TRAITEMENTS).forEach(bc => {
+    const t = TRAITEMENTS[bc];
+    if(counts[t.statut] !== undefined){ counts[t.statut]++; total++; }
+    if(BY_BC.has(bc)) magTreated++;
+  });
+  const nKeys = Object.keys(TRAITEMENTS).length;
+  const horsMag = nKeys - magTreated;
+  const item = (label, val, color) => `<div class="pro-minikpi"><span class="pro-label">${label}</span><div class="pro-minikpi__value"${color ? ` style="color:${color}"` : ''}>${fmt(val)}</div></div>`;
+  const mag = DESHERB.length
+    ? `Magasins d'étage : <strong>${fmt(DESHERB.length - magTreated)}</strong> non traités sur ${fmt(DESHERB.length)} exemplaires (${fmt(magTreated)} traités).` +
+      (horsMag ? ` Les ${fmt(horsMag)} autres décisions concernent des rayons en libre accès.` : '')
+    : 'Chargement des exemplaires des magasins…';
+  $('rb-stats').innerHTML = `<div class="pro-minikpis">
+      ${item('Décisions prises', total)}
+      ${STATUTS.map(s => item(STATUT_LABEL[s], counts[s], DEC[s].textOnWhite)).join('')}
+    </div><p class="rb-note" style="margin-top:.7rem">${mag}</p>`;
+  $('rb-exports').innerHTML = STATUTS.map(s =>
+    `<button type="button" class="pro-btn pro-btn--secondary" data-export="${s}">${rpUI.icon('download', {size:16})}Exporter ${STATUT_LABEL[s]} (.txt) · ${fmt(counts[s])}</button>`).join('');
+}
+
+/* Mise à jour légère : barre de contexte + compteur d'onglet (et bandeau si visible). */
+function updateStats(){
+  updateCtx();
+  if(activeTab === 'journal') renderStats();
+}
+
+/* ════════════════════════════════════════════════════════════
+   SCAN + AFFICHAGE DE LA FICHE
+   ════════════════════════════════════════════════════════════ */
+const scanInput = $('roto-scan-input');
+
+function showEmpty(){
+  currentRecord = null;
+  $('roto-detail').classList.remove('show');
+  $('roto-empty').style.display = '';
+  $('rb-next').hidden = true;
+  markScatterCurrent(null);
+}
+
+function handleScanLookup(raw){
+  const bc = String(raw||'').trim();
+  if(!bc) return;
+  const rec = BY_BC.get(bc) || RAYON_BY_BC.get(bc);
+  $('roto-flash').classList.remove('show');
+  showTab('decider');
+  if(!rec){
+    showEmpty();
+    const nf = $('roto-notfound');
+    nf.innerHTML = `Code-barre <strong>${esc(bc)}</strong> introuvable parmi les ${fmt(DESHERB.length)} exemplaires des magasins d'étage. Ce n'est peut-être pas un livre concerné par cette campagne (rayons, réserve patrimoniale…).`;
+    nf.classList.add('show');
+    scanInput.value = '';
+    scanInput.focus();
+    return;
+  }
+  $('roto-notfound').classList.remove('show');
+  NAV = null; // un scan quitte la navigation dans le rayon
+  showDetail(rec);
+  updateNav();
+  scanInput.value = '';
+  scanInput.focus();
+}
+scanInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); handleScanLookup(scanInput.value); }
+});
+// Focus permanent du champ de scan, sauf si on clique dans un contrôle.
+document.addEventListener('click', e => {
+  if(!e.target.closest('input,select,button,a,summary,label,textarea,details,[role=tab]')) scanInput.focus({ preventScroll: true });
+});
+
+/* ── Verdict en une phrase, à partir des vraies données ── */
+function rayonRowOf(rec){ return RAYON_ROW_BY_BC.get(rec._barcode) || null; }
+function inRayonStats(rec){
+  const row = rayonRowOf(rec);
+  return row && !row.absent && RSTAT && RSTAT.n > 1 ? row : null;
+}
+function verdictHtml(rec){
+  const Y = REFERENCE_YEAR, p = rec.prets;
+  const parts = [];
+  if(!p){
+    parts.push({ t:'Statistiques de prêt indisponibles', bad:true });
+  }else{
+    const cum = p.cumules || 0, last = yearOf(rec.derniereAnneePret);
+    if(cum === 0) parts.push({ t:'Jamais emprunté', bad:true });
+    else if((p.an || 0) > 0) parts.push({ t:`${plural(p.an, 'prêt')} en ${Y}` });
+    else if(last === 2007) parts.push({ t:'Dernier prêt en 2007 ou avant', bad:true });
+    else if(last && last < Y) parts.push({ t:`Aucun prêt depuis ${last}`, bad:true });
+    else parts.push({ t:`Aucun prêt en ${Y}`, bad:true });
+  }
+  const m = String(rec.dateSaisie || '').match(/(\d{4})$/);
+  if(m) parts.push({ t:`catalogué en ${m[1]}` });
+  const row = p ? inRayonStats(rec) : null;
+  if(row){
+    const higher = RSTAT.n - upperBound(RSTAT.cum, p.cumules || 0);   // livres plus empruntés
+    if(higher > 0) parts.push({ t:`moins emprunté que ${fmtPct(higher, RSTAT.n)} du rayon`, bad: higher / RSTAT.n >= .75 });
+    else parts.push({ t:'parmi les plus empruntés du rayon' });
+  }
+  const phrase = parts.map(x => x.bad ? `<span class="is-bad">${esc(x.t)}</span>` : esc(x.t)).join('<span class="sep"> · </span>');
+  const sub = [];
+  if(p){
+    const cum = p.cumules || 0;
+    sub.push(cum ? `${plural(cum, 'prêt')} au total` : 'aucun prêt enregistré');
+  }
+  const r = rec.reservations || {};
+  const resa = r.cumulees != null ? r.cumulees : (r.an||0)+(r.an1||0)+(r.an2||0)+(r.an3||0);
+  sub.push(resa ? plural(resa, 'réservation') : 'aucune réservation');
+  if(rec.exclusionPret) sub.push('exclu du prêt');
+  return `<p class="pro-eyebrow">Verdict des données</p><p class="rb-verdict__p">${phrase}</p><p class="rb-verdict__sub">${esc(sub.join(' · '))}.</p>`;
+}
+// Premier indice dont la valeur dépasse x dans un tableau trié croissant.
+function upperBound(a, x){
+  let lo = 0, hi = a.length;
+  while(lo < hi){ const mid = (lo + hi) >> 1; if(a[mid] <= x) lo = mid + 1; else hi = mid; }
+  return lo;
+}
+
+/* ── Prêts de ce livre : colonnes par année + « avant » à part, médiane du rayon en pointillé ── */
+function ybGroup(cols, max, withAxis){
+  const nt = rpCharts.niceTicks(max, 3), top = nt.max || 1;
+  const pos = v => Math.min(100, v / top * 100);
+  let h = '<div class="rb-yb__grp">';
+  if(withAxis) h += '<div class="rb-yb__axis" aria-hidden="true">' + nt.ticks.map(t => `<span style="bottom:${pos(t)}%">${t}</span>`).join('') + '</div>';
+  h += '<div class="rb-yb__body"><div class="rb-yb__plot">';
+  nt.ticks.forEach(t => { if(t > 0) h += `<span class="rb-yb__grid" aria-hidden="true" style="bottom:${pos(t)}%"></span>`; });
+  cols.forEach(c => {
+    const tip = `${c.label}${c.cur ? ' (année en cours)' : ''}\n${plural(c.v, 'prêt')}` + (c.med != null ? `\nMédiane du rayon : ${c.med}` : '');
+    h += `<div class="rb-yb__col"${tipAttr(tip)}>` +
+      (c.med != null ? `<span class="rb-yb__med" style="bottom:${pos(c.med)}%"></span>` : '') +
+      `<span class="rb-yb__bar${c.cur ? ' rb-yb__bar--cur' : ''}" style="height:${pos(c.v)}%"></span>` +
+      `<span class="rb-yb__val" style="bottom:calc(${pos(c.v)}% + 4px)">${c.v}</span></div>`;
+  });
+  h += '</div><div class="rb-yb__labs">' + cols.map(c => `<div>${esc(c.label)}${c.med != null ? `<small>méd. ${c.med}</small>` : ''}</div>`).join('') + '</div></div></div>';
+  return h;
+}
+function bookChartsHtml(rec){
+  const p = rec.prets;
+  if(!p) return '<div class="rb-chartcard"><p class="rb-note" style="margin:0">Pas de statistiques de prêt pour ce code-barre dans l\'export Syracuse.</p></div>';
+  const Y = REFERENCE_YEAR;
+  const row = inRayonStats(rec);
+  const keys = pretYearKeys([{ prets:p }]);
+  const cols = keys.map((k,i) => ({ label: String(Y - i), v: p[k] || 0, cur: i === 0, med: row ? (RSTAT.medByKey[k] != null ? RSTAT.medByKey[k] : null) : null })).reverse();
+  const reste = resteOf(p, keys);
+  const medReste = row ? RSTAT.medReste : null;
+  const max = Math.max(1, ...cols.map(c => Math.max(c.v, c.med || 0)));
+  const maxR = Math.max(1, reste, medReste || 0);
+  const oldest = Y - (keys.length - 1);
+  let h = `<div class="rb-chartcard"><div class="rb-chartcard__head"><span class="pro-label" style="color:var(--pro-bleu);font-weight:700">Prêts par année</span>
+    <span class="rb-leg"><span><i class="rb-sw" style="background:var(--pro-prets)"></i>Ce livre</span>${row ? '<span><i class="dash"></i>Médiane du rayon</span>' : ''}</span></div>
+    <div class="rb-yb"><div class="rb-yb__years">${ybGroup(cols, max, true)}</div>
+    <div class="rb-yb__avant"><div class="rb-yb__own">échelle propre</div>${ybGroup([{ label:'avant ' + oldest, v:reste, med:medReste }], maxR, false)}</div></div>
+    <p class="rb-note">${Y} (hachuré) est l'année en cours, incomplète. « Avant ${oldest} » regroupe toutes les années plus anciennes depuis l'acquisition.${row ? '' : ' Importez le rayon du livre pour le comparer à sa médiane.'}</p></div>`;
+  if(row){
+    const cum = p.cumules || 0;
+    const higher = RSTAT.n - upperBound(RSTAT.cum, cum);
+    h += `<div class="rb-chartcard rb-chartcard--pos"><span class="pro-label" style="color:var(--pro-bleu);font-weight:700">Position dans le rayon</span>
+      <p class="rb-note" style="margin-top:.15rem">Prêts cumulés des ${fmt(RSTAT.n)} livres</p>
+      <div class="rb-fig"><div><b class="${higher / RSTAT.n >= .75 ? 'is-bad' : ''}">${cum}</b><span>Ce livre</span></div><div><b>${RSTAT.medCum != null ? RSTAT.medCum : '—'}</b><span>Médiane</span></div></div>
+      <p class="rb-note">${higher > 0 ? `Moins emprunté que <strong>${fmtPct(higher, RSTAT.n)}</strong> des livres du rayon.` : 'Aucun livre du rayon n\'a été plus emprunté.'}</p></div>`;
+  }
+  return h;
+}
+
+function avisState(t){
+  const v = t && t.validation;
+  if(!v) return null;
+  if(!v.avis) return v.commentaire ? 'comment' : null;
+  if(v.statutVu && v.statutVu !== t.statut) return 'stale';
+  return v.avis === 'valide' || v.avis === t.statut ? 'valide' : 'disagree';
+}
+/* Avis du collègue qui valide la campagne (validation-desherbage.html,
+   champ `validation` de la décision — voir api/desherbage.mjs). */
+function avisHtml(t, compact){
+  const st = avisState(t);
+  if(!st) return '';
+  const v = t.validation;
+  const label = {
+    valide: '✓ Validé',
+    disagree: `↪ Propose : ${STATUT_LABEL[v.avis]}`,
+    stale: `⚠ Avis donné sur « ${STATUT_LABEL[v.statutVu] || '?'} », décision changée depuis`,
+    comment: '💬 Commentaire',
+  }[st];
+  if(compact){
+    return `<div class="avis-line ${st}" title="${esc(v.commentaire || '')}">${esc(label)}${v.commentaire && st !== 'comment' ? ' 💬' : ''}</div>`;
+  }
+  const pill = { valide:'pro-pill--valide', disagree:'pro-pill--contre', stale:'pro-pill--revoir', comment:'pro-pill--pret' }[st];
+  const ptxt = { valide:'Validé', disagree:'Contre-proposition', stale:'À revoir', comment:'Commentaire' }[st];
+  const adopt = st === 'disagree' && STATUT_LABEL[v.avis]
+    ? `<button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-adopt="${esc(v.avis)}">Adopter « ${esc(STATUT_LABEL[v.avis])} »</button>` : '';
+  const ctx = st === 'stale' ? `<div style="margin-top:.4rem">Avis donné sur « ${esc(STATUT_LABEL[v.statutVu] || '?')} », décision changée depuis.</div>`
+    : st === 'disagree' ? `<div style="margin-top:.4rem">Propose : ${decPill(v.avis)}</div>` : '';
+  return `<div class="rb-avis rb-avis--${st}"><div class="rb-avis__head"><strong>Avis du validateur</strong><span class="pro-pill ${pill}">${ptxt}</span></div>${ctx}` +
+    (v.commentaire ? `<p class="rb-avis__q">« ${esc(v.commentaire)} »</p>` : '') +
+    (v.par ? `<div class="rb-avis__by">${esc(v.par)}</div>` : '') + adopt + '</div>';
+}
+
+function showDetail(rec){
+  currentRecord = rec;
+  const cover = $('roto-cover');
+  if(rec.imagette){ cover.src = rec.imagette; cover.style.display = ''; cover.onerror = () => { cover.style.display = 'none'; }; }
+  else cover.style.display = 'none';
+  // Agrandissement ouvert pendant la navigation ← → : il suit le livre affiché.
+  if($('roto-zoom').classList.contains('show')){
+    if(rec.imagette) fillZoom(rec); else closeZoom();
+  }
+
+  $('roto-titre').textContent = titreComplet(rec);
+  const st = sousTitre(rec);
+  const stEl = $('roto-soustitre');
+  if(st){ stEl.textContent = st; stEl.style.display = ''; } else stEl.style.display = 'none';
+  $('roto-auteur').textContent = auteurComplet(rec) || '';
+  $('roto-editeur').textContent = rec['210$c'] || '';
+
+  const badges = [];
+  if(rec.coteAffichee) badges.push(`<span class="pro-cote">${esc(rec.coteAffichee)}</span>`);
+  if(rec.exclusionPret) badges.push(`<span class="pro-pill pro-pill--anomalie" title="Exclusion de prêt : ${esc(rec.exclusionPret)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>Exclu du prêt (${esc(rec.exclusionPret)})</span>`);
+  const where = [rec.section, rec.bibliotheque].filter(Boolean).join(' · ');
+  if(where) badges.push(`<span class="pro-pill pro-pill--absent" style="border-style:solid">${esc(where)}</span>`);
+  if(rec.etat) badges.push(`<span class="pro-pill pro-pill--pret">${esc(rec.etat)}</span>`);
+  $('roto-badges').innerHTML = badges.join('');
+
+  const row = rayonRowOf(rec);
+  const r = rec.reservations || {};
+  const resa = r.cumulees != null ? r.cumulees : (r.an||0)+(r.an1||0)+(r.an2||0)+(r.an3||0);
+  const last = yearOf(rec.derniereAnneePret);
+  const dl = [
+    ['Parution', rec['210$d'] || '—'],
+    ['Catalogué le', rec.dateSaisie || '—'],
+    ['Dernier prêt', rec.prets && !rec.prets.cumules ? 'Jamais' : (last ? yearLabel(last) : '—')],
+    ['Réservations', fmt(resa)],
+  ];
+  if(row) dl.push(['Emplacement', `${row.travee ? row.travee + ' · ' : ''}colonne ${row.colonne ?? '—'}${row.etage != null ? ' · étagère ' + row.etage : ''}`]);
+  if(rec.isbn) dl.push(['ISBN', rec.isbn]);
+  if(rec.issn) dl.push(['ISSN', rec.issn]);
+  dl.push(['Code-barre', rec._barcode]);
+  $('roto-meta').innerHTML = dl.map(([k,v]) => `<div><dt>${k}</dt><dd${k === 'Code-barre' ? ' class="pro-mono"' : ''}>${esc(v)}</dd></div>`).join('');
+
+  $('roto-verdict').innerHTML = verdictHtml(rec);
+  $('roto-charts').innerHTML = bookChartsHtml(rec);
+
+  highlightButtons();
+  $('roto-empty').style.display = 'none';
+  $('roto-detail').classList.add('show');
+  markScatterCurrent(rec._barcode);
+  renderUpcoming();
+}
+
+/* ── Colonne de décision ── */
+function buildDecisionButtons(){
+  $('rb-decbtns').innerHTML = STATUTS.map(s =>
+    `<button type="button" class="roto-btn rb-dbig" data-statut="${s}" aria-pressed="false" aria-keyshortcuts="${STATUT_KEY[s]}" aria-label="${STATUT_LABEL[s]} (touche ${STATUT_KEY[s]})" title="Raccourci : ${STATUT_KEY[s]}">` +
+    `${decIcon(s, 24, 2)}<span>${STATUT_LABEL[s]}</span><span class="rb-chosen">${rpUI.icon('check', {size:14, stroke:3})}Choisi</span><span class="rb-kbd" aria-hidden="true">${STATUT_KEY[s]}</span></button>`).join('');
+  $('roto-undo').innerHTML = rpUI.icon('arrow', {size:16}).replace('M5 12h14 M13 6l6 6-6 6', 'M9 14L4 9l5-5 M4 9h10a6 6 0 010 12h-3') + 'Annuler la décision <span class="pro-kbd">U</span>';
+  $('roto-prev').innerHTML = rpUI.icon('chevLeft', {size:16}) + 'Précédent <span class="pro-kbd">←</span>';
+  $('roto-next').innerHTML = 'Suivant <span class="pro-kbd">→</span>' + rpUI.icon('chevRight', {size:16});
+  $('rayon-refresh-btn').innerHTML = rpUI.icon('refresh', {size:18});
+}
+function highlightButtons(){
+  if(!currentRecord) return;
+  const t = TRAITEMENTS[currentRecord._barcode];
+  document.querySelectorAll('.roto-btn').forEach(b => {
+    const on = !!t && b.dataset.statut === t.statut;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  $('roto-undo').disabled = !t;
+  $('rb-cur').innerHTML = `<span class="pro-label">Décision actuelle</span><div class="rb-cur__row">` +
+    (t ? decPill(t.statut) + `<span>${rpUI.fmt.date(t.ts)}, ${rpUI.fmt.time(t.ts)}</span>` : '<span class="pro-pill pro-pill--todo">Non traité</span>') + '</div>';
+  const avisEl = $('roto-avis');
+  const avis = avisHtml(t);
+  avisEl.innerHTML = avis;
+  avisEl.style.display = avis ? '' : 'none';
+}
+
+/* ════════════════════════════════════════════════════════════
+   TRAITEMENT (conserver / braderie / relocalisation / pilon)
+   ════════════════════════════════════════════════════════════ */
+function setTraitement(bc, statut){
+  const record = { barcode: bc, statut, ts: new Date().toISOString() };
+  // L'avis du validateur survit à un changement de décision — le serveur le
+  // conserve aussi (patch `set`, api/desherbage.mjs).
+  if(TRAITEMENTS[bc] && TRAITEMENTS[bc].validation) record.validation = TRAITEMENTS[bc].validation;
+  TRAITEMENTS[bc] = record;
+  queuePatch({ type:'set', record: { barcode: bc, statut, ts: record.ts } });
+  saveLocal();
+  onDecisionsChanged([bc]);
+}
+function clearTraitement(bc){
+  delete TRAITEMENTS[bc];
+  saveLocal();
+  queuePatch({ type:'clear', barcode: bc });
+  onDecisionsChanged([bc]);
+}
+
+/* Une décision (locale ou venue d'un autre poste) ne met à jour que ce qui la
+   concerne : barre de progression, compteurs, bouton de la fiche, LA ligne du
+   tableau, LE point du nuage. Le reste du panneau rayon n'est pas reconstruit ;
+   s'il est masqué, on note les codes-barres et on rattrape à son affichage. */
+function onDecisionsChanged(bcs){
+  updateStats();
+  if(currentRecord && bcs.includes(currentRecord._barcode)) highlightButtons();
+  journalDirty = true;
+  if(activeTab === 'journal') renderLog();
+  if(RAYON_CURRENT){
+    if(activeTab === 'rayon') applyTouched(bcs);
+    else bcs.forEach(b => rayonTouched.add(b));
+  }
+  if(NAV) updateNav(); else renderUpcoming();
+}
+function applyTouched(bcs){
+  renderRayonKpis();
+  if(bcs.length > 40){ renderRayonTable(); bcs.forEach(updatePointColor); return; }
+  bcs.forEach(bc => { refreshRow(bc); updatePointColor(bc); });
+}
+
+function decide(statut){
+  if(!currentRecord) return;
+  const rec = currentRecord;
+  setTraitement(rec._barcode, statut);
+  if(NAV) navAfterDecision(rec, statut);
+  else flashTreated(rec, statut);
+  scanInput.focus({ preventScroll:true });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.roto-btn');
+  if(b) decide(b.dataset.statut);
+});
+$('roto-undo').addEventListener('click', () => { if(currentRecord) clearTraitement(currentRecord._barcode); scanInput.focus({ preventScroll:true }); });
+$('roto-avis').addEventListener('click', e => {
+  const a = e.target.closest('[data-adopt]');
+  if(a && currentRecord) decide(a.dataset.adopt);
+});
+
+function flashTreated(rec, statut){
+  showEmpty();
+  const fl = $('roto-flash');
+  fl.textContent = `✓ « ${titreComplet(rec)} » marqué « ${STATUT_LABEL[statut]} ». Prêt pour le prochain scan.`;
+  fl.classList.add('show');
+  scanInput.value = '';
+}
+
+/* ════════════════════════════════════════════════════════════
+   NAVIGATION LIVRE PAR LIVRE DANS UN RAYON IMPORTÉ
+   ────────────────────────────────────────────────────────────
+   Une fiche ouverte depuis le tableau du rayon garde l'ordre du tableau
+   (tri + filtres en cours, thème Dewey compris) pour passer au précédent /
+   suivant (boutons ou flèches ← →). Cet ordre est FIGÉ à l'ouverture
+   (NAV.order) : avec « Masquer les traités », le livre qu'on vient de
+   traiter disparaît du tableau, et un ordre recalculé décalerait la
+   position. Un scan de code-barre quitte ce mode (NAV = null).
+   ════════════════════════════════════════════════════════════ */
+const autoNextBox = $('roto-auto-next');
+try { autoNextBox.checked = localStorage.getItem(LS_AUTO_NEXT) !== '0'; } catch(e) { autoNextBox.checked = true; }
+autoNextBox.addEventListener('change', () => {
+  try { localStorage.setItem(LS_AUTO_NEXT, autoNextBox.checked ? '1' : '0'); } catch(e) {}
+});
+
+function openFromRayon(bc){
+  const order = RAYON_VIEW.includes(bc) ? RAYON_VIEW.slice() : [bc];
+  NAV = { order, index: order.indexOf(bc) };
+  showNavAt(NAV.index);
+}
+function revealDetail(){
+  const detail = $('roto-detail');
+  if(detail.getBoundingClientRect().top < 0) detail.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function showNavAt(i){
+  if(!NAV || i < 0 || i >= NAV.order.length) return;
+  NAV.index = i;
+  const bc = NAV.order[i];
+  const rec = RAYON_BY_BC.get(bc) || recordOf(bc);
+  if(!rec) return;
+  $('roto-notfound').classList.remove('show');
+  showTab('decider');
+  showDetail(rec);
+  updateNav();
+  revealDetail();
+}
+function updateNav(){
+  const bar = $('roto-nav');
+  $('roto-nav-none').style.display = NAV ? 'none' : '';
+  if(!NAV){ bar.style.display = 'none'; markCurrentRow(); renderUpcoming(); return; }
+  bar.style.display = '';
+  const n = NAV.order.length, i = NAV.index;
+  const restants = NAV.order.filter(bc => !TRAITEMENTS[bc]).length;
+  const ctx = [$('rayon-title').textContent];
+  if(deweyFilter) ctx.push('thème ' + (deweyFilter.key || 'sans indice'));
+  $('roto-nav-pos').innerHTML = `<span class="pro-label">Livre</span><b>${i+1}</b><span style="color:var(--pro-texte-doux)">/ ${fmt(n)}</span>`;
+  $('roto-nav-sub').textContent = `${ctx.join(' · ')} · ${restants} non traité${restants>1?'s':''} dans cette liste`;
+  $('roto-prev').disabled = i <= 0;
+  $('roto-next').disabled = i >= n - 1;
+  markCurrentRow();
+  renderUpcoming();
+}
+function markCurrentRow(){
+  const cur = NAV ? NAV.order[NAV.index] : null;
+  document.querySelectorAll('#rayon-tbody tr.is-current').forEach(tr => { if(tr.dataset.bc !== cur) tr.classList.remove('is-current'); });
+  if(cur){ const tr = rowEl(cur); if(tr) tr.classList.add('is-current'); }
+}
+function navAfterDecision(rec, statut){
+  const last = NAV.index >= NAV.order.length - 1;
+  if(autoNextBox.checked && !last){
+    showNavAt(NAV.index + 1);
+  }else{
+    updateNav();
+    if(last) rpUI.toast('C\'était le dernier livre de la liste.', { type:'info', timeout:3500 });
+  }
+}
+$('roto-prev').addEventListener('click', () => { if(NAV) showNavAt(NAV.index - 1); });
+$('roto-next').addEventListener('click', () => { if(NAV) showNavAt(NAV.index + 1); });
+
+/* « À suivre » : les 5 livres suivants dans l'ordre figé de la navigation. */
+function renderUpcoming(){
+  const host = $('rb-next');
+  if(!NAV || !currentRecord){ host.hidden = true; return; }
+  const next = NAV.order.slice(NAV.index + 1, NAV.index + 6);
+  if(!next.length){ host.hidden = true; return; }
+  host.hidden = false;
+  $('rb-next-grid').innerHTML = next.map((bc, k) => {
+    const row = RAYON_ROW_BY_BC.get(bc), t = TRAITEMENTS[bc];
+    return `<button type="button" class="rb-next__card" data-next="${NAV.index + 1 + k}">
+      <span class="pro-cote">${esc(row ? row.cote : bc)}</span>
+      <span class="rb-next__t">${esc(row ? (row.titre || '(titre inconnu)') : bc)}</span>
+      ${t ? decPill(t.statut) : '<span class="pro-pill pro-pill--todo">Non traité</span>'}</button>`;
+  }).join('');
+}
+$('rb-next-grid').addEventListener('click', e => {
+  const b = e.target.closest('[data-next]');
+  if(b) showNavAt(Number(b.dataset.next));
+});
+
+/* Raccourcis clavier : actifs quand la fiche est affichée dans l'onglet
+   Décider, si aucun champ de saisie n'est en cours d'usage — le champ de scan
+   garde le focus en permanence, on l'accepte s'il est vide. Flèches ← → :
+   livre précédent/suivant. C / B / R / P : décision ; U : annuler. Des
+   lettres et pas des chiffres : une scannette tape des chiffres dans ce même
+   champ (tous les codes-barres de data/desherbage.json sont numériques). */
+const DECISION_KEYS = { c:'conserver', b:'braderie', r:'relocalisation', p:'pilon' };
+document.addEventListener('keydown', e => {
+  if(activeTab !== 'decider' || !currentRecord) return;
+  if(e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  const t = e.target;
+  if(t && t.closest && t.closest('[role=tablist]')) return;
+  const typing = t && t.matches && t.matches('input:not([type=checkbox]),select,textarea');
+  if(typing && !(t === scanInput && !scanInput.value)) return;
+  if(NAV && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')){
+    e.preventDefault();
+    showNavAt(NAV.index + (e.key === 'ArrowRight' ? 1 : -1));
+    return;
+  }
+  const k = String(e.key).toLowerCase();
+  if(k === 'u'){
+    e.preventDefault();
+    if(TRAITEMENTS[currentRecord._barcode]) clearTraitement(currentRecord._barcode);
+    return;
+  }
+  const statut = DECISION_KEYS[k];
+  if(statut){
+    e.preventDefault(); // sinon la lettre atterrit dans le champ de scan
+    document.querySelector(`.roto-btn[data-statut="${statut}"]`).click();
+  }
+});
+
+// ── Agrandissement de la couverture ──
+function fillZoom(rec){
+  $('roto-zoom-img').src = rec.imagette;
+  $('roto-zoom-cap').textContent = titreComplet(rec);
+}
+function openZoom(){
+  if(!currentRecord || !currentRecord.imagette) return;
+  const zoom = $('roto-zoom');
+  fillZoom(currentRecord);
+  const embedded = document.documentElement.classList.contains('rp-embedded');
+  if(embedded){
+    const parent = zoom.offsetParent || document.body;
+    const top = $('roto-detail').getBoundingClientRect().top - parent.getBoundingClientRect().top;
+    zoom.style.setProperty('--zoom-top', Math.max(0, top) + 'px');
+  }
+  zoom.classList.add('show');
+  if(embedded) zoom.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function closeZoom(){
+  $('roto-zoom').classList.remove('show');
+  $('roto-zoom-img').removeAttribute('src');
+}
+$('roto-cover').addEventListener('click', openZoom);
+$('roto-zoom').addEventListener('click', closeZoom);
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && $('roto-zoom').classList.contains('show')) closeZoom();
+});
+
+/* Ouvre la fiche d'un code-barre depuis le journal : dans la navigation du
+   rayon importé s'il en fait partie, sinon fiche seule. */
+function openRecord(bc){
+  if(RAYON_ROW_BY_BC.has(bc)){ $('roto-flash').classList.remove('show'); openFromRayon(bc); return true; }
+  const rec = RAYON_BY_BC.get(bc) || recordOf(bc);
+  if(!rec){ rpUI.toast('Fiche introuvable pour ce code-barre.', { type:'warn' }); return false; }
+  NAV = null;
+  $('roto-flash').classList.remove('show');
+  $('roto-notfound').classList.remove('show');
+  showTab('decider');
+  showDetail(rec);
+  updateNav();
+  revealDetail();
+  return true;
+}
+
+/* ════════════════════════════════════════════════════════════
+   JOURNAL DES TRAITEMENTS RÉCENTS (onglet Journal & exports)
+   ════════════════════════════════════════════════════════════ */
+function renderLog(){
+  journalDirty = false;
+  renderStats();
+  const q = ($('log-search').value || '').toLowerCase();
+  const all = Object.values(TRAITEMENTS)
+    .map(t => ({ t, rec: recordOf(t.barcode) }))
+    .filter(({t, rec}) => {
+      if(!q) return true;
+      const titre = rec ? titreComplet(rec).toLowerCase() : '';
+      return t.barcode.toLowerCase().includes(q) || titre.includes(q);
+    })
+    .sort((a,b) => (b.t.ts||'').localeCompare(a.t.ts||''));
+  const rows = all.slice(0, logLimit);
+  const tbody = $('log-tbody');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--pro-texte-doux);padding:1.25rem">Aucun traitement enregistré.</td></tr>`;
+  }else{
+    tbody.innerHTML = rows.map(({t, rec}) => `
+      <tr>
+        <td class="pro-mono">${esc(t.barcode)}</td>
+        <td>${rec ? `<button type="button" class="rb-ttl" data-open-log="${esc(t.barcode)}">${esc(titreComplet(rec))}</button>${rec.coteAffichee ? ` <span class="pro-cote">${esc(rec.coteAffichee)}</span>` : ''}` : '—'}</td>
+        <td>${STATUT_LABEL[t.statut] ? decPill(t.statut) : esc(t.statut)}</td>
+        <td>${t.ts ? esc(new Date(t.ts).toLocaleString('fr-FR')) : ''}</td>
+        <td><button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" data-undo="${esc(t.barcode)}">Annuler</button></td>
+      </tr>`).join('');
+  }
+  $('log-foot').innerHTML = `<span class="pro-pager__info">${fmt(rows.length)} sur ${fmt(all.length)} traitement${all.length>1?'s':''}</span>` +
+    (all.length > rows.length ? `<button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="log-more">Afficher ${Math.min(100, all.length - rows.length)} de plus</button>` : '');
+}
+$('log-search').addEventListener('input', () => { logLimit = 100; renderLog(); });
+$('log-tbody').addEventListener('click', e => {
+  const u = e.target.closest('[data-undo]');
+  if(u){ clearTraitement(u.dataset.undo); return; }
+  const o = e.target.closest('[data-open-log]');
+  if(o) openRecord(o.dataset.openLog);
+});
+$('log-foot').addEventListener('click', e => {
+  if(e.target.closest('#log-more')){ logLimit += 100; renderLog(); }
+});
+
+/* Exports .txt, un code-barre par ligne */
+function downloadTxt(text, filename){
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 300);
+}
+$('rb-exports').addEventListener('click', e => {
+  const btn = e.target.closest('[data-export]');
+  if(!btn) return;
+  const statut = btn.dataset.export;
+  const barcodes = Object.values(TRAITEMENTS).filter(t => t.statut === statut).map(t => t.barcode);
+  if(!barcodes.length){ rpUI.toast(`Aucun exemplaire marqué « ${STATUT_LABEL[statut]} » pour l'instant.`, { type:'warn' }); return; }
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  downloadTxt(barcodes.join('\n') + '\n', `rotobib-${statut}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+});
+
+/* ════════════════════════════════════════════════════════════
+   IMPORT D'UN RAYON DU RÉCOLEMENT
+   ────────────────────────────────────────────────────────────
+   Les rayons en libre accès sont créés à la volée dans recolement.html
+   (catégorie `rayons` de l'état partagé, identifiants "RY-…") et leurs livres
+   y sont scannés (travee = id du rayon). On relit cet état en lecture seule
+   via GET /api/recolement (public), on prend les codes-barres scannés dans
+   le rayon choisi (± une colonne) et on les joint à data/desherbage.json —
+   toute la bibliothèque, pas seulement les magasins : c'est le seul endroit
+   de Rotobib où un livre hors magasin peut recevoir une décision. Rien n'est
+   écrit dans le récolement.
+   ════════════════════════════════════════════════════════════ */
+const rayonSelect = $('rayon-select');
+const rayonColSelect = $('rayon-col-select');
+const rayonImportBtn = $('rayon-import-btn');
+const rayonMsg = $('rayon-msg');
+const pickerEl = $('rayon-picker');
+
+function setPicker(open){
+  pickerEl.hidden = !open;
+  $('rayon-picker-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+  if(window.rpEmbed && window.rpEmbed.refresh) window.rpEmbed.refresh();
+}
+$('rayon-picker-btn').addEventListener('click', () => setPicker(pickerEl.hidden));
+$('rayon-empty-btn').addEventListener('click', () => { setPicker(true); $('rayon-picker-btn').scrollIntoView({ block:'nearest' }); rayonSelect.focus(); });
 
 async function loadRecolement(){
   rayonSelect.disabled = true;
@@ -1096,6 +1424,7 @@ function renderSourcesList(selectId){
   RECOL.selections.forEach(sel => { counts[sel.id] = RECOL.scans.filter(sc => selectionsDesherbage.selectionMatches(sel, sc)).length; });
   if(!RECOL.rayons.length && !RECOL.selections.length){
     rayonSelect.innerHTML = '<option value="">Aucun rayon — créez-en un dans le récolement ou avec « + Rayon fictif »</option>';
+    rayonSelect.disabled = false;
     updateSelEditBtn();
     return;
   }
@@ -1145,23 +1474,32 @@ function fillColSelect(){
 }
 
 function loadSavedRayon(){ try { return JSON.parse(localStorage.getItem(LS_RAYON)); } catch(e) { return null; } }
+function loadSeen(){ try { return JSON.parse(localStorage.getItem(LS_RAYON_SEEN)) || {}; } catch(e) { return {}; } }
 
-function importRayon(id, col){
+function computeRayonStats(){
+  const known = RAYON_ROWS.filter(r => !r.absent);
+  const keys = pretYearKeys(known);
+  const medByKey = {};
+  keys.forEach(k => { medByKey[k] = median(known.map(r => (r.prets && r.prets[k]) || 0)); });
+  const cum = known.map(r => r.cumules).sort((a,b) => a - b);
+  RSTAT = { n: known.length, cum, medCum: median(cum), keys, medByKey, medReste: median(known.map(r => resteOf(r.prets, keys))) };
+}
+
+function importRayon(id, col, opts){
   if(!RECOL) return;
   const def = sourceDef(id);
   if(!def) return;
+  opts = opts || {};
   const isSel = selectionsDesherbage.isSelectionId(id);
   if(isSel) col = '';
   const inCol = s => !col || String(s.colonne) === col;
   const scans = sourceScans(def).filter(inCol);
-  /* Réimport = fusion, pas remplacement (demande explicite : le désherbage
-     avance en même temps que le récolement). Les décisions vivent dans
-     TRAITEMENTS, indépendamment de cette liste ; ce qu'il faut préserver,
-     c'est la PRÉSENCE dans la liste d'un livre déjà traité dont le scan a
-     disparu du rayon entre-temps (scan supprimé, livre retiré de l'étagère
-     après un pilon…). Chaque livre vu dans un rayon est donc mémorisé sur ce
-     poste (LS_RAYON_SEEN) ; au réimport, les scans actuels sont complétés
-     par les livres déjà vus ET traités. */
+  /* Réimport = fusion, pas remplacement (le désherbage avance en même temps
+     que le récolement). Les décisions vivent dans TRAITEMENTS ; ce qu'il faut
+     préserver, c'est la PRÉSENCE dans la liste d'un livre déjà traité dont le
+     scan a disparu du rayon entre-temps. Chaque livre vu dans un rayon est
+     mémorisé sur ce poste (LS_RAYON_SEEN) ; au réimport, les scans actuels
+     sont complétés par les livres déjà vus ET traités. */
   const seen = loadSeen();
   const seenRayon = seen[id] || {};
   const current = new Set(scans.map(s => s.barcode));
@@ -1171,22 +1509,22 @@ function importRayon(id, col){
   try { localStorage.setItem(LS_RAYON_SEEN, JSON.stringify(seen)); } catch(e) {}
   const before = new Set(RAYON_CURRENT && RAYON_CURRENT.id === id && RAYON_CURRENT.col === (col||'') ? RAYON_ROWS.map(r => r.bc) : []);
   const wasOpen = before.size > 0;
-  if(!wasOpen) deweyFilter = null; // autre rayon : le filtre de thème ne s'applique plus
+  if(!wasOpen){ deweyFilter = null; tblLimit = 300; } // autre rayon : le filtre de thème ne s'applique plus
   RAYON_CURRENT = { id, col: col || '' };
   try { localStorage.setItem(LS_RAYON, JSON.stringify(RAYON_CURRENT)); } catch(e) {}
   RAYON_BY_BC = new Map();
+  RAYON_ROW_BY_BC = new Map();
   RAYON_ROWS = [...scans, ...kept.map(s => ({ ...s, horsRayon:true }))].map(s => {
     let rec = recordOf(s.barcode);
     const absent = !rec;
     if(!rec){
-      // Code-barre scanné mais absent de l'export bib.xml (acquisition plus
-      // récente que l'export, ou code-barre d'une autre bibliothèque) : fiche
-      // minimale à partir de ce que le récolement a enregistré au scan.
+      // Code-barre scanné mais absent de l'export bib.xml : fiche minimale à
+      // partir de ce que le récolement a enregistré au scan.
       rec = { _barcode: s.barcode, '200$a': s.titre || null, '700$a': s.auteur || null, coteAffichee: s.cote || null };
     }
     RAYON_BY_BC.set(s.barcode, rec);
     const p = rec.prets || {};
-    return {
+    const row = {
       bc: s.barcode, rec, absent, horsRayon: !!s.horsRayon,
       colonne: s.colonne, etage: s.etage,
       // Rayon fictif : plusieurs travées possibles, affichées dans « Empl. ».
@@ -1206,23 +1544,29 @@ function importRayon(id, col){
       cumules: absent ? null : (p.cumules || 0),
       dernier: rec.derniereAnneePret || '',
     };
+    RAYON_ROW_BY_BC.set(s.barcode, row);
+    return row;
   });
-  document.getElementById('rayon-title').textContent = def.label + (col ? ` — colonne ${col}` : '');
-  document.getElementById('rayon-panel').classList.add('show');
+  computeRayonStats();
+  $('rayon-title').textContent = def.label + (col ? ` — colonne ${col}` : '');
+  const sig = id + '|' + (col||'') + '|' + RAYON_ROWS.map(r => `${r.bc}:${r.colonne}:${r.etage}`).join(',');
+  const changed = sig !== lastRayonSig;
+  lastRayonSig = sig;
   if(wasOpen){
     const added = RAYON_ROWS.filter(r => !before.has(r.bc)).length;
     rayonMsg.textContent = added
       ? `↻ ${added} nouveau${added>1?'x':''} livre${added>1?'s':''} ajouté${added>1?'s':''} depuis le récolement (${new Date().toLocaleTimeString('fr-FR')}). Les livres déjà traités sont conservés.`
       : `↻ Rayon à jour (${new Date().toLocaleTimeString('fr-FR')}) — aucun nouveau livre scanné.`;
   }
-  renderRayon();
+  updateCtx();
+  // Rien de nouveau dans le rayon (sondage de 60 s) : rien à reconstruire.
+  if(wasOpen && !changed && !opts.force) return;
+  renderRayonAll();
 }
-function loadSeen(){ try { return JSON.parse(localStorage.getItem(LS_RAYON_SEEN)) || {}; } catch(e) { return {}; } }
 
 /* Le récolement avance pendant le désherbage : tant qu'un rayon est ouvert
    et l'onglet visible, on relit /api/recolement (ETag/304 : quasi gratuit
-   quand rien n'a changé) et on refusionne. Le bouton ↻ fait la même chose
-   immédiatement. */
+   quand rien n'a changé) et on refusionne. Le bouton ↻ fait la même chose. */
 async function refreshRayonFromRecolement(){
   await loadRecolement();
   if(RAYON_CURRENT && sourceDef(RAYON_CURRENT.id)){
@@ -1232,168 +1576,167 @@ async function refreshRayonFromRecolement(){
 }
 setInterval(() => { if(!document.hidden && RAYON_CURRENT) refreshRayonFromRecolement(); }, 60000);
 
-/* Années de prêt détaillées disponibles : AN…AN-3 dans le profil d'export
-   actuel ; AN-4/AN-5 apparaîtront d'eux-mêmes si un futur export les porte
-   (voir build-desherbage.mjs — clé posée seulement si le champ existe). */
-const PRET_YEAR_KEYS = ['an','an1','an2','an3','an4','an5'];
-function pretYearKeys(rows){
-  return PRET_YEAR_KEYS.filter((k, i) => i < 4 || rows.some(r => r.prets && k in r.prets));
+/* ════════════════════════════════════════════════════════════
+   ONGLET RAYON — rendu
+   ════════════════════════════════════════════════════════════ */
+function renderRayonAll(){
+  const has = !!RAYON_CURRENT;
+  $('rayon-empty').hidden = has;
+  $('rayon-panel').hidden = !has;
+  updateCtx();
+  if(!has) return;
+  if(activeTab !== 'rayon'){ rayonFullDirty = true; return; }
+  rayonFullDirty = false; rayonTouched.clear();
+  const scanned = RAYON_ROWS.length;
+  $('rayon-sub').textContent = scanned
+    ? `${fmt(scanned)} livre${scanned>1?'s':''} scanné${scanned>1?'s':''} dans le récolement · statistiques de prêt de l'export Syracuse (année en cours : ${REFERENCE_YEAR}).`
+    : 'Aucun livre scanné dans ce rayon pour l\'instant.';
+  $('rayon-only-zero-label').textContent = `Aucun prêt en ${REFERENCE_YEAR}`;
+  renderRayonKpis();
+  renderRayonCharts();
+  renderRayonTable();
 }
-const fmt = n => n.toLocaleString('fr-FR');
-const pctOf = (n, total) => total ? Math.round(n * 100 / total) : 0;
+// Les graphiques lourds ne sont calculés que lorsque l'onglet est visible.
+function onTabShown(id){
+  if(id === 'rayon' && RAYON_CURRENT){
+    if(rayonFullDirty) renderRayonAll();
+    else if(rayonTouched.size){ const b = [...rayonTouched]; rayonTouched.clear(); applyTouched(b); }
+  }
+  if(id === 'journal' && journalDirty) renderLog();
+  else if(id === 'journal') renderStats();
+}
 
-// Ordre ET couleurs validés pour le daltonisme (dataviz validate_palette :
-// rouge et orange côte à côte étaient indiscernables, vert/orange aussi en
-// protanopie) — d'où l'ambre pour Braderie et cet ordre précis.
-const PROGRESS_ORDER = ['conserver','braderie','relocalisation','pilon'];
-const STATUT_ICON = { conserver:'✓', pilon:'🗑️', braderie:'🏷️', relocalisation:'📦' };
-
-function rayonStatsHtml(rows){
-  const Y = REFERENCE_YEAR;
+function renderRayonKpis(){
+  const rows = RAYON_ROWS, Y = REFERENCE_YEAR;
   const known = rows.filter(r => !r.absent);
   const absents = rows.length - known.length;
-  const jamais = known.filter(r => r.cumules === 0).length;
   const zeroAn = known.filter(r => r.an === 0).length;
+  const jamais = known.filter(r => r.cumules === 0).length;
   const medParution = median(rows.map(r => r.parutionYear));
   const minParution = rows.reduce((m,r) => r.parutionYear != null && (m == null || r.parutionYear < m) ? r.parutionYear : m, null);
   const medSaisie = median(rows.map(r => r.saisieKey ? parseInt(r.saisieKey.slice(0,4),10) : null));
-  const card = (label, val, sub) => `<div class="stat-card"><div class="stat-card-label">${label}</div><div class="stat-card-val">${val}</div>${sub ? `<div class="stat-card-sub">${sub}</div>` : ''}</div>`;
-  const cards = [
-    card('Livres', rows.length, absents ? `dont ${absents} absent${absents>1?'s':''} de l'export` : 'tous trouvés dans l\'export'),
-    card(`0 prêt en ${Y}`, zeroAn, `${pctOf(zeroAn, known.length)} % du rayon`),
-    card('Jamais empruntés', jamais, `${pctOf(jamais, known.length)} % du rayon`),
-    card('Parution médiane', medParution ?? '—', minParution != null ? `plus ancien : ${minParution}` : ''),
-    card('Catalogage médian', medSaisie ?? '—', 'année de saisie Syracuse'),
-  ].join('');
-  return `<div class="stats-row rayon-stats">${cards}</div>
-    <div class="viz-grid">${loansChartHtml(known)}${progressHtml(rows)}</div>
-    ${deweyHtml(rows)}`;
+  const c = rayonCounts();
+  const segs = progSegments(c);
+  const ring = rpCharts.ring(segs.filter(s => s.key !== 'todo'), {
+    size:132, thickness:16, total:c.total || 1, label: fmtPct(c.treated, c.total), sub:'traités',
+    ariaLabel: `Avancement : ${c.treated} livres traités sur ${c.total}`,
+  });
+  const legend = segs.map(s => `<div><i class="rb-sw" style="background:${s.color}"></i><strong>${fmt(s.value)}</strong>${s.label}<small>${fmtPct(s.value, c.total)}</small></div>`).join('');
+  const kpi = (label, val, note) => `<div class="pro-kpi"><p class="pro-kpi__label">${label}</p><div class="pro-kpi__row"><span class="pro-kpi__value">${val}</span></div>${note ? `<p class="pro-kpi__note">${note}</p>` : ''}</div>`;
+  $('rb-kpis').innerHTML =
+    `<div class="pro-kpi rb-kpis__ring"><div style="flex:none">${ring}</div><div class="rb-kpis__legend"><p class="pro-kpi__label" style="margin:0 0 .2rem">Avancement du traitement</p>${legend}</div></div>` +
+    kpi(`0 prêt en ${Y}`, fmt(zeroAn), `${pctOf(zeroAn, known.length)} % du rayon${absents ? ` · ${absents} absent${absents>1?'s':''} de l'export` : ''}`) +
+    kpi('Jamais empruntés', fmt(jamais), `${pctOf(jamais, known.length)} % du rayon`) +
+    kpi('Parution médiane', medParution ?? '—', minParution != null ? `plus ancien : ${minParution}` : '') +
+    kpi('Catalogage médian', medSaisie ?? '—', 'année de saisie Syracuse');
 }
 
-/* Prêts par année : une colonne par année détaillée (une seule série, une
-   seule teinte, pas de légende), puis « tout le reste » À PART, en grand
-   chiffre — sur le même axe, ce cumul de toutes les années antérieures
-   écraserait les années détaillées (241 prêts contre 5 sur un rayon test). */
-function loansChartHtml(known){
-  const keys = pretYearKeys(known);
+function renderRayonCharts(){
+  renderScatter();
+  renderLoans();
+  renderDewey();
+  renderLastYear();
+}
+
+/* Âge et usage : année de catalogage × prêts cumulés, couleur = décision. */
+function renderScatter(){
+  SC_ROWS = RAYON_ROWS.filter(r => !r.absent && r.saisieKey);
+  const host = $('rb-scatter');
+  if(SC_ROWS.length < 2){
+    host.innerHTML = '<p class="rb-note" style="margin:0">Pas assez de livres datés pour tracer le nuage.</p>';
+    SC_PTS = []; SC_PT_BY_BC = new Map(); scCurrent = null;
+    return;
+  }
+  const xOf = r => { const k = r.saisieKey; return +k.slice(0,4) + ((+k.slice(4,6) - 1) + (+k.slice(6,8) - 1) / 31) / 12; };
+  const pts = SC_ROWS.map(r => {
+    const t = TRAITEMENTS[r.bc];
+    return { x:xOf(r), y:r.cumules, color:colorOfStatut(t && t.statut),
+      tip:`${r.titre || '(titre inconnu)'}\n${r.cote}${r.saisie ? ' · catalogué le ' + r.saisie : ''}\n${plural(r.cumules, 'prêt')} cumulé${r.cumules>1?'s':''} · ${t ? STATUT_LABEL[t.statut] : 'non traité'}` };
+  });
+  const xs = pts.map(p => p.x);
+  const x0 = Math.floor(Math.min(...xs)), x1 = Math.ceil(Math.max(...xs));
+  const yMax = Math.max(5, ...pts.map(p => p.y));
+  const leg = STATUTS.map(s => `<span><i class="rb-sw" style="background:${DEC[s].color};border-radius:50%"></i>${STATUT_LABEL[s]}</span>`).join('') +
+    `<span><i class="rb-sw" style="background:${TODO_POINT};border-radius:50%"></i>Non traité</span><span><i class="rb-sw" style="border:2px solid var(--pro-carmin);border-radius:50%;background:none"></i>Livre affiché</span>`;
+  host.innerHTML = `<div class="rb-leg" style="margin-bottom:.7rem">${leg}</div>` +
+    rpCharts.scatter(pts, { xDomain:[x0, Math.max(x1, x0 + 1)], yDomain:[0, yMax], yScale:'sqrt', xLabel:'Année de catalogage', yLabel:'Prêts cumulés', height:300, title:'Âge et usage' });
+  // Le kit sépare les milliers : « 2 018 » pour une année. On retire l'espace.
+  host.querySelectorAll('.pro-chart-scatter__x span').forEach(sp => { sp.textContent = sp.textContent.replace(/\s/g, ''); });
+  SC_PTS = [...host.querySelectorAll('.pro-chart-scatter__pt')];
+  SC_PT_BY_BC = new Map();
+  SC_PTS.forEach((el, i) => { el.dataset.i = i; SC_PT_BY_BC.set(SC_ROWS[i].bc, el); });
+  scCurrent = null;
+  markScatterCurrent(currentRecord ? currentRecord._barcode : null);
+}
+function updatePointColor(bc){
+  const el = SC_PT_BY_BC.get(bc);
+  if(!el) return;
+  const t = TRAITEMENTS[bc];
+  el.style.setProperty('--c', colorOfStatut(t && t.statut));
+}
+function markScatterCurrent(bc){
+  if(scCurrent){ scCurrent.classList.remove('is-hi'); scCurrent = null; }
+  const el = bc ? SC_PT_BY_BC.get(bc) : null;
+  if(el){ el.classList.add('is-hi'); scCurrent = el; }
+}
+$('rb-scatter').addEventListener('click', e => {
+  const pt = e.target.closest('.pro-chart-scatter__pt');
+  if(!pt || pt.dataset.i == null) return;
+  const row = SC_ROWS[+pt.dataset.i];
+  if(row) openFromRayon(row.bc);
+});
+
+/* Prêts par année : une colonne par année détaillée (une seule série), puis
+   « tout le reste » À PART, en grand chiffre — sur le même axe, ce cumul de
+   toutes les années antérieures écraserait les années détaillées. */
+function renderLoans(){
+  const known = RAYON_ROWS.filter(r => !r.absent);
+  const keys = pretYearKeys(known), Y = REFERENCE_YEAR;
   const years = keys.map((k, i) => {
     const prets = known.reduce((t,r) => t + ((r.prets && r.prets[k]) || 0), 0);
     const livres = known.filter(r => r.prets && r.prets[k] > 0).length;
-    return { label: String(REFERENCE_YEAR - i), current: i === 0, prets, livres };
+    return { label: String(Y - i), current: i === 0, prets, livres };
+  }).reverse();
+  const oldest = Y - (keys.length - 1);
+  const rest = r => resteOf(r.prets, keys);
+  const reste = known.reduce((t,r) => t + rest(r), 0);
+  const resteLivres = known.filter(r => rest(r) > 0).length;
+  const items = years.map(y => ({
+    label: y.label, value: y.prets, color: 'var(--pro-prets)', hatched: y.current,
+    tip: `${y.label}${y.current ? ' (année en cours)' : ''}\n${plural(y.prets, 'prêt')}\n${plural(y.livres, 'livre')} emprunté${y.livres>1?'s':''} sur ${known.length} (${pctOf(y.livres, known.length)} %)`,
+  }));
+  $('rb-loans').innerHTML = `<div class="rb-loans"><div class="rb-loans__chart pro-chart">${rpCharts.bars(items, { height:180, unit:'prêts', title:'Prêts par année', color:undefined })}
+    <p class="rb-note">Total des prêts des ${fmt(known.length)} livres du rayon trouvés dans l'export. ${Y} (hachuré) = année en cours, incomplète. Survolez une colonne pour le nombre de livres empruntés.</p></div>
+    <div class="rb-loans__rest"><span class="pro-label">Avant ${oldest}</span><b>${fmt(reste)}</b><small>prêts sur toutes les années antérieures, depuis l'acquisition · ${plural(resteLivres, 'livre')}</small></div></div>`;
+}
+
+/* Dernière année de prêt : histogramme des livres, 2007 = « 2007 ou avant ». */
+function renderLastYear(){
+  const known = RAYON_ROWS.filter(r => !r.absent);
+  const Y = REFERENCE_YEAR, cnt = new Map();
+  let jamais = 0;
+  known.forEach(r => {
+    const y = yearOf(r.dernier);
+    if(!y){ if(r.cumules === 0) jamais++; return; }
+    cnt.set(y, (cnt.get(y) || 0) + 1);
   });
-  const oldest = REFERENCE_YEAR - (keys.length - 1);
-  const resteOf = r => Math.max(0, (r.prets.cumules || 0) - keys.reduce((t,k) => t + (r.prets[k] || 0), 0));
-  const reste = known.reduce((t,r) => t + resteOf(r), 0);
-  const resteLivres = known.filter(r => resteOf(r) > 0).length;
-  const max = Math.max(1, ...years.map(y => y.prets));
-  const cols = years.slice().reverse().map(y => {
-    const tip = `${y.label}${y.current ? ' (année en cours)' : ''} : ${fmt(y.prets)} prêt${y.prets>1?'s':''} · ${y.livres} livre${y.livres>1?'s':''} emprunté${y.livres>1?'s':''} sur ${known.length} (${pctOf(y.livres, known.length)} %)`;
-    return `<div class="vb-col" tabindex="0" data-tip="${esc(tip)}">
-      <div class="vb-plot"><div class="vb-val">${fmt(y.prets)}</div>
-        <div class="vb-bar ${y.prets ? '' : 'empty'}" style="height:${y.prets ? Math.max(2, y.prets / max * 100) : 0}%"></div></div>
-      <div class="vb-x ${y.current ? 'current' : ''}">${y.label}</div>
-      <div class="vb-sub">${y.livres} livre${y.livres>1?'s':''}</div>
-    </div>`;
-  }).join('');
-  return `<div class="viz-card">
-    <div class="viz-title">Prêts par année</div>
-    <div class="viz-sub">Total des prêts des ${known.length} livres du rayon trouvés dans l'export · sous chaque année, le nombre de livres empruntés au moins une fois · ${REFERENCE_YEAR} (en gras) = année en cours</div>
-    <div class="vb-wrap">
-      <div class="vb-chart">${cols}</div>
-      <div class="vb-rest">
-        <div class="vb-rest-label">Avant ${oldest}</div>
-        <div class="vb-rest-val">${fmt(reste)}</div>
-        <div class="vb-rest-sub">prêts sur toutes les années antérieures, depuis l'acquisition · ${resteLivres} livre${resteLivres>1?'s':''}</div>
-      </div>
-    </div>
-    <div class="viz-tip" role="tooltip"></div>
-  </div>`;
-}
-
-/* Avancement du traitement : barre empilée 100 % (une part par décision +
-   « non traité » en gris), grand pourcentage traité, légende complète avec
-   effectifs (l'ambre est peu contrasté sur blanc : chaque part a donc
-   toujours son libellé et son nombre en légende). */
-function progressHtml(rows){
-  const total = rows.length;
-  const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
-  rows.forEach(r => { const t = TRAITEMENTS[r.bc]; if(t && counts[t.statut] !== undefined) counts[t.statut]++; });
-  const treated = PROGRESS_ORDER.reduce((t,s) => t + counts[s], 0);
-  const parts = [...PROGRESS_ORDER.map(s => ({ key:s, label:STATUT_LABEL[s], icon:STATUT_ICON[s], n:counts[s] })),
-                 { key:'todo', label:'Non traité', icon:'○', n: total - treated }];
-  const segs = parts.filter(p => p.n > 0).map(p =>
-    `<div class="pg-seg pg-${p.key}" style="flex-grow:${p.n}" tabindex="0" data-tip="${esc(`${p.label} : ${p.n} livre${p.n>1?'s':''} (${fmtPct(p.n, total)})`)}"></div>`
-  ).join('');
-  const legend = parts.map(p => `<div class="pg-leg ${p.n ? '' : 'zero'}">
-      <span class="pg-sw pg-${p.key}"></span><span class="pg-leg-lbl">${p.icon} ${p.label}</span>
-      <span class="pg-leg-n">${p.n}</span><span class="pg-leg-pct">${fmtPct(p.n, total)}</span>
-    </div>`).join('');
-  return `<div class="viz-card">
-    <div class="viz-title">Avancement du traitement</div>
-    <div class="pg-head"><span class="pg-big">${fmtPct(treated, total)}</span>
-      <span class="pg-head-sub">${treated} livre${treated>1?'s':''} traité${treated>1?'s':''} sur ${total}</span></div>
-    <div class="pg-bar">${segs || '<div class="pg-seg pg-todo" style="flex-grow:1"></div>'}</div>
-    <div class="pg-legend">${legend}</div>
-    <div class="viz-tip" role="tooltip"></div>
-  </div>`;
-}
-
-// Infobulle partagée des deux graphiques (survol + focus clavier).
-function showVizTip(target){
-  const card = target.closest('.viz-card'); if(!card) return;
-  const tip = card.querySelector('.viz-tip');
-  tip.textContent = target.dataset.tip;
-  tip.classList.add('show');
-  const cr = card.getBoundingClientRect(), tr = target.getBoundingClientRect();
-  const left = Math.min(Math.max(8, tr.left - cr.left + tr.width / 2 - tip.offsetWidth / 2), cr.width - tip.offsetWidth - 8);
-  tip.style.left = left + 'px';
-  tip.style.top = Math.max(4, tr.top - cr.top - tip.offsetHeight - 8) + 'px';
-}
-function hideVizTip(target){
-  const card = target.closest('.viz-card');
-  if(card) card.querySelector('.viz-tip').classList.remove('show');
-}
-const rayonStatsEl = document.getElementById('rayon-stats');
-rayonStatsEl.addEventListener('mouseover', e => { const t = e.target.closest('[data-tip]'); if(t) showVizTip(t); });
-rayonStatsEl.addEventListener('mouseout', e => { const t = e.target.closest('[data-tip]'); if(t) hideVizTip(t); });
-rayonStatsEl.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if(t) showVizTip(t); });
-rayonStatsEl.addEventListener('focusout', e => { const t = e.target.closest('[data-tip]'); if(t) hideVizTip(t); });
-rayonStatsEl.addEventListener('click', e => {
-  const lv = e.target.closest('[data-dw-level]');
-  if(lv){ deweyLevel = lv.dataset.dwLevel; renderRayon(); return; }
-  const ms = e.target.closest('[data-dw-measure]');
-  if(ms){ deweyMeasure = ms.dataset.dwMeasure; renderRayon(); return; }
-  if(e.target.closest('[data-dw-more]')){ deweyShowAll = !deweyShowAll; renderRayon(); return; }
-  const row = e.target.closest('[data-dw-key]');
-  if(row){
-    const key = row.dataset.dwKey;
-    const same = deweyFilter && deweyFilter.level === deweyLevel && deweyFilter.key === key;
-    deweyFilter = same ? null : { level: deweyLevel, key };
-    renderRayon();
-    if(deweyFilter) document.querySelector('#rayon-panel .rayon-table').scrollIntoView({ behavior:'smooth', block:'start' });
+  const years = [...cnt.keys()];
+  if(!years.length){ $('rb-lastyear').innerHTML = '<p class="rb-note" style="margin:0">Aucune année de dernier prêt connue pour ce rayon.</p>'; return; }
+  const lo = Math.min(...years), hi = Math.max(Y, ...years);
+  const n = hi - lo + 1, step = n > 12 ? 2 : 1;
+  const items = [];
+  for(let y = lo; y <= hi; y++){
+    const v = cnt.get(y) || 0;
+    items.push({ label: y === 2007 ? '≤ 2007' : ((hi - y) % step === 0 ? String(y) : ''), value: v, color: 'var(--pro-bleu)', hatched: y === 2007,
+      tip: `${yearLabel(y)}\n${plural(v, 'livre')} dont le dernier prêt date de ${y === 2007 ? '2007 ou avant' : 'cette année'}` });
   }
-});
-document.getElementById('rayon-dewey-chip').addEventListener('click', e => {
-  if(e.target.closest('#rayon-dewey-clear')){ deweyFilter = null; renderRayon(); }
-});
+  $('rb-lastyear').innerHTML = `<div class="pro-chart">${rpCharts.bars(items, { height:180, unit:'livres', valueLabels: n <= 10, title:'Dernière année de prêt' })}</div>
+    <p class="rb-note">${plural(known.filter(r => yearOf(r.dernier)).length, 'livre')} empruntés au moins une fois. 2007 (hachuré) regroupe « 2007 ou avant » : l'export ne remonte pas plus loin.${jamais ? ` ${plural(jamais, 'livre')} jamais emprunté${jamais>1?'s':''} (non comptés ici).` : ''}</p>`;
+}
 
 /* ── Répartition par thème (indice Dewey de la cote, js/dewey-labels.js) ──
    Pour chaque thème : sa part des livres du rayon face à sa part des prêts.
-   Un thème dont la part des prêts dépasse nettement sa part du rayon
-   « tourne » ; l'inverse signale un fonds peu demandé. Clic sur une ligne =
-   filtre du tableau sur ce thème. Bleu/teal validés (validate_palette). */
-let deweyLevel = 'indice';       // 'division' | 'indice' | 'precis'
-let deweyMeasure = 'cumules';    // 'cumules' (toutes années) | 'an' (année en cours)
-let deweyShowAll = false;
-let deweyFilter = null;          // { level, key } — key '' = sans indice Dewey
-const DEWEY_TOP = 12;
-const DEWEY_LEVELS = [['division','Division (94x)'],['indice','Indice (944)'],['precis','Précis (944.04)']];
-
-function fmtPct(n, total){
-  if(!total) return '0 %';
-  const v = n * 100 / total;
-  return (v > 0 && v < 10 ? v.toFixed(1).replace('.', ',') : Math.round(v)) + ' %';
-}
+   Clic sur une ligne = filtre du tableau sur ce thème. */
 function deweyGroups(rows){
   const groups = new Map();
   rows.forEach(r => {
@@ -1405,6 +1748,7 @@ function deweyGroups(rows){
   });
   return [...groups.values()];
 }
+function renderDewey(){ $('rb-dewey').innerHTML = deweyHtml(RAYON_ROWS); }
 function deweyHtml(rows){
   const Y = REFERENCE_YEAR;
   const groups = deweyGroups(rows);
@@ -1417,46 +1761,63 @@ function deweyHtml(rows){
   if(sans) shown.push(sans);
   const maxShare = Math.max(0.01, ...shown.map(g => Math.max(g.livres / (totalLivres||1), g.prets / (totalPrets||1))));
   const measureLbl = deweyMeasure === 'an' ? `prêts ${Y}` : 'prêts (toutes années)';
-  const seg = (attr, val, cur, lbl) => `<button type="button" class="dw-seg ${val===cur?'on':''}" ${attr}="${val}">${lbl}</button>`;
+  const seg = (attr, val, cur, lbl) => `<button type="button" ${attr}="${val}" aria-pressed="${val===cur}">${lbl}</button>`;
   const lines = shown.map(g => {
     const pl = g.livres / (totalLivres||1), pp = g.prets / (totalPrets||1);
     const ratio = g.known ? (g.prets / g.known) : null;
     const active = deweyFilter && deweyFilter.level === deweyLevel && deweyFilter.key === g.key;
-    const tip = `${g.key || '—'} ${g.label} : ${g.livres} livre${g.livres>1?'s':''} (${fmtPct(g.livres, totalLivres)} du rayon) · ${fmt(g.prets)} ${measureLbl} (${fmtPct(g.prets, totalPrets)} des prêts)` +
-      (ratio != null ? ` · ${ratio.toFixed(1).replace('.', ',')} prêt${ratio>=2?'s':''} par livre` : '') + ' — cliquer pour filtrer le tableau';
-    return `<button type="button" class="dw-row ${active?'active':''} ${g.key?'':'none'}" data-dw-key="${esc(g.key)}" data-tip="${esc(tip)}">
-      <span class="dw-code">${esc(g.key || '—')}</span>
-      <span class="dw-label">${esc(g.label)}</span>
-      <span class="dw-bars"><span class="dw-bar dw-livres" style="width:${pl / maxShare * 100}%"></span><span class="dw-bar dw-prets" style="width:${pp / maxShare * 100}%"></span></span>
-      <span class="dw-num"><b>${g.livres}</b> livre${g.livres>1?'s':''}<small>${fmtPct(g.livres, totalLivres)}</small></span>
-      <span class="dw-num"><b>${fmt(g.prets)}</b> prêt${g.prets>1?'s':''}<small>${fmtPct(g.prets, totalPrets)}</small></span>
-      <span class="dw-num dw-ratio">${ratio != null ? ratio.toFixed(1).replace('.', ',') : '—'}<small>prêts/livre</small></span>
+    const tip = `${g.key || '—'} ${g.label}\n${plural(g.livres, 'livre')} (${fmtPct(g.livres, totalLivres)} du rayon)\n${fmt(g.prets)} ${measureLbl} (${fmtPct(g.prets, totalPrets)} des prêts)` +
+      (ratio != null ? `\n${ratio.toFixed(1).replace('.', ',')} prêt${ratio>=2?'s':''} par livre` : '') + '\nCliquer pour filtrer le tableau';
+    return `<button type="button" class="rb-dw__row ${active?'active':''} ${g.key?'':'none'}" data-dw-key="${esc(g.key)}" aria-pressed="${active ? 'true' : 'false'}" data-tip="${esc(tip).replace(/\n/g, '&#10;')}">
+      <span class="rb-dw__code">${esc(g.key || '—')}</span>
+      <span class="rb-dw__label">${esc(g.label)}</span>
+      <span class="rb-dw__bars"><span class="rb-dw__bar" style="width:${pl / maxShare * 100}%;background:var(--dw-livres)"></span><span class="rb-dw__bar" style="width:${pp / maxShare * 100}%;background:var(--dw-prets)"></span></span>
+      <span class="rb-dw__num"><b>${g.livres}</b> livre${g.livres>1?'s':''}<small>${fmtPct(g.livres, totalLivres)}</small></span>
+      <span class="rb-dw__num"><b>${fmt(g.prets)}</b> prêt${g.prets>1?'s':''}<small>${fmtPct(g.prets, totalPrets)}</small></span>
+      <span class="rb-dw__num rb-dw__ratio">${ratio != null ? ratio.toFixed(1).replace('.', ',') : '—'}<small>prêts/livre</small></span>
     </button>`;
   }).join('');
   const more = sorted.length > DEWEY_TOP
-    ? `<button type="button" class="dw-more" data-dw-more="1">${deweyShowAll ? 'Afficher les ' + DEWEY_TOP + ' premiers thèmes' : `Afficher les ${sorted.length} thèmes`}</button>` : '';
-  return `<div class="viz-card dw-card">
-    <div class="dw-top">
-      <div><div class="viz-title">Répartition par thème (Dewey)</div>
-        <div class="viz-sub">Part de chaque thème dans le rayon et dans les prêts. Cliquez sur un thème pour n'afficher que ses livres dans le tableau.</div></div>
-      <div class="dw-controls">
-        <div class="dw-segs">${DEWEY_LEVELS.map(([v,l]) => seg('data-dw-level', v, deweyLevel, l)).join('')}</div>
-        <div class="dw-segs">${seg('data-dw-measure','cumules',deweyMeasure,'Prêts toutes années')}${seg('data-dw-measure','an',deweyMeasure,`Prêts ${Y}`)}</div>
+    ? `<button type="button" class="pro-btn pro-btn--ghost pro-btn--sm rb-dw__more" data-dw-more="1">${deweyShowAll ? 'Afficher les ' + DEWEY_TOP + ' premiers thèmes' : `Afficher les ${sorted.length} thèmes`}</button>` : '';
+  return `<div class="rb-dw__top">
+      <p class="rb-dw__sub">Part de chaque thème dans le rayon et dans les prêts. Cliquez sur un thème pour n'afficher que ses livres dans le tableau.</p>
+      <div style="display:flex;flex-direction:column;gap:.4rem;align-items:flex-end">
+        <div class="pro-seg pro-seg--sm" role="group" aria-label="Niveau de détail">${DEWEY_LEVELS.map(([v,l]) => seg('data-dw-level', v, deweyLevel, l)).join('')}</div>
+        <div class="pro-seg pro-seg--sm" role="group" aria-label="Mesure des prêts">${seg('data-dw-measure','cumules',deweyMeasure,'Prêts toutes années')}${seg('data-dw-measure','an',deweyMeasure,`Prêts ${Y}`)}</div>
       </div>
     </div>
-    <div class="dw-legend"><span><i class="dw-sw dw-livres"></i>Part des livres du rayon</span><span><i class="dw-sw dw-prets"></i>Part des ${measureLbl}</span></div>
-    <div class="dw-list">${lines || '<div class="log-empty">Aucun livre.</div>'}</div>
-    ${more}
-    <div class="viz-tip" role="tooltip"></div>
-  </div>`;
+    <div class="rb-dw__legend"><span><i class="rb-sw" style="background:var(--dw-livres)"></i>Part des livres du rayon</span><span><i class="rb-sw" style="background:var(--dw-prets)"></i>Part des ${measureLbl}</span></div>
+    <div>${lines || '<p class="rb-note">Aucun livre.</p>'}</div>${more}`;
 }
+$('rb-dewey').addEventListener('click', e => {
+  const lv = e.target.closest('[data-dw-level]');
+  if(lv){ deweyLevel = lv.dataset.dwLevel; renderDewey(); return; }
+  const ms = e.target.closest('[data-dw-measure]');
+  if(ms){ deweyMeasure = ms.dataset.dwMeasure; renderDewey(); return; }
+  if(e.target.closest('[data-dw-more]')){ deweyShowAll = !deweyShowAll; renderDewey(); return; }
+  const row = e.target.closest('[data-dw-key]');
+  if(row){
+    const key = row.dataset.dwKey;
+    const same = deweyFilter && deweyFilter.level === deweyLevel && deweyFilter.key === key;
+    deweyFilter = same ? null : { level: deweyLevel, key };
+    tblLimit = 300;
+    renderDewey();
+    renderRayonTable();
+    if(deweyFilter) $('rayon-search').closest('.pro-toolbar').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+});
+$('rayon-dewey-chip').addEventListener('click', e => {
+  if(e.target.closest('#rayon-dewey-clear')){ deweyFilter = null; tblLimit = 300; renderDewey(); renderRayonTable(); }
+});
 
+/* ── Tableau de travail ── */
 const RAYON_COLS = [
   { key:'empl',    label:'Empl.' },
   { key:'cote',    label:'Cote' },
   { key:'titre',   label:'Titre' },
   { key:'parution',label:'Parution' },
   { key:'saisie',  label:'Catalogué le' },
+  { key:'spark',   label:'Prêts / an', nosort:true },
   { key:'an',      label:'Prêts AN', num:true },
   { key:'avant',   label:'Prêts avant', num:true },
   { key:'dernier', label:'Dernier prêt', num:true },
@@ -1491,78 +1852,106 @@ function compareRayonRows(a, b){
   }
   return c * d;
 }
-
-function renderRayon(){
-  if(!RAYON_CURRENT || !document.getElementById('rayon-panel').classList.contains('show')) return;
-  const Y = REFERENCE_YEAR;
-  document.getElementById('rayon-only-zero-label').textContent = `Aucun prêt en ${Y}`;
-  document.getElementById('rayon-stats').innerHTML = rayonStatsHtml(RAYON_ROWS);
-  const scanned = RAYON_ROWS.length;
-  document.getElementById('rayon-sub').textContent = scanned
-    ? `${scanned} livre${scanned>1?'s':''} scanné${scanned>1?'s':''} dans le récolement · statistiques de prêt de l'export Syracuse (année en cours : ${Y}). Cliquez sur un titre pour la fiche détaillée.`
-    : 'Aucun livre scanné dans ce rayon pour l\'instant.';
-
-  document.getElementById('rayon-thead').innerHTML = '<tr>' + RAYON_COLS.map(c => {
-    const lbl = c.key === 'an' ? `Prêts ${Y}` : c.key === 'avant' ? `Prêts avant ${Y}` : c.label;
-    const arrow = rayonSort.key === c.key ? (rayonSort.dir > 0 ? ' ▲' : ' ▼') : '';
-    return `<th data-sort="${c.key}" class="${c.num?'num':''} ${rayonSort.key===c.key?'sorted':''}">${lbl}${arrow}</th>`;
-  }).join('') + '</tr>';
-
-  const q = (document.getElementById('rayon-search').value || '').toLowerCase().trim();
-  const hideTreated = document.getElementById('rayon-hide-treated').checked;
-  const onlyZero = document.getElementById('rayon-only-zero').checked;
-  const rows = RAYON_ROWS.filter(r => {
+const isPressed = id => $(id).getAttribute('aria-pressed') === 'true';
+function filteredRows(){
+  const q = ($('rayon-search').value || '').toLowerCase().trim();
+  const hideTreated = isPressed('rayon-hide-treated'), onlyZero = isPressed('rayon-only-zero');
+  return RAYON_ROWS.filter(r => {
     if(hideTreated && TRAITEMENTS[r.bc]) return false;
     if(onlyZero && r.an !== 0) return false;
     if(deweyFilter && (dewey.deweyKey(r.dewey, deweyFilter.level) || '') !== deweyFilter.key) return false;
     if(q && !(`${r.bc} ${r.cote} ${r.titre} ${r.auteur}`.toLowerCase().includes(q))) return false;
     return true;
   }).sort(compareRayonRows);
-  RAYON_VIEW = rows.map(r => r.bc);
-
-  document.getElementById('rayon-dewey-chip').innerHTML = deweyFilter
-    ? `<button type="button" class="dw-chip" id="rayon-dewey-clear" title="Retirer le filtre de thème">Thème : ${esc(deweyFilter.key || 'sans indice')} ${esc(dewey.deweyLabel(deweyFilter.key || null, deweyFilter.level))} ✕</button>`
-    : '';
-
-  const tbody = document.getElementById('rayon-tbody');
-  if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="${RAYON_COLS.length}" class="log-empty">${scanned ? 'Aucun livre ne correspond aux filtres.' : 'Aucun livre.'}</td></tr>`;
-    return;
-  }
-  const numCell = v => v == null ? '<td class="num">—</td>' : `<td class="num ${v===0?'zero':'pos'}">${v}</td>`;
-  tbody.innerHTML = rows.map(r => {
-    const t = TRAITEMENTS[r.bc];
-    const btns = STATUTS.map(s => `<button type="button" class="mini-btn ${t && t.statut===s ? 'active' : ''}" data-statut="${s}" data-bc="${esc(r.bc)}" title="${STATUT_LABEL[s]}${t && t.statut===s ? ' (cliquer pour annuler)' : ''}">${{conserver:'✓',pilon:'🗑️',braderie:'🏷️',relocalisation:'📦'}[s]}</button>`).join('');
-    const cur = NAV && NAV.order[NAV.index] === r.bc;
-    return `<tr data-bc="${esc(r.bc)}" class="${t?'treated':''} ${cur?'current':''}">
-      <td class="log-bc">${r.travee ? esc(r.travee) + ' · ' : ''}${esc(r.colonne ?? '')}${r.etage != null ? '-' + esc(r.etage) : ''}</td>
-      <td class="log-bc">${esc(r.cote)}</td>
-      <td><button type="button" class="ttl" data-open="${esc(r.bc)}">${esc(r.titre || '(titre inconnu)')}</button>
-        ${r.auteur ? `<div class="aut">${esc(r.auteur)}</div>` : ''}
-        ${r.absent ? `<div class="absent">absent de l'export Syracuse — pas de statistiques</div>` : ''}
-        ${r.horsRayon ? `<div class="absent">plus scanné dans ce rayon — gardé car déjà traité</div>` : ''}
-        ${avisHtml(t, true)}</td>
-      <td>${esc(r.parution || '—')}</td>
-      <td>${esc(r.saisie || '—')}</td>
-      ${numCell(r.an)}
-      ${numCell(r.avant)}
-      <td class="num">${esc(r.dernier || '—')}</td>
-      <td><div class="mini-btns">${btns}</div></td>
-    </tr>`;
+}
+const numCell = v => v == null ? '<td class="is-num">—</td>' : `<td class="is-num ${v===0?'rb-zero':'rb-pos'}">${v}</td>`;
+function rowHtml(r){
+  const Y = REFERENCE_YEAR;
+  const t = TRAITEMENTS[r.bc];
+  const btns = STATUTS.map(s => {
+    const on = !!t && t.statut === s;
+    return `<button type="button" class="rb-dbtn rb-dbtn--${s}" data-statut="${s}" data-bc="${esc(r.bc)}" aria-pressed="${on}" aria-label="${STATUT_LABEL[s]}" title="${STATUT_LABEL[s]} (${STATUT_KEY[s]})${on ? ' — cliquer pour annuler' : ''}">${STATUT_KEY[s]}</button>`;
   }).join('');
+  const cur = NAV && NAV.order[NAV.index] === r.bc;
+  const p = r.prets;
+  const spark = p ? rpCharts.miniBars([p.an3, p.an2, p.an1, p.an].map(v => v || 0), { color:'#0f9d8a', lastColor:'#6fc7bb', labels:[Y-3, Y-2, Y-1, Y], title:'Prêts par année' }) : '—';
+  return `<tr data-bc="${esc(r.bc)}" class="${t?'is-treated':''} ${cur?'is-current':''}">
+    <td class="pro-mono">${r.travee ? esc(r.travee) + ' · ' : ''}${esc(r.colonne ?? '')}${r.etage != null ? '-' + esc(r.etage) : ''}</td>
+    <td class="pro-mono">${esc(r.cote)}</td>
+    <td><button type="button" class="rb-ttl" data-open="${esc(r.bc)}">${esc(r.titre || '(titre inconnu)')}</button>
+      ${r.auteur ? `<div class="rb-aut">${esc(r.auteur)}</div>` : ''}
+      ${r.absent ? `<div class="rb-absent">absent de l'export Syracuse — pas de statistiques</div>` : ''}
+      ${r.horsRayon ? `<div class="rb-absent">plus scanné dans ce rayon — gardé car déjà traité</div>` : ''}
+      ${avisHtml(t, true)}</td>
+    <td>${esc(r.parution || '—')}</td>
+    <td>${esc(r.saisie || '—')}</td>
+    <td>${spark}</td>
+    ${numCell(r.an)}
+    ${numCell(r.avant)}
+    <td class="is-num">${esc(r.dernier || '—')}</td>
+    <td><div class="rb-dbtns">${btns}</div></td>
+  </tr>`;
+}
+function rowEl(bc){
+  return $('rayon-tbody').querySelector(`tr[data-bc="${CSS.escape(bc)}"]`);
+}
+/* Reconstruction complète du tableau : tri, filtres, import. Une décision
+   isolée passe, elle, par refreshRow(). */
+function renderRayonTable(){
+  if(!RAYON_CURRENT) return;
+  const Y = REFERENCE_YEAR;
+  $('rayon-thead').innerHTML = '<tr>' + RAYON_COLS.map(c => {
+    const lbl = c.key === 'an' ? `Prêts ${Y}` : c.key === 'avant' ? `Prêts avant ${Y}` : c.label;
+    if(c.nosort) return `<th scope="col">${lbl}</th>`;
+    const sorted = rayonSort.key === c.key;
+    return `<th scope="col" data-sort="${c.key}" class="${c.num?'is-num':''}" aria-sort="${sorted ? (rayonSort.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" class="pro-sortbtn">${lbl}</button></th>`;
+  }).join('') + '</tr>';
+
+  const rows = filteredRows();
+  RAYON_VIEW = rows.map(r => r.bc);
+  $('rayon-dewey-chip').innerHTML = deweyFilter
+    ? `<span class="pro-chip">Thème : ${esc(deweyFilter.key || 'sans indice')} ${esc(dewey.deweyLabel(deweyFilter.key || null, deweyFilter.level))}<button type="button" id="rayon-dewey-clear" aria-label="Retirer le filtre de thème">${rpUI.icon('x', {size:14, stroke:2.6})}</button></span>`
+    : '';
+  const tbody = $('rayon-tbody');
+  const scanned = RAYON_ROWS.length;
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="${RAYON_COLS.length}" style="text-align:center;color:var(--pro-texte-doux);padding:1.25rem">${scanned ? 'Aucun livre ne correspond aux filtres.' : 'Aucun livre.'}</td></tr>`;
+    $('rayon-foot').innerHTML = '';
+  }else{
+    const shown = rows.slice(0, tblLimit);
+    tbody.innerHTML = shown.map(rowHtml).join('');
+    $('rayon-foot').innerHTML = `<span class="pro-pager__info">${fmt(shown.length)} sur ${fmt(rows.length)} livre${rows.length>1?'s':''}${rows.length < scanned ? ` (${fmt(scanned)} dans le rayon)` : ''}</span>` +
+      (rows.length > shown.length ? `<button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="rayon-more">Afficher ${Math.min(300, rows.length - shown.length)} de plus</button>` : '');
+  }
   if(NAV) updateNav(); // compteur « non traités » de la barre de navigation
 }
-
-document.getElementById('rayon-thead').addEventListener('click', e => {
+/* Une décision change : on ne touche qu'à la ligne concernée. Si « Masquer les
+   traités » est actif, la ligne traitée disparaît (sans rien réordonner) ; une
+   décision annulée fait réapparaître une ligne : là, reconstruction. */
+function refreshRow(bc){
+  const row = RAYON_ROW_BY_BC.get(bc);
+  const tr = rowEl(bc);
+  if(!row) return;
+  const t = TRAITEMENTS[bc];
+  if(isPressed('rayon-hide-treated')){
+    if(t && tr){ tr.remove(); const i = RAYON_VIEW.indexOf(bc); if(i >= 0) RAYON_VIEW.splice(i, 1); return; }
+    if(!t && !tr){ renderRayonTable(); return; }
+  }
+  if(!tr) return;
+  const tmp = document.createElement('tbody');
+  tmp.innerHTML = rowHtml(row);
+  tr.replaceWith(tmp.firstElementChild);
+}
+$('rayon-thead').addEventListener('click', e => {
   const th = e.target.closest('th[data-sort]');
   if(!th) return;
   const key = th.dataset.sort;
-  // Prêts : du moins emprunté au plus emprunté d'abord (candidats au désherbage).
   rayonSort = rayonSort.key === key ? { key, dir: -rayonSort.dir } : { key, dir: 1 };
-  renderRayon();
+  tblLimit = 300;
+  renderRayonTable();
 });
-document.getElementById('rayon-tbody').addEventListener('click', e => {
-  const mini = e.target.closest('.mini-btn');
+$('rayon-tbody').addEventListener('click', e => {
+  const mini = e.target.closest('.rb-dbtn');
   if(mini){
     const bc = mini.dataset.bc, statut = mini.dataset.statut;
     const t = TRAITEMENTS[bc];
@@ -1572,30 +1961,44 @@ document.getElementById('rayon-tbody').addEventListener('click', e => {
   const open = e.target.closest('[data-open]');
   if(open){
     if(!RAYON_BY_BC.has(open.dataset.open)) return;
-    document.getElementById('roto-flash').classList.remove('show');
+    $('roto-flash').classList.remove('show');
     openFromRayon(open.dataset.open);
-    document.getElementById('roto-detail').scrollIntoView({ behavior:'smooth', block:'start' });
   }
 });
-['rayon-search','rayon-hide-treated','rayon-only-zero'].forEach(id => {
-  document.getElementById(id).addEventListener('input', renderRayon);
+$('rayon-foot').addEventListener('click', e => {
+  if(e.target.closest('#rayon-more')){ tblLimit += 300; renderRayonTable(); }
+});
+$('rayon-search').addEventListener('input', () => { tblLimit = 300; renderRayonTable(); });
+['rayon-hide-treated','rayon-only-zero'].forEach(id => {
+  $(id).addEventListener('click', () => {
+    $(id).setAttribute('aria-pressed', isPressed(id) ? 'false' : 'true');
+    tblLimit = 300;
+    renderRayonTable();
+  });
 });
 rayonSelect.addEventListener('change', fillColSelect);
 rayonImportBtn.addEventListener('click', async () => {
   await desherbReady;
-  importRayon(rayonSelect.value, rayonColSelect.value);
+  importRayon(rayonSelect.value, rayonColSelect.value, { force:true });
+  setPicker(false);
+  showTab('rayon');
 });
-document.getElementById('rayon-refresh-btn').addEventListener('click', refreshRayonFromRecolement);
-document.getElementById('rayon-close').addEventListener('click', () => {
+$('rayon-refresh-btn').addEventListener('click', refreshRayonFromRecolement);
+$('rayon-close').addEventListener('click', () => {
   RAYON_CURRENT = null;
-  RAYON_ROWS = [];
-  RAYON_BY_BC = new Map();
+  RAYON_ROWS = []; RAYON_VIEW = [];
+  RAYON_BY_BC = new Map(); RAYON_ROW_BY_BC = new Map();
+  RSTAT = null; lastRayonSig = '';
   deweyFilter = null;
+  rayonTouched.clear(); rayonFullDirty = false;
   if(NAV){ NAV = null; updateNav(); }
   try { localStorage.removeItem(LS_RAYON); } catch(e) {}
-  document.getElementById('rayon-panel').classList.remove('show');
+  $('rayon-title').textContent = '';
+  renderRayonAll();
+  if(currentRecord) showDetail(currentRecord);
+  setPicker(true);
 });
-document.getElementById('rayon-export-csv').addEventListener('click', () => {
+$('rayon-export-csv').addEventListener('click', () => {
   if(!RAYON_ROWS.length) return;
   const Y = REFERENCE_YEAR;
   const q = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
@@ -1604,7 +2007,7 @@ document.getElementById('rayon-export-csv').addEventListener('click', () => {
     r.bc, r.colonne, r.etage, r.cote, dewey.deweyKey(r.dewey, 'precis') || '', dewey.deweyLabel(dewey.deweyKey(r.dewey, 'indice')), r.titre, r.auteur, r.parution, r.saisie,
     r.an, r.avant, r.cumules, r.dernier, TRAITEMENTS[r.bc] ? STATUT_LABEL[TRAITEMENTS[r.bc].statut] : '',
   ].map(q).join(';'));
-  const label = document.getElementById('rayon-title').textContent.replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'');
+  const label = $('rayon-title').textContent.replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'');
   // BOM : Excel ouvre ainsi le fichier en UTF-8 (accents).
   downloadTxt('﻿' + [head.map(q).join(';'), ...lines].join('\r\n') + '\r\n', `rotobib-rayon-${label}.csv`);
 });
@@ -1621,12 +2024,12 @@ document.getElementById('rayon-export-csv').addEventListener('click', () => {
    ════════════════════════════════════════════════════════════ */
 const SD = selectionsDesherbage;
 let SEL_EDIT = null; // { id|null, parts:[...] }
-const selEditor = document.getElementById('sel-editor');
-const selTravee = document.getElementById('sel-travee');
+const selEditor = $('sel-editor');
+const selTravee = $('sel-travee');
 let selCols = new Set();
 
 function updateSelEditBtn(){
-  document.getElementById('sel-edit-btn').style.display = selectionsDesherbage.isSelectionId(rayonSelect.value) ? '' : 'none';
+  $('sel-edit-btn').style.display = selectionsDesherbage.isSelectionId(rayonSelect.value) ? '' : 'none';
 }
 selTravee.innerHTML = SD.MAGASINS.map(m =>
   `<optgroup label="Magasin — ${m.label}">${m.travees.map(t => `<option value="${t.id}">${esc(SD.traveeName(t.id))} (${t.nbCols} col.)</option>`).join('')}</optgroup>`
@@ -1641,59 +2044,60 @@ function currentZone(){
   return SD.normalizePart({
     travee: selTravee.value,
     cols: [...selCols],
-    etFrom: document.getElementById('sel-et-from').value,
-    etTo: document.getElementById('sel-et-to').value,
+    etFrom: $('sel-et-from').value,
+    etTo: $('sel-et-to').value,
   });
 }
 function renderSelCols(){
-  document.getElementById('sel-cols').innerHTML = SD.colLetters(selTravee.value).map(c =>
-    `<button type="button" class="sel-col ${selCols.has(c)?'on':''}" data-col="${c}">${c}</button>`).join('');
+  $('sel-cols').innerHTML = SD.colLetters(selTravee.value).map(c =>
+    `<button type="button" class="sel-col ${selCols.has(c)?'on':''}" data-col="${c}" aria-pressed="${selCols.has(c)}">${c}</button>`).join('');
   const n = selScanCount([currentZone()]);
-  document.getElementById('sel-zone-count').textContent = n == null ? '' : `${n} livre${n>1?'s':''} scanné${n>1?'s':''} dans cette zone`;
+  $('sel-zone-count').textContent = n == null ? '' : `${n} livre${n>1?'s':''} scanné${n>1?'s':''} dans cette zone`;
 }
 function renderSelParts(){
-  const ul = document.getElementById('sel-parts');
+  const ul = $('sel-parts');
   ul.innerHTML = SEL_EDIT.parts.length
     ? SEL_EDIT.parts.map((p, i) => {
         const n = selScanCount([p]);
-        return `<li><span>${esc(SD.partLabel(p))}</span><span class="n">${n ?? '—'} livre${n>1?'s':''} <button type="button" data-del="${i}" title="Retirer cette zone">✕</button></span></li>`;
+        return `<li><span>${esc(SD.partLabel(p))}</span><span class="n">${n ?? '—'} livre${n>1?'s':''} <button type="button" data-del="${i}" title="Retirer cette zone" aria-label="Retirer cette zone">✕</button></span></li>`;
       }).join('')
-    : `<li style="color:#888">Aucune zone pour l'instant : choisissez une travée, ses colonnes et ses étagères, puis « + Ajouter cette zone ».</li>`;
+    : `<li style="color:var(--pro-texte-doux)">Aucune zone pour l'instant : choisissez une travée, ses colonnes et ses étagères, puis « + Ajouter cette zone ».</li>`;
   const total = selScanCount(SEL_EDIT.parts);
-  document.getElementById('sel-total').textContent = SEL_EDIT.parts.length && total != null ? `Total : ${total} livre${total>1?'s':''} scanné${total>1?'s':''}` : '';
+  $('sel-total').textContent = SEL_EDIT.parts.length && total != null ? `Total : ${total} livre${total>1?'s':''} scanné${total>1?'s':''}` : '';
 }
 function openSelEditor(def){
   SEL_EDIT = { id: def ? def.id : null, parts: def ? def.parts.map(p => ({ ...p })) : [] };
-  document.getElementById('sel-editor-title').textContent = def ? 'Modifier le rayon fictif' : 'Nouveau rayon fictif';
-  document.getElementById('sel-name').value = def ? def.label : '';
-  document.getElementById('sel-delete').style.display = def ? '' : 'none';
-  document.getElementById('sel-err').textContent = '';
+  $('sel-editor-title').textContent = def ? 'Modifier le rayon fictif' : 'Nouveau rayon fictif';
+  $('sel-name').value = def ? def.label : '';
+  $('sel-delete').style.display = def ? '' : 'none';
+  $('sel-err').textContent = '';
   if(def && def.parts.length) selTravee.value = def.parts[def.parts.length-1].travee;
   selCols = new Set();
-  document.getElementById('sel-et-from').value = '';
-  document.getElementById('sel-et-to').value = '';
+  $('sel-et-from').value = '';
+  $('sel-et-to').value = '';
   renderSelCols();
   renderSelParts();
+  selEditor.hidden = false;
   selEditor.classList.add('show');
-  document.getElementById('sel-name').focus({ preventScroll:true });
+  $('sel-name').focus({ preventScroll:true });
 }
-function closeSelEditor(){ SEL_EDIT = null; selEditor.classList.remove('show'); }
+function closeSelEditor(){ SEL_EDIT = null; selEditor.classList.remove('show'); selEditor.hidden = true; }
 
-document.getElementById('sel-new-btn').addEventListener('click', () => openSelEditor(null));
-document.getElementById('sel-edit-btn').addEventListener('click', () => {
+$('sel-new-btn').addEventListener('click', () => openSelEditor(null));
+$('sel-edit-btn').addEventListener('click', () => {
   const def = sourceDef(rayonSelect.value);
   if(def && SD.isSelectionId(def.id)) openSelEditor(def);
 });
-document.getElementById('sel-cancel').addEventListener('click', closeSelEditor);
+$('sel-cancel').addEventListener('click', closeSelEditor);
 selTravee.addEventListener('change', () => { selCols = new Set(); renderSelCols(); });
-['sel-et-from','sel-et-to'].forEach(id => document.getElementById(id).addEventListener('input', renderSelCols));
-document.getElementById('sel-cols').addEventListener('click', e => {
+['sel-et-from','sel-et-to'].forEach(id => $(id).addEventListener('input', renderSelCols));
+$('sel-cols').addEventListener('click', e => {
   const b = e.target.closest('[data-col]');
   if(!b) return;
   if(selCols.has(b.dataset.col)) selCols.delete(b.dataset.col); else selCols.add(b.dataset.col);
   renderSelCols();
 });
-document.getElementById('sel-add-part').addEventListener('click', () => {
+$('sel-add-part').addEventListener('click', () => {
   const z = currentZone();
   if(!z) return;
   SEL_EDIT.parts.push(z);
@@ -1701,7 +2105,7 @@ document.getElementById('sel-add-part').addEventListener('click', () => {
   renderSelCols();
   renderSelParts();
 });
-document.getElementById('sel-parts').addEventListener('click', e => {
+$('sel-parts').addEventListener('click', e => {
   const b = e.target.closest('[data-del]');
   if(!b) return;
   SEL_EDIT.parts.splice(Number(b.dataset.del), 1);
@@ -1723,81 +2127,75 @@ async function reloadWithSelection(record){
   RECOL.selections = record.deleted ? others : SD.applySelectionRecords([...others, record]);
   renderSourcesList(record.deleted ? '' : record.id);
 }
-document.getElementById('sel-save').addEventListener('click', async () => {
-  const err = document.getElementById('sel-err');
-  const label = document.getElementById('sel-name').value.trim();
+$('sel-save').addEventListener('click', async () => {
+  const err = $('sel-err');
+  const label = $('sel-name').value.trim();
   // Zone préparée mais pas encore ajoutée : on l'ajoute plutôt que de la perdre.
   if(!SEL_EDIT.parts.length){ const z = currentZone(); if(z) SEL_EDIT.parts.push(z); }
   if(!label){ err.textContent = 'Donnez un nom au rayon.'; return; }
   if(!SEL_EDIT.parts.length){ err.textContent = 'Ajoutez au moins une zone.'; return; }
   const record = { id: SEL_EDIT.id || SD.newSelectionId(), label, parts: SEL_EDIT.parts, ts: Date.now() };
-  const btn = document.getElementById('sel-save');
+  const btn = $('sel-save');
   btn.disabled = true; err.textContent = '';
   try{
     await saveSelectionRecord(record);
     closeSelEditor();
     await reloadWithSelection(record);
     await desherbReady;
-    importRayon(record.id, '');
+    importRayon(record.id, '', { force:true });
     rayonMsg.textContent = `Rayon fictif « ${label} » enregistré et importé.`;
+    rpUI.toast(`Rayon fictif « ${label} » enregistré et importé.`, { type:'ok' });
   }catch(e){
     err.textContent = 'Enregistrement impossible : ' + e.message;
   }finally{
     btn.disabled = false;
   }
 });
-document.getElementById('sel-delete').addEventListener('click', async () => {
+$('sel-delete').addEventListener('click', async () => {
   if(!SEL_EDIT || !SEL_EDIT.id) return;
-  if(!confirm('Supprimer ce rayon fictif ? Les livres et les décisions déjà prises ne sont pas touchés : seul le regroupement disparaît.')) return;
   const id = SEL_EDIT.id;
+  const ok = await rpUI.confirmInline($('sel-confirm'), 'Supprimer ce rayon fictif ? Les livres et les décisions déjà prises ne sont pas touchés : seul le regroupement disparaît.', { okLabel:'Supprimer', danger:true });
+  if(!ok) return;
   try{
     await saveSelectionRecord({ id, deleted:true, ts: Date.now() });
     closeSelEditor();
-    if(RAYON_CURRENT && RAYON_CURRENT.id === id) document.getElementById('rayon-close').click();
+    if(RAYON_CURRENT && RAYON_CURRENT.id === id) $('rayon-close').click();
     await reloadWithSelection({ id, deleted:true });
     rayonMsg.textContent = 'Rayon fictif supprimé.';
   }catch(e){
-    document.getElementById('sel-err').textContent = 'Suppression impossible : ' + e.message;
+    $('sel-err').textContent = 'Suppression impossible : ' + e.message;
   }
-});
-
-// Réimporte au chargement le dernier rayon ouvert sur ce poste.
-loadRecolement().then(async () => {
-  const saved = loadSavedRayon();
-  if(saved && sourceDef(saved.id)){
-    await desherbReady;
-    importRayon(saved.id, saved.col);
-  }
-});
-
-/* ════════════════════════════════════════════════════════════
-   EXPORT .TXT PAR TYPE DE TRAITEMENT
-   ════════════════════════════════════════════════════════════ */
-function downloadTxt(text, filename){
-  const blob = new Blob([text], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.download = filename;
-  a.href = URL.createObjectURL(blob);
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 300);
-}
-document.querySelectorAll('[data-export]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const statut = btn.dataset.export;
-    const barcodes = Object.values(TRAITEMENTS).filter(t => t.statut === statut).map(t => t.barcode);
-    if(!barcodes.length){ alert(`Aucun exemplaire marqué « ${STATUT_LABEL[statut]} » pour l'instant.`); return; }
-    const d = new Date(), pad = n => String(n).padStart(2,'0');
-    downloadTxt(barcodes.join('\n') + '\n', `rotobib-${statut}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
-  });
 });
 
 /* ════════════════════════════════════════════════════════════
    INIT
    ════════════════════════════════════════════════════════════ */
+rpUI.help($('rb-help'), 'rotobib');
+rpCharts.attachTooltips($('panel-decider'));
+rpCharts.attachTooltips($('panel-rayon'));
+$('rb-help-btn').addEventListener('click', () => {
+  const h = $('rb-help'); h.open = true; h.scrollIntoView({ block:'nearest', behavior:'smooth' });
+});
+buildDecisionButtons();
 updateSyncIndicator();
 syncFromServer();
-renderLog();
+updateCtx();
+renderStats();
+tabsCtl = rpUI.tabs($('rb-tabs'), { hashPrefix:'onglet-' });
 scanInput.focus();
+
+// Réimporte au chargement le dernier rayon ouvert sur ce poste.
+setPicker(!loadSavedRayon());
+loadRecolement().then(async () => {
+  const saved = loadSavedRayon();
+  if(saved && sourceDef(saved.id)){
+    await desherbReady;
+    importRayon(saved.id, saved.col, { force:true });
+    setPicker(false);
+  }else{
+    setPicker(true);
+  }
+});
 </script>
 </body>
 </html>

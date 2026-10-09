@@ -1,105 +1,122 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<!-- Contrôle d'accès de l'espace pro (gate localStorage, voir CLAUDE.md « Sécurité ») -->
+<script>
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.href = 'index.html';
+</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
 <title>ScanDocs — Rognage & Renommage</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@500;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="fonts.css" />
 <link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="css/admin.css" />
 <style>
+  /* ScanDocs : application plein écran (file d'attente à gauche, éditeur à droite).
+     Compléments locaux au kit, préfixe sd- ; le kit fournit en-tête, boutons, pastilles. */
   :root {
     --bg:var(--papier); --surface:#ffffff; --surface2:var(--papier-ombre);
     --border2:var(--trait-fort);
-    --warn:#e65100; --danger:#c62828;
+    --danger:#c62828;
     --muted:var(--text-light);
-    --r:10px; --rl:16px;
+    --r:0px;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;overflow:hidden}
-  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;line-height:normal;display:flex;flex-direction:column}
-  header{height:54px;flex-shrink:0;border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between}
-  .logo-mark{font-weight:800;font-size:1.15rem;color:var(--accent);letter-spacing:-.02em}
-  .logo-sub{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-left:.5rem}
-  .cpill{font-family:'DM Mono',monospace;font-size:.7rem;padding:3px 11px;border:1px solid var(--border2);border-radius:999px;color:var(--muted)}
-  .cpill span{color:var(--accent);font-weight:500}
+  body{background:var(--bg);color:var(--text);line-height:normal;display:flex;flex-direction:column}
+
+  /* En-tête compact pleine largeur */
+  .sd-head{flex-shrink:0}
+  .sd-head .pro-head__inner{max-width:none;min-height:54px;flex-wrap:nowrap;align-items:center;gap:0 1.25rem}
+  .sd-head .pro-head__title{flex-direction:row;align-items:baseline;gap:.2rem .9rem;flex-wrap:wrap;padding:.3rem 0}
+  .sd-head .pro-crumb{white-space:nowrap}
+  .sd-head .pro-head__h1{font-size:1.2rem}
+  .sd-sub{font:400 .68rem var(--pro-font-mono);color:rgba(255,255,255,.7)}
+  .sd-count{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .8rem;border-radius:20px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;font:600 .78rem var(--pro-font-body);white-space:nowrap}
+  .sd-count b{font-family:var(--pro-font-mono);font-weight:500}
+  .sd-head .pro-btn{min-height:36px}
+  .sd-prog{flex-shrink:0;height:4px;background:var(--pro-papier-ombre)}
+  .sd-prog>span{display:block;height:100%;width:0;background:var(--pro-bleu);transition:width .25s}
+
   main{flex:1;min-height:0;display:grid;grid-template-columns:320px 1fr;overflow:hidden}
-  .lp{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;height:100%}
-  .dz{flex-shrink:0;margin:.9rem .9rem .6rem;border:1.5px dashed var(--border2);border-radius:var(--rl);padding:1rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
-  .dz:hover,.dz.over{border-color:var(--accent);background:rgba(42,60,212,.04)}
-  .dz-icon{font-size:1.4rem;display:block;margin-bottom:.3rem}
-  .dz-title{font-weight:700;font-size:.82rem;margin-bottom:.1rem}
-  .dz-sub{font-size:.67rem;color:var(--muted);font-family:'DM Mono',monospace}
+  .lp{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;height:100%;background:#fff}
+  .dz{flex-shrink:0;margin:.9rem .9rem .6rem;border:1.5px dashed var(--border2);padding:1rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--bg)}
+  .dz:hover,.dz.over{border-color:var(--pro-bleu);background:var(--pro-bleu-pale)}
+  .dz:focus-visible{outline:2px solid var(--pro-carmin);outline-offset:2px}
+  .dz-icon{display:block;margin:0 auto .3rem;color:var(--pro-bleu)}
+  .dz-title{font-weight:700;font-size:.85rem;margin-bottom:.1rem}
+  .dz-sub{font-size:.72rem;color:var(--muted)}
   #fi{display:none}
-  .qh{flex-shrink:0;padding:0 .9rem .35rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
-  .clear-btn{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px}
-  .clear-btn:hover{color:var(--danger);background:rgba(198,40,40,.08)}
+  .qh{flex-shrink:0;padding:0 .9rem .35rem;font-size:.68rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+  .qh .pro-btn{min-height:30px;padding:0 .5rem;font-size:.72rem;font-weight:600;color:var(--muted);letter-spacing:0;text-transform:none}
+  .qh .pro-btn:hover{color:var(--danger);background:rgba(198,40,40,.08)}
   .ql{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 .45rem .75rem}
-  .ql::-webkit-scrollbar{width:3px}
-  .ql::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
-  .qi{display:flex;align-items:center;gap:.45rem;padding:.4rem .55rem;border-radius:8px;cursor:pointer;transition:background .12s;font-size:.74rem}
+  .ql::-webkit-scrollbar{width:4px}
+  .ql::-webkit-scrollbar-thumb{background:var(--border2)}
+  .qi{display:flex;align-items:center;gap:.5rem;padding:.5rem .55rem;cursor:pointer;transition:background .12s;font-size:.78rem;min-height:38px;border:1px solid transparent}
   .qi:hover{background:var(--surface2)}
-  .qi.active{background:var(--surface2);border:1px solid var(--border2)}
+  .qi.active{background:var(--pro-bleu-pale);border-color:var(--pro-bleu-bord)}
   .qi.done .qin{color:var(--muted);text-decoration:line-through}
-  .qii{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);min-width:22px}
+  .qii{font-family:var(--pro-font-mono);font-size:.62rem;color:var(--muted);min-width:24px}
   .qin{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .qid{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-  .qid.p{background:var(--border2)}
-  .qid.a{background:var(--accent);box-shadow:0 0 6px var(--accent)}
-  .qid.d{background:var(--ink-soft)}
-  .qid.s{background:var(--warn)}
-  .noq{padding:.9rem;font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);text-align:center}
-  .rp{display:flex;flex-direction:column;overflow:hidden;height:100%}
-  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted)}
-  .empty-big{font-size:2.2rem}
-  .empty p{font-size:.78rem;font-family:'DM Mono',monospace}
+  /* Statut d'une image : pastille + glyphe (jamais la couleur seule) */
+  .qid{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;line-height:1;border:1.5px solid var(--border2);color:var(--muted);background:#fff}
+  .qid.p::before{content:""}
+  .qid.a{border-color:var(--pro-bleu);background:var(--pro-bleu);color:#fff}
+  .qid.a::before{content:"▶";font-size:.5rem;margin-left:1px}
+  .qid.d{border-color:var(--pro-ok);background:var(--pro-ok);color:#fff}
+  .qid.d::before{content:"✓"}
+  .qid.s{border-color:var(--pro-dec-braderie);background:var(--pro-ok-fond);background:#FFF3CF;color:#6b4a00}
+  .qid.s::before{content:"→"}
+  .qi.validated .qin{color:var(--pro-bleu)}
+  .noq{padding:.9rem;font-size:.78rem;color:var(--muted);text-align:center}
+  .rp{display:flex;flex-direction:column;overflow:hidden;height:100%;min-width:0}
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted);text-align:center;padding:1rem}
+  .empty svg{color:var(--pro-texte-faible)}
+  .empty-t{font:600 1.1rem var(--pro-font-display);color:var(--pro-bleu)}
+  .empty p{font-size:.82rem}
   .editor{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
   .crow{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:.65rem;padding:.85rem .85rem .45rem;overflow:hidden}
   .cwrap{display:flex;flex-direction:column;gap:.35rem;min-height:0;overflow:hidden}
-  .clabel{flex-shrink:0;font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:.4rem}
-  .clabel .dim{color:var(--border2)}
-  .cbox{flex:1;min-height:0;background:var(--papier-ombre);border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+  .clabel{flex-shrink:0;font-size:.64rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:.4rem}
+  .clabel .dim{color:var(--pro-texte-faible);font-family:var(--pro-font-mono);letter-spacing:0}
+  .cbox{flex:1;min-height:0;background:var(--papier-ombre);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
   canvas{max-width:100%;max-height:100%;object-fit:contain;display:block}
-  #origbox{cursor:crosshair}
+  #origbox{cursor:crosshair;touch-action:none}
   #overlay{position:absolute;pointer-events:none}
-  .ctrl{flex-shrink:0;border-top:1px solid var(--border);padding:.65rem .85rem;display:flex;flex-direction:column;gap:.55rem}
-  .brow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
-  .bb{font-family:'DM Mono',monospace;font-size:.63rem;padding:2px 9px;border-radius:999px;font-weight:500;flex-shrink:0}
-  .bb.ok{background:rgba(42,60,212,.12);color:var(--accent);border:1px solid rgba(42,60,212,.25)}
-  .bb.warn{background:rgba(230,81,0,.12);color:var(--warn);border:1px solid rgba(230,81,0,.25)}
-  .bb.load{background:rgba(107,107,123,.1);color:var(--muted);border:1px solid var(--border2)}
-  .bval{font-family:'DM Mono',monospace;font-size:.76rem;color:var(--accent)}
+  .ctrl{flex-shrink:0;border-top:1px solid var(--border);padding:.65rem .85rem;display:flex;flex-direction:column;gap:.55rem;background:#fff}
+  .brow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;min-height:28px}
+  .bval{font-family:var(--pro-font-mono);font-size:.82rem;color:var(--pro-bleu)}
+  .bhint{font-size:.74rem;color:var(--pro-dec-braderie-ink);font-weight:600}
+  .bhint:empty{display:none}
   .fnrow{display:flex;align-items:center;gap:.55rem}
-  .fnrow label{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);white-space:nowrap}
-  .fnwrap{flex:1;display:flex;align-items:center;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);overflow:hidden;transition:border-color .2s}
-  .fnwrap:focus-within{border-color:var(--accent)}
-  #fn{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Mono',monospace;font-size:.8rem;padding:6px 10px}
-  .fnext{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);padding:0 9px;border-left:1px solid var(--border)}
+  .fnrow label{font-size:.72rem;color:var(--muted);white-space:nowrap;font-weight:600}
+  .fnwrap{flex:1;display:flex;align-items:center;border:1px solid var(--pro-trait-fort);background:var(--surface);overflow:hidden;transition:border-color .2s;min-width:0}
+  .fnwrap:focus-within{border-color:var(--pro-bleu)}
+  #fn{flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--pro-font-mono);font-size:.85rem;padding:0 10px;height:42px}
+  .fnext{font-family:var(--pro-font-mono);font-size:.74rem;color:var(--muted);padding:0 9px;border-left:1px solid var(--border);height:42px;display:flex;align-items:center}
   .arow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
-  .mc{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted)}
-  input[type=range]{-webkit-appearance:none;width:75px;height:3px;background:var(--border2);border-radius:3px;outline:none;cursor:pointer}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer}
-  .mv{min-width:18px;color:var(--accent);font-weight:500}
-  .btn{display:inline-flex;align-items:center;gap:.3rem;padding:5px 13px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Syne',sans-serif;font-size:.74rem;font-weight:500;cursor:pointer;transition:background .12s,transform .1s;white-space:nowrap}
-  .btn:hover{background:#E3DED4}
-  .btn:active{transform:scale(.97)}
-  .btn-a{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
-  .btn-a:hover{filter:brightness(0.88)}
+  .mc{display:flex;align-items:center;gap:.5rem;font-size:.74rem;color:var(--muted)}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:90px;height:4px;background:var(--border2);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--pro-bleu);cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px var(--pro-bleu)}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--pro-bleu);cursor:pointer;border:2px solid #fff}
+  .mv{min-width:18px;color:var(--pro-bleu);font-weight:600;font-family:var(--pro-font-mono)}
   .mla{margin-left:auto}
-  .sbar{flex-shrink:0;border-top:1px solid var(--border);padding:.28rem .85rem;display:flex;align-items:center;gap:.65rem;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}
+  .arow .pro-btn{min-height:40px}
+  .sbar{flex-shrink:0;border-top:1px solid var(--border);padding:.32rem .85rem;display:flex;align-items:center;gap:.65rem;font-size:.7rem;color:var(--muted);background:#fff;flex-wrap:wrap}
   #sm{color:var(--text)}
   .sep{color:var(--border2)}
-  .spin{width:11px;height:11px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:none}
+  .spin{width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--pro-bleu);border-radius:50%;animation:sp .7s linear infinite;display:none}
   .spin.on{display:inline-block}
-  .qi.validated .qin { color: var(--accent); }
-  .qi.validated .qid { background: var(--accent) !important; }
   #loupe {
     position: fixed;
     width: 200px; height: 200px;
     border-radius: 50%;
-    border: 2px solid var(--accent);
+    border: 2px solid var(--pro-bleu);
     box-shadow: 0 4px 24px rgba(0,0,0,.6);
     pointer-events: none;
     display: none;
@@ -108,6 +125,7 @@
   }
   #loupe canvas { position: absolute; top: 0; left: 0; }
   @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){.spin{animation:none}.sd-prog>span{transition:none}}
 
   /* Publication en iframe (voir js/parent-page-height.js) : la page est bâtie
      comme une application plein écran (header + main en flex:1). Une fois la
@@ -117,6 +135,31 @@
      dépendrait de ce contenu. Hors iframe, rien ne change. */
   html.rp-embedded main{height:700px}
   @media (max-width:900px){html.rp-embedded main{height:560px}}
+
+  /* Écran étroit hors iframe : la file passe au-dessus de l'éditeur et la page
+     défile (sinon 320 px de file + éditeur ne tiennent pas dans 390 px). */
+  @media (max-width:900px){
+    html:not(.rp-embedded),html:not(.rp-embedded) body{height:auto;overflow:visible}
+    html:not(.rp-embedded) body{min-height:0}
+    html:not(.rp-embedded) main{display:block;overflow:visible}
+    html:not(.rp-embedded) .lp{height:auto;border-right:0;border-bottom:1px solid var(--border)}
+    html:not(.rp-embedded) .ql{max-height:150px}
+    html:not(.rp-embedded) .rp{height:auto;min-height:18rem}
+    html:not(.rp-embedded) .empty{min-height:14rem}
+    html:not(.rp-embedded) .editor{overflow:visible}
+    html:not(.rp-embedded) .crow{grid-template-columns:1fr;overflow:visible}
+    html:not(.rp-embedded) .cbox{flex:none;height:260px}
+    .sd-sub{display:none}
+    .sd-head .pro-head__inner{gap:0 .6rem}
+    .sd-head .pro-head__actions .pro-btn--ghost{padding:0 .6rem}
+  }
+  @media (max-width:40rem){
+    .sd-head .pro-head__inner{flex-wrap:wrap;padding-top:.3rem;padding-bottom:.3rem}
+    .sd-head .pro-head__actions{margin-left:0;width:100%;justify-content:space-between}
+    .arow .pro-btn{flex:1 1 auto}
+    .mc{width:100%}
+    input[type=range]{flex:1}
+  }
 </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
        qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
@@ -124,29 +167,40 @@
        rendu. Voir js/parent-page-height.js. -->
   <script src="js/parent-page-height.js"></script>
 </head>
-<body>
-<header>
-  <div><span class="logo-mark">ScanDocs</span><span class="logo-sub">zxing-wasm · sans installation</span></div>
-  <div class="cpill">Traités : <span id="dc">0</span> / <span id="tc">0</span></div>
+<body class="pro">
+<header class="pro-head sd-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace pro</a> › Numérisation</p>
+      <h1 class="pro-head__h1">ScanDocs <span class="sd-sub">rognage &amp; renommage · zxing-wasm</span></h1>
+    </div>
+    <div class="pro-head__actions">
+      <span class="sd-count" id="sd-count" title="Images téléchargées / images chargées">Traités <b id="dc">0</b> / <b id="tc">0</b></span>
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="sd-logout">Déconnexion</button>
+    </div>
+  </div>
 </header>
+<div class="sd-prog" id="sd-prog" role="progressbar" aria-label="Progression globale : images validées ou passées" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="sd-prog-bar"></span></div>
 <main>
   <div class="lp">
-    <div class="dz" id="dz">
-      <span class="dz-icon">📂</span>
+    <div class="dz" id="dz" role="button" tabindex="0" aria-label="Déposer des photos ou cliquer pour choisir des fichiers">
+      <svg class="dz-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4 M7 9l5-5 5 5 M5 20h14"/></svg>
       <div class="dz-title">Déposer les photos ici</div>
       <div class="dz-sub">ou cliquer · JPG PNG WEBP · plusieurs à la fois</div>
     </div>
     <input type="file" id="fi" accept="image/*" multiple />
     <div class="qh">
       <span>File d'attente</span>
-      <button class="clear-btn" id="clr" title="Vider la file">✕ vider</button>
+      <button type="button" class="pro-btn pro-btn--ghost" id="clr" title="Vider la file d'attente">✕ vider</button>
     </div>
     <div class="ql" id="ql"><div class="noq" id="noq">Aucune image chargée</div></div>
   </div>
   <div class="rp">
     <div class="empty" id="es">
-      <span class="empty-big">🖼</span>
-      <p>Déposez des photos pour commencer</p>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v14H3z M3 16l5-5 4 4 3-3 6 6 M16 9h.01"/></svg>
+      <div class="empty-t">Aucune image à traiter</div>
+      <p>Déposez des photos pour commencer.</p>
     </div>
     <div class="editor" id="ed" style="display:none">
       <div class="crow">
@@ -163,66 +217,74 @@
         </div>
       </div>
       <div class="ctrl">
-        <div class="brow">
-          <span class="bb load" id="bb">CODE-BARRE</span>
+        <div class="brow" aria-live="polite">
+          <span class="pro-pill pro-pill--pret" id="bb">Code-barre</span>
           <span class="bval" id="bv">—</span>
-          <div class="spin" id="sp"></div>
+          <div class="spin" id="sp" aria-hidden="true"></div>
+          <span class="bhint" id="bhint"></span>
         </div>
         <div class="fnrow">
-          <label>Nom :</label>
+          <label for="fn">Nom :</label>
           <div class="fnwrap"><input type="text" id="fn" placeholder="code-barre ou saisie manuelle" autocomplete="off" spellcheck="false" /><span class="fnext">.jpg</span></div>
         </div>
         <div class="arow">
-          <div class="mc">Marge <input type="range" id="ms" min="0" max="80" value="8" step="1" /> <span class="mv" id="mv">8</span>px</div>
-          <button class="btn" id="br">🔲 Re-détecter</button>
-          <button class="btn" id="bsk">Passer →</button>
-          <button class="btn" id="bs">✓ Valider</button>
-          <button class="btn btn-a" id="bdl" disabled style="opacity:.4">⬇ Télécharger tout (<span id="vc">0</span>)</button>
+          <div class="mc"><label for="ms">Marge</label> <input type="range" id="ms" min="0" max="80" value="8" step="1" /> <span class="mv" id="mv">8</span>px</div>
+          <button type="button" class="pro-btn pro-btn--ghost" id="br" title="Relancer la détection des bords et la lecture du code-barre">Re-détecter</button>
+          <button type="button" class="pro-btn pro-btn--secondary" id="bsk" title="Passer à l'image suivante sans la valider">Passer →</button>
+          <button type="button" class="pro-btn pro-btn--primary" id="bs" title="Valider ce rognage et ce nom, puis passer à l'image suivante">✓ Valider</button>
+          <button type="button" class="pro-btn pro-btn--secondary mla" id="bdl" disabled title="Validez d'abord au moins une image : le téléchargement regroupe toutes les images validées.">⬇ Télécharger tout (<span id="vc">0</span>)</button>
         </div>
       </div>
-      <div class="sbar"><span id="sm">Prêt</span><span class="sep">·</span><span id="pm"></span></div>
+      <div class="sbar"><span id="sm">Prêt</span><span class="sep">·</span><span id="pm"></span><span class="sep">·</span><span id="gm">Aucune image validée</span></div>
     </div>
   </div>
   <div id="loupe"><canvas id="loupeCanvas"></canvas></div>
 </main>
 
+<script src="js/admin-ui.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/iife/reader/index.js"></script>
 <script>
-/* ════════════ AUTH ════════════ */
-(function() {
-  if (localStorage.getItem('rp_admin_auth') !== '1') {
-    window.location.href = 'index.html';
-  }
-})();
+/* ════════════ AUTH (le contrôle d'accès est en tête de <head>) ════════════ */
+$('sd-logout').addEventListener('click', () => {
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+function $(id) { return document.getElementById(id); }
 
 /* ════════════════════════════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════════════════════════ */
 let files = [];          // tous les fichiers chargés
 let idx = 0;             // index courant
-let done = 0;            // nombre traité
+let done = 0;            // nombre traité (téléchargé)
 let origImg = null;      // Image() chargée
 let cropR = null;        // {x,y,w,h} sans marge
 let displayScale = 1;    // facteur d'affichage du canvas original
 let dragState = null;    // {edge} pendant un drag
 let scanGen = 0;         // génération pour annuler les scans obsolètes
+let scanTimer = null;    // message « détection lente » (n'interrompt jamais la détection)
+const handled = new Set(); // index des images validées ou passées (barre de progression)
+const SCAN_SLOW_MS = 15000;
+const HANDLE_R = 12;     // rayon des poignées dessinées (px)
+const HANDLE_HIT = 28;   // rayon de saisie (px) — plus large pour le tactile
 
 /* ════════════════════════════════════════════════════════════════
    DOM
 ═══════════════════════════════════════════════════════════════ */
-const $ = id => document.getElementById(id);
 const dz=$('dz'),fi=$('fi'),ql=$('ql'),noq=$('noq'),clr=$('clr');
 const es=$('es'),ed=$('ed');
 const co=$('co'),cc=$('cc'),overlay=$('overlay'),origbox=$('origbox');
 const od=$('od'),cd=$('cd');
-const bb=$('bb'),bv=$('bv'),sp=$('sp'),fn=$('fn');
+const bb=$('bb'),bv=$('bv'),sp=$('sp'),fn=$('fn'),bhint=$('bhint');
 const ms=$('ms'),mv=$('mv'),bs=$('bs'),br=$('br'),bsk=$('bsk');
-const sm=$('sm'),pm=$('pm'),dc=$('dc'),tc=$('tc');
+const sm=$('sm'),pm=$('pm'),dc=$('dc'),tc=$('tc'),gm=$('gm');
 
 /* ════════════════════════════════════════════════════════════════
    EVENTS
 ═══════════════════════════════════════════════════════════════ */
 dz.addEventListener('click', () => fi.click());
+dz.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); } });
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('over'));
 dz.addEventListener('drop', e => {
@@ -239,7 +301,7 @@ ms.addEventListener('input', () => {
 br.addEventListener('click', () => { if (origImg) { doAutoCrop(origImg); scanBarcode(origImg); } });
 bs.addEventListener('click', doValidate);
 $('bdl').addEventListener('click', doDownloadAll);
-bsk.addEventListener('click', () => { markItem(idx, 's'); advance(); });
+bsk.addEventListener('click', () => { handled.add(idx); updateProgress(); markItem(idx, 's'); advance(); });
 
 // Drag des poignées
 function posFromEvent(e) {
@@ -271,7 +333,7 @@ origbox.addEventListener('mousemove', e => {
   // Curseur dynamique
   if (!cropR) return;
   const { x, y } = posFromEvent(e);
-  const hit = getHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  const hit = getHandles().find(h => Math.hypot(h.x - x, h.y - y) < HANDLE_HIT);
   origbox.style.cursor = hit ? (hit.edge === 'top' || hit.edge === 'bottom' ? 'ns-resize' : 'ew-resize') : 'crosshair';
 });
 window.addEventListener('mouseup', endDrag);
@@ -282,7 +344,7 @@ window.addEventListener('touchend', endDrag);
 function startDrag(e) {
   if (!cropR) return;
   const { x, y } = posFromEvent(e);
-  const hit = getHandles().find(h => Math.hypot(h.x - x, h.y - y) < 18);
+  const hit = getHandles().find(h => Math.hypot(h.x - x, h.y - y) < HANDLE_HIT);
   if (hit) {
     e.preventDefault();
     dragState = { edge: hit.edge };
@@ -316,6 +378,33 @@ function doDrag(e) {
 function endDrag() { dragState = null; }
 
 /* ════════════════════════════════════════════════════════════════
+   PROGRESSION GLOBALE
+═══════════════════════════════════════════════════════════════ */
+function updateProgress() {
+  const total = files.length, n = Math.min(handled.size, total);
+  const pct = total ? Math.round(n / total * 100) : 0;
+  $('sd-prog-bar').style.width = pct + '%';
+  $('sd-prog').setAttribute('aria-valuenow', String(pct));
+  gm.textContent = total ? `${n} / ${total} image${total > 1 ? 's' : ''} validée${n > 1 ? 's' : ''} ou passée${n > 1 ? 's' : ''}` : 'Aucune image validée';
+}
+
+function updateDlButton(state) {
+  const bdl = $('bdl');
+  const n = validated.length;
+  if (state === 'busy') {
+    bdl.disabled = true;
+    bdl.textContent = '⏳ En cours…';
+    bdl.title = 'Téléchargement en cours…';
+    return;
+  }
+  bdl.innerHTML = '⬇ Télécharger tout (<span id="vc">' + n + '</span>)';
+  bdl.disabled = n === 0;
+  bdl.title = n === 0
+    ? "Validez d'abord au moins une image : le téléchargement regroupe toutes les images validées."
+    : `Télécharge les ${n} image${n > 1 ? 's' : ''} validée${n > 1 ? 's' : ''} (rognées, en .jpg)`;
+}
+
+/* ════════════════════════════════════════════════════════════════
    FILE QUEUE
 ═══════════════════════════════════════════════════════════════ */
 function handleFiles(fl) {
@@ -326,31 +415,45 @@ function handleFiles(fl) {
   tc.textContent = files.length;
   noq.style.display = 'none';
   nf.forEach((f, i) => addQI(f, si + i));
+  updateProgress();
   if (si === 0) { idx = 0; loadFile(0); }
 }
 
-function clearQueue() {
-  if (files.length && !confirm('Vider la file d\'attente ?')) return;
-  files = []; idx = 0; done = 0;
+async function clearQueue() {
+  if (files.length) {
+    const ok = await rpUI.confirmInline(
+      document.querySelector('.qh'),
+      validated.length
+        ? `Vider la file d'attente ? ${validated.length} image${validated.length > 1 ? 's' : ''} validée${validated.length > 1 ? 's' : ''} non téléchargée${validated.length > 1 ? 's' : ''} sera perdue.`
+        : "Vider la file d'attente ?",
+      { okLabel: 'Vider', danger: true }
+    );
+    if (!ok) return;
+  }
+  files = []; idx = 0; done = 0; validated = []; handled.clear();
   tc.textContent = '0'; dc.textContent = '0';
   ql.innerHTML = '<div class="noq" id="noq">Aucune image chargée</div>';
   es.style.display = 'flex'; ed.style.display = 'none';
   origImg = null; cropR = null;
   scanGen++;
+  clearTimeout(scanTimer);
+  updateProgress(); updateDlButton();
 }
 
 function addQI(file, i) {
   const d = document.createElement('div');
   d.className = 'qi'; d.id = 'qi-' + i;
-  d.innerHTML = `<span class="qii">${String(i+1).padStart(3,'0')}</span><span class="qin">${esc(file.name)}</span><span class="qid p" id="qd-${i}"></span>`;
+  d.innerHTML = `<span class="qii">${String(i+1).padStart(3,'0')}</span><span class="qin">${esc(file.name)}</span><span class="qid p" id="qd-${i}" title="En attente"></span>`;
   d.addEventListener('click', () => { idx = i; loadFile(i); });
   ql.appendChild(d);
 }
 
+const QID_TITLES = { p: 'En attente', a: 'En cours', d: 'Validée', s: 'Passée' };
 function markItem(i, s) {
   const d = $('qd-' + i), el = $('qi-' + i);
   if (!d || !el) return;
   d.className = 'qid ' + s;
+  d.title = QID_TITLES[s] || '';
   if (s === 'd' || s === 's') el.classList.add('done');
   el.classList.remove('active');
 }
@@ -359,7 +462,7 @@ function setActive(i) {
   document.querySelectorAll('.qi').forEach(e => e.classList.remove('active'));
   const el = $('qi-' + i), d = $('qd-' + i);
   if (el) { el.classList.add('active'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-  if (d) d.className = 'qid a';
+  if (d) { d.className = 'qid a'; d.title = QID_TITLES.a; }
 }
 
 function advance() {
@@ -375,10 +478,12 @@ function loadFile(i) {
   if (i >= files.length) return;
   idx = i; setActive(i);
   scanGen++;
+  clearTimeout(scanTimer);
   es.style.display = 'none'; ed.style.display = 'flex';
   origImg = null; cropR = null;
   fn.value = stripExt(files[i].name);
-  bv.textContent = '—'; bb.className = 'bb load'; bb.textContent = 'LECTURE…';
+  bv.textContent = '—'; setBadge('load', 'Lecture en cours');
+  bhint.textContent = '';
   sp.classList.add('on');
   sm.textContent = 'Chargement…';
   pm.textContent = `Image ${i+1} / ${files.length}`;
@@ -442,16 +547,19 @@ function drawOverlay() {
   // Bordure
   ctx.strokeStyle = '#2A3CD4'; ctx.lineWidth = 2; ctx.setLineDash([]);
   ctx.strokeRect(rx, ry, rw, rh);
-  // Poignées
+  // Poignées (grandes : saisie tactile)
   const handles = [
     [rx + rw/2, ry], [rx + rw/2, ry + rh],
     [rx, ry + rh/2], [rx + rw, ry + rh/2]
   ];
   handles.forEach(([hx, hy]) => {
     ctx.fillStyle = '#2A3CD4';
-    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(hx, hy, HANDLE_R, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(hx, hy, HANDLE_R, 0, Math.PI*2); ctx.stroke();
+    // petit repère central
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(hx, hy, 2.5, 0, Math.PI*2); ctx.fill();
   });
 }
 
@@ -523,9 +631,36 @@ function renderCrop() {
    Stratégie : envoyer une version redimensionnée à 2000px max.
    En interne, ZXing gère les rotations et la détection multi-zone.
 ═══════════════════════════════════════════════════════════════ */
+// Pastille de statut du code-barre : icône + libellé (jamais la couleur seule).
+const BADGE = {
+  ok:   { cls: 'pro-pill--valide',   icon: 'checkCircle' },
+  warn: { cls: 'pro-pill--anomalie', icon: 'warn' },
+  load: { cls: 'pro-pill--pret',     icon: 'clock' },
+};
+function setBadge(kind, label) {
+  const b = BADGE[kind] || BADGE.load;
+  bb.className = 'pro-pill ' + b.cls;
+  bb.innerHTML = rpUI.icon(b.icon, { size: 14, stroke: 2.4 }) + '<span>' + esc(label) + '</span>';
+}
+
+// Si la détection ne répond pas au bout de SCAN_SLOW_MS, on prévient — sans
+// l'interrompre : elle peut toujours aboutir (le résultat remplacera le message).
+function armSlowHint(myGen) {
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => {
+    if (myGen !== scanGen || !sp.classList.contains('on')) return;
+    bhint.textContent = 'La détection est longue — saisissez le numéro à la main ou cliquez sur Re-détecter.';
+    sm.textContent = 'Détection toujours en cours…';
+  }, SCAN_SLOW_MS);
+}
+
 async function scanBarcode(img) {
   const myGen = ++scanGen;
   sm.textContent = 'Scan code-barre…';
+  bhint.textContent = '';
+  setBadge('load', 'Lecture en cours');
+  sp.classList.add('on');
+  armSlowHint(myGen);
 
   // Préparer une version redimensionnée pour la rapidité
   const MAX = 2000;
@@ -539,7 +674,7 @@ async function scanBarcode(img) {
   try {
     // Attendre que ZXing soit prêt
     if (typeof ZXingWASM === 'undefined') {
-      setBR(null, 'INDISPONIBLE', 'warn');
+      setBR(null, 'Indisponible', 'warn');
       sm.textContent = 'ZXing non chargé — vérifiez votre connexion internet';
       return;
     }
@@ -563,14 +698,14 @@ async function scanBarcode(img) {
       // Prendre le résultat le plus "code de bibliothèque" : que des chiffres, 5-10 caractères
       let best = results.find(r => /^\d{5,10}$/.test(r.text));
       if (!best) best = results[0];
-      setBR(best.text, 'ZXING', 'ok');
+      setBR(best.text, 'Détecté', 'ok');
     } else {
       // Réessai avec image plus grande (2× la taille)
       retryWithLarger(img, myGen);
     }
   } catch (e) {
     console.error('ZXing error:', e);
-    if (myGen === scanGen) setBR(null, 'ERREUR', 'warn');
+    if (myGen === scanGen) setBR(null, 'Erreur', 'warn');
   }
 }
 
@@ -591,23 +726,24 @@ async function retryWithLarger(img, myGen) {
     if (results && results.length > 0) {
       let best = results.find(r => /^\d{5,10}$/.test(r.text));
       if (!best) best = results[0];
-      setBR(best.text, 'ZXING HD', 'ok');
+      setBR(best.text, 'Détecté (haute résolution)', 'ok');
     } else {
-      setBR(null, 'NON DÉTECTÉ', 'warn');
+      setBR(null, 'Non détecté', 'warn');
     }
   } catch (e) {
-    if (myGen === scanGen) setBR(null, 'ERREUR', 'warn');
+    if (myGen === scanGen) setBR(null, 'Erreur', 'warn');
   }
 }
 
 function setBR(code, label, cls) {
+  clearTimeout(scanTimer);
+  bhint.textContent = '';
   sp.classList.remove('on');
-  bb.className = 'bb ' + cls;
-  bb.textContent = label;
+  setBadge(cls, label);
   if (code) {
     bv.textContent = code;
     fn.value = code;
-    sm.textContent = 'Code-barre détecté — prêt à télécharger';
+    sm.textContent = 'Code-barre détecté — prêt à valider';
   } else {
     bv.textContent = 'aucun code détecté';
     sm.textContent = 'Saisissez le numéro manuellement';
@@ -633,11 +769,9 @@ function doValidate() {
   const el = $('qi-' + savedIdx);
   if (el) el.classList.add('validated');
   markItem(savedIdx, 'd');
-
-  $('vc').textContent = validated.length;
-  const bdl = $('bdl');
-  bdl.disabled = false;
-  bdl.style.opacity = '1';
+  handled.add(savedIdx);
+  updateProgress();
+  updateDlButton();
 
   sm.textContent = `✓ Validé : ${name} — ${validated.length} en attente de téléchargement`;
   advance(); // seulement après avoir tout sauvegardé
@@ -645,9 +779,7 @@ function doValidate() {
 
 async function doDownloadAll() {
   if (!validated.length) return;
-  const bdl = $('bdl');
-  bdl.disabled = true;
-  bdl.textContent = '⏳ En cours…';
+  updateDlButton('busy');
 
   for (const v of validated) {
     await new Promise(res => {
@@ -668,21 +800,20 @@ async function doDownloadAll() {
     });
   }
 
-  done += validated.length;
+  const n = validated.length;
+  done += n;
   dc.textContent = done;
-  sm.textContent = `✓ ${validated.length} fichiers téléchargés`;
+  sm.textContent = `✓ ${n} fichiers téléchargés`;
   validated = [];
-  $('vc').textContent = '0';
-  bdl.disabled = true;
-  bdl.style.opacity = '.4';
-  bdl.innerHTML = '⬇ Télécharger tout (<span id="vc">0</span>)';
+  updateDlButton();
+  rpUI.toast(`${n} fichier${n > 1 ? 's' : ''} téléchargé${n > 1 ? 's' : ''}.`, { type: 'ok' });
 }
 
 /* ════════════════════════════════════════════════════════════════
    UTILS
 ═══════════════════════════════════════════════════════════════ */
 function stripExt(n) { return n.replace(/\.[^.]+$/, ''); }
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ── LOUPE ── */
 const loupe = $('loupe');

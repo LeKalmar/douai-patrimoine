@@ -505,6 +505,19 @@ document.getElementById('logout-btn').addEventListener('click', function(){
   window.location.href = 'index.html';
 });
 
+/* ════════════ ONGLETS (Saisie / Tableau de bord / Anomalies / Données) ════════════
+   Posés tout en haut du script (avant l'await d'initStorage) pour que la page
+   n'affiche jamais les quatre panneaux d'un coup. rpUI.tabs() ne sait pas
+   faire un hash « #saisie » sans préfixe : le hash est géré ici à la main.
+   `activeTab` est lu pendant l'initialisation synchrone (updateStats() →
+   scheduleDashboard()/updateAdvListsCount()) : déclaré ICI, tôt, pour la
+   même raison que ADV_GROUPS (temporal dead zone — voir CLAUDE.md). Les
+   écouteurs de changement d'onglet sont branchés tout en bas (DÉMARRAGE). */
+const TAB_IDS = ['saisie','tableau','anomalies','donnees'];
+let activeTab = (function(){ const h = (location.hash||'').slice(1); return TAB_IDS.includes(h) ? h : 'saisie'; })();
+const tabsApi = rpUI.tabs(document.getElementById('rc-tabs'));
+if(tabsApi && activeTab!=='saisie') tabsApi.select(activeTab);
+
 /* ════════════ CONSTANTES / STOCKAGE ════════════
    TRAVEES, GROUPES, EMPLACEMENTS_ARMOIRE, EMPLACEMENTS_TIROIR, compareCotes,
    getFondsFromCote viennent de js/reserve-shared.js */
@@ -863,20 +876,23 @@ let lastSyncError = null;
 function updateSyncIndicator(){
   const el = document.getElementById('sync-status');
   if(!el) return;
+  const txt = document.getElementById('sync-text');
   const storageWarning = localStorageBroken ? '⚠ stockage local plein, cache hors-ligne de cet appareil non à jour (la synchro serveur continue normalement)' : '';
+  let label, title, off;
   if(pendingSync.length){
-    el.textContent = `⏳ ${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
-    el.title = lastSyncError ? `Dernière erreur de synchro : ${lastSyncError}` : 'Synchronisation avec les autres postes (via R2)';
-    el.classList.add('pending');
+    label = `${pendingSync.length} en attente${lastSyncError ? ' — ' + lastSyncError : ''}`;
+    title = lastSyncError ? `Dernière erreur de synchro : ${lastSyncError}` : 'Synchronisation avec les autres postes (via R2)';
+    off = true;
   } else if(storageWarning){
-    el.textContent = storageWarning;
-    el.title = storageWarning;
-    el.classList.add('pending');
+    label = storageWarning; title = storageWarning; off = true;
   } else {
-    el.textContent = '✓ synchronisé';
-    el.title = 'Synchronisation avec les autres postes (via R2)';
-    el.classList.remove('pending');
+    label = 'Synchronisé'; title = 'Synchronisation avec les autres postes (via R2)'; off = false;
   }
+  if(txt) txt.textContent = label; else el.textContent = label;
+  el.title = title;
+  el.classList.toggle('pending', off);
+  el.classList.toggle('pro-sync--off', off);
+  el.classList.remove('pro-sync--wait');
 }
 
 function queuePatch(patch){
@@ -1158,7 +1174,7 @@ function syracuseCorrectionCell(barcode){
   if(!fresh) return '—';
   const d = fresh.ts ? new Date(fresh.ts) : null;
   const dateStr = d && !isNaN(d) ? d.toLocaleDateString('fr-FR') : '';
-  return `<span style="color:#1565c0" title="Cote/titre/auteur relevés par la synchronisation incrémentale Syracuse${dateStr ? ', le '+dateStr : ''} — plus récents que le dernier export XML complet">🔄 corrigé${dateStr?' le '+esc(dateStr):''}</span>`;
+  return `<span class="pro-pill pro-pill--corrige" title="Cote/titre/auteur relevés par la synchronisation incrémentale Syracuse${dateStr ? ', le '+dateStr : ''} — plus récents que le dernier export XML complet">🔄 corrigé${dateStr?' le '+esc(dateStr):''}</span>`;
 }
 // Utilisé uniquement par "Récolés" (ADV_CATS.scanned), à la place du badge
 // "corrigé" ci-dessus : cette section liste des documents déjà localisés
@@ -1175,7 +1191,7 @@ function syracuseLoanBadge(barcode){
   const fresh = barcode ? SYRACUSE_OVERLAY[barcode] : null;
   const statut = fresh && fresh.statut;
   if(!statut || !/pr[eê]t/i.test(statut)) return '—';
-  return `<span style="color:#c62828" title="${esc(statut)} — relevé par la synchronisation incrémentale Syracuse">📕 en prêt</span>`;
+  return `<span class="pro-pill pro-pill--pret" title="${esc(statut)} — relevé par la synchronisation incrémentale Syracuse">📕 en prêt</span>`;
 }
 // Utilisé par les boutons d'export (voir "Exclure les codes-barres déjà
 // corrigés" dans advDetailsTemplate()) pour ne garder que les lignes dont le
@@ -1498,6 +1514,24 @@ function scheduleAdvListsCount(){
   advListsCountTimer = setTimeout(()=>{ advListsCountTimer = null; updateAdvListsCount(); }, 150);
 }
 
+/* État des onglets « Tableau de bord » et « Anomalies » — déclaré ICI (tôt)
+   pour la même raison que advListsCountTimer ci-dessus : updateStats(),
+   appelée pendant l'initialisation synchrone, lit tout ceci.
+   - scopeGroupId : périmètre choisi dans la barre « Périmètre » (null = suit
+     le local sélectionné dans l'onglet Saisie) ;
+   - advCounts : compteurs par groupe, recalculés par updateAdvListsCount() ;
+     les deux lourds (notScannedCount/probablyLostCount, qui parcourent tout
+     le catalogue) ne le sont qu'onglet Tableau/Anomalies visible, sinon au
+     repos (heavyCountsTimer) — jamais à chaque scan ;
+   - dash* : rendu du tableau de bord, uniquement onglet visible ;
+   - allLogDirty : le journal « Tous les scans » (onglet Données) n'est
+     rendu que visible. */
+let scopeGroupId = null;
+let advCounts = {};
+let heavyCountsTimer = null;
+let dashTimer = null, dashDirty = true, dashSig = '', dashLast = 0;
+let allLogDirty = true;
+
 /* "Notices récolées" par magasin physique distinct (2e/5e/6e étage) — un
    stat-card dédié dans chacun des 3 panneaux magasin ci-dessus.
    catalogByGroup.magasin reste un catalogue UNIQUE, non scindé par étage
@@ -1564,21 +1598,10 @@ function magasinFloorStats(group){
   });
   return { scanned: scannedNotices.size, total };
 }
-// `only` (facultatif) : ne rafraîchir que ce groupe — les trois cartes ne
-// sont jamais visibles en même temps, et chaque appel à magasinFloorStats()
-// parcourt tout le catalogue magasins. Sans argument, les trois sont
-// recalculées (comportement d'origine, conservé pour tout appelant futur).
-function updateMagasinEtageStats(only){
-  const groups = only ? MAGASIN_ADV_GROUPS.filter(g=>g.id===only) : MAGASIN_ADV_GROUPS;
-  groups.forEach(g=>{
-    const el = document.getElementById('st-etage-'+g.id);
-    if(!el) return; // sécurité, toujours présent pour ces 3 groupes (voir advGroupTemplate())
-    const r = magasinFloorStats(g.id);
-    el.textContent = r.total
-      ? `${r.scanned.toLocaleString('fr-FR')} / ${r.total.toLocaleString('fr-FR')}`
-      : r.scanned.toLocaleString('fr-FR');
-  });
-}
+// (L'ancien updateMagasinEtageStats(), qui peuplait une carte « Notices
+// récolées » par étage dans « Statistiques avancées », est remplacé par le
+// KPI « Notices récolées » du Tableau de bord, qui lit catalogStatsForGroup()
+// → magasinFloorStats() pour le périmètre affiché — voir renderDashboard().)
 
 /* ════════════ PROGRESSION EN HAUT DE PAGE, PAR ÉTAGE ════════════
    Les cartes récapitulatives et la barre de progression en tête de page ne
@@ -1628,23 +1651,27 @@ function nonCatTotalForGroup(group){
 }
 
 function updateNoticeProgressBar(group, catStats, nonCatCount){
-  document.getElementById('notice-progress-label').textContent = 'Progression — ' + (ADV_GROUP_BY_ID[group] || ADV_GROUP_BY_ID.reserve).label;
+  document.getElementById('notice-progress-label').textContent = (ADV_GROUP_BY_ID[group] || ADV_GROUP_BY_ID.reserve).label;
   const catalogTotal = catStats ? catStats.total : 0;
   const scanned = catStats ? catStats.scanned : 0;
   const jamais = Math.max(0, catalogTotal - scanned);
   const total = catalogTotal + nonCatCount;
   const pct = n => total ? Math.round(n/total*100) : 0;
+  const nf = n => rpUI.fmt.n(n);
   document.getElementById('seg-notice-recolees').style.width = pct(scanned)+'%';
   document.getElementById('seg-notice-noncat').style.width = pct(nonCatCount)+'%';
   document.getElementById('seg-notice-jamais').style.width = pct(jamais)+'%';
-  document.getElementById('leg-notice-recolees').textContent = scanned.toLocaleString('fr-FR');
-  document.getElementById('leg-notice-noncat').textContent = nonCatCount.toLocaleString('fr-FR');
-  document.getElementById('leg-notice-jamais').textContent = jamais.toLocaleString('fr-FR');
+  document.getElementById('leg-notice-recolees').textContent = nf(scanned);
+  document.getElementById('leg-notice-noncat').textContent = nf(nonCatCount);
+  document.getElementById('leg-notice-jamais').textContent = nf(jamais);
   document.getElementById('leg-notice-recolees-pct').textContent = total ? `(${pct(scanned)} %)` : '';
   document.getElementById('leg-notice-noncat-pct').textContent = total ? `(${pct(nonCatCount)} %)` : '';
   document.getElementById('leg-notice-jamais-pct').textContent = total ? `(${pct(jamais)} %)` : '';
+  document.getElementById('np-pct').textContent = total ? `${pct(scanned)} % récolé` : '—';
+  const bar = document.getElementById('notice-progress-bar');
+  bar.setAttribute('aria-valuenow', String(total ? pct(scanned) : 0));
   document.getElementById('notice-progress-total').textContent = total
-    ? `${total.toLocaleString('fr-FR')} au total`
+    ? `${nf(scanned)} / ${nf(total)} notices`
     : (catStats ? 'aucune notice pour l\'instant' : (catalogFailedGroup[catalogGroupOf(group)] ? 'catalogue indisponible' : 'chargement du catalogue…'));
 }
 
@@ -1662,10 +1689,10 @@ const ADV_CATS = {
     showCorrectionFilter: true,
     listFn: damagedList,
     rowHtml: r => `<tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td class="pro-mono pro-muted">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
       <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
@@ -1683,9 +1710,9 @@ const ADV_CATS = {
     showCorrectionFilter: true,
     listFn: manualCoteList,
     rowHtml: r => `<tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td class="pro-mono pro-muted">${esc(r.barcode)}</td>
       <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
   },
@@ -1702,10 +1729,10 @@ const ADV_CATS = {
     showCorrectionFilter: true,
     listFn: notScannedList,
     rowHtml: r => `<tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
       <td>${esc(r.auteur)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td class="pro-mono pro-muted">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
       <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
@@ -1723,10 +1750,10 @@ const ADV_CATS = {
     showCorrectionFilter: true,
     listFn: probablyLostList,
     rowHtml: r => `<tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
       <td>${esc(r.auteur)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td class="pro-mono pro-muted">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
       <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
@@ -1743,11 +1770,11 @@ const ADV_CATS = {
     needsCatalog: false,
     listFn: scannedList,
     rowHtml: r => `<tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(r.auteur)}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td class="pro-mono pro-muted">${esc(r.barcode)}</td>
       <td>${syracuseLoanBadge(r.barcode)}</td>
     </tr>`,
   },
@@ -1764,10 +1791,10 @@ const ADV_CATS = {
     needsCatalog: false,
     listFn: noBarcodeList,
     rowHtml: r => `<tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||(r.foundInCatalog?'':'(absent du catalogue)')}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td>${r.coteApprox ? '<span style="color:#f57f17" title="Numéro tapé différent de la cote complète du catalogue">≈ numéro approximatif — récolé</span>' : r.foundInCatalog ? '<span style="color:#2e7d32">✓ trouvée — récolé</span>' : '<span style="color:#c62828">✗ absente</span>'}</td>
+      <td>${r.coteApprox ? '<span class="pro-pill pro-pill--contre" title="Numéro tapé différent de la cote complète du catalogue">≈ numéro approximatif — récolé</span>' : r.foundInCatalog ? '<span class="pro-pill pro-pill--valide">✓ trouvée — récolé</span>' : '<span class="pro-pill pro-pill--absent">✗ absente</span>'}</td>
     </tr>`,
   },
   horssection: {
@@ -1783,11 +1810,11 @@ const ADV_CATS = {
     showCorrectionFilter: true,
     listFn: horsSectionList,
     rowHtml: r => `<tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
       <td>${esc(r.titre)||'(titre inconnu)'}</td>
       <td>${esc(r.sectionReelle)||'—'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}</td>
+      <td class="pro-mono pro-muted">${esc(r.barcode)}</td>
       <td>${esc(r.piege)||'—'}</td>
       <td>${syracuseCorrectionCell(r.barcode)}</td>
     </tr>`,
@@ -1815,12 +1842,33 @@ function advGroupIdForReserve(reserveId){
   return 'reserve';
 }
 function applyAdvGroupVisibility(){
-  const activeId = advGroupIdForReserve(loc.reserve);
+  const activeId = visibleAdvGroupId();
   ADV_GROUPS.forEach(g=>{
     const el = document.getElementById('adv-group-'+g.id);
-    if(el) el.style.display = (g.id===activeId) ? '' : 'none';
+    if(el) el.hidden = (g.id!==activeId);
+  });
+  updateScopeBar();
+}
+
+/* Barre « Périmètre » (onglets Tableau de bord et Anomalies) : un bouton par
+   groupe de statistiques (ADV_GROUPS). Par défaut (scopeGroupId null) le
+   périmètre suit le local choisi dans l'onglet Saisie ; un clic l'épingle. */
+function buildScopeBar(){
+  const box = document.getElementById('scope-seg');
+  box.innerHTML = ADV_GROUPS.map(g=>`<button type="button" data-gid="${g.id}" aria-pressed="false">${esc(g.label)}</button>`).join('');
+  box.addEventListener('click', e=>{
+    const b = e.target.closest('button[data-gid]'); if(!b) return;
+    scopeGroupId = b.dataset.gid;
+    applyAdvGroupVisibility();
+    updateAdvListsCount();
+    if(activeTab==='tableau') renderDashboard(true);
   });
 }
+function updateScopeBar(){
+  const gid = visibleAdvGroupId();
+  document.querySelectorAll('#scope-seg button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.gid===gid ? 'true' : 'false'));
+}
+buildScopeBar();
 
 /* ════════════ EMPLACEMENT ════════════
    Le scan code-barre et le comptage des non-catalogués sont deux outils
@@ -1911,7 +1959,7 @@ function applyReserveVisibility(){
   if(isHorsReserve) document.getElementById('stp-travee-wrap').style.display = 'none';
   document.getElementById('noncat-mode-zone').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('nobarcode-row').style.display = isHorsReserve ? 'none' : '';
-  document.querySelector('.expected-panel').style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('expected-panel').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
   updateVideRowVisibility();
   // Rayons : choix du rayon par son nom + boutons de création/modification ;
@@ -1925,7 +1973,7 @@ function applyReserveVisibility(){
   document.getElementById('btn-rayon-edit').style.display = (isRayons && !noRayon) ? '' : 'none';
   document.getElementById('stp-colonne-wrap').style.display = (isHorsReserve || noRayon) ? 'none' : '';
   document.getElementById('stp-etage-wrap').style.display = (isHorsReserve || noRayon) ? 'none' : '';
-  document.querySelector('.scan-layout').style.display = noRayon ? 'none' : '';
+  document.getElementById('scan-layout').style.display = noRayon ? 'none' : '';
   document.getElementById('rayon-empty-note').style.display = noRayon ? '' : 'none';
   // Le nombre d'étagères de chaque colonne d'un rayon est saisi à sa
   // création : "dernière étagère de cette colonne" ferait doublon.
@@ -1937,6 +1985,7 @@ function applyReserveVisibility(){
 
 selReserve.addEventListener('change', ()=>{
   loc.reserve = selReserve.value;
+  scopeGroupId = null;   // le périmètre des onglets Tableau/Anomalies suit de nouveau le local
   syncActiveCatalog();
   applyReserveVisibility();
   if(loc.reserve==='horsreserve'){
@@ -2026,6 +2075,11 @@ function refreshLoc(){
   else if(loc.locType==='tiroir') readout = `${reserveLabel} · Armoire à tiroirs · Meuble ${colLetter(loc.colonne)} · Tiroir ${loc.etage}`;
   else readout = `${reserveLabel} · Travée ${displayTraveeId(loc.travee)} · Col. ${colLetter(loc.colonne)} · Étage ${loc.etage}`;
   document.getElementById('loc-readout').textContent = readout;
+  const meuble = loc.locType!=='etagere';
+  document.getElementById('lbl-colonne').textContent = meuble ? 'Meuble' : 'Colonne';
+  document.getElementById('lbl-etage').textContent = loc.locType==='armoire' ? 'Niveau' : loc.locType==='tiroir' ? 'Tiroir' : 'Étagère';
+  const sh = document.getElementById('shelf-here-label');
+  if(sh) sh.textContent = loc.reserve==='horsreserve' ? 'Hors réserve' : 'Cette étagère';
   renderExpected();
   renderHereLog();
   updateStats();
@@ -2034,7 +2088,7 @@ function refreshLoc(){
   updateNonRangeUI();
   updateLastShelfUI();
   buildMiniPlan();
-  scanInput.focus();
+  if(activeTab==='saisie') scanInput.focus({preventScroll:true});
 }
 /* ════════════ RAYONS (libre accès, créés à la volée) ════════════
    Plutôt que d'écrire la géométrie de chaque rayon en dur dans
@@ -2177,6 +2231,18 @@ document.getElementById('rayon-save').addEventListener('click', ()=>{
   const colEtages = rayonColInputs().map(i=>clampInt(i.value, 1, RAYON_MAX_ETAGES, 1));
   if(!colEtages.length){ msg.textContent = 'Il faut au moins une colonne.'; return; }
 
+  const commit = ()=>{
+    const id = rayonEditingId || (RAYON_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2,6));
+    const isNew = !rayonEditingId;
+    commitRayonRecord({ id, label, colEtages, ts:Date.now() });
+    closeRayonEditor();
+    loc.reserve = 'rayons'; selReserve.value = 'rayons';
+    loc.travee = id;
+    if(isNew){ loc.colonne = 1; loc.etage = 1; }
+    beep(660,.1);
+    onRayonsChanged();
+  };
+
   if(rayonEditingId){
     // Rétrécir un rayon ne supprime rien : les données au-delà restent
     // enregistrées et continuent de s'afficher (le plan s'étend toujours
@@ -2185,18 +2251,14 @@ document.getElementById('rayon-save').addEventListener('click', ()=>{
       const ci = String(r.colonne||'').charCodeAt(0)-64;
       return ci > colEtages.length || parseInt(r.etage,10) > (colEtages[ci-1]||0);
     });
-    if(beyond.length && !confirm(`${beyond.length} donnée(s) déjà saisie(s) dans ce rayon se trouvent au-delà des nouvelles dimensions. Elles ne seront pas effacées et resteront visibles sur le plan. Continuer ?`)) return;
+    if(beyond.length){
+      rpUI.confirmInline(document.getElementById('rayon-actions-bar'),
+        `${beyond.length} donnée(s) déjà saisie(s) dans ce rayon se trouvent au-delà des nouvelles dimensions. Elles ne seront pas effacées et resteront visibles sur le plan. Continuer ?`,
+        { okLabel:'Enregistrer quand même' }).then(ok=>{ if(ok) commit(); });
+      return;
+    }
   }
-
-  const id = rayonEditingId || (RAYON_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2,6));
-  const isNew = !rayonEditingId;
-  commitRayonRecord({ id, label, colEtages, ts:Date.now() });
-  closeRayonEditor();
-  loc.reserve = 'rayons'; selReserve.value = 'rayons';
-  loc.travee = id;
-  if(isNew){ loc.colonne = 1; loc.etage = 1; }
-  beep(660,.1);
-  onRayonsChanged();
+  commit();
 });
 
 document.getElementById('rayon-delete').addEventListener('click', ()=>{
@@ -2208,10 +2270,13 @@ document.getElementById('rayon-delete').addEventListener('click', ()=>{
       `Impossible de supprimer « ${def.label} » : ${n} donnée(s) y sont enregistrées (scans, comptages, marquages). Supprimez-les d'abord, ou renommez simplement le rayon.`;
     return;
   }
-  if(!confirm(`Supprimer le rayon « ${def.label} » pour tous les postes ?`)) return;
-  commitRayonRecord({ id:def.id, label:def.label, colEtages:def.colEtages, deleted:true, ts:Date.now() });
-  closeRayonEditor();
-  onRayonsChanged();
+  rpUI.confirmInline(document.getElementById('rayon-actions-bar'), `Supprimer le rayon « ${def.label} » pour tous les postes ?`,
+    { okLabel:'Supprimer le rayon', danger:true }).then(ok=>{
+    if(!ok) return;
+    commitRayonRecord({ id:def.id, label:def.label, colEtages:def.colEtages, deleted:true, ts:Date.now() });
+    closeRayonEditor();
+    onRayonsChanged();
+  });
 });
 
 applyReserveVisibility();
@@ -2254,37 +2319,46 @@ function beepError(){
 }
 
 /* ════════════ SCAN ════════════ */
+// Enregistre le contenu du champ de scan (touche Entrée ou bouton « Enregistrer »).
+function submitScan(){
+  // Le champ DOIT être vidé même si handleScan()/handleScanHorsReserve()
+  // lève une exception (try/finally) : sans ça, le code-barre en cours
+  // reste dans le champ et le scan suivant vient s'y accoler tel quel —
+  // jusqu'à ce qu'un scan finisse par passer sans erreur, avec tous les
+  // codes-barres accumulés collés bout à bout comme un seul "inconnu du
+  // catalogue" (bug observé le 2026-09-01, cause exacte de l'exception
+  // encore à identifier via le console.error ci-dessous).
+  try{
+    if(noRayonYet()){ beepError(); return; }   // aucun emplacement où enregistrer
+    if(loc.reserve==='horsreserve') handleScanHorsReserve(scanInput.value.trim(), damagedToggle.checked);
+    else handleScan(scanInput.value.trim(), damagedToggle.checked);
+  }catch(err){
+    console.error('Le scan a échoué, code-barre non enregistré :', err);
+  }finally{
+    scanInput.value='';
+    damagedToggle.checked=false;
+  }
+}
 scanInput.addEventListener('keydown', e=>{
   if(e.key==='Enter'){
     e.preventDefault();
-    // Le champ DOIT être vidé même si handleScan()/handleScanHorsReserve()
-    // lève une exception (try/finally) : sans ça, le code-barre en cours
-    // reste dans le champ et le scan suivant vient s'y accoler tel quel —
-    // jusqu'à ce qu'un scan finisse par passer sans erreur, avec tous les
-    // codes-barres accumulés collés bout à bout comme un seul "inconnu du
-    // catalogue" (bug observé le 2026-09-01, cause exacte de l'exception
-    // encore à identifier via le console.error ci-dessous).
-    try{
-      if(noRayonYet()){ beepError(); return; }   // aucun emplacement où enregistrer
-      if(loc.reserve==='horsreserve') handleScanHorsReserve(scanInput.value.trim(), damagedToggle.checked);
-      else handleScan(scanInput.value.trim(), damagedToggle.checked);
-    }catch(err){
-      console.error('Le scan a échoué, code-barre non enregistré :', err);
-    }finally{
-      scanInput.value='';
-      damagedToggle.checked=false;
-    }
+    submitScan();
   }
 });
+document.getElementById('scan-submit').addEventListener('click', ()=>{
+  submitScan();
+  scanInput.focus({preventScroll:true});
+});
 document.addEventListener('click', e=>{
-  // .adv-details (menus dépliables des statistiques avancées), et depuis
-  // 2026-09-01 .expected-panel/.log-wrap (également des <details> repliables
-  // — "Attendu à cet emplacement"/"Scans récents ici"/"Tous les scans") sont
-  // exclus : refocuser scanInput (en haut de la page, hors de vue une fois
-  // qu'on a scrollé plus bas) forçait le navigateur à faire défiler la page
+  // Le champ de scan ne reprend le focus qu'onglet « Saisie » actif, et pas
+  // pour un clic dans un champ, un bouton, un lien, un panneau repliable
+  // (<summary>/<details>), un tableau ou une confirmation en ligne :
+  // refocuser scanInput forçait le navigateur à faire défiler la page
   // jusqu'à lui à chaque clic sur un <summary> ou une ligne de tableau —
-  // sensation de "téléportation" en haut de page.
-  if(!e.target.closest('input,select,button,a,label,.adv-details,.expected-panel,.log-wrap')) scanInput.focus();
+  // sensation de "téléportation" en haut de page. preventScroll : un clic
+  // dans un espace vide ne doit jamais déplacer la page non plus.
+  if(activeTab!=='saisie') return;
+  if(!e.target.closest('input,select,button,a,label,summary,details,textarea,table,.pro-confirm,.pro-table,[role="tab"],#rayon-editor')) scanInput.focus({preventScroll:true});
 });
 
 function handleScan(barcode, damaged, opts){
@@ -2419,45 +2493,103 @@ function applyReliureCascade(sourceBarcode, siblingBarcodes, fields){
   return results;
 }
 
+/* Retour de scan : une grande carte à aplat de couleur, icône + verbe, un
+   état par situation — enregistré (vert), déjà scanné ici (bleu pâle),
+   déplacé (ambre, ancien emplacement mis en avant), anomalie de classement
+   (carmin), inconnu (gris, saisie de cote). Un flash bref à chaque scan fait
+   voir un scan identique au précédent. aria-live="polite" est posé sur
+   #feedback lui-même (voir le HTML). */
+const FB_STATES = {
+  ok:      { cls:'ok',      verb:'Enregistré',            icon:'M5 12.5l4.5 4.5L19 7.5' },
+  dup:     { cls:'dup',     verb:'Déjà scanné ici',       icon:'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4' },
+  moved:   { cls:'moved',   verb:'Déplacé',               icon:'M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4' },
+  anom:    { cls:'anom',    verb:'Anomalie de classement', icon:'M12 3l10 18H2zM12 10v5M12 18v.5' },
+  unknown: { cls:'unknown', verb:'Inconnu du catalogue',  icon:'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 1-1 1.7M12 17v.5' },
+  hors:    { cls:'moved',   verb:'Hors réserve',          icon:'M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' },
+};
+function slotText(r){
+  return [displayTraveeId(r.travee), r.colonne, r.etage].filter(x=>x!==''&&x!=null).join(' · ');
+}
+function flashFeedback(fb){
+  fb.classList.remove('flash');
+  void fb.offsetWidth;          // relance l'animation même pour un scan identique
+  fb.classList.add('flash');
+}
+// o : { state, verb?, record, extra?, pills?[html], hideBarcode?, kicker? }
+function renderFeedbackCard(fb, o){
+  const st = FB_STATES[o.state];
+  const r = o.record;
+  const when = r.ts ? new Date(r.ts).toLocaleTimeString('fr-FR') : '';
+  const pills = (o.pills||[]).join('');
+  const titre = r.titre ? esc(r.titre) : (o.state==='unknown' ? '(non catalogué)' : '(titre inconnu)');
+  const meta = [r.auteur, r.fonds].filter(Boolean).map(esc).join(' · ');
+  fb.className = 'feedback show fb-' + st.cls;
+  fb.innerHTML = `
+    <div class="fb-icon" aria-hidden="true"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="${st.icon}"/></svg></div>
+    <div class="fb-body">
+      <div class="fb-head"><span class="fb-verb">${esc(o.verb || st.verb)}</span><span class="fb-time">${esc(when)}${o.kicker ? ' · '+esc(o.kicker) : ''}</span></div>
+      ${r.cote ? `<div class="fb-cote">${esc(r.cote)}</div>` : ''}
+      <div class="fb-titre">${titre}</div>
+      ${meta ? `<div class="fb-meta">${meta}</div>` : ''}
+      ${pills ? `<div class="fb-pills">${pills}</div>` : ''}
+      ${o.extra || ''}
+    </div>
+    ${(r.travee || (!o.hideBarcode && r.barcode)) ? `<div class="fb-side">
+      ${r.travee ? `<div><span class="fb-lbl">Emplacement</span><span class="fb-val">${esc(slotText(r))}</span></div>` : ''}
+      ${(!o.hideBarcode && r.barcode) ? `<div><span class="fb-lbl">Code-barre</span><span class="fb-val fb-mono">${esc(r.barcode)}</span></div>` : ''}
+    </div>` : ''}`;
+  flashFeedback(fb);
+}
+function fbPill(txt, title){ return `<span class="fb-pill"${title?` title="${esc(title)}"`:''}>${txt}</span>`; }
+
+// Champ « Cote (si connue) » d'un code-barre inconnu : onSave() est appelé
+// une fois record.cote/fonds posés.
+function manualCoteFormHtml(){
+  return `<div class="fb-manual">
+      <label for="manual-cote">Renseigner la cote</label>
+      <span class="fb-manual-row"><input type="text" id="manual-cote" placeholder="Cote (si connue)" autocomplete="off"><button type="button" id="manual-save">Renseigner</button></span>
+    </div>`;
+}
+function wireManualCote(record, onSave){
+  const save = ()=>{
+    const v = document.getElementById('manual-cote').value.trim();
+    if(v){
+      record.cote = v;
+      record.fonds = getFondsFromCote(v);
+      scans[record.barcode] = record;
+      putScanRecord(record);
+      onSave();
+      queuePatch({type:'scan', record});
+    }
+    scanInput.focus();
+  };
+  document.getElementById('manual-save').addEventListener('click', save);
+  document.getElementById('manual-cote').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
+}
+
 function showFeedback(record, status, prev, reliureRecords){
   const fb = document.getElementById('feedback');
-  fb.className = 'feedback show ' + (status==='unknown' ? 'warn' : status==='dup' ? 'dup' : status==='moved' ? 'dup' : 'ok');
-  const badgeTxt = { ok:'✓ Enregistré', dup:'🔁 Déjà scanné ici', moved:'↔ Déplacé depuis un autre emplacement', unknown:'⚠ Code-barre inconnu du catalogue' }[status];
-  const badgeCls = status==='unknown' ? 'warn' : (status==='dup'||status==='moved') ? 'dup' : 'ok';
-  let html = `<div class="fb-top"><span class="fb-badge ${badgeCls}">${badgeTxt}</span>
-    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
-    ${record.manuel ? `<span class="fb-badge" style="background:var(--plan-manuel);color:#fff" title="Créé via exemplarisation.html, pas encore une vraie notice Syracuse">⚡ Exemplarisé rapide</span>` : ''}
-    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}
-    ${record.sansCodeBarre ? `<span class="fb-badge abime" title="Ajouté à la liste « Mauvais numéro / code-barre absent »">📎 Sans code-barre</span>` : ''}
-    ${record.coteApprox ? `<span class="fb-badge" style="background:#f57f17;color:#fff" title="La cote tapée ne correspondait pas exactement à celle du catalogue — retrouvé par son numéro, à vérifier">≈ Cote approximative</span>` : ''}
-    ${record.horsSection ? `<span class="fb-badge" style="background:#c62828;color:#fff" title="Catalogué sous une autre section que Magasin/Magasin Jeunesse — à vérifier dans Syracuse">⚠ Anomalie de classement</span>` : ''}</div>`;
-  html += `<div class="fb-titre">${esc(record.titre) || (status==='unknown' ? '(non catalogué)' : '(titre inconnu)')}</div>`;
-  html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
+  // Anomalie de classement : enregistrée comme un scan normal, mais mise en
+  // avant (carmin) tant que ce n'est pas un simple « déjà scanné ici ».
+  const state = status==='unknown' ? 'unknown' : (record.horsSection && status!=='dup') ? 'anom' : status;
+  const pills = [];
+  if(record.manuel) pills.push(fbPill('⚡ Exemplarisé rapide', 'Créé via exemplarisation.html, pas encore une vraie notice Syracuse'));
+  if(record.barcodeAbime) pills.push(fbPill('✎ Code-barre endommagé (saisi à la main)'));
+  if(record.sansCodeBarre) pills.push(fbPill('📎 Sans code-barre', 'Ajouté à la liste « Mauvais numéro / code-barre absent »'));
+  if(record.coteApprox) pills.push(fbPill('≈ Cote approximative', 'La cote tapée ne correspondait pas exactement à celle du catalogue — retrouvé par son numéro, à vérifier'));
+  if(record.horsSection && state!=='anom') pills.push(fbPill('⚠ Anomalie de classement', 'Catalogué sous une autre section que Magasin/Magasin Jeunesse — à vérifier dans Syracuse'));
+  let extra = '';
+  if(state==='anom') extra += `<div class="fb-note"><strong>Section réelle : ${esc(record.fonds) || '—'}</strong> — catalogué hors magasin, à reclasser ou à vérifier dans Syracuse.</div>`;
   if(status==='moved' && prev){
-    html += `<div class="fb-meta">Précédemment : ${esc(locLabel(prev.travee))}${prev.colonne?' · col. '+esc(prev.colonne):''} · étage/n° ${esc(prev.etage)}</div>`;
+    extra += `<div class="fb-prev"><span class="fb-lbl">Ancien emplacement</span><strong>${esc(slotText(prev))}</strong><span class="fb-prev-arrow" aria-hidden="true">→</span><span>maintenant ${esc(slotText(record))}</span></div>`;
   }
   if(reliureRecords && reliureRecords.length){
-    html += `<div class="fb-meta" style="color:#00897b">🔗 Relié avec ${reliureRecords.length} autre(s) document(s), récolé(s) automatiquement au même emplacement : ${reliureRecords.map(r=>esc(r.cote||r.barcode)).join(', ')}</div>`;
+    extra += `<div class="fb-note">🔗 Relié avec ${reliureRecords.length} autre(s) document(s), récolé(s) automatiquement au même emplacement : ${reliureRecords.map(r=>esc(r.cote||r.barcode)).join(', ')}</div>`;
   }
+  if(status==='unknown') extra += manualCoteFormHtml();
+  renderFeedbackCard(fb, { state, record, pills, extra });
   if(status==='unknown'){
-    html += `<div class="fb-manual">
-      <input type="text" id="manual-cote" placeholder="Cote (si connue)">
-      <button type="button" id="manual-save">Renseigner</button>
-    </div>`;
-  }
-  fb.innerHTML = html;
-  if(status==='unknown'){
-    document.getElementById('manual-save').addEventListener('click', ()=>{
-      const v = document.getElementById('manual-cote').value.trim();
-      if(v){
-        record.cote = v;
-        record.fonds = getFondsFromCote(v);
-        scans[record.barcode] = record;
-        putScanRecord(record); renderExpected(); renderHereLog(); updateStats(); buildMiniPlan();
-        queuePatch({type:'scan', record});
-      }
-      scanInput.focus();
-    });
+    wireManualCote(record, ()=>{ renderExpected(); renderHereLog(); updateStats(); buildMiniPlan(); });
   }
 }
 
@@ -2515,11 +2647,11 @@ function handleNoBarcodeCote(coteRaw){
 }
 function showNoBarcodeFeedback(record){
   const fb = document.getElementById('feedback');
-  fb.className = 'feedback show warn';
-  fb.innerHTML = `<div class="fb-top"><span class="fb-badge warn">⚠ Cote absente du catalogue</span>
-    <span class="fb-cote">${esc(record.cote)}</span></div>
-    <div class="fb-titre">(non catalogué)</div>
-    <div class="fb-meta">Ajouté à la liste « Mauvais numéro / code-barre absent » — pas compté comme récolé.</div>`;
+  renderFeedbackCard(fb, {
+    state:'unknown', verb:'Cote absente du catalogue',
+    record:Object.assign({ titre:'', ts:record.ts }, record), hideBarcode:true,
+    extra:`<div class="fb-note">Ajouté à la liste « Mauvais numéro / code-barre absent » — pas compté comme récolé.</div>`
+  });
 }
 document.getElementById('nobarcode-save').addEventListener('click', ()=>{
   handleNoBarcodeCote(document.getElementById('nobarcode-input').value);
@@ -2578,38 +2710,21 @@ function handleScanHorsReserve(barcode, damaged){
 function showHorsReserveFeedback(record, unknown){
   const fb = document.getElementById('feedback');
   const baselineRec = baseline ? baseline[record.barcode] : null;
-  fb.className = 'feedback show ' + (baselineRec ? 'dup' : 'warn');
-  const badgeTxt = baselineRec ? '📍 Déjà récolé — emplacement d\'origine ci-dessous' : '⚠ Hors réserve';
-  let html = `<div class="fb-top"><span class="fb-badge ${baselineRec?'dup':'warn'}">${badgeTxt}</span>
-    ${record.cote ? `<span class="fb-cote">${esc(record.cote)}</span>` : ''}
-    ${record.barcodeAbime ? `<span class="fb-badge abime">✎ Code-barre endommagé (saisi manuellement)</span>` : ''}</div>`;
-  html += `<div class="fb-titre">${esc(record.titre) || (unknown ? '(non catalogué)' : '(titre inconnu)')}</div>`;
-  html += `<div class="fb-meta">${esc(record.auteur)}${record.auteur&&record.fonds?' · ':''}${esc(record.fonds)} · code-barre ${esc(record.barcode)}</div>`;
+  const pills = [];
+  if(record.barcodeAbime) pills.push(fbPill('✎ Code-barre endommagé (saisi à la main)'));
+  let extra = '';
   if(baselineRec){
-    html += `<div class="fb-meta"><strong>Emplacement lors du récolement de référence :</strong> ${esc(locLabel(baselineRec.travee))}${baselineRec.colonne?' · col. '+esc(baselineRec.colonne):''} · étage/n° ${esc(baselineRec.etage)}. Remettez-le à cet emplacement.</div>`;
+    extra += `<div class="fb-prev"><span class="fb-lbl">Emplacement lors du récolement de référence</span><strong>${esc(locLabel(baselineRec.travee))}${baselineRec.colonne?' · col. '+esc(baselineRec.colonne):''} · étage/n° ${esc(baselineRec.etage)}</strong><span>Remettez-le à cet emplacement.</span></div>`;
   } else {
-    html += `<div class="fb-meta">${baseline ? 'Aucune trace de ce livre dans le récolement de référence chargé.' : 'Aucun récolement de référence chargé.'} Veuillez mettre ce livre à l'emplacement indiqué par sa cote. Une fois cela fait, scannez le code-barre avec le bon emplacement sélectionné pour l'ajouter au récolement principal.</div>`;
+    extra += `<div class="fb-note">${baseline ? 'Aucune trace de ce livre dans le récolement de référence chargé.' : 'Aucun récolement de référence chargé.'} Veuillez mettre ce livre à l'emplacement indiqué par sa cote. Une fois cela fait, scannez le code-barre avec le bon emplacement sélectionné pour l'ajouter au récolement principal.</div>`;
   }
-  if(unknown){
-    html += `<div class="fb-manual">
-      <input type="text" id="manual-cote" placeholder="Cote (si connue)">
-      <button type="button" id="manual-save">Renseigner</button>
-    </div>`;
-  }
-  fb.innerHTML = html;
-  if(unknown){
-    document.getElementById('manual-save').addEventListener('click', ()=>{
-      const v = document.getElementById('manual-cote').value.trim();
-      if(v){
-        record.cote = v;
-        record.fonds = getFondsFromCote(v);
-        scans[record.barcode] = record;
-        putScanRecord(record); updateStats();
-        queuePatch({type:'scan', record});
-      }
-      scanInput.focus();
-    });
-  }
+  if(unknown) extra += manualCoteFormHtml();
+  renderFeedbackCard(fb, {
+    state: unknown ? 'unknown' : 'hors',
+    verb: baselineRec ? 'Déjà récolé — à remettre en place' : undefined,
+    record, pills, extra, hideBarcode:false
+  });
+  if(unknown) wireManualCote(record, ()=>updateStats());
 }
 
 /* ════════════ NON CATALOGUÉS (mode "Catalogage") ════════════ */
@@ -2642,10 +2757,10 @@ function saveNonCatCount(){
 
 function showNonCatFeedback(count){
   const fb = document.getElementById('noncat-feedback');
-  fb.className = 'feedback show ok';
-  fb.innerHTML = count > 0
-    ? `<div class="fb-top"><span class="fb-badge ok">✓ Enregistré</span></div><div class="fb-titre">${count} livre${count>1?'s':''} non catalogué${count>1?'s':''} estimé${count>1?'s':''} sur cet emplacement.</div>`
-    : `<div class="fb-top"><span class="fb-badge ok">✓ Enregistré</span></div><div class="fb-titre">Emplacement marqué sans livre non catalogué.</div>`;
+  fb.className = 'rc-ncfb show';
+  fb.textContent = count > 0
+    ? `✓ Enregistré — ${count} livre${count>1?'s':''} non catalogué${count>1?'s':''} estimé${count>1?'s':''} sur cet emplacement.`
+    : '✓ Enregistré — emplacement marqué sans livre non catalogué.';
 }
 
 // Enregistrement automatique dès que la valeur change, avec un petit délai
@@ -2678,38 +2793,50 @@ function emplacementKey(fields){ return `${fields.travee}|${fields.colonne}|${fi
 function isCurrentVide(){ return !!videShelves[emplacementKey(locFieldsOf(loc))]; }
 function isCurrentNonRange(){ return !!nonRangeShelves[emplacementKey(locFieldsOf(loc))]; }
 
+// Bouton du groupe segmenté « Cette étagère » : état exposé par aria-pressed
+// (jamais la couleur seule — le libellé change aussi).
+function setSegBtn(btn, pressed, label){
+  btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  btn.querySelector('.rc-seg-label').textContent = label;
+}
 function updateVideUI(){
-  const btn = document.getElementById('btn-vide');
-  const marked = isCurrentVide();
-  btn.textContent = marked ? '☑ Vide' : '☐ Vide';
-  btn.classList.toggle('active', marked);
+  setSegBtn(document.getElementById('btn-vide'), isCurrentVide(), isCurrentVide() ? 'Vide ✓' : 'Vide');
 }
 
 function updateNonRangeUI(){
-  const btn = document.getElementById('btn-nonrange');
-  const marked = isCurrentNonRange();
-  btn.textContent = marked ? '☑ Non rangé' : '☐ Non rangé';
-  btn.classList.toggle('active', marked);
+  setSegBtn(document.getElementById('btn-nonrange'), isCurrentNonRange(), isCurrentNonRange() ? 'Non rangé ✓' : 'Non rangé');
 }
 
-document.getElementById('btn-vide').addEventListener('click', ()=>{
-  const fields = locFieldsOf(loc);
-  const key = emplacementKey(fields);
-  if(!videShelves[key]){
-    const hereCount = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
-    if(hereCount>0 && !confirm(`${hereCount} scan(s) déjà enregistré(s) sur cet emplacement. Marquer quand même comme vide ?`)) return;
-    videShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
-    if(nonRangeShelves[key]){ delete nonRangeShelves[key]; saveNonRangeShelves(); }
-    beep(660,.1);
-  } else {
-    delete videShelves[key];
-  }
+function afterShelfMark(){
   saveVideShelves();
   updateVideUI();
   updateNonRangeUI();
   updateStats();
   buildMiniPlan();
-  queuePatch({type:'vide', key, record: videShelves[key] || null});
+}
+document.getElementById('btn-vide').addEventListener('click', ()=>{
+  const fields = locFieldsOf(loc);
+  const key = emplacementKey(fields);
+  const commit = ()=>{
+    if(!videShelves[key]){
+      videShelves[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
+      if(nonRangeShelves[key]){ delete nonRangeShelves[key]; saveNonRangeShelves(); }
+      beep(660,.1);
+    } else {
+      delete videShelves[key];
+    }
+    afterShelfMark();
+    queuePatch({type:'vide', key, record: videShelves[key] || null});
+  };
+  if(!videShelves[key]){
+    const hereCount = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage).length;
+    if(hereCount>0){
+      rpUI.confirmInline(document.getElementById('vide-row'), `${hereCount} scan(s) déjà enregistré(s) sur cet emplacement. Marquer quand même comme vide ?`,
+        { okLabel:'Marquer comme vide' }).then(ok=>{ if(ok) commit(); scanInput.focus({preventScroll:true}); });
+      return;
+    }
+  }
+  commit();
 });
 
 document.getElementById('btn-nonrange').addEventListener('click', ()=>{
@@ -2741,13 +2868,12 @@ function lastShelfKey(fields){ return `${fields.travee}|${fields.colonne}`; }
 function currentLastShelfRecord(){ return lastShelves[lastShelfKey(locFieldsOf(loc))] || null; }
 
 function updateLastShelfUI(){
-  const btn = document.getElementById('btn-lastshelf');
   const rec = currentLastShelfRecord();
   const markedHere = rec && String(rec.etage) === String(loc.etage);
-  btn.classList.toggle('active', markedHere);
-  if(markedHere) btn.textContent = '☑ Dernière étagère';
-  else if(rec) btn.textContent = `☐ Dernière étagère (étage ${rec.etage})`;
-  else btn.textContent = '☐ Dernière étagère';
+  let label = 'Dernière étagère';
+  if(markedHere) label = 'Dernière étagère ✓';
+  else if(rec) label = `Dernière étagère (étage ${rec.etage})`;
+  setSegBtn(document.getElementById('btn-lastshelf'), !!markedHere, label);
 }
 
 document.getElementById('btn-lastshelf').addEventListener('click', ()=>{
@@ -2966,10 +3092,11 @@ function buildMiniPlan(){
 
   titleEl.textContent=travMiniTitle(tid);
 
-  const GAP=2, BASE_SLOT_H=10;
+  const GAP=2;
   const refMaxEt=defaultMaxEtageOf(tDef);
+  const BASE_SLOT_H = refMaxEt>12 ? 8 : 16;   // les armoires (34 niveaux) restent compactes
   const targetH=refMaxEt*BASE_SLOT_H+(refMaxEt-1)*GAP;
-  const w=tDef.nbCols<=5?14:11;
+  const w=tDef.nbCols<=6?30:tDef.nbCols<=9?26:20;
 
   let total=0, filled=0;
   const box=document.createElement('div'); box.className='mp-box';
@@ -2982,9 +3109,11 @@ function buildMiniPlan(){
       const state=miniSlotState(maps,tid,col,String(e));
       if(state==='cat'||state==='manuel'||state==='noncat'||state==='nonrange') filled++;
       const isCur = col===curCol && e===loc.etage;
-      const s=document.createElement('div'); s.className='mp-slot'+(isCur?' cur':'');
+      const s=document.createElement('button'); s.type='button'; s.className='mp-slot'+(isCur?' cur':'');
       s.style.cssText=`width:${w}px;height:${h}px;background:${miniSlotColor(maps,tid,col,String(e),state)}`;
-      s.title=miniSlotTitle(tDef,col,e,state,maps);
+      const ttl = miniSlotTitle(tDef,col,e,state,maps)+(isCur?' (emplacement courant)':'');
+      s.title=ttl; s.setAttribute('aria-label', ttl);
+      s.dataset.col=col; s.dataset.et=String(e);
       cd.appendChild(s);
     }
     const lbl=document.createElement('div'); lbl.className='mp-collbl'+(col===curCol?' cur':''); lbl.textContent=col;
@@ -3002,13 +3131,23 @@ function buildMiniPlan(){
 function exportMiniPlanBarcodes(){
   const fields = locFieldsOf(loc);
   const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage);
-  if(!here.length){ alert('Aucun code-barre scanné sur cet emplacement.'); return; }
+  if(!here.length){ rpUI.toast('Aucun code-barre scanné sur cet emplacement.', {type:'warn'}); return; }
   const slug = displayTraveeId(fields.travee).replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase();
   const d = new Date(), pad = n => String(n).padStart(2,'0');
   downloadTxt(here.map(r=>r.barcode).join('\n'),
     `codes-barres-${slug}-col${fields.colonne}-${fields.etage}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
 }
 document.getElementById('mp-export-btn').addEventListener('click', exportMiniPlanBarcodes);
+// Clic sur une case du mini-plan = se positionner sur cette colonne/étagère
+// (même chemin que les steppers : loc → refreshLoc()).
+document.getElementById('mp-room').addEventListener('click', ev=>{
+  const b = ev.target.closest('.mp-slot'); if(!b || !b.dataset.col) return;
+  const n = b.dataset.col.length===1 ? b.dataset.col.charCodeAt(0)-64 : 0;
+  const et = parseInt(b.dataset.et, 10);
+  if(n<1 || n>26 || !(et>=1)) return;
+  loc.colonne = n; loc.etage = et;
+  refreshLoc();
+});
 
 /* ════════════ ATTENDU ICI ════════════ */
 function renderExpected(){
@@ -3049,87 +3188,123 @@ function renderExpected(){
 }
 
 /* ════════════ LOGS ════════════ */
+const HERE_LOG_LINES = 8;   // « Scans récents ici » : liste compacte, 6–10 lignes
+function logBarcodeCell(r){
+  return `<td class="pro-mono pro-muted">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#8a5f00">≈</span>':''}</td>`;
+}
+function logDelCell(r, label){
+  return `<td class="is-act"><button type="button" class="pro-btn pro-btn--secondary pro-btn--sm log-del" data-bc="${esc(r.barcode)}" aria-label="Supprimer le scan ${esc(r.cote||r.barcode)}">${label}</button></td>`;
+}
+const HERE_LOG_LINES = 8;   // « Scans récents ici » : liste compacte, 6–10 lignes
+function logBarcodeCell(r){
+  return `<td class="pro-mono pro-muted">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#8a5f00">≈</span>':''}</td>`;
+}
+function logDelCell(r, label){
+  return `<td class="is-act"><button type="button" class="pro-btn pro-btn--secondary pro-btn--sm log-del" data-bc="${esc(r.barcode)}" aria-label="Supprimer le scan ${esc(r.cote||r.barcode)}">${label}</button></td>`;
+}
 function renderHereLog(){
-  const fields = locFieldsOf(loc);
-  const here = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage)
-    .sort((a,b)=>b.ts-a.ts).slice(0,30);
   const tbody = document.getElementById('log-here');
+  // Une confirmation de suppression est ouverte dans le tableau : ne pas la
+  // détruire (le sondage de 45 s rappelle ce rendu).
+  if(tbody.querySelector('.pro-confirm')) return;
+  const fields = locFieldsOf(loc);
+  const allHere = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage)
+    .sort((a,b)=>b.ts-a.ts);
+  const here = allHere.slice(0, HERE_LOG_LINES);
+  document.getElementById('here-count').textContent = allHere.length
+    ? `${allHere.length} scan${allHere.length>1?'s':''} sur cet emplacement${allHere.length>here.length?` · les ${here.length} derniers`:''}`
+    : '';
   if(!here.length){
     tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun scan sur cet emplacement pour l\'instant.</td></tr>';
     return;
   }
   tbody.innerHTML = here.map(r=>`
     <tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
-      <td>${esc(r.titre)||'(non catalogué)'}</td>
-      <td>${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#f57f17">≈</span>':''}</td>
-      <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
+      <td class="pro-mono pro-muted">${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
+      <td class="rc-ell">${esc(r.titre)||'(non catalogué)'}</td>
+      ${logBarcodeCell(r)}
+      ${logDelCell(r, 'Annuler')}
     </tr>`).join('');
-  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
 }
 
 function renderAllLog(filter){
+  // Journal de l'onglet « Données » : rendu seulement visible (voir
+  // onTabChange()), il n'y a aucune raison de trier 27 000 scans en tâche
+  // de fond à chaque synchro.
+  if(activeTab!=='donnees'){ allLogDirty = true; return; }
+  const tbody = document.getElementById('log-all');
+  if(tbody.querySelector('.pro-confirm')) return;
+  allLogDirty = false;
   const q = (filter||'').trim().toLowerCase();
   const all = Object.values(scans).sort((a,b)=>b.ts-a.ts);
   const filtered = q ? all.filter(r =>
     (r.cote||'').toLowerCase().includes(q) || (r.titre||'').toLowerCase().includes(q) || (r.barcode||'').toLowerCase().includes(q)
   ) : all;
-  const tbody = document.getElementById('log-all');
+  document.getElementById('all-count').textContent = `${rpUI.fmt.n(filtered.length)} scan${filtered.length>1?'s':''}${q?' correspondant'+(filtered.length>1?'s':''):''}`;
   if(!filtered.length){
     tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun scan.</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.slice(0,300).map(r=>`
     <tr>
-      <td style="font-family:monospace">${esc(r.cote)||'—'}</td>
-      <td>${esc(r.titre)||'(non catalogué)'}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
+      <td class="rc-ell">${esc(r.titre)||'(non catalogué)'}</td>
       <td>${esc(locLabel(r.travee))}${r.colonne?' · col. '+esc(r.colonne):''} · ${esc(r.etage)}</td>
-      <td style="font-family:monospace;color:#888">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#f57f17">≈</span>':''}</td>
-      <td><button class="log-del" data-bc="${esc(r.barcode)}">✕</button></td>
-    </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${filtered.length-300} de plus (affinez la recherche)</td></tr>` : '');
-  tbody.querySelectorAll('.log-del').forEach(b=>b.addEventListener('click', ()=>deleteScan(b.dataset.bc)));
+      ${logBarcodeCell(r)}
+      ${logDelCell(r, '✕')}
+    </tr>`).join('') + (filtered.length>300 ? `<tr><td class="log-empty" colspan="5">… et ${rpUI.fmt.n(filtered.length-300)} de plus (affinez la recherche)</td></tr>` : '');
 }
 document.getElementById('log-search').addEventListener('input', function(){ renderAllLog(this.value); });
+
+// Suppression d'un scan : toujours confirmée en ligne (ligne de tableau).
+function confirmDeleteScan(btn){
+  const tr = btn.closest('tr');
+  const bc = btn.dataset.bc;
+  const r = scans[bc];
+  const what = r ? `${r.cote ? r.cote+' — ' : ''}${r.titre ? r.titre : 'code-barre '+bc}` : bc;
+  rpUI.confirmInline(tr, `Supprimer le scan « ${what} » ? Il disparaît du récolement, pour tous les postes.`,
+    { okLabel:'Supprimer le scan', danger:true }).then(ok=>{
+    if(ok) deleteScan(bc);
+    else if(activeTab==='saisie') scanInput.focus({preventScroll:true});
+  });
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest('.log-del');
+  if(b) confirmDeleteScan(b);
+});
 
 function deleteScan(barcode){
   delete scans[barcode];
   deleteScanRecord(barcode);
   renderExpected(); renderHereLog(); renderAllLog(document.getElementById('log-search').value); updateStats(); buildMiniPlan();
   queuePatch({type:'deleteScan', barcode});
+  if(activeTab==='saisie') scanInput.focus({preventScroll:true});
 }
 
 /* ════════════ STATS ════════════ */
 function updateStats(){
-  // Barre de progression : scopée à l'étage/groupe actuellement sélectionné
-  // (voir "PROGRESSION EN HAUT DE PAGE, PAR ÉTAGE" plus haut) plutôt qu'au
-  // catalogue reserve/magasin global.
+  // Barre de progression du local (bandeau de l'onglet Saisie) : scopée à
+  // l'étage/groupe actuellement sélectionné (voir "PROGRESSION EN HAUT DE
+  // PAGE, PAR ÉTAGE" plus haut) plutôt qu'au catalogue reserve/magasin global.
   const group = currentStatsGroup();
   const catStats = catalogStatsForGroup(group);
   const nonCatCount = nonCatTotalForGroup(group);
   updateNoticeProgressBar(group, catStats, nonCatCount);
 
-  // Un seul panneau de "Statistiques avancées" est affiché à la fois depuis
-  // le 2026-09-01 (celui de la réserve sélectionnée, voir
-  // applyAdvGroupVisibility) — on ne recalcule donc que celui-là au lieu des
-  // quatre. Les trois autres gardaient des chiffres qui n'étaient de toute
-  // façon jamais lus, au prix, pour chaque groupe magasin, d'un parcours
-  // complet du catalogue (~200 000 entrées) à chaque scan.
-  // Rien ne se périme : refreshLoc() rappelle updateStats() à chaque
-  // changement de réserve, donc un panneau est toujours recalculé au moment
-  // précis où il devient visible.
-  const visible = visibleAdvGroupId();
-  updateShelfBar(visible);
-  updateTimeStats(visible);
-  updateMagasinEtageStats(visible);
+  // Tout le reste (compteurs d'anomalies, tableau de bord) est calculé pour
+  // le seul périmètre visible, au repos (debounce) — et le tableau de bord
+  // uniquement onglet visible : voir scheduleDashboard()/updateAdvListsCount().
   scheduleAdvListsCount();
+  scheduleDashboard();
 }
 
-/* Groupe de "Statistiques avancées" actuellement à l'écran. Déclarée en
-   `function` (donc hissée) : updateStats() tourne pendant l'initialisation
-   synchrone de la page, avant cette ligne — voir la note sur la temporal
-   dead zone en tête de la section CATALOGUE(S). */
-function visibleAdvGroupId(){ return advGroupIdForReserve(loc.reserve); }
+/* Groupe de statistiques actuellement à l'écran : le périmètre choisi dans la
+   barre « Périmètre » (onglets Tableau de bord / Anomalies), sinon celui du
+   local sélectionné. Déclarée en `function` (donc hissée) : updateStats()
+   tourne pendant l'initialisation synchrone de la page, avant cette ligne —
+   voir la note sur la temporal dead zone en tête de la section CATALOGUE(S). */
+function visibleAdvGroupId(){ return scopeGroupId || advGroupIdForReserve(loc.reserve); }
 
 // Le debounce de updateAdvListsCount() (advListsCountTimer /
 // scheduleAdvListsCount) est déclaré tôt dans le script, avec ADV_GROUPS —
@@ -3203,24 +3378,56 @@ function computeShelfBreakdown(group){
   return { recoled, vide, nonrange, nontraite, treated, possible };
 }
 
-function updateShelfBar(group){
-  const { recoled, vide, nonrange, nontraite, treated, possible } = computeShelfBreakdown(group);
-  const pct = n => possible ? Math.round(n/possible*100) : 0;
-  document.getElementById('seg-recoled-'+group).style.width = pct(recoled)+'%';
-  document.getElementById('seg-vide-'+group).style.width = pct(vide)+'%';
-  document.getElementById('seg-nonrange-'+group).style.width = pct(nonrange)+'%';
-  document.getElementById('seg-nontraite-'+group).style.width = pct(nontraite)+'%';
-  document.getElementById('leg-recoled-'+group).textContent = recoled.toLocaleString('fr-FR');
-  document.getElementById('leg-vide-'+group).textContent = vide.toLocaleString('fr-FR');
-  document.getElementById('leg-nonrange-'+group).textContent = nonrange.toLocaleString('fr-FR');
-  document.getElementById('leg-nontraite-'+group).textContent = nontraite.toLocaleString('fr-FR');
-  document.getElementById('leg-recoled-pct-'+group).textContent = possible ? `(${pct(recoled)} %)` : '';
-  document.getElementById('leg-vide-pct-'+group).textContent = possible ? `(${pct(vide)} %)` : '';
-  document.getElementById('leg-nonrange-pct-'+group).textContent = possible ? `(${pct(nonrange)} %)` : '';
-  document.getElementById('leg-nontraite-pct-'+group).textContent = possible ? `(${pct(nontraite)} %)` : '';
-  document.getElementById('shelf-bar-total-'+group).textContent = possible
-    ? `${treated.toLocaleString('fr-FR')} / ${possible.toLocaleString('fr-FR')} (${pct(treated)} %)`
-    : 'aucun emplacement pour l\'instant';
+/* Emplacements d'un groupe de statistiques, travée par travée (même
+   géométrie que totalSlotsForGroup() ci-dessus) : sert à « Couverture par
+   travée » du Tableau de bord. */
+function traveesOfStatsGroup(group){
+  if(group==='rayons') return TRAVEES_RAYONS;
+  if(group==='magasin-2e') return TRAVEES_MAGASIN2;
+  if(group==='magasin-5e') return TRAVEES_MAGASIN5;
+  if(group==='magasin-6e') return TRAVEES_MAGASIN6;
+  return [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_TIROIR];
+}
+function slotsOfTravee(def){
+  if(Array.isArray(def.colEtages)) return def.colEtages.reduce((a,b)=>a+b,0);
+  return def.nbCols * defaultMaxEtageOf(def);
+}
+function coverageLabel(group, def){
+  if(def.label) return def.label;
+  if(def.id.startsWith('RD-')) return 'Douaisienne · ' + displayTraveeId(def.id);
+  return 'Travée ' + displayTraveeId(def.id);
+}
+// Même classement que computeShelfBreakdown() (contenu > non rangé > vide),
+// mais ventilé par travée : { rows:[{id,label,recoled,vide,nonrange,treated,possible}] }.
+function computeCoverage(group){
+  const defs = traveesOfStatsGroup(group);
+  const per = {};
+  const bucket = tid => per[tid] || (per[tid] = { def:null, content:new Set(), nr:new Set(), vi:new Set() });
+  defs.forEach(d=>{ bucket(d.id).def = d; });
+  Object.values(scans).forEach(r=>{
+    if(r.kind==='horsreserve' || traveeGroupOf(r.travee)!==group) return;
+    bucket(r.travee).content.add(`${r.colonne}|${r.etage}`);
+  });
+  const addKeys = (dict, field)=>{
+    Object.keys(dict).forEach(k=>{
+      const p = k.split('|');
+      if(traveeGroupOf(p[0])!==group) return;
+      bucket(p[0])[field].add(`${p[1]}|${p[2]}`);
+    });
+  };
+  addKeys(nonCat, 'content'); addKeys(videShelves, 'vi'); addKeys(nonRangeShelves, 'nr');
+  const rows = [];
+  Object.keys(per).forEach(tid=>{
+    const b = per[tid];
+    let recoled = b.content.size, nonrange = 0, vide = 0;
+    b.nr.forEach(k=>{ if(!b.content.has(k)) nonrange++; });
+    b.vi.forEach(k=>{ if(!b.content.has(k) && !b.nr.has(k)) vide++; });
+    const treated = recoled + nonrange + vide;
+    const def = b.def || { id:tid, nbCols:0 };
+    const possible = Math.max(b.def ? slotsOfTravee(def) : 0, treated);
+    rows.push({ id:tid, label:coverageLabel(group, def), recoled, vide, nonrange, treated, possible });
+  });
+  return rows;
 }
 
 /* ════════════ STATISTIQUES AVANCÉES (temps) ════════════
@@ -3244,31 +3451,359 @@ function formatDuration(ms){
   if(mins || !parts.length) parts.push(mins+' min');
   return parts.join(' ');
 }
+function localDayKey(d){
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
 
-function updateTimeStats(group){
-  // st-abime-<group> est mis à jour par updateAdvListsCount() — voir
-  // "LISTES AVANCÉES" plus bas.
-  const list = Object.values(scans).filter(r=>traveeGroupOf(r.travee)===group).map(r=>r.ts).filter(t=>t).sort((a,b)=>a-b);
-  const elStart=document.getElementById('st-start-'+group), elLast=document.getElementById('st-last-'+group),
-        elSpan=document.getElementById('st-span-'+group), elReal=document.getElementById('st-realtime-'+group),
-        elSessions=document.getElementById('st-sessions-'+group);
-  if(!list.length){
-    elStart.textContent='—'; elLast.textContent='—'; elSpan.textContent='—'; elReal.textContent='—'; elSessions.textContent='—';
-    return;
+// Dates des scans du groupe, ventilées par jour (heure locale) et par heure.
+// n === 0 : rien (tous les champs date valent null).
+function computeTimeStats(group){
+  const list = [], byDay = {}, byHour = new Array(24).fill(0);
+  for(const bc in scans){
+    const r = scans[bc];
+    if(!r.ts || traveeGroupOf(r.travee)!==group) continue;
+    list.push(r.ts);
+    const d = new Date(r.ts);
+    const k = localDayKey(d);
+    byDay[k] = (byDay[k]||0) + 1;
+    byHour[d.getHours()]++;
   }
-  const startTs = list[0], lastTs = list[list.length-1];
-  elStart.textContent = formatDateTimeFR(startTs);
-  elLast.textContent = formatDateTimeFR(lastTs);
-  elSpan.textContent = formatDuration(lastTs-startTs);
-
+  list.sort((a,b)=>a-b);
+  if(!list.length) return { n:0, start:null, last:null, span:0, real:0, sessions:0, byDay, byHour };
   let real = 0, sessions = 1;
   for(let i=1;i<list.length;i++){
     const gap = list[i]-list[i-1];
     if(gap < GAP_MS) real += gap; else sessions++;
   }
-  elReal.textContent = formatDuration(real);
-  elSessions.textContent = sessions.toLocaleString('fr-FR');
+  return { n:list.length, start:list[0], last:list[list.length-1], span:list[list.length-1]-list[0], real, sessions, byDay, byHour };
 }
+
+/* ════════════ TABLEAU DE BORD ════════════
+   Rendu UNIQUEMENT onglet « Tableau de bord » visible (scheduleDashboard()
+   ne fait que marquer le tableau « à rafraîchir » tant qu'un autre onglet est
+   affiché), au plus toutes les ~4 s, et seulement si les données ont changé
+   (dashSignature()). Les variables d'état (dashTimer, dashDirty…) sont
+   déclarées tôt dans le script — voir plus haut. Aucune valeur n'est
+   inventée : tout vient de scans/nonCat/videShelves/… et du catalogue ;
+   une donnée indisponible s'affiche « — ». */
+function scheduleDashboard(){
+  if(activeTab!=='tableau'){ dashDirty = true; return; }
+  if(dashTimer) return;
+  const wait = Math.max(1200, 4000 - (Date.now()-dashLast));
+  dashTimer = setTimeout(()=>{ dashTimer = null; renderDashboard(); }, wait);
+}
+function dashSignature(gid){
+  let n=0, mx=0, nc=0;
+  for(const bc in scans){ n++; const t = scans[bc].ts||0; if(t>mx) mx=t; }
+  for(const k in nonCat) nc += nonCat[k].count||0;
+  const c = advCounts[gid] || {};
+  return [gid, n, mx, nc, Object.keys(videShelves).length, Object.keys(nonRangeShelves).length, Object.keys(lastShelves).length,
+    !!catalogByGroup.reserve, !!catalogByGroup.magasin, c.notscanned, c.perdus, c.abime, c.manualcote, c.nobarcode, c.horssection,
+    Object.keys(SYRACUSE_OVERLAY).length, new Date().getDate()].join('|');
+}
+
+// Date de première saisie de chaque notice du périmètre, triées. La date
+// d'un exemplaire est celle de son DERNIER scan (un rescan écrase l'ancien) :
+// la courbe est donc une approximation, jamais en avance sur la réalité.
+function noticeFirstTimestamps(gid){
+  const cat = catalogByGroup[catalogGroupOf(gid)];
+  if(!cat) return null;
+  const first = new Map();
+  for(const bc in scans){
+    const r = scans[bc];
+    if(!r.ts || traveeGroupOf(r.travee)!==gid) continue;
+    const e = cat[bc];
+    if(!e || (gid!=='rayons' && !inGroupScope(e))) continue;
+    const nid = e.noticeId || bc;
+    const t = first.get(nid);
+    if(t===undefined || r.ts < t) first.set(nid, r.ts);
+  }
+  return [...first.values()].sort((a,b)=>a-b);
+}
+
+const DASH_DAY = 86400000;
+function dayStart(t){ const d = new Date(t); d.setHours(0,0,0,0); return d.getTime(); }
+function shortDateFR(ms){ return new Date(ms).toLocaleDateString('fr-FR', {day:'numeric', month:'short'}); }
+function longDateFR(ms){ return new Date(ms).toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'}); }
+
+// Courbe cumulée des notices récolées + projection au rythme des 14 derniers
+// jours. `ts` = dates de première saisie triées ; `total` = notices attendues
+// (0/null si inconnu : pas de projection). Renvoie {html, rate14, cumNow, cum7}.
+function progressCurve(ts, total){
+  const RF = rpUI.fmt;
+  const now = Date.now();
+  const d0 = dayStart(ts[0]), today = dayStart(now);
+  const nDays = Math.max(0, Math.round((today-d0)/DASH_DAY));
+  const cum = new Array(nDays+1).fill(0);
+  ts.forEach(t=>{ cum[Math.min(nDays, Math.max(0, Math.round((dayStart(t)-d0)/DASH_DAY)))]++; });
+  for(let i=1;i<=nDays;i++) cum[i] += cum[i-1];
+  const cumNow = cum[nDays];
+  const cum7 = nDays-7 >= 0 ? cum[nDays-7] : 0;       // état il y a 7 jours (avant la 1re saisie : 0)
+  const span = Math.min(14, nDays+1);
+  const recent = ts.filter(t=>t >= now - span*DASH_DAY).length;
+  const rate14 = recent / span;
+
+  let projIdx = null;
+  if(total>cumNow && rate14>0){
+    const left = (total-cumNow)/rate14;
+    if(left <= 730) projIdx = nDays + left;
+  }
+  const xMax = Math.max(1, projIdx!=null ? projIdx : nDays);
+  const yTop = Math.max(total>0 ? total : 0, cumNow, 1);
+  const yTicks = rpCharts.niceTicks(yTop, 4, true).ticks.filter(v=>v<=yTop);
+  const X = i => (i/xMax*1000);
+  const Y = v => (300 - v/yTop*300);
+
+  const pts = [];
+  for(let i=0;i<=nDays;i++) pts.push(X(i).toFixed(1)+','+Y(cum[i]).toFixed(1));
+  if(nDays===0) pts.push(X(1).toFixed(1)+','+Y(cum[0]).toFixed(1));
+  const line = 'M'+pts.join(' L');
+  const lastX = nDays===0 ? X(1) : X(nDays);
+  const area = line + ` L${lastX.toFixed(1)},300 L0,300 Z`;
+  const proj = projIdx!=null ? `M${X(nDays).toFixed(1)},${Y(cumNow).toFixed(1)} L${X(projIdx).toFixed(1)},${Y(total).toFixed(1)}` : '';
+
+  let grid = '';
+  yTicks.forEach(v=>{
+    const top = (Y(v)/300*100).toFixed(2);
+    grid += `<span class="rc-curve__gl" style="top:${top}%"></span><span class="rc-curve__yl" style="top:${top}%">${RF.n(v)}</span>`;
+  });
+  for(let k=0;k<=4;k++){
+    const i = Math.round(k*xMax/4);
+    grid += `<span class="rc-curve__xl" style="left:${(i/xMax*100).toFixed(2)}%">${esc(shortDateFR(d0 + i*DASH_DAY))}</span>`;
+  }
+  const dotLeft = (nDays===0 ? 0 : nDays/xMax*100);
+  const dotTop = Y(cumNow)/300*100;
+  const tagSide = dotLeft > 55 ? 'rc-curve__tag--l' : 'rc-curve__tag--r';
+  const pctNow = total>0 ? ` · ${RF.pct(cumNow/total)}` : '';
+  let end = '';
+  let endTxt = '';
+  if(projIdx!=null){
+    const endDate = now + (projIdx-nDays)*DASH_DAY;
+    endTxt = longDateFR(endDate);
+    end = `<span class="rc-curve__enddot" style="left:${(projIdx/xMax*100).toFixed(2)}%;top:0"></span>
+      <div class="rc-curve__end" style="right:0"><strong>Fin estimée : ${esc(endTxt)}</strong><span>${RF.n(total)} notices · à ${RF.n(rate14,1)} notices / jour</span></div>`;
+  }
+  const aria = `Courbe cumulée des notices récolées, du ${longDateFR(d0)} au ${longDateFR(today)} : ${RF.n(cumNow)} notices${total>0?' sur '+RF.n(total):''}`
+    + (endTxt ? `, fin estimée le ${endTxt} au rythme actuel` : '') + '.';
+  const html = `<div class="rc-curve-wrap"><div class="rc-curve" role="img" aria-label="${esc(aria)}">${grid}
+    <svg viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path d="${area}" fill="#E6E8F7" stroke="none"/>
+      <path d="${line}" fill="none" stroke="#2A3CD4" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      ${proj ? `<path d="${proj}" fill="none" stroke="#B4213C" stroke-width="2.5" stroke-dasharray="7 6" vector-effect="non-scaling-stroke"/>` : ''}
+    </svg>
+    <span class="rc-curve__dot" style="left:${dotLeft.toFixed(2)}%;top:${dotTop.toFixed(2)}%"></span>
+    <div class="rc-curve__tag ${tagSide}" style="left:${dotLeft.toFixed(2)}%;top:${dotTop.toFixed(2)}%"><strong>Aujourd'hui · ${esc(shortDateFR(today))}</strong><span>${RF.n(cumNow)} notices${pctNow}</span></div>
+    ${end}
+  </div></div>`;
+  return { html, rate14, cumNow, cum7, endTxt, hasProjection: projIdx!=null };
+}
+
+const ANOM_TODO = {
+  abime:       'Codes-barres saisis à la main, illisibles au scanner : à recoller ou à vérifier.',
+  manualcote:  'Scannés mais absents du catalogue : seule la cote a été saisie à la main.',
+  notscanned:  'Dans le catalogue mais jamais scannés : égarés, ou récolement pas encore fait.',
+  perdus:      'Jamais scannés alors que leur cote tombe dans la plage déjà parcourue.',
+  nobarcode:   'Cotes saisies sans code-barre : à recoller, ou introuvables au catalogue.',
+  horssection: 'Scannés dans un magasin mais catalogués dans une autre section Syracuse.',
+};
+function todoCatsFor(gid){
+  const cats = ['abime','manualcote'];
+  if(gid!=='rayons') cats.push('notscanned');
+  if(gid==='magasin-2e' || gid==='magasin-5e') cats.push('perdus');
+  cats.push('nobarcode');
+  if(gid.startsWith('magasin-')) cats.push('horssection');
+  return cats;
+}
+
+function renderDashboard(force){
+  if(activeTab!=='tableau'){ dashDirty = true; return; }
+  const gid = visibleAdvGroupId();
+  const sig = dashSignature(gid);
+  if(!force && !dashDirty && sig===dashSig) return;
+  dashSig = sig; dashDirty = false; dashLast = Date.now();
+
+  const RF = rpUI.fmt, root = document.getElementById('dash-root');
+  const group = ADV_GROUP_BY_ID[gid];
+  const catReady = !!catalogByGroup[catalogGroupOf(gid)];
+  const catStats = catalogStatsForGroup(gid);
+  const sh = computeShelfBreakdown(gid);
+  const tstat = computeTimeStats(gid);
+  const counts = advCounts[gid] || {};
+  const ts = noticeFirstTimestamps(gid);
+  const hasTotal = !!(catStats && gid!=='rayons' && catStats.total>0);
+
+  document.getElementById('scope-note').textContent =
+    `${group.label}${hasTotal ? ' · '+RF.n(catStats.total)+' notices attendues' : ''} · mis à jour à ${RF.time(Date.now())}`;
+
+  // — Courbe (et chiffres qui en dérivent)
+  let curve = null;
+  if(ts && ts.length) curve = progressCurve(ts, hasTotal ? catStats.total : 0);
+
+  // — KPI
+  const scanned = catStats ? catStats.scanned : null;
+  let heroValue = '—', heroNote = catReady ? '' : 'Chargement du catalogue…', heroBar = '';
+  if(scanned!=null){
+    if(hasTotal){
+      const frac = scanned/catStats.total;
+      heroValue = RF.pct(frac, 0);
+      heroBar = `<div class="rc-herobar" role="progressbar" aria-valuenow="${Math.round(frac*100)}" aria-valuemin="0" aria-valuemax="100" aria-label="Notices récolées"><span style="width:${Math.min(100, frac*100).toFixed(1)}%"></span></div>`;
+      const reste = Math.max(0, catStats.total-scanned);
+      let delta = '';
+      if(curve && curve.cum7!=null){
+        const pts = (curve.cumNow - curve.cum7) / catStats.total * 100;
+        delta = pts>0 ? `<span class="pro-delta pro-delta--up">+${RF.n(pts,1)} pts</span> ` : '';
+      }
+      heroNote = `${delta}sur les 7 derniers jours · reste ${RF.n(reste)} notice${reste>1?'s':''}`;
+    } else {
+      heroValue = RF.n(scanned);
+      heroNote = gid==='rayons' ? 'notices récoltées — aucun total attendu pour des rayons créés à la volée' : 'notices récoltées';
+    }
+  }
+  const todayKey = localDayKey(new Date());
+  const last7 = [], last7Labels = [];
+  let sum7 = 0;
+  for(let i=6;i>=0;i--){
+    const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-i);
+    const v = tstat.byDay[localDayKey(d)] || 0;
+    last7.push(v); sum7 += v; last7Labels.push(shortDateFR(d.getTime()));
+  }
+  const rythme = tstat.n ? sum7/7 : null;
+  const kpis = `<section class="pro-kpis" aria-label="Chiffres clés">
+    <div class="pro-kpi pro-kpi--hero">
+      <p class="pro-kpi__label">Avancement du récolement</p>
+      <div class="pro-kpi__row"><span class="pro-kpi__value">${heroValue}</span>${hasTotal ? '<span class="pro-kpi__unit" style="color:#fff;font-family:var(--pro-font-display);font-weight:600;font-size:1.1rem">des notices récolées</span>' : ''}</div>
+      ${heroBar}
+      <p class="pro-kpi__note">${heroNote}</p>
+    </div>
+    <div class="pro-kpi">
+      <p class="pro-kpi__label">Notices récolées</p>
+      <div class="pro-kpi__row"><span class="pro-kpi__value">${scanned!=null ? RF.n(scanned) : '—'}</span>${hasTotal ? `<span class="pro-kpi__unit">/ ${RF.n(catStats.total)}</span>` : ''}</div>
+      <p class="pro-kpi__note">Notices distinctes retrouvées en rayon</p>
+    </div>
+    <div class="pro-kpi">
+      <p class="pro-kpi__label">Emplacements traités</p>
+      <div class="pro-kpi__row"><span class="pro-kpi__value">${RF.n(sh.treated)}</span><span class="pro-kpi__unit">/ ${RF.n(sh.possible)}</span></div>
+      <p class="pro-kpi__note">Étagères scannées, vides ou non rangées${sh.possible ? ' ('+RF.pct(sh.treated/sh.possible)+')' : ''}</p>
+    </div>
+    <div class="pro-kpi">
+      <p class="pro-kpi__label">Rythme</p>
+      <div class="pro-kpi__row"><span class="pro-kpi__value">${rythme!=null ? RF.n(rythme, rythme<10?1:0) : '—'}</span><span class="pro-kpi__unit">scans / jour</span>
+        ${tstat.n ? `<span style="margin-left:auto">${rpCharts.miniBars(last7, {labels:last7Labels, title:'Scans des 7 derniers jours', lastColor:false})}</span>` : ''}</div>
+      <p class="pro-kpi__note">${tstat.n ? 'Moyenne sur les 7 derniers jours' : 'Aucun scan pour l\'instant'}</p>
+    </div>
+  </section>`;
+
+  // — Avancement dans le temps
+  let curveBlock;
+  if(!catReady) curveBlock = '<div class="pro-empty"><p class="pro-empty__title">Chargement du catalogue…</p><p class="pro-empty__text">La courbe se tracera dès que le catalogue sera disponible.</p></div>';
+  else if(!curve) curveBlock = '<div class="pro-empty"><p class="pro-empty__title">Pas encore de notice récolée</p><p class="pro-empty__text">La courbe apparaît dès le premier scan d\'un exemplaire catalogué de ce périmètre.</p></div>';
+  else curveBlock = `<div class="rc-curve-legend"><span><i class="rc-lg rc-lg--solid"></i>Notices récolées (cumul)</span>${curve.hasProjection ? `<span><i class="rc-lg rc-lg--dash"></i>Projection au rythme des 14 derniers jours (${RF.n(curve.rate14,1)} notices / jour)</span>` : ''}${hasTotal ? `<span class="pro-muted" style="margin-left:auto">Objectif : ${RF.n(catStats.total)} notices</span>` : ''}</div>${curve.html}
+    <p class="pro-chart__caption">${hasTotal && !curve.hasProjection ? (curve.rate14>0 ? 'Cadence trop lente pour projeter une date de fin.' : 'Aucune notice nouvelle sur les 14 derniers jours : pas de projection.') : ''} La date d'un exemplaire est celle de son dernier scan.</p>`;
+
+  // — Activité
+  let activity;
+  if(!tstat.n){
+    activity = '<div class="pro-empty"><p class="pro-empty__title">Aucun scan dans ce périmètre</p><p class="pro-empty__text">L\'activité apparaît dès le premier scan.</p></div>';
+  } else {
+    const days = Object.keys(tstat.byDay).map(k=>({date:k, value:tstat.byDay[k]}));
+    const firstKey = days.map(d=>d.date).sort()[0];
+    const weeksSince = Math.ceil((Date.now() - new Date(firstKey+'T00:00:00').getTime())/(7*DASH_DAY)) + 1;
+    const weeks = Math.max(8, Math.min(26, weeksSince));
+    const hv = tstat.byHour;
+    let lo = 7, hi = 18;
+    for(let h=0;h<24;h++) if(hv[h]>0){ lo = Math.min(lo,h); hi = Math.max(hi,h); }
+    const hItems = [];
+    let peak = 0;
+    for(let h=lo;h<=hi;h++){ if(hv[h]>hv[peak]) peak = h; hItems.push({ label:h+' h', value:hv[h], tip:`${h} h – ${h+1} h\n${RF.n(hv[h])} scans` }); }
+    const real = tstat.real, sessions = tstat.sessions;
+    activity = `<div class="rc-twocol">
+      <div class="rc-col-main">
+        <div class="pro-card pro-card--pad">
+          <div class="rc-cardhead"><h3 class="pro-h4">Scans par jour</h3><span class="pro-muted rc-small">${RF.n(tstat.n)} scans · ${RF.n(days.length)} jour${days.length>1?'s':''} d'activité</span></div>
+          ${rpCharts.heatmapCalendar(days, {weeks, unit:'scans', end:todayKey})}
+        </div>
+        <div class="pro-card pro-card--pad" style="border-top:3px solid var(--pro-bleu)">
+          <div class="rc-time">
+            <div><span class="pro-label">Temps de travail réel (estimé)</span><div class="pro-kpi__value" style="margin-top:.4rem">${formatDuration(real)}</div></div>
+            <div class="rc-time__txt">en <strong>${RF.n(sessions)} session${sessions>1?'s':''}</strong>${sessions>0 ? ', soit '+formatDuration(real/sessions)+' en moyenne' : ''}.<br>
+              <span class="pro-muted">Première saisie le ${esc(formatDateTimeFR(tstat.start))} · dernier scan le ${esc(formatDateTimeFR(tstat.last))} · durée calendaire ${esc(formatDuration(tstat.span))}.</span><br>
+              <span class="pro-muted rc-small">Les écarts de plus d'1 h entre deux scans (pauses, changements de jour) ne comptent pas comme du travail ; chacun marque une nouvelle session.</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="pro-card pro-card--pad rc-col-side">
+        <div class="rc-cardhead"><h3 class="pro-h4">Heures de la journée</h3><span class="pro-muted rc-small">Pic à ${peak} h</span></div>
+        ${rpCharts.bars(hItems, {height:200, axis:true, unit:'scans'})}
+        <p class="pro-chart__caption" style="text-align:center">Scans cumulés depuis le début du récolement, par heure de la journée</p>
+      </div>
+    </div>`;
+  }
+
+  // — Couverture par travée
+  const cov = computeCoverage(gid).filter(r=>r.possible>0 || r.treated>0);
+  const covCols = cov.map(r=>{
+    const segs = [
+      { label:'Récolés', value:r.recoled, color:rpCharts.PLAN.cat.color },
+      { label:'Non rangés', value:r.nonrange, color:rpCharts.PLAN.nonrange.color },
+      { label:'Vides', value:r.vide, color:rpCharts.PLAN.vide.color, ink:'#1b5e20' },
+    ];
+    const pc = r.possible ? r.treated/r.possible : 0;
+    const aria = `${r.label} : ${r.treated} emplacements traités sur ${r.possible} (${Math.round(pc*100)} %)`;
+    return `<a class="rc-cover__row" href="reserve.html" aria-label="${esc(aria)}">
+      <span class="rc-cover__name">${esc(r.label)}</span>
+      <span class="rc-cover__bar">${rpCharts.stacked(segs, {legend:false, height:18, total:r.possible||1, decimals:0, title:r.label})}</span>
+      <span class="rc-cover__pct">${RF.pct(pc)}</span></a>`;
+  }).join('');
+  const coverBlock = cov.length ? `<div class="pro-card pro-card--pad">
+      <div class="pro-chart-legend pro-chart-legend--inline" style="margin:0 0 1rem">
+        <span class="pro-chart-legend__item"><span class="pro-chart-legend__sw" style="--c:${rpCharts.PLAN.cat.color}"></span>Récolés (au moins un scan)</span>
+        <span class="pro-chart-legend__item"><span class="pro-chart-legend__sw" style="--c:${rpCharts.PLAN.vide.color};border-color:${rpCharts.PLAN.vide.border}"></span>Vides</span>
+        <span class="pro-chart-legend__item"><span class="pro-chart-legend__sw" style="--c:${rpCharts.PLAN.nonrange.color}"></span>Non rangés</span>
+        <span class="pro-chart-legend__item"><span class="pro-chart-legend__sw" style="--c:${rpCharts.DECISION.todo.color}"></span>Jamais traités</span>
+      </div>
+      <div class="rc-cover">${covCols}</div></div>`
+    : '<div class="pro-empty"><p class="pro-empty__title">Aucun emplacement</p><p class="pro-empty__text">Aucune travée n\'est définie pour ce périmètre.</p></div>';
+
+  // — À traiter
+  const todo = todoCatsFor(gid).map(k=>{
+    const spec = ADV_CATS[k], v = counts[k];
+    return `<article class="pro-card rc-todo">
+      <h3 class="rc-todo__name">${esc(spec.title.split(' — ')[0].replace(/^Documents /,'Documents '))}</h3>
+      <div class="rc-todo__val ${v>0 ? '' : 'is-zero'}">${v!=null ? RF.n(v) : '—'}</div>
+      <p class="rc-todo__txt">${esc(ANOM_TODO[k])}</p>
+      <button type="button" class="pro-btn pro-btn--primary pro-btn--sm" data-open-cat="${k}">Voir la liste</button>
+    </article>`;
+  }).join('');
+
+  const sec = (id, title, body, extra) => `<section class="pro-section rc-dsec" aria-labelledby="${id}">
+    <div class="pro-section-head"><h2 class="pro-eyebrow" id="${id}">${title}</h2><span class="pro-rule" aria-hidden="true"></span>${extra||''}</div>${body}</section>`;
+  root.innerHTML = kpis
+    + sec('d-time', 'Avancement dans le temps', `<div class="pro-card pro-card--pad">${curveBlock}</div>`)
+    + sec('d-act', 'Activité', activity)
+    + sec('d-cov', 'Couverture par travée', coverBlock, '<span class="pro-section-note">Clic sur une travée = ouvre le plan des magasins</span>')
+    + sec('d-todo', 'À traiter', `<div class="rc-todogrid">${todo}</div>`, '<button type="button" class="pro-link" data-open-tab="anomalies" style="background:none;border:0;cursor:pointer">Toutes les anomalies →</button>');
+  if(window.rpEmbed) rpEmbed.refresh();
+}
+
+// « Voir la liste » (carte « À traiter ») : ouvre l'onglet Anomalies sur la
+// bonne catégorie, déjà dépliée.
+function openAnomaly(catKey){
+  if(tabsApi) tabsApi.select('anomalies');
+  const gid = visibleAdvGroupId();
+  const d = document.getElementById(`adv-${catKey}-${gid}`);
+  if(!d) return;
+  d.open = true;
+  refreshAdvList(gid, catKey);
+  try{ d.scrollIntoView({ block:'start' }); }catch(e){ /* ancien navigateur */ }
+}
+document.getElementById('dash-root').addEventListener('click', e=>{
+  const b = e.target.closest('[data-open-cat]');
+  if(b){ openAnomaly(b.dataset.openCat); return; }
+  const t = e.target.closest('[data-open-tab]');
+  if(t && tabsApi) tabsApi.select(t.dataset.openTab);
+});
+rpCharts.attachTooltips(document.getElementById('dash-root'));
 
 /* ════════════ LISTES AVANCÉES (endommagés / cote manuelle / jamais scannés) ════════════
    Le panneau "Statistiques avancées" (occupation, temps, et les listes

@@ -4,161 +4,49 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
+  <!-- Contrôle d'accès de l'espace pro (même gate localStorage que les autres
+       pages protégées — voir « Sécurité » dans CLAUDE.md). En tête de <head>
+       pour rediriger avant tout rendu. -->
+  <script>
+    if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+  </script>
   <title>Espace professionnel — Réserve patrimoniale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="css/admin.css">
   <style>
-    /* Espace pro — planche 2b de « Révision design » (2026-09-08).
-       « Traitement B généralisé » : les trois outils du quotidien passent en
-       grandes cartes en tête, tout le reste descend en second rang. Les
-       couleurs viennent des tokens de style.css. */
+    /* Mise en page propre à l'accueil de l'espace pro. Les composants
+       (en-tête, KPI, tuiles, graphiques) viennent de css/admin.css. */
+    .ad-today-card { display: flex; flex-direction: column; gap: 0.55rem; padding: 1.25rem 1.375rem; min-width: 0; }
+    .ad-today-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .ad-bigrow { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.55rem; }
+    .ad-big { font-family: var(--pro-font-display); font-weight: 700; font-size: 2.4rem; line-height: 1; color: var(--pro-bleu); }
+    .ad-bigunit { font-size: 0.9rem; color: var(--pro-texte); }
+    .ad-line { margin: 0; font-size: 0.82rem; color: var(--pro-texte); }
+    .ad-spark-cap { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.72rem; color: var(--pro-texte-doux); }
+    .ad-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: auto; padding-top: 0.7rem; border-top: 1px solid var(--pro-filet); font-size: 0.82rem; }
+    .ad-card-foot strong { color: var(--pro-carmin); }
+    .ad-tech { margin: 0.9rem 0 0; font-size: 0.7rem; color: var(--pro-texte-faible); }
 
-    body { background: var(--papier); color: var(--text); --ad-gutter: clamp(1.25rem, 4vw, 2.5rem); }
-
-    .ad-shell { max-width: 1180px; margin: 0 auto; }
-
-    /* ── Bandeau ─────────────────────────────────────────────────────── */
-    .ad-head { background: var(--bleu); color: #fff; }
-    .ad-head-inner {
-      max-width: 1180px; margin: 0 auto; padding: 1.4rem var(--ad-gutter);
-      display: flex; align-items: flex-end; justify-content: space-between;
-      gap: 1.25rem; flex-wrap: wrap;
-    }
-    .ad-eyebrow {
-      font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase;
-      color: var(--rose); margin-bottom: 0.5rem;
-    }
-    .ad-head h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.125rem; line-height: 1; }
-    .ad-head-actions { display: flex; gap: 0.5rem; align-items: center; font-size: 0.75rem; flex-wrap: wrap; }
-    .ad-sync { display: flex; align-items: center; gap: 0.4rem; color: rgba(255,255,255,0.8); }
-    .ad-sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #7BE0A0; flex-shrink: 0; }
-    .ad-sync-dot--off { background: #F9A825; }
-    .ad-head-actions a, .ad-head-actions button {
-      border: 1px solid rgba(255,255,255,0.28); background: none; color: #fff;
-      padding: 0.45rem 0.8rem; font-family: inherit; font-size: 0.75rem; cursor: pointer;
-      transition: background var(--transition);
-    }
-    .ad-head-actions a:hover, .ad-head-actions button:hover { background: rgba(255,255,255,0.14); color: #fff; }
-
-    .ad-page { padding: 1.6rem var(--ad-gutter) 2.5rem; }
-
-    /* ── Chiffres d'inventaire ───────────────────────────────────────── */
-    .ad-stats { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0.875rem; margin-bottom: 0.875rem; }
-    .ad-stat-total { background: var(--encre); color: #fff; padding: 1.25rem 1.375rem; }
-    .ad-stat-label {
-      font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: rgba(255,255,255,0.6); margin-bottom: 0.6rem;
-    }
-    .ad-stat-total .ad-stat-value {
-      font-family: var(--font-display); font-weight: 700; font-size: 2.875rem; line-height: 1;
-    }
-    .ad-stat-row { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
-    .ad-stat-note { font-size: 0.72rem; color: rgba(255,255,255,0.6); margin-top: 0.6rem; }
-    .ad-stat-card { background: #fff; border: 1px solid #E3DED4; padding: 1.25rem 1.375rem; }
-    .ad-stat-card .ad-stat-label { color: var(--text-light); }
-    .ad-stat-card .ad-stat-value {
-      font-family: var(--font-display); font-weight: 700; font-size: 2rem; line-height: 1; color: var(--bleu);
-    }
-    .ad-stat-card .ad-delta { display: block; margin-top: 0.6rem; }
-    .ad-delta { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.5rem; }
-    .ad-delta--up { background: #7BE0A0; color: var(--encre); }
-    .ad-delta--down { background: #FBE3E6; color: #A0182F; }
-    .ad-delta--flat { background: transparent; color: #8A8A99; padding-left: 0; }
-
-    /* ── Avancement du récolement ────────────────────────────────────── */
-    .ad-progress { background: #fff; border: 1px solid #E3DED4; padding: 1.25rem 1.375rem; margin-bottom: 1.6rem; }
-    .ad-progress-head {
-      display: flex; align-items: baseline; justify-content: space-between;
-      gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap;
-    }
-    .ad-progress-title {
-      font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-light);
-    }
-    .ad-progress-sub { font-size: 0.75rem; color: #8A8A99; }
-    .ad-bar { display: flex; height: 14px; overflow: hidden; background: var(--papier-ombre); }
-    .ad-bar span { display: block; height: 100%; }
-    .ad-legend {
-      display: flex; gap: 1.4rem; margin-top: 0.75rem; flex-wrap: wrap;
-      font-size: 0.78rem; color: var(--text);
-    }
-    .ad-legend span.ad-legend-item { display: flex; align-items: center; gap: 0.45rem; }
-    .ad-swatch { width: 9px; height: 9px; flex-shrink: 0; }
-    .ad-legend strong { color: var(--encre); }
-    .ad-legend em { color: #9A9AA8; font-style: normal; }
-
-    /* ── Outils ──────────────────────────────────────────────────────── */
-    .ad-hero-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.875rem; margin-bottom: 1.6rem; }
-    .ad-hero-tool {
-      background: var(--encre); color: #fff; padding: 1.4rem 1.375rem 1.25rem;
-      display: flex; flex-direction: column; gap: 0.75rem; min-height: 13.25rem;
-      transition: transform var(--transition), box-shadow var(--transition);
-    }
-    .ad-hero-tool:hover {
-      color: #fff; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(20,24,63,0.22);
-    }
-    .ad-hero-icon {
-      width: 44px; height: 44px; flex-shrink: 0;
-      background: var(--corail); color: var(--rose);
-      display: flex; align-items: center; justify-content: center; font-size: 1.15rem;
-    }
-    .ad-hero-title { font-family: var(--font-display); font-weight: 600; font-size: 1.4rem; line-height: 1.1; }
-    .ad-hero-desc { font-size: 0.78rem; color: rgba(255,255,255,0.76); line-height: 1.6; flex: 1; }
-    .ad-hero-foot {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem;
-      padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.18);
-    }
-    .ad-hero-meta { font-size: 0.7rem; color: var(--rose); }
-    .ad-hero-open { font-size: 0.78rem; font-weight: 700; color: var(--rose); white-space: nowrap; }
-
-    .ad-section-head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.875rem; }
-    .ad-section-title {
-      font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--carmin);
-      white-space: nowrap;
-    }
-    .ad-section-rule { flex: 1; height: 1px; background: var(--trait); }
-
-    .ad-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
-    .ad-tool {
-      background: #fff; border: 1px solid #E3DED4; border-top: 3px solid var(--bleu);
-      padding: 0.95rem 1rem; color: inherit; display: block;
-      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
-    }
-    .ad-tool:hover {
-      color: inherit; box-shadow: 0 4px 14px rgba(20,24,63,0.10); transform: translateY(-2px);
-      border-top-color: var(--carmin);
-    }
-    .ad-tool-icon { display: block; font-size: 0.95rem; color: var(--bleu); margin-bottom: 0.55rem; }
-    .ad-tool-name { display: block; font-size: 0.85rem; font-weight: 700; color: var(--encre); line-height: 1.25; }
-    .ad-tool-desc { display: block; font-size: 0.72rem; color: var(--text-light); line-height: 1.5; margin-top: 0.3rem; }
-
-    .ad-foot {
-      background: var(--encre); color: rgba(255,255,255,0.7);
-      padding: 1.5rem var(--ad-gutter); font-size: 0.75rem; text-align: center;
-    }
-
-    .ad-export-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem; margin-top: 1rem; }
-    .ad-export-card { background: #fff; border: 1px solid #E3DED4; padding: 0.9rem 1rem; }
-    .ad-export-card h3 { font-size: 0.72rem; font-weight: 700; color: var(--encre); margin-bottom: 0.45rem; }
-    .ad-export-row {
-      display: flex; justify-content: space-between; gap: 0.5rem;
-      font-size: 0.72rem; color: var(--text-light); padding: 0.1rem 0;
-    }
-    .ad-export-row strong { color: var(--encre); font-weight: 600; }
-    .ad-tech { font-size: 0.7rem; color: #9A9AA8; margin-top: 0.9rem; }
-
-    @media (max-width: 60rem) {
-      .ad-stats { grid-template-columns: 1fr 1fr; }
-      .ad-hero-tools { grid-template-columns: 1fr; }
-      .ad-tools { grid-template-columns: 1fr 1fr; }
-    }
+    .ad-groups { display: flex; flex-wrap: wrap; gap: 2rem 1.5rem; }
+    .ad-group { min-width: 0; }
+    .ad-group--full { flex: 1 1 100%; }
+    .ad-group--wide { flex: 2 1 520px; }
+    .ad-group--narrow { flex: 1 1 260px; }
+    .ad-group__head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.7rem; }
+    .ad-group__title { margin: 0; font-family: var(--pro-font-display); font-weight: 600; font-size: 1.3rem; color: var(--pro-bleu); white-space: nowrap; }
+    .ad-group__count { font-size: 0.7rem; color: var(--pro-texte-doux); white-space: nowrap; }
+    .ad-group__body { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: stretch; }
+    .ad-heroes { display: flex; flex-wrap: wrap; gap: 0.75rem; min-width: 0; }
+    .ad-heroes > .pro-tile { flex: 1 1 220px; }
+    .ad-tools { display: grid; gap: 0.75rem; grid-auto-rows: 1fr; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+    .ad-group[hidden] { display: none; }
     @media (max-width: 40rem) {
-      .ad-stats { grid-template-columns: 1fr; }
-      .ad-tools { grid-template-columns: 1fr; }
+      .ad-big { font-size: 2rem; }
+      .ad-heroes, .ad-tools { flex-basis: 100% !important; }
     }
   </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
@@ -167,342 +55,692 @@
        rendu. Voir js/parent-page-height.js. -->
   <script src="js/parent-page-height.js"></script>
 </head>
-<body>
+<body class="pro">
 
-<header class="ad-head">
-  <div class="ad-head-inner">
-    <div>
-      <p class="ad-eyebrow">Espace professionnel</p>
-      <h1>Réserve &amp; magasins</h1>
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head pro-head--home">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb">Bibliothèques de Douai · Réserve patrimoniale</p>
+      <h1 class="pro-head__h1">Espace professionnel</h1>
     </div>
-    <div class="ad-head-actions">
-      <span class="ad-sync" id="ad-sync">
-        <span class="ad-sync-dot" id="ad-sync-dot" aria-hidden="true"></span>
+    <div class="pro-head__actions">
+      <label class="pro-search--head">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B6B7B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+        <input type="search" id="tool-search" aria-label="Aller à un outil" aria-keyshortcuts="/" placeholder="Aller à un outil…" autocomplete="off" aria-controls="tools-zone">
+        <span class="pro-kbd" aria-hidden="true">/</span>
+      </label>
+      <span class="pro-sync pro-sync--wait" id="ad-sync" role="status">
+        <span class="pro-sync__dot" id="ad-sync-dot" aria-hidden="true"></span>
         <span id="ad-sync-text">Synchronisation…</span>
       </span>
-      <a href="index.html">← Site public</a>
-      <button type="button" id="admin-logout">Déconnexion</button>
+      <a class="pro-btn pro-btn--ghost" href="index.html">← Site public</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="admin-logout">Déconnexion</button>
     </div>
   </div>
 </header>
 
-<div class="ad-shell">
-  <div class="ad-page">
+<main id="contenu" class="pro-main">
 
-    <!-- ── Chiffres d'inventaire (rapports de build) ── -->
+  <!-- ── Aujourd'hui ── -->
+  <section class="pro-wrap pro-section" aria-labelledby="h-today" style="padding-top:2rem">
+    <div class="pro-section-head">
+      <h2 class="pro-eyebrow" id="h-today">Aujourd'hui</h2>
+      <span class="pro-rule" aria-hidden="true"></span>
+      <span class="pro-section-note" id="today-date"></span>
+    </div>
+    <div class="pro-grid">
+
+      <article class="pro-card ad-today-card" aria-labelledby="t-rec">
+        <div class="ad-today-top">
+          <span class="pro-label" id="t-rec">Récolement</span>
+          <a class="pro-link" href="recolement.html">Ouvrir →</a>
+        </div>
+        <div id="today-recolement">
+          <div class="pro-skeleton" style="height:2.4rem;width:60%"></div>
+          <div class="pro-skeleton" style="height:.9rem;width:80%;margin-top:.7rem"></div>
+          <div class="pro-skeleton" style="height:3.5rem;margin-top:.7rem"></div>
+        </div>
+      </article>
+
+      <article class="pro-card ad-today-card" aria-labelledby="t-des">
+        <div class="ad-today-top">
+          <span class="pro-label" id="t-des">Désherbage</span>
+          <a class="pro-link" href="rotobib.html">Ouvrir →</a>
+        </div>
+        <div id="today-desherbage">
+          <div class="pro-skeleton" style="height:2.4rem;width:60%"></div>
+          <div class="pro-skeleton" style="height:.9rem;width:80%;margin-top:.7rem"></div>
+          <div class="pro-skeleton" style="height:12px;margin-top:.7rem"></div>
+        </div>
+      </article>
+
+      <article class="pro-card ad-today-card" aria-labelledby="t-exp">
+        <div class="ad-today-top">
+          <span class="pro-label" id="t-exp">Exports Syracuse</span>
+        </div>
+        <div id="today-exports">
+          <div class="pro-skeleton" style="height:2.4rem;width:60%"></div>
+          <div class="pro-skeleton" style="height:.9rem;width:80%;margin-top:.7rem"></div>
+          <div class="pro-skeleton" style="height:4rem;margin-top:.7rem"></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ── État des collections ── -->
+  <section class="pro-wrap pro-section" aria-labelledby="h-coll">
+    <div class="pro-section-head">
+      <h2 class="pro-eyebrow" id="h-coll">État des collections</h2>
+      <span class="pro-rule" aria-hidden="true"></span>
+      <span class="pro-section-note" id="coll-note"></span>
+    </div>
     <div id="ad-inventory">
-      <p class="ad-tech">Chargement des rapports de build…</p>
-    </div>
-
-    <!-- ── Avancement du récolement ── -->
-    <section class="ad-progress" id="ad-progress" hidden>
-      <div class="ad-progress-head">
-        <span class="ad-progress-title">Avancement du récolement — réserve</span>
-        <span class="ad-progress-sub" id="ad-progress-sub"></span>
+      <div class="pro-kpis">
+        <div class="pro-kpi pro-kpi--hero" aria-busy="true"><div class="pro-skeleton" style="height:3rem;width:50%;background:rgba(255,255,255,.2)"></div></div>
+        <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
+        <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
+        <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
       </div>
-      <div class="ad-bar" id="ad-bar"></div>
-      <div class="ad-legend" id="ad-legend"></div>
-    </section>
-
-    <!-- ── Trois outils du quotidien ── -->
-    <div class="ad-hero-tools">
-      <a href="reserve.html" class="ad-hero-tool">
-        <span class="ad-hero-icon"><i class="fa-solid fa-map" aria-hidden="true"></i></span>
-        <span class="ad-hero-title">Plan des magasins</span>
-        <span class="ad-hero-desc">Travées, colonnes, armoires et taux d'occupation de la réserve patrimoniale, de la Réserve Douaisienne et des magasins 2e/5e/6e étage, calculés d'après le récolement.</span>
-        <span class="ad-hero-foot">
-          <span class="ad-hero-meta">5 locaux couverts</span>
-          <span class="ad-hero-open">Ouvrir →</span>
-        </span>
-      </a>
-      <a href="recolement.html" class="ad-hero-tool">
-        <span class="ad-hero-icon"><i class="fa-solid fa-barcode" aria-hidden="true"></i></span>
-        <span class="ad-hero-title">Récolement</span>
-        <span class="ad-hero-desc">Scannez les codes-barres pour enregistrer la travée, la colonne et l'étage de chaque document, et compter les non-catalogués.</span>
-        <span class="ad-hero-foot">
-          <span class="ad-hero-meta" id="ad-meta-recolement">—</span>
-          <span class="ad-hero-open">Ouvrir →</span>
-        </span>
-      </a>
-      <a href="rotobib.html" class="ad-hero-tool">
-        <span class="ad-hero-icon"><i class="fa-solid fa-recycle" aria-hidden="true"></i></span>
-        <span class="ad-hero-title">Rotobib</span>
-        <span class="ad-hero-desc">Fiche, date de parution, historique de prêts, puis décision : conserver, pilon, braderie ou relocalisation. Export .txt par traitement pour le panier SIGB.</span>
-        <span class="ad-hero-foot">
-          <span class="ad-hero-meta" id="ad-meta-rotobib">—</span>
-          <span class="ad-hero-open">Ouvrir →</span>
-        </span>
-      </a>
     </div>
 
-    <!-- ── Catalogue & autres outils ── -->
-    <div class="ad-section-head">
-      <span class="ad-section-title">Catalogue &amp; autres outils</span>
-      <span class="ad-section-rule" aria-hidden="true"></span>
+    <div class="pro-card pro-card--pad" id="ad-locals" style="margin-top:.875rem" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.9rem">
+        <h3 class="pro-label" style="letter-spacing:.12em;font-size:.66rem">Récolement par local</h3>
+        <span id="ad-locals-sub" style="font-size:.75rem;color:var(--pro-texte-doux)"></span>
+      </div>
+      <div id="ad-locals-chart"></div>
+      <div class="pro-prog" id="ad-locals-rows" style="margin-top:1.1rem"></div>
     </div>
-    <div class="ad-tools">
-      <a href="magasins.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-book" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Catalogue des magasins</span>
-        <span class="ad-tool-desc">Exemplaires des 2e, 5e et 6e étage (adulte et jeunesse).</span>
-      </a>
-      <a href="exemplarisation.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-tag" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Exemplarisation rapide</span>
-        <span class="ad-tool-desc">Créer un exemplaire (cote, code-barre, emplacement, photo) sans notice complète.</span>
-      </a>
-      <a href="reliures.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-link" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Gestion des reliures</span>
-        <span class="ad-tool-desc">Grouper les documents reliés dans un même volume, et repérer les groupes en conflit.</span>
-      </a>
-      <a href="analyse-cotes.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-ruler-combined" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Analyse des cotes</span>
-        <span class="ad-tool-desc">Trous, disponibilités et doublons de cotes.</span>
-      </a>
-      <a href="transfert-magasins.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-box" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Transfert 2e étage</span>
-        <span class="ad-tool-desc">Registre papier, puis exemplarisation une fois le livre retrouvé.</span>
-      </a>
-      <a href="validation-desherbage.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Validation du désherbage</span>
-        <span class="ad-tool-desc">Décisions de Rotobib rayon par rayon, en direct : valider, proposer autre chose, commenter.</span>
-      </a>
-      <a href="desherbage-stats.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-chart-column" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Statistiques de prêt</span>
-        <span class="ad-tool-desc">Prêts par année, répartition par usage, liste triable.</span>
-      </a>
-      <a href="livres-spolies.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Livres spoliés</span>
-        <span class="ad-tool-desc">Recherche croisée et suivi des restitutions.</span>
-      </a>
-      <a href="scan-docs.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-crop-simple" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">ScanDocs</span>
-        <span class="ad-tool-desc">Rognage et renommage des images numérisées.</span>
-      </a>
+    <p class="ad-tech" id="ad-tech" hidden></p>
+  </section>
+
+  <!-- ── Outils ── -->
+  <section class="pro-wrap pro-section" aria-labelledby="h-tools" id="tools-zone">
+    <div class="pro-section-head" style="margin-bottom:1.1rem">
+      <h2 class="pro-eyebrow" id="h-tools">Outils</h2>
+      <span class="pro-rule" aria-hidden="true"></span>
+      <span class="pro-section-note">Regroupés par métier</span>
+    </div>
+    <p class="pro-sr" id="tools-count" role="status"></p>
+
+    <div class="ad-groups" id="ad-groups">
+
+      <!-- Récolement & localisation -->
+      <div class="ad-group ad-group--full" data-group="Récolement et localisation">
+        <div class="ad-group__head">
+          <h3 class="ad-group__title">Récolement &amp; localisation</h3>
+          <span class="pro-rule" aria-hidden="true"></span>
+          <span class="ad-group__count">5 outils</span>
+        </div>
+        <div class="ad-group__body">
+          <div class="ad-heroes" style="flex:1 1 520px">
+            <a class="pro-tile pro-tile--hero pro-on-blue" href="recolement.html" data-keywords="scanner scannette code-barre localiser travée colonne étage non catalogués">
+              <span class="pro-tile__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2 M17 3h2a2 2 0 0 1 2 2v2 M21 17v2a2 2 0 0 1-2 2h-2 M7 21H5a2 2 0 0 1-2-2v-2 M7 8v8 M11 8v8 M15 8v8 M18 8v8"/></svg></span>
+              <span class="pro-tile__name">Récolement</span>
+              <span class="pro-tile__desc">Scanner les codes-barres et localiser chaque document : travée, colonne, étage.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live" data-live="recolement"></span><span class="pro-tile__open">Ouvrir →</span></span>
+            </a>
+            <a class="pro-tile pro-tile--hero pro-on-blue" href="reserve.html" data-keywords="plan réserve travées armoires occupation emplacements magasins">
+              <span class="pro-tile__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z M9 3v16 M15 5v16"/></svg></span>
+              <span class="pro-tile__name">Plan des magasins</span>
+              <span class="pro-tile__desc">Le plan interactif des travées, avec l'occupation et l'état de chaque étagère.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live">6 locaux couverts</span><span class="pro-tile__open">Ouvrir →</span></span>
+            </a>
+          </div>
+          <div class="ad-tools" style="flex:1 1 520px">
+            <a class="pro-tile" href="reliures.html" data-keywords="reliés relié volume groupes conflit recueil">
+              <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1 M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span class="pro-tile__name">Gestion des reliures</span></span>
+              <span class="pro-tile__desc">Grouper les documents reliés dans un même volume, et repérer les groupes en conflit.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live" data-live="reliures"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+            </a>
+            <a class="pro-tile" href="exemplarisation.html" data-keywords="exemplaire créer cote code-barre photo notice catalogage">
+              <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z M7.5 7.5h.01"/></svg><span class="pro-tile__name">Exemplarisation rapide</span></span>
+              <span class="pro-tile__desc">Créer un exemplaire (cote, code-barre, emplacement, photo) sans notice complète.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live" data-live="exemplarisation"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+            </a>
+            <a class="pro-tile" href="transfert-magasins.html" data-keywords="transfert 2e étage registre papier réserve patrimoniale exemplariser">
+              <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14 M14 4l4 4-4 4 M20 16H6 M10 12l-4 4 4 4"/></svg><span class="pro-tile__name">Transfert 2e étage</span></span>
+              <span class="pro-tile__desc">Registre papier, puis exemplarisation une fois le livre retrouvé.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live" data-live="transfert"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Désherbage -->
+      <div class="ad-group ad-group--full" data-group="Désherbage">
+        <div class="ad-group__head">
+          <h3 class="ad-group__title">Désherbage</h3>
+          <span class="pro-rule" aria-hidden="true"></span>
+          <span class="ad-group__count">3 outils</span>
+        </div>
+        <div class="ad-group__body">
+          <div class="ad-heroes" style="flex:1 1 330px">
+            <a class="pro-tile pro-tile--hero pro-on-blue" href="rotobib.html" data-keywords="rotobib désherbage pilon braderie conserver relocalisation prêts statistiques">
+              <span class="pro-tile__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2 M3 12A9 9 0 0 1 18.5 5.8 M18 2v4h-4 M6 22v-4h4"/></svg></span>
+              <span class="pro-tile__name">Rotobib</span>
+              <span class="pro-tile__desc">Décider livre par livre avec les statistiques de prêt : conserver, pilon, braderie, relocalisation.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live" data-live="rotobib"></span><span class="pro-tile__open">Ouvrir →</span></span>
+            </a>
+          </div>
+          <div class="ad-tools" style="flex:2 1 520px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+            <a class="pro-tile" href="validation-desherbage.html" data-keywords="validation valider avis contre-proposition commentaire désherbage rayon">
+              <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6v3H9z M7 5H5v16h14V5h-2 M9 14l2 2 4-4"/></svg><span class="pro-tile__name">Validation du désherbage</span></span>
+              <span class="pro-tile__desc">Valider ou contre-proposer les décisions de l'équipe, par rayon.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live" data-live="validation"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+            </a>
+            <a class="pro-tile" href="desherbage-stats.html" data-keywords="statistiques prêts prêt années répartition emprunts désherbage">
+              <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10 M10 20V4 M16 20v-7 M22 20H2"/></svg><span class="pro-tile__name">Statistiques de prêt</span></span>
+              <span class="pro-tile__desc">Prêts par année et répartition sur toute la collection.</span>
+              <span class="pro-tile__foot"><span class="pro-tile__live" data-live="stats"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Catalogue -->
+      <div class="ad-group ad-group--wide" data-group="Catalogue">
+        <div class="ad-group__head">
+          <h3 class="ad-group__title">Catalogue</h3>
+          <span class="pro-rule" aria-hidden="true"></span>
+          <span class="ad-group__count">4 outils</span>
+        </div>
+        <div class="ad-tools" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+          <a class="pro-tile" href="magasins.html" data-keywords="catalogue magasins exemplaires 2e 5e 6e étage adulte jeunesse">
+            <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v16H4z M12 4h4v16h-4z M18 5l3 .8-3.4 14.3-2.6-.6"/></svg><span class="pro-tile__name">Catalogue des magasins</span></span>
+            <span class="pro-tile__desc">Exemplaires des 2e, 5e et 6e étage (adulte et jeunesse).</span>
+            <span class="pro-tile__foot"><span class="pro-tile__live" data-live="magasins"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+          </a>
+          <a class="pro-tile" href="cotes-numeriques.html" data-keywords="cotes numériques 5 chiffres 6 chiffres panier SIGB export codes-barres">
+            <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h14 M5 15h14 M10 3L8 21 M16 3l-2 18"/></svg><span class="pro-tile__name">Cotes numériques</span></span>
+            <span class="pro-tile__desc">Repérer les cotes à 5 ou 6 chiffres, exporter les codes-barres.</span>
+            <span class="pro-tile__foot"><span class="pro-tile__live" data-live="cotesnum"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+          </a>
+          <a class="pro-tile" href="analyse-cotes.html" data-keywords="analyse cotes trous doublons disponibilités">
+            <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg><span class="pro-tile__name">Analyse des cotes</span></span>
+            <span class="pro-tile__desc">Trous, doublons et disponibilités dans les cotes.</span>
+            <span class="pro-tile__foot"><span class="pro-tile__live"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+          </a>
+          <a class="pro-tile" href="livres-spolies.html" data-keywords="livres spoliés restitutions recherche croisée suivi">
+            <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4"/></svg><span class="pro-tile__name">Livres spoliés</span></span>
+            <span class="pro-tile__desc">Recherche croisée et suivi des restitutions.</span>
+            <span class="pro-tile__foot"><span class="pro-tile__live"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Numérisation -->
+      <div class="ad-group ad-group--narrow" data-group="Numérisation">
+        <div class="ad-group__head">
+          <h3 class="ad-group__title">Numérisation</h3>
+          <span class="pro-rule" aria-hidden="true"></span>
+          <span class="ad-group__count">1 outil</span>
+        </div>
+        <div class="ad-tools" style="grid-template-columns:1fr">
+          <a class="pro-tile" href="scan-docs.html" data-keywords="scandocs scan rognage renommage images numérisées zxing">
+            <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14 M2 6h14a2 2 0 0 1 2 2v14"/></svg><span class="pro-tile__name">ScanDocs</span></span>
+            <span class="pro-tile__desc">Rognage et renommage des images numérisées.</span>
+            <span class="pro-tile__foot"><span class="pro-tile__live"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Expositions -->
+      <div class="ad-group ad-group--narrow" data-group="Expositions">
+        <div class="ad-group__head">
+          <h3 class="ad-group__title">Expositions</h3>
+          <span class="pro-rule" aria-hidden="true"></span>
+          <span class="ad-group__count">2 outils</span>
+        </div>
+        <div class="ad-tools" style="grid-template-columns:1fr">
+          <a class="pro-tile" href="voyageurs-admin.html" data-keywords="voyageurs douaisiens exposition éditeur fiches voyages tracé récits">
+            <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M8 17h6a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h6"/></svg><span class="pro-tile__name">Voyageurs douaisiens</span></span>
+            <span class="pro-tile__desc">Fiches des voyageurs, tracé des voyages sur la carte, étapes et récits.</span>
+            <span class="pro-tile__foot"><span class="pro-tile__live"></span><span class="pro-tile__go" aria-hidden="true">→</span></span>
+          </a>
+          <a class="pro-tile" href="voyageurs.html" target="_blank" rel="noopener" data-keywords="voyageurs aperçu exposition globe préparation">
+            <span class="pro-tile__head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18 M12 3c-3 3-3 15 0 18"/></svg><span class="pro-tile__name">Aperçu de l'exposition ↗</span></span>
+            <span class="pro-tile__desc">En préparation : visible depuis l'espace pro uniquement, pas encore publiée sur le site.</span>
+            <span class="pro-tile__foot"><span class="pro-tile__live"></span><span class="pro-tile__go" aria-hidden="true">↗</span></span>
+          </a>
+        </div>
+      </div>
+
     </div>
 
-    <!-- ── Expositions ── -->
-    <div class="ad-section-head" style="margin-top:1.6rem">
-      <span class="ad-section-title">Expositions</span>
-      <span class="ad-section-rule" aria-hidden="true"></span>
+    <div class="pro-empty" id="tools-empty" hidden style="margin-top:1rem">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+      <div class="pro-empty__title">Aucun outil ne correspond</div>
+      <div class="pro-empty__text" id="tools-empty-text"></div>
+      <button type="button" class="pro-btn pro-btn--secondary" id="tools-clear">Effacer la recherche</button>
     </div>
-    <div class="ad-tools">
-      <a href="voyageurs-admin.html" class="ad-tool">
-        <span class="ad-tool-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Voyageurs douaisiens</span>
-        <span class="ad-tool-desc">Fiches des voyageurs, tracé des voyages sur la carte, étapes et récits.</span>
-      </a>
-      <a href="voyageurs.html" class="ad-tool" target="_blank" rel="noopener">
-        <span class="ad-tool-icon"><i class="fa-solid fa-earth-europe" aria-hidden="true"></i></span>
-        <span class="ad-tool-name">Aperçu de l'exposition ↗</span>
-        <span class="ad-tool-desc">En préparation : visible depuis l'espace pro uniquement, pas encore publiée sur le site.</span>
-      </a>
-    </div>
+  </section>
 
+</main>
+
+<footer class="pro-foot">
+  <div class="pro-foot__inner">
+    <span>Réserve patrimoniale · Bibliothèques de Douai-Cuincy · Espace réservé à l'équipe</span>
+    <span style="display:flex;flex-wrap:wrap;gap:.4rem 1.25rem">
+      <span id="foot-export"></span>
+      <a href="index.html">Site public</a>
+      <a href="inventaire.html">Inventaire</a>
+    </span>
   </div>
-</div>
-
-<footer class="ad-foot">
-  <p>Bibliothèques de Douai — Réserve patrimoniale</p>
 </footer>
 
+<!-- Kit commun des outils pro : chargé sans « defer » pour être disponible
+     au script de la page, juste en dessous. -->
+<script src="js/admin-ui.js"></script>
+<script src="js/admin-charts.js"></script>
 <script>
-(function() {
-  if (localStorage.getItem('rp_admin_auth') !== '1') {
-    window.location.href = 'index.html';
-    return;
-  }
+(function () {
+  'use strict';
 
-  document.getElementById('admin-logout').addEventListener('click', function() {
+  var ui = window.rpUI, charts = window.rpCharts, fmt = ui.fmt, esc = ui.esc;
+
+  function $(id) { return document.getElementById(id); }
+  function getJson(path) {
+    return fetch(path).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // ══ Déconnexion ═══════════════════════════════════════════════════════
+  $('admin-logout').addEventListener('click', function () {
     localStorage.removeItem('rp_admin_auth');
     localStorage.removeItem('rp_admin_token');
     window.location.href = 'index.html';
   });
 
-  function fetchJsonOrNull(path) {
-    return fetch(path)
-      .then(function(res) { return res.ok ? res.json() : null; })
-      .catch(function() { return null; });
+  $('today-date').textContent = cap(new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  }));
+
+  charts.attachTooltips(document.body);
+
+  // ══ Indicateur de synchronisation ═════════════════════════════════════
+  /* Files d'attente hors ligne de toutes les pages (clés rp_*_pending_sync) :
+     ce qui n'est pas encore parti vers l'état partagé. */
+  function pendingCount() {
+    var n = 0;
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (/^rp_.*_pending_sync$/.test(k)) {
+          var v = JSON.parse(localStorage.getItem(k));
+          if (Array.isArray(v)) n += v.length;
+        }
+      }
+    } catch (e) { /* stockage illisible : on n'affiche pas de compte */ }
+    return n;
   }
 
-  function formatDate(iso) {
-    return iso ? new Date(iso).toLocaleString('fr-FR') : '—';
+  function setSync(mode, text) {
+    var box = $('ad-sync');
+    box.classList.toggle('pro-sync--off', mode === 'off');
+    box.classList.toggle('pro-sync--wait', mode === 'wait');
+    $('ad-sync-text').textContent = text;
   }
 
-  function nf(n) { return n != null ? n.toLocaleString('fr-FR') : '—'; }
-
-  function deltaBadge(current, previous) {
-    if (current == null || previous == null) return '';
-    var diff = current - previous;
-    if (diff === 0) return '<span class="ad-delta ad-delta--flat">= inchangé</span>';
-    var cls = diff > 0 ? 'ad-delta--up' : 'ad-delta--down';
-    var sign = diff > 0 ? '+' : '';
-    return '<span class="ad-delta ' + cls + '">' + sign + nf(diff) + '</span>';
+  // ══ Tuiles : pied « données vivantes » ════════════════════════════════
+  function setLive(key, text, alert) {
+    var els = document.querySelectorAll('[data-live="' + key + '"]');
+    for (var i = 0; i < els.length; i++) {
+      els[i].classList.toggle('is-alert', !!alert);
+      els[i].innerHTML = (alert ? ui.icon('warn', { size: 14, stroke: 2.4 }) : '') + '<span>' + esc(text) + '</span>';
+    }
   }
 
-  // ══ Chiffres d'inventaire (identiques à avant : rapports de build) ══
-  Promise.all([
-    fetchJsonOrNull('data/build-report.json'),
-    fetchJsonOrNull('data/build-report-previous.json'),
-    fetchJsonOrNull('data/magasins-build-report.json'),
-    fetchJsonOrNull('data/magasins-build-report-previous.json'),
-  ]).then(function(results) {
-    var current = results[0], previous = results[1];
-    var magCurrent = results[2], magPrevious = results[3];
+  // ══ Locaux physiques d'après le préfixe de travée ═════════════════════
+  var LOCALS = {
+    patri:  { name: 'Réserve patrimoniale',   color: '#2A3CD4' },
+    douai:  { name: 'Réserve Douaisienne',    color: '#0f9d8a' },
+    m25:    { name: 'Magasins 2e + 5e étage', color: '#1A1E99' },
+    m6:     { name: 'Magasin 6e étage',       color: '#7F8BE8' },
+    rayons: { name: 'Rayons (libre accès)',   color: '#F44E62' },
+    hors:   { name: 'Hors réserve',           color: '#6B6B7B' }
+  };
+  function localOf(t) {
+    t = String(t || '');
+    if (/^RD-/.test(t)) return 'douai';
+    if (/^M[25]-/.test(t)) return 'm25';
+    if (/^M6-/.test(t)) return 'm6';
+    if (/^RY-/.test(t)) return 'rayons';
+    if (/^HORS-/.test(t)) return 'hors';
+    return 'patri';
+  }
+  function placeOf(scan, rayons) {
+    var t = String(scan.travee || '');
+    if (/^RY-/.test(t)) {
+      var r = null;
+      for (var i = 0; i < rayons.length; i++) if (rayons[i].id === t) r = rayons[i];
+      return r ? 'Rayon « ' + r.label + ' »' : 'Rayon en libre accès';
+    }
+    if (/^HORS-/.test(t)) return 'Hors réserve';
+    var name = /^RD-/.test(t) ? 'Réserve Douaisienne'
+      : /^M2-/.test(t) ? 'Magasin 2e étage' : /^M5-/.test(t) ? 'Magasin 5e étage'
+      : /^M6-/.test(t) ? 'Magasin 6e étage' : 'Réserve patrimoniale';
+    return name + ', travée ' + t.replace(/^(RD|M2|M5|M6)-/, '');
+  }
 
-    if (!current && !magCurrent) {
-      document.getElementById('ad-inventory').innerHTML =
-        '<p class="ad-tech">Rapports de build indisponibles.</p>';
+  function dayKey(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+
+  // ══ Récolement : carte du jour + répartition par local ════════════════
+  var recolementPromise = getJson('/api/recolement');
+  var reports = {};
+
+  function renderRecolementToday(state) {
+    var box = $('today-recolement');
+    if (!state) {
+      box.innerHTML = '<div class="ad-bigrow"><span class="ad-big">—</span></div>' +
+        '<p class="ad-line pro-muted">État partagé indisponible : scans du jour non affichés.</p>';
       return;
     }
+    var scans = state.scans || [];
+    var rayons = (state.rayons || []).filter(function (r) { return !r.deleted; });
+    var now = new Date();
+    var counts = {}, last = null;
+    scans.forEach(function (s) {
+      if (typeof s.ts !== 'number') return;
+      var k = dayKey(s.ts);
+      counts[k] = (counts[k] || 0) + 1;
+      if (!last || s.ts > last.ts) last = s;
+    });
+    var values = [], first = null;
+    for (var i = 13; i >= 0; i--) {
+      var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      if (i === 13) first = d;
+      values.push(counts[dayKey(d.getTime())] || 0);
+    }
+    var today = values[13];
+    var total14 = values.reduce(function (a, b) { return a + b; }, 0);
+    var lastLine = '<span class="pro-muted">Aucun scan enregistré.</span>';
+    if (last) {
+      var same = dayKey(last.ts) === dayKey(now.getTime());
+      lastLine = (same ? 'Dernier à <strong>' + fmt.time(last.ts) + '</strong>'
+        : 'Dernier le <strong>' + fmt.date(last.ts) + '</strong> à ' + fmt.time(last.ts)) +
+        ' — ' + esc(placeOf(last, rayons));
+    }
+    box.innerHTML =
+      '<div class="ad-bigrow"><span class="ad-big">' + fmt.n(today) + '</span><span class="ad-bigunit">scan' + (today > 1 ? 's' : '') + ' aujourd’hui</span></div>' +
+      '<p class="ad-line" style="margin-top:.55rem">' + lastLine + '</p>' +
+      '<div style="margin-top:.25rem">' + charts.sparkline(values, { label: 'Scans par jour sur les 14 derniers jours' }) + '</div>' +
+      '<div class="ad-spark-cap"><span>' + fmt.date(first).slice(0, 5) + '</span><span>14 derniers jours · moyenne ' + fmt.n(Math.round(total14 / 14)) + ' par jour</span><span>' + fmt.date(now).slice(0, 5) + '</span></div>';
+  }
 
-    var s = (current && current.stats) || {};
-    var sp = (previous && previous.stats) || {};
-    var ms = (magCurrent && magCurrent.stats) || {};
-    var msp = (magPrevious && magPrevious.stats) || {};
+  function renderLocals(state, current) {
+    var card = $('ad-locals');
+    if (!state) return;
+    var scans = state.scans || [];
+    var all = {}, cat = {};
+    Object.keys(LOCALS).forEach(function (k) { all[k] = 0; cat[k] = 0; });
+    scans.forEach(function (s) {
+      var k = localOf(s.travee);
+      all[k]++;
+      if (!s.manuel) cat[k]++;      // les exemplaires créés à la main ne sont pas dans le total attendu
+    });
+    var ms = (reports.mag && reports.mag.stats) || {};
+    var expected = {
+      patri: current && current.reservePatrimoniale,
+      douai: current && current.reserveDouaisienne,
+      m25: ms.byEtage && ms.byEtage['2e/5e'],
+      m6: ms.byEtage && ms.byEtage['6e']
+    };
+    var order = ['patri', 'douai', 'm25', 'm6', 'rayons', 'hors'];
+    var segs = order.filter(function (k) { return all[k] > 0; }).map(function (k) {
+      return { label: LOCALS[k].name, value: all[k], color: LOCALS[k].color };
+    });
+    $('ad-locals-chart').innerHTML = charts.stacked(segs, {
+      height: 22, decimals: 1, title: 'Répartition des ' + fmt.n(scans.length) + ' scans par local'
+    });
+    var rows = '';
+    order.forEach(function (k) {
+      if (!all[k]) return;
+      var den = expected[k];
+      var pct = den ? Math.min(1, cat[k] / den) : null;
+      rows += '<div class="pro-prog__row" style="--c:' + LOCALS[k].color + '">' +
+        '<span class="pro-prog__name"><span class="pro-prog__sw" aria-hidden="true"></span>' + esc(LOCALS[k].name) + '</span>' +
+        '<span class="pro-prog__track" role="img" aria-label="' + esc(LOCALS[k].name + ' : ' + (pct == null ? 'pas de total attendu' : fmt.pct(pct) + ' récolé')) + '"><span class="pro-prog__bar" style="width:' + (pct == null ? 0 : (pct * 100).toFixed(1)) + '%"></span></span>' +
+        '<span class="pro-prog__val"><span class="pro-prog__pct">' + (pct == null ? '—' : fmt.pct(pct)) + '</span>' +
+        '<span class="pro-prog__ratio">' + (pct == null ? fmt.n(all[k]) + ' livres · sans total attendu' : fmt.n(Math.min(cat[k], den)) + ' / ' + fmt.n(den)) + '</span></span></div>';
+    });
+    $('ad-locals-rows').innerHTML = rows;
+    $('ad-locals-sub').innerHTML = '<strong style="color:var(--pro-bleu)">' + fmt.n(scans.length) + '</strong> scans au total · mis à jour à ' + fmt.time(Date.now());
+    card.hidden = false;
+  }
 
-    var patrimoniale = s.reservePatrimoniale;
-    var douaisienne = s.reserveDouaisienne;
-    var magasins = ms.kept;
-    var reserves = (patrimoniale != null && douaisienne != null) ? patrimoniale + douaisienne : null;
+  // ══ Chiffres d'inventaire (rapports de build) ═════════════════════════
+  function delta(cur, prev, suffix) {
+    if (cur == null || prev == null) return '';
+    var diff = cur - prev;
+    if (diff === 0) return '<span class="pro-delta pro-delta--flat">= inchangé</span>';
+    return '<span class="pro-delta pro-delta--' + (diff > 0 ? 'up' : 'down') + '">' + (diff > 0 ? '+' : '') + fmt.n(diff) + (suffix || '') + '</span>';
+  }
+  function kpi(label, value, deltaHtml, note, extraClass) {
+    return '<div class="pro-kpi' + (extraClass ? ' ' + extraClass : '') + '">' +
+      '<div class="pro-kpi__label">' + esc(label) + '</div>' +
+      '<div class="pro-kpi__row"><span class="pro-kpi__value">' + value + '</span>' + (deltaHtml || '') + '</div>' +
+      (note ? '<div class="pro-kpi__note">' + esc(note) + '</div>' : '') + '</div>';
+  }
+
+  function renderInventory(rep, state) {
+    var cur = rep.build, prev = rep.buildPrev, mag = rep.mag, magPrev = rep.magPrev, des = rep.des;
+    if (!cur && !mag) {
+      $('ad-inventory').innerHTML = '<p class="ad-tech" style="margin:0">Rapports de build indisponibles.</p>';
+      return;
+    }
+    var s = (cur && cur.stats) || {}, sp = (prev && prev.stats) || {};
+    var ms = (mag && mag.stats) || {}, msp = (magPrev && magPrev.stats) || {};
+    var patri = s.reservePatrimoniale, douai = s.reserveDouaisienne;
+    var reserves = (patri != null && douai != null) ? patri + douai : null;
+    var reservesPrev = (sp.reservePatrimoniale != null && sp.reserveDouaisienne != null) ? sp.reservePatrimoniale + sp.reserveDouaisienne : null;
     var total = ms.keptTotalDouai;
 
-    var patrimonialePrev = sp.reservePatrimoniale;
-    var douaisiennePrev = sp.reserveDouaisienne;
-    var magasinsPrev = msp.kept;
-    var reservesPrev = (patrimonialePrev != null && douaisiennePrev != null)
-      ? patrimonialePrev + douaisiennePrev : null;
-    var totalPrev = msp.keptTotalDouai;
+    var heroNote = (des && des.stats && des.stats.withLoanData != null)
+      ? 'dont ' + fmt.n(des.stats.withLoanData) + ' empruntés au moins une fois sur 4 ans'
+      : 'Export complet de la bibliothèque · ' + fmt.date(mag && mag.generatedAt);
+    var rayonsActifs = state ? (state.rayons || []).filter(function (r) { return !r.deleted; }).length : null;
+    var rayonsLivres = state ? (state.scans || []).filter(function (x) { return /^RY-/.test(String(x.travee || '')); }).length : null;
 
-    var html = '<div class="ad-stats">';
-
-    html += '<div class="ad-stat-total">' +
-      '<div class="ad-stat-label">Documents au total</div>' +
-      '<div class="ad-stat-row">' +
-        '<span class="ad-stat-value">' + nf(total) + '</span>' +
-        deltaBadge(total, totalPrev) +
-      '</div>' +
-      '<div class="ad-stat-note">Export complet de la bibliothèque · ' +
-        formatDate(magCurrent && magCurrent.generatedAt) + '</div>' +
+    var html = '<div class="pro-kpis">' +
+      kpi('Exemplaires de la bibliothèque', fmt.n(total), delta(total, msp.keptTotalDouai, ' depuis l’export précédent'), heroNote, 'pro-kpi--hero') +
+      kpi('Magasins 2e / 5e / 6e', fmt.n(ms.kept), delta(ms.kept, msp.kept),
+        'adulte et jeunesse' + (ms.kept != null && total ? ' · ' + fmt.pct(ms.kept / total) + ' de la bibliothèque' : '')) +
+      kpi('Réserves', fmt.n(reserves), delta(reserves, reservesPrev),
+        'notices' + (patri != null ? ' · patrimoniale ' + fmt.n(patri) + ', Douaisienne ' + fmt.n(douai) : '')) +
+      kpi('Rayons en libre accès', fmt.n(rayonsActifs), '',
+        rayonsActifs == null ? 'état partagé indisponible' : 'rayons créés dans le récolement · ' + fmt.n(rayonsLivres) + ' livres scannés') +
       '</div>';
-
-    html += statCard('Magasins 2e/5e/6e', magasins, magasinsPrev);
-    html += statCard('Réserves patrimoniale + Douaisienne', reserves, reservesPrev);
-    html += '</div>';
-
-    html += '<div class="ad-export-cards">';
-    html += exportCard('Réserve (patrimoniale + Douaisienne)', current, previous);
-    html += exportCard('Magasins 2e/5e/6e étage', magCurrent, magPrevious);
-    html += '</div>';
+    $('ad-inventory').innerHTML = html;
+    $('coll-note').textContent = mag && mag.generatedAt ? 'Export complet du ' + fmt.date(mag.generatedAt) : '';
 
     if (s.joinRate != null || (ms.byEtage && ms.byEtage['6e'] != null)) {
-      html += '<p class="ad-tech">Détails techniques : ' +
-        (s.joinRate != null ? 'taux de jointure réserve ' + s.joinRate + '% (' + (s.orphans || 0) + ' orphelins)' : '') +
+      var t = $('ad-tech');
+      t.textContent = 'Détails techniques : ' +
+        (s.joinRate != null ? 'taux de jointure réserve ' + s.joinRate + ' % (' + (s.orphans || 0) + ' orphelins)' : '') +
         (s.joinRate != null && ms.byEtage ? ' — ' : '') +
-        (ms.byEtage ? 'magasins : ' + nf(ms.byEtage['2e/5e'] || 0) + ' au 2e/5e étage, ' + nf(ms.byEtage['6e'] || 0) + ' au 6e étage' : '') +
-        '.</p>';
+        (ms.byEtage ? 'magasins : ' + fmt.n(ms.byEtage['2e/5e'] || 0) + ' au 2e/5e étage, ' + fmt.n(ms.byEtage['6e'] || 0) + ' au 6e étage' : '') + '.';
+      t.hidden = false;
     }
 
-    document.getElementById('ad-inventory').innerHTML = html;
+    setLive('magasins', fmt.n(ms.kept) + ' exemplaires');
+    setLive('stats', des && des.stats && des.stats.kept != null ? fmt.n(des.stats.kept) + ' exemplaires' : '—');
+    if (s.reliureGroups != null) setLive('reliures', fmt.n(s.reliureGroups) + ' groupes Syracuse');
+    if (mag && mag.generatedAt) $('foot-export').textContent = 'Export Syracuse du ' + fmt.date(mag.generatedAt);
+  }
 
-    /* Le dénominateur de la barre d'avancement, c'est le nombre de notices de
-       la réserve — il vient du même rapport de build. */
-    loadRecolement(s.notices);
+  // ══ Carte « Exports Syracuse » ════════════════════════════════════════
+  function renderExports(rep) {
+    var rows = [
+      ['Réserve (notices et exemplaires)', rep.build, rep.buildPrev],
+      ['Bibliothèque complète (bib.xml)', rep.mag, rep.magPrev],
+      ['Statistiques de prêt', rep.des, rep.desPrev]
+    ].filter(function (r) { return r[1] && r[1].generatedAt; });
+    var box = $('today-exports');
+    if (!rows.length) {
+      box.innerHTML = '<div class="ad-bigrow"><span class="ad-big">—</span></div><p class="ad-line pro-muted">Rapports de build indisponibles.</p>';
+      return;
+    }
+    var main = rep.mag && rep.mag.generatedAt ? rep.mag : rows[0][1];
+    var html = '<div class="ad-bigrow"><span class="ad-big" style="font-size:2rem">' + fmt.date(main.generatedAt) + '</span></div>' +
+      '<p class="ad-line" style="margin-top:.55rem">dernier export complet · ' + fmt.ago(main.generatedAt) + '</p>' +
+      '<div style="margin-top:.35rem">';
+    rows.forEach(function (r) {
+      html += '<div class="pro-kv"><span>' + esc(r[0]) + '</span><strong>' + fmt.date(r[1].generatedAt) +
+        '<small>' + (r[2] && r[2].generatedAt ? 'précédent ' + fmt.date(r[2].generatedAt) : 'pas d’export précédent') + '</small></strong></div>';
+    });
+    box.innerHTML = html + '</div>';
+  }
+
+  // ══ Désherbage : carte du jour, avis à donner, tuile Rotobib ══════════
+  function renderDesherbage(state) {
+    var box = $('today-desherbage');
+    if (!state) {
+      box.innerHTML = '<div class="ad-bigrow"><span class="ad-big">—</span></div><p class="ad-line pro-muted">Décisions indisponibles.</p>';
+      setLive('rotobib', '—');
+      setLive('validation', '—');
+      return;
+    }
+    var list = Object.keys(state).map(function (k) { return state[k]; });
+    var n = list.length;
+    var by = { conserver: 0, braderie: 0, relocalisation: 0, pilon: 0 };
+    var last = 0, aDonner = 0;
+    list.forEach(function (d) {
+      if (by[d.statut] != null) by[d.statut]++;
+      var t = d.ts ? new Date(d.ts).getTime() : 0;
+      if (t > last) last = t;
+      var v = d.validation;
+      if (!v || !v.avis || (v.statutVu && v.statutVu !== d.statut)) aDonner++;
+    });
+    var segs = ['conserver', 'braderie', 'relocalisation', 'pilon'].map(function (k) {
+      return { label: charts.DECISION[k].label, value: by[k], color: charts.DECISION[k].color, ink: charts.DECISION[k].ink };
+    });
+    box.innerHTML =
+      '<div class="ad-bigrow"><span class="ad-big">' + fmt.n(n) + '</span><span class="ad-bigunit">livre' + (n > 1 ? 's' : '') + ' décidé' + (n > 1 ? 's' : '') + '</span></div>' +
+      '<p class="ad-line" style="margin-top:.55rem">' + (last ? 'Dernière décision <strong>' + fmt.ago(last) + '</strong>' : 'Aucune décision enregistrée.') + '</p>' +
+      (n ? '<div style="margin-top:.35rem">' + charts.stacked(segs, { height: 12, decimals: 0, legend: 'inline', title: 'Décisions de désherbage' }) + '</div>' : '') +
+      '<div class="ad-card-foot">' + (aDonner
+        ? '<span><strong>' + fmt.n(aDonner) + ' avis</strong> à donner</span><a class="pro-link" href="validation-desherbage.html">Donner mon avis →</a>'
+        : '<span>Aucun avis en attente</span><a class="pro-link" href="validation-desherbage.html">Voir la validation →</a>') + '</div>';
+    setLive('rotobib', fmt.n(n) + ' décision' + (n > 1 ? 's' : '') + ' enregistrée' + (n > 1 ? 's' : ''));
+    setLive('validation', aDonner ? fmt.n(aDonner) + ' avis à donner' : 'Aucun avis en attente', aDonner > 0);
+  }
+
+  // ══ Chargements ═══════════════════════════════════════════════════════
+  Promise.all([
+    getJson('data/build-report.json'),
+    getJson('data/build-report-previous.json'),
+    getJson('data/magasins-build-report.json'),
+    getJson('data/magasins-build-report-previous.json'),
+    getJson('data/desherbage-build-report.json'),
+    getJson('data/desherbage-build-report-previous.json'),
+    recolementPromise
+  ]).then(function (r) {
+    reports = { build: r[0], buildPrev: r[1], mag: r[2], magPrev: r[3], des: r[4], desPrev: r[5] };
+    var state = r[6];
+
+    if (!state) {
+      setSync('off', 'État partagé indisponible');
+      ui.toast({ title: 'État partagé indisponible.', text: 'Les chiffres du récolement ne sont pas affichés.' }, { type: 'warn', timeout: 8000 });
+    } else {
+      var p = pendingCount();
+      setSync(p > 0 ? 'off' : 'ok', 'Synchronisé · ' + fmt.time(Date.now()) + ' · ' + fmt.n(p) + ' en attente');
+      setLive('recolement', fmt.n((state.scans || []).length) + ' scans enregistrés');
+    }
+    renderRecolementToday(state);
+    renderInventory(reports, state);
+    renderExports(reports);
+    renderLocals(state, reports.build && reports.build.stats);
   });
 
-  function statCard(label, value, previousValue) {
-    return '<div class="ad-stat-card">' +
-      '<div class="ad-stat-label">' + label + '</div>' +
-      '<div class="ad-stat-value">' + nf(value) + '</div>' +
-      deltaBadge(value, previousValue) +
-      '</div>';
+  getJson('/api/desherbage').then(renderDesherbage);
+
+  getJson('data/cotes-numeriques-build-report.json').then(function (rep) {
+    var n = rep && rep.stats && rep.stats.kept;
+    if (n != null) setLive('cotesnum', fmt.n(n) + ' cotes repérées');
+  });
+
+  getJson('/api/exemplaires-manuels').then(function (st) {
+    if (!st) return;
+    var list = Object.keys(st).map(function (k) { return st[k]; });
+    var week = Date.now() - 7 * 86400000;
+    var recent = list.filter(function (e) { return typeof e.ts === 'number' && e.ts >= week; }).length;
+    setLive('exemplarisation', fmt.n(list.length) + ' créé' + (list.length > 1 ? 's' : '') + (recent ? ' · ' + fmt.n(recent) + ' cette semaine' : ''));
+  });
+
+  getJson('/api/transferts').then(function (st) {
+    if (!st) return;
+    var pending = Object.keys(st).filter(function (k) { return st[k] && st[k].status === 'pending'; }).length;
+    setLive('transfert', fmt.n(pending) + ' en attente');
+  });
+
+  getJson('/api/reliures-manuelles').then(function (st) {
+    if (!st) return;
+    var groups = st.groups || st;
+    var n = Object.keys(groups).length;
+    var el = document.querySelector('[data-live="reliures"] span');
+    if (el && n) el.textContent += ' · ' + fmt.n(n) + ' manuel' + (n > 1 ? 's' : '');
+  });
+
+  // ══ « Aller à un outil… » ═════════════════════════════════════════════
+  var input = $('tool-search');
+  var tiles = Array.prototype.slice.call(document.querySelectorAll('.pro-tile'));
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.ad-group'));
+  var haystacks = tiles.map(function (t) {
+    var g = t.closest('.ad-group');
+    return norm(t.textContent + ' ' + (t.getAttribute('data-keywords') || '') + ' ' + (g ? g.getAttribute('data-group') : ''));
+  });
+
+  function norm(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ');
   }
 
-  function exportCard(label, current, previous) {
-    return '<div class="ad-export-card">' +
-      '<h3>' + label + '</h3>' +
-      '<div class="ad-export-row"><span>Export Syracuse actuel</span><strong>' + formatDate(current && current.generatedAt) + '</strong></div>' +
-      '<div class="ad-export-row"><span>Export précédent</span><strong>' + formatDate(previous && previous.generatedAt) + '</strong></div>' +
-      '</div>';
+  function filterTools() {
+    var q = norm(input.value).trim();
+    var words = q ? q.split(' ') : [];
+    var shown = 0;
+    tiles.forEach(function (t, i) {
+      var ok = words.every(function (w) { return haystacks[i].indexOf(w) >= 0; });
+      t.hidden = !ok;
+      if (ok) shown++;
+    });
+    groups.forEach(function (g) {
+      g.hidden = !g.querySelector('.pro-tile:not([hidden])');
+    });
+    $('tools-empty').hidden = shown > 0;
+    $('tools-empty-text').textContent = shown ? '' : 'Aucun résultat pour « ' + input.value.trim() + ' ».';
+    $('tools-count').textContent = q ? shown + ' outil' + (shown > 1 ? 's' : '') + ' affiché' + (shown > 1 ? 's' : '') : '';
   }
 
-  // ══ Avancement du récolement ══════════════════════════════════════════
-  /* Deux segments seulement — « récolées » et « jamais récolées » — là où la
-     planche 2b en montrait trois. Le troisième (« à cataloguer ») ne
-     correspond à aucune donnée réelle : les estimations `nonCatalogues` du
-     récolement comptent des documents qui, par définition, ne sont PAS dans le
-     catalogue, donc pas dans le dénominateur. Les additionner aurait produit un
-     pourcentage faux sur un tableau de bord que l'équipe lit comme une source
-     de vérité. Voir « Statistiques avancées » de recolement.html pour le
-     détail par catégorie. */
-  function setSync(ok, text) {
-    document.getElementById('ad-sync-dot').classList.toggle('ad-sync-dot--off', !ok);
-    document.getElementById('ad-sync-text').textContent = text;
-  }
+  input.addEventListener('input', filterTools);
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') {
+      var first = tiles.filter(function (t) { return !t.hidden; })[0];
+      if (!first) return;
+      ev.preventDefault();
+      if (first.target === '_blank') window.open(first.href, '_blank', 'noopener');
+      else window.location.href = first.href;
+    } else if (ev.key === 'Escape' && input.value) {
+      input.value = '';
+      filterTools();
+    }
+  });
+  $('tools-clear').addEventListener('click', function () { input.value = ''; filterTools(); input.focus(); });
 
-  function isMagasinTravee(t) {
-    return /^M[256]-/.test(String(t || ''));
-  }
-
-  function loadRecolement(noticesReserve) {
-    fetch('/api/recolement')
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(state) {
-        if (!state) { setSync(false, 'État partagé indisponible'); return; }
-
-        var scans = state.scans || [];
-        var reserveBarcodes = new Set();
-        scans.forEach(function(s) {
-          if (!isMagasinTravee(s.travee)) reserveBarcodes.add(s.barcode);
-        });
-
-        setSync(true, 'Synchronisé · ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
-        document.getElementById('ad-meta-recolement').textContent =
-          nf(scans.length) + ' scans enregistrés';
-
-        if (noticesReserve == null || !noticesReserve) return;
-
-        var done = Math.min(reserveBarcodes.size, noticesReserve);
-        var rest = noticesReserve - done;
-        var pct = Math.round(100 * done / noticesReserve);
-
-        document.getElementById('ad-progress-sub').textContent =
-          nf(noticesReserve) + ' notices de réserve';
-        document.getElementById('ad-bar').innerHTML =
-          '<span style="width:' + pct + '%;background:var(--bleu)"></span>' +
-          '<span style="width:' + (100 - pct) + '%;background:#D9D4C8"></span>';
-        document.getElementById('ad-legend').innerHTML =
-          legendItem('var(--bleu)', 'Récolées', done, pct) +
-          legendItem('#D9D4C8', 'Jamais récolées', rest, 100 - pct);
-        document.getElementById('ad-progress').hidden = false;
-      })
-      .catch(function() { setSync(false, 'État partagé injoignable'); });
-  }
-
-  function legendItem(color, label, n, pct) {
-    return '<span class="ad-legend-item">' +
-      '<span class="ad-swatch" style="background:' + color + '"></span>' +
-      label + ' <strong>' + nf(n) + '</strong> <em>' + pct + ' %</em>' +
-      '</span>';
-  }
-
-  // ══ Compteur Rotobib ══════════════════════════════════════════════════
-  fetch('/api/desherbage')
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(state) {
-      if (!state) return;
-      var n = Object.keys(state).length;
-      document.getElementById('ad-meta-rotobib').textContent =
-        nf(n) + ' traitement' + (n > 1 ? 's' : '') + ' enregistré' + (n > 1 ? 's' : '');
-    })
-    .catch(function() { /* le compteur reste à « — » */ });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== '/' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    var a = document.activeElement, tag = a && a.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (a && a.isContentEditable)) return;
+    ev.preventDefault();
+    input.focus();
+    input.select();
+  });
 })();
 </script>
 

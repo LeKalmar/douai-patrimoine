@@ -4,151 +4,101 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
+  <!-- Contrôle d'accès de l'espace pro -->
+  <script>
+    if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+  </script>
   <title>Cotes numériques — Réserve patrimoniale</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/admin.css">
   <script src="js/columnar.js"></script>
   <style>
-    :root { --radius-sm:4px; --radius-md:8px; --radius-lg:12px; }
-    body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--papier);margin:0;line-height:normal}
-    .page-hero{background:var(--bleu);color:#fff;padding:2.5rem 1.5rem 2rem}
-    .page-hero .container{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-    .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.75rem;letter-spacing:.04em}
-    .breadcrumb a{color:rgba(255,255,255,0.7);text-decoration:none}
-    .breadcrumb a:hover{color:#fff}
-    .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:400;margin:0 0 .5rem;line-height:1.15}
-    .page-lead{font-size:.9rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
-    .hero-actions a{font-family:inherit;font-size:.82rem;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s}
-    .hero-actions a:hover{background:rgba(255,255,255,0.2);color:#fff}
-    .container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
-
-    .mg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;margin:1.5rem 0}
-    .mstat{background:#fff;border:1px solid #E3DED4;border-radius:8px;padding:.75rem .9rem}
-    .mstat-lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);margin-bottom:.25rem}
-    .mstat-val{font-family:'Moret','DM Serif Display',serif;font-size:1.5rem;line-height:1;color:var(--bleu)}
-
-    .mg-toolbar{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;padding:.85rem 1rem;background:var(--papier-ombre);border:1px solid var(--trait);border-radius:8px}
-    .mg-search{display:flex;align-items:center;gap:.4rem;background:#fff;border:1px solid var(--trait-fort);border-radius:6px;padding:.4rem .7rem;flex:1;min-width:220px}
-    .mg-search input{border:none;outline:none;font-size:.85rem;background:transparent;width:100%;font-family:inherit;color:var(--text)}
-    .mg-select{font-family:inherit;font-size:.8rem;border:1px solid var(--trait-fort);border-radius:6px;padding:.4rem .6rem;background:#fff;color:var(--text);cursor:pointer}
-    .mg-count{font-size:.78rem;color:var(--text-light);white-space:nowrap}
-    .mg-export-btn{font-family:inherit;font-size:.8rem;padding:.45rem .8rem;border:1px solid var(--encre);border-radius:6px;background:var(--encre);color:#fff;cursor:pointer;white-space:nowrap}
-    .mg-export-btn:hover{background:var(--bleu);border-color:var(--bleu)}
-    .mg-export-btn-secondary{background:#fff;color:var(--encre)}
-    .mg-export-btn-secondary:hover{background:var(--papier-ombre)}
-
-    .mg-table-wrap{border:1px solid #E3DED4;border-radius:8px;overflow:hidden}
-    table.mg-table{width:100%;border-collapse:collapse;font-size:.82rem}
-    .mg-table th{position:sticky;top:0;background:#fff;padding:.5rem .75rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);border-bottom:1px solid var(--trait);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
-    .mg-table th:hover{color:var(--bleu)}
-    .mg-table th .arrow{font-size:.65rem;margin-left:.2rem;color:var(--carmin)}
-    .mg-table td{padding:.45rem .75rem;border-bottom:1px solid #F0ECE3;vertical-align:top}
-    .mg-table tr:last-child td{border-bottom:none}
-    .mg-table tr:hover td{background:var(--papier-ombre)}
-    .mg-cote{font-family:'DM Mono',monospace;font-weight:600;color:var(--bleu);white-space:nowrap}
-    .mg-barcode{font-family:'DM Mono',monospace;color:var(--text);white-space:nowrap}
-    .mg-meta{color:var(--text-light);font-size:.76rem;white-space:nowrap}
-    .mg-empty{padding:2rem;text-align:center;color:var(--text-light);font-size:.85rem;font-style:italic}
-
-    .mg-pagination{display:flex;align-items:center;justify-content:space-between;padding:.55rem .75rem;border-top:1px solid var(--trait);background:var(--papier-ombre);flex-wrap:wrap;gap:.5rem}
-    .pag-info{font-size:.72rem;color:var(--text-light)}
-    .pag-controls{display:flex;align-items:center;gap:.25rem}
-    .pag-btn{font-family:inherit;font-size:.72rem;padding:.2rem .55rem;border:1px solid var(--trait-fort);border-radius:5px;background:#fff;cursor:pointer;color:var(--text);transition:all .12s;min-width:28px;text-align:center;line-height:1.4}
-    .pag-btn:hover:not(:disabled){background:var(--papier-ombre);border-color:#B0A99A}
-    .pag-btn:disabled{opacity:.35;cursor:default}
-    .pag-btn.active{background:var(--encre);color:#fff;border-color:var(--encre);font-weight:600}
-    .pag-ellipsis{font-size:.72rem;color:var(--text-light);padding:0 .15rem}
-
-    footer{background:var(--encre);color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:3rem;font-size:.8rem;text-align:center}
-    footer a{color: var(--carmin);text-decoration:none}
+    /* Mise en page propre à cette page catalogue */
   </style>
-  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
-       qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
-       Chargé sans « defer » : il pose la classe .rp-embedded avant le premier
-       rendu. Voir js/parent-page-height.js. -->
+  <!-- Publication en iframe -->
   <script src="js/parent-page-height.js"></script>
+  <!-- Kit commun des outils pro -->
+  <script src="js/admin-ui.js"></script>
+  <script src="js/admin-charts.js"></script>
 </head>
-<body>
+<body class="pro">
 
-<div class="page-hero">
-  <div class="container">
-    <div>
-      <div class="breadcrumb"><a href="admin.html">Espace professionnel</a> / Cotes numériques</div>
-      <h1 class="page-title">Cotes numériques</h1>
-      <p class="page-lead">Exemplaires de l'export complet de la bibliothèque (bib.xml, toutes bibliothèques et sections de Douai confondues) dont la cote est un numéro d'enregistrement à 5 ou 6 chiffres commençant par « 1 » (ex. « 11268 », « 138678 », parfois écrites avec un point séparateur de milliers). Les cotes Dewey classiques ne sont pas retenues. La colonne Bibliothèque/Section sert à repérer une cote numérique qui traînerait hors d'un magasin — cf. <a href="data/cotes-numeriques-build-report.json" download style="color:inherit">rapport de build</a>.</p>
+<header class="pro-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace professionnel</a> › Cotes numériques</p>
+      <h1 class="pro-head__h1">Cotes numériques</h1>
     </div>
-    <div class="hero-actions">
-      <a href="admin.html">← Espace professionnel</a>
+    <div class="pro-head__actions">
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace professionnel</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="mg-logout">Déconnexion</button>
     </div>
   </div>
-</div>
+</header>
 
-<div class="container">
-  <div class="mg-stats" id="mg-stats">
-    <div class="mstat"><div class="mstat-lbl">Chargement…</div></div>
-  </div>
+<main id="contenu" class="pro-main pro-wrap">
 
-  <div class="mg-toolbar">
-    <div class="mg-search">
-      <span>🔎</span>
-      <input type="text" id="mg-search-input" placeholder="Rechercher une cote, un code-barre…">
+  <section class="pro-section">
+    <div class="pro-kpis" id="mg-stats">
+      <div class="pro-kpi pro-kpi--hero" aria-busy="true"><div class="pro-skeleton" style="height:3rem;width:50%;background:rgba(255,255,255,.2)"></div></div>
+      <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
+      <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
+      <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
+      <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
+      <div class="pro-kpi" aria-busy="true"><div class="pro-skeleton" style="height:2rem;width:50%"></div></div>
     </div>
-    <select class="mg-select" id="mg-etage-select">
+  </section>
+
+  <div class="pro-toolbar">
+    <div class="pro-search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+      <input type="text" id="mg-search-input" class="pro-input" placeholder="Rechercher une cote, un code-barre…">
+    </div>
+    <select class="pro-input" id="mg-etage-select">
       <option value="">Tous les étages</option>
       <option value="2e">2e étage</option>
       <option value="5e">5e étage</option>
     </select>
-    <select class="mg-select" id="mg-perpage">
+    <select class="pro-input" id="mg-perpage">
       <option value="25">25 / page</option>
       <option value="50" selected>50 / page</option>
       <option value="100">100 / page</option>
       <option value="200">200 / page</option>
     </select>
-    <span class="mg-count" id="mg-count"></span>
-    <button type="button" class="mg-export-btn" id="mg-export">⬇ Exporter (filtre actuel)</button>
-    <button type="button" class="mg-export-btn mg-export-btn-secondary" id="mg-export-2e">⬇ 2e étage</button>
-    <button type="button" class="mg-export-btn mg-export-btn-secondary" id="mg-export-5e">⬇ 5e étage</button>
+    <span class="pro-muted" id="mg-count"></span>
+    <button type="button" class="pro-btn pro-btn--primary pro-btn--sm" id="mg-export">Exporter la sélection (.txt)</button>
+    <button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" id="mg-export-2e">Exporter le 2e étage (.txt)</button>
+    <button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" id="mg-export-5e">Exporter le 5e étage (.txt)</button>
   </div>
 
-  <div class="mg-table-wrap">
-    <table class="mg-table">
+  <div class="pro-table-wrap">
+    <table class="pro-table" aria-label="Cotes numériques">
       <thead>
         <tr>
-          <th data-sort="cote">Cote<span class="arrow" data-arrow="cote"></span></th>
-          <th data-sort="etage">Étage<span class="arrow" data-arrow="etage"></span></th>
-          <th data-sort="titre">Titre<span class="arrow" data-arrow="titre"></span></th>
-          <th data-sort="auteur">Auteur<span class="arrow" data-arrow="auteur"></span></th>
-          <th data-sort="bibsection">Bibliothèque · Section<span class="arrow" data-arrow="bibsection"></span></th>
-          <th data-sort="publie">Publié le<span class="arrow" data-arrow="publie"></span></th>
-          <th data-sort="barcode">Code-barre<span class="arrow" data-arrow="barcode"></span></th>
+          <th data-sort="cote" aria-sort="none"><button class="pro-sortbtn">Cote</button></th>
+          <th data-sort="etage" aria-sort="none"><button class="pro-sortbtn">Étage</button></th>
+          <th data-sort="titre" aria-sort="none"><button class="pro-sortbtn">Titre</button></th>
+          <th data-sort="auteur" aria-sort="none"><button class="pro-sortbtn">Auteur</button></th>
+          <th data-sort="bibsection" aria-sort="none"><button class="pro-sortbtn">Bibliothèque · Section</button></th>
+          <th data-sort="publie" aria-sort="none"><button class="pro-sortbtn">Publié le</button></th>
+          <th data-sort="barcode" aria-sort="none"><button class="pro-sortbtn">Code-barre</button></th>
         </tr>
       </thead>
       <tbody id="mg-tbody">
-        <tr><td colspan="7" class="mg-empty">Chargement…</td></tr>
+        <tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--pro-texte-doux)">Chargement…</td></tr>
       </tbody>
     </table>
   </div>
 
-  <div class="mg-pagination">
-    <span class="pag-info" id="pag-info"></span>
-    <div class="pag-controls" id="pag-controls"></div>
+  <div class="pro-pager">
+    <span class="pro-pager__info" id="pag-info"></span>
+    <div class="pro-pager__nav" id="pag-controls"></div>
   </div>
-</div>
 
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
-  </div>
-</footer>
+</main>
 
 <script>
-(function() {
-  if (localStorage.getItem('rp_admin_auth') !== '1') {
-    window.location.href = 'index.html';
-  }
-})();
-
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 let ROWS = [];        // toutes les entrées, normalisées pour l'affichage/tri
@@ -232,25 +182,29 @@ function render() {
 
   const tbody = document.getElementById('mg-tbody');
   if (!pageRows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="mg-empty">Aucun résultat.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--pro-texte-doux)">Aucun résultat.</td></tr>';
   } else {
     tbody.innerHTML = pageRows.map(r => `
       <tr>
-        <td class="mg-cote">${esc(r.cote)}</td>
-        <td class="mg-meta">${r.etage ? r.etage + ' étage' : '—'}</td>
-        <td>${esc(r.titre) || '—'}</td>
-        <td class="mg-meta">${esc(r.auteur) || '—'}</td>
-        <td class="mg-meta">${esc(r.bibsection) || '—'}</td>
-        <td class="mg-meta">${esc(r.publie) || '—'}</td>
-        <td class="mg-barcode">${esc(r.barcode) || '—'}</td>
+        <td class="pro-mono pro-cote-cell">${esc(r.cote)}</td>
+        <td>${r.etage ? r.etage + ' étage' : '—'}</td>
+        <td title="${esc(r.titre)}">${esc(r.titre) || '—'}</td>
+        <td>${esc(r.auteur) || '—'}</td>
+        <td>${esc(r.bibsection) || '—'}</td>
+        <td>${esc(r.publie) || '—'}</td>
+        <td class="pro-mono">${esc(r.barcode) || '—'}</td>
       </tr>
     `).join('');
   }
 
   renderPagination(total, totalPages);
-  document.querySelectorAll('.mg-table th .arrow').forEach(el => {
-    const key = el.dataset.arrow;
-    el.textContent = key === sortKey ? (sortDir === 1 ? '▲' : '▼') : '';
+  document.querySelectorAll('.pro-table th[aria-sort]').forEach(th => {
+    const key = th.dataset.sort;
+    if (key === sortKey) {
+      th.setAttribute('aria-sort', sortDir === 1 ? 'ascending' : 'descending');
+    } else {
+      th.setAttribute('aria-sort', 'none');
+    }
   });
 }
 
@@ -260,21 +214,12 @@ function renderPagination(total, totalPages) {
 
   const controls = document.getElementById('pag-controls');
   const btn = (label, target, disabled, active) =>
-    `<button class="pag-btn${active ? ' active' : ''}" data-page="${target}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+    `<button class="pro-btn pro-btn--sm ${active ? '' : 'pro-btn--ghost'}" data-page="${target}" ${disabled ? 'disabled' : ''}>${label}</button>`;
 
-  let html = btn('«', 1, page === 1, false) + btn('‹', page - 1, page === 1, false);
-  const windowSize = 2;
-  for (let p = 1; p <= totalPages; p++) {
-    if (p === 1 || p === totalPages || Math.abs(p - page) <= windowSize) {
-      html += btn(String(p), p, false, p === page);
-    } else if (Math.abs(p - page) === windowSize + 1) {
-      html += '<span class="pag-ellipsis">…</span>';
-    }
-  }
-  html += btn('›', page + 1, page === totalPages, false) + btn('»', totalPages, page === totalPages, false);
+  let html = btn('‹ Précédent', page - 1, page === 1, false) + btn('Suivant ›', page + 1, page === totalPages, false);
   controls.innerHTML = html;
 
-  controls.querySelectorAll('.pag-btn').forEach(b => {
+  controls.querySelectorAll('.pro-btn').forEach(b => {
     b.addEventListener('click', () => {
       page = parseInt(b.dataset.page, 10);
       render();
@@ -289,7 +234,12 @@ document.getElementById('mg-perpage').addEventListener('change', (e) => {
   page = 1;
   render();
 });
-document.querySelectorAll('.mg-table th[data-sort]').forEach(th => {
+document.getElementById('mg-logout').addEventListener('click', () => {
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+document.querySelectorAll('.pro-table th[data-sort]').forEach(th => {
   th.addEventListener('click', () => {
     const key = th.dataset.sort;
     if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
@@ -343,16 +293,36 @@ let rowsLoaded = false;
 function renderStats() {
   if (!rowsLoaded || !latestReport) return;
   const s = latestReport.stats || {};
-  const date = latestReport.generatedAt ? new Date(latestReport.generatedAt).toLocaleString('fr-FR') : '—';
+  const date = latestReport.generatedAt ? rpUI.fmt.ago(latestReport.generatedAt) : '—';
   const etage2 = ROWS.filter(r => r.etage === '2e').length;
   const etage5 = ROWS.filter(r => r.etage === '5e').length;
+  const total = (s.kept ?? 0);
   document.getElementById('mg-stats').innerHTML = `
-    <div class="mstat"><div class="mstat-lbl">Cotes numériques</div><div class="mstat-val">${(s.kept ?? '—').toLocaleString?.('fr-FR') ?? s.kept}</div></div>
-    <div class="mstat"><div class="mstat-lbl">2e étage</div><div class="mstat-val">${etage2.toLocaleString('fr-FR')}</div></div>
-    <div class="mstat"><div class="mstat-lbl">5e étage</div><div class="mstat-val">${etage5.toLocaleString('fr-FR')}</div></div>
-    <div class="mstat"><div class="mstat-lbl">Exclus</div><div class="mstat-val">${(s.excluded ?? '—').toLocaleString?.('fr-FR') ?? s.excluded}</div></div>
-    <div class="mstat"><div class="mstat-lbl">Total exemplaires</div><div class="mstat-val">${(s.totalItems ?? '—').toLocaleString?.('fr-FR') ?? s.totalItems}</div></div>
-    <div class="mstat"><div class="mstat-lbl">Dernier build</div><div class="mstat-val" style="font-size:.95rem">${date}</div></div>
+    <div class="pro-kpi pro-kpi--hero">
+      <div class="pro-kpi__label">Cotes numériques</div>
+      <div class="pro-kpi__value">${rpUI.fmt.n(total)}</div>
+    </div>
+    <div class="pro-kpi">
+      <div class="pro-kpi__label">2e étage</div>
+      <div class="pro-kpi__value">${rpUI.fmt.n(etage2)}</div>
+    </div>
+    <div class="pro-kpi">
+      <div class="pro-kpi__label">5e étage</div>
+      <div class="pro-kpi__value">${rpUI.fmt.n(etage5)}</div>
+    </div>
+    <div class="pro-kpi pro-kpi--alert">
+      <div class="pro-kpi__label">Exclus (Douaisienne)</div>
+      <div class="pro-kpi__value">${rpUI.fmt.n(s.excluded ?? 0)}</div>
+      <div class="pro-kpi__note">Cotes commençant par « D » — Réserve Douaisienne</div>
+    </div>
+    <div class="pro-kpi">
+      <div class="pro-kpi__label">Total bibliothèque</div>
+      <div class="pro-kpi__value">${rpUI.fmt.n(s.totalItems ?? 0)}</div>
+    </div>
+    <div class="pro-kpi">
+      <div class="pro-kpi__label">Export du</div>
+      <div class="pro-kpi__value" style="font-size:1.1rem">${date}</div>
+    </div>
   `;
 }
 

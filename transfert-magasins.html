@@ -4,102 +4,80 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<!-- Contrôle d'accès de l'espace pro (gate localStorage — voir « Sécurité » dans
+     CLAUDE.md). En tête de <head> pour rediriger avant tout rendu. -->
+<script>
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+</script>
 <title>Transfert 2e étage → Réserve patrimoniale — Réserve patrimoniale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts.css">
-<script src="js/sync-queue.js"></script>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/admin.css">
+<script src="js/sync-queue.js"></script>
 <script src="js/reserve-shared.js"></script>
 <style>
-  :root{
-    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
-    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
-  }
-  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
-  .page-hero{background:#2A3CD4;color:#fff;padding:1.75rem 1.5rem}
-  .page-hero .container{max-width:1150px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
-  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
-  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
-  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-  .hero-actions a,.hero-actions button{
-    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
-    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
-    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
-  }
-  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
-  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
-  .sync-status.pending{color:#ffcc80}
-  .container{max-width:1150px;margin:0 auto;padding:0 1.5rem}
+  /* CSS propre à la page (préfixe tr-) : ce que le kit commun ne fournit pas
+     encore — groupes de champs, tag UNIMARC discret, stepper d'emplacement
+     avec libellé, fiche d'exemplarisation, indicateur de synchro. */
+  .tr-main { padding-top: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+  .tr-groups { display: grid; gap: 1.75rem 2.5rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 60rem) { .tr-groups { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .tr-group { margin: 0; padding: 0; border: 0; min-width: 0; }
+  .tr-group > legend { display: flex; align-items: center; gap: 0.9rem; width: 100%; padding: 0; margin-bottom: 0.9rem; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pro-carmin); }
+  .tr-group > legend::after { content: ""; flex: 1; height: 1px; background: var(--pro-trait); }
+  .tr-fields { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
+  .tr-fields .tr-wide { grid-column: 1 / -1; }
+  .tr-tag { margin: 0 0 0 0.45rem; font: 400 0.68rem var(--pro-font-mono); letter-spacing: 0; text-transform: none; color: var(--pro-texte-faible); }
+  .tr-req { color: var(--pro-carmin); }
+  .tr-submit { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem 1rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--pro-trait); }
+  .tr-submit .pro-btn--primary { min-height: 48px; padding: 0 1.6rem; }
+  .tr-progress { display: flex; flex-direction: column; gap: 0.2rem; }
 
-  .section{padding:1.5rem 0 3rem}
-  .ex-note{font-size:.8rem;color:#888;line-height:1.6;background:#fffde7;border:1px solid #fff9c4;border-radius:8px;padding:.85rem 1rem;margin-bottom:1.5rem}
-  .ex-note strong{color:#665c00}
+  .tr-table { min-width: 44rem; }
+  .tr-table .tr-actions { display: flex; align-items: center; gap: 0.4rem; justify-content: flex-end; white-space: nowrap; }
+  .tr-table .tr-cote { white-space: nowrap; }
+  .tr-table td.tr-nowrap { white-space: nowrap; }
+  #pending-tbody td:nth-child(2), #done-tbody td:nth-child(2) { min-width: 14rem; }
+  .tr-bc { font-family: var(--pro-font-mono); font-size: 0.78rem; color: var(--pro-texte-doux); }
 
-  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem}
-  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
-  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
-  .stat-card-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1;color:#2A3CD4}
+  /* Fiche d'exemplarisation : carte large au-dessus de la liste, jamais dans
+     une ligne de tableau. */
+  .tr-ex { border-top: 3px solid var(--pro-bleu); }
+  .tr-ex-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.75rem 1rem; margin-bottom: 1rem; }
+  .tr-ex-head > div { min-width: 0; }
+  .tr-facts { display: grid; gap: 0.6rem 1.5rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); margin: 0 0 1.5rem; padding: 0.9rem 1rem; background: var(--pro-papier); border: 1px solid var(--pro-carte-bord); }
+  .tr-facts dt { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pro-texte-doux); }
+  .tr-facts dd { margin: 0.1rem 0 0; font-size: 0.88rem; overflow-wrap: anywhere; }
+  .tr-sec { display: flex; align-items: center; gap: 0.7rem; margin: 0 0 1rem; font: 600 1.15rem/1.2 var(--pro-font-display); color: var(--pro-bleu); }
+  .tr-num { width: 28px; height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--pro-bleu); color: #fff; font: 700 0.85rem var(--pro-font-body); }
+  .tr-cols { display: grid; gap: 2rem 2.5rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 60rem) { .tr-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .tr-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+  .pro-input.tr-barcode { height: 60px; border: 2px solid var(--pro-bleu); color: var(--pro-bleu); font: 600 1.5rem var(--pro-font-mono); letter-spacing: 0.04em; }
+  .pro-input.tr-barcode.pro-input--err { border-color: var(--pro-dec-braderie); }
+  .tr-warn { display: none; align-items: flex-start; gap: 0.6rem; padding: 0.75rem 1rem; background: #FFF6DC; border: 1px solid #F3D68A; border-left: 4px solid var(--pro-dec-braderie); font-size: 0.85rem; color: var(--pro-texte); }
+  .tr-warn.show { display: flex; }
+  .tr-warn svg { flex: none; margin-top: 2px; color: var(--pro-dec-braderie-ink); }
+  .tr-warn strong { color: var(--pro-dec-braderie-ink); }
+  .tr-pair { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 30rem) { .tr-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .tr-steppers { display: flex; flex-wrap: wrap; gap: 1rem 1.25rem; }
+  .tr-steppers .pro-stepper__val { min-width: 52px; }
+  .tr-stepper-group { display: flex; flex-direction: column; gap: 0.4rem; }
+  .tr-readout { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; background: var(--pro-bleu-pale); border-left: 4px solid var(--pro-bleu); color: var(--pro-bleu); font: 700 1.1rem/1.3 var(--pro-font-display); overflow-wrap: anywhere; }
+  .tr-readout svg { flex: none; }
+  .tr-readout small { display: block; font: 400 0.62rem var(--pro-font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--pro-texte-doux); }
+  .tr-ex-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--pro-trait); }
+  .tr-ex-actions .pro-btn--primary { min-height: 52px; padding: 0 1.8rem; font-size: 0.95rem; }
 
-  .form-card{background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
-  .form-card h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 1rem;color:#2A3CD4}
-  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.9rem;margin-bottom:.5rem}
-  .form-field{display:flex;flex-direction:column;gap:.3rem}
-  .form-field label{font-size:.72rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
-  .form-field input{font-family:inherit;font-size:.95rem;padding:.55rem .7rem;border:1px solid #ccc;border-radius:8px;outline:none}
-  .form-field input:focus{border-color:#2A3CD4;box-shadow:0 0 0 3px rgba(42,60,212,.12)}
-  .form-field.barcode input{font-family:monospace;font-size:1.05rem}
-  .form-warn{font-size:.78rem;color:#e65100;background:#fff8e1;border:1px solid #ffe0a3;border-radius:6px;padding:.5rem .7rem;margin-top:.3rem;display:none}
-  .form-warn.show{display:block}
-
-  .loc-fields{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin:.75rem 0}
-  .loc-toggle{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#333;margin:.9rem 0 0}
-  .loc-sel{font-family:inherit;font-size:.85rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
-  .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
-  .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
-  .stepper button:hover{background:#e0e0e0}
-  .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#2A3CD4}
-  .loc-readout{font-size:.85rem;color:#2A3CD4;font-weight:600;background:#F5F5FF;border:1px solid #ccc;border-radius:20px;padding:.45rem 1rem}
-
-  .form-submit{display:flex;align-items:center;gap:.75rem;margin-top:1rem}
-  .btn-primary{font-family:inherit;font-size:.9rem;padding:.65rem 1.4rem;border:1px solid #2A3CD4;border-radius:8px;background:#2A3CD4;color:#fff;cursor:pointer}
-  .btn-primary:hover{background:#1c1fa0}
-  .btn-mini{font-family:inherit;font-size:.75rem;padding:.35rem .8rem;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;color:#555}
-  .btn-mini:hover{background:#f5f5f5}
-
-  .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
-  .feedback.show{display:block}
-  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9}
-  .fb-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
-  .fb-badge{font-size:.68rem;padding:2px 9px;border-radius:20px;font-weight:600;background:#c8e6c9;color:#1b5e20}
-  .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
-
-  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.5rem}
-  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
-  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
-  .log-table-wrap{overflow-x:auto}
-  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
-  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0;white-space:nowrap}
-  .log-table td{padding:.4rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
-  .log-table tr:hover td{background:#fafafa}
-  .log-body{max-height:460px;overflow-y:auto}
-  .log-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:.85rem;padding:2px 6px}
-  .log-empty{padding:1.25rem;text-align:center;color:#bbb;font-style:italic;font-size:.85rem}
-  .log-cote{font-family:monospace;color:#2A3CD4}
-  .log-bc{font-family:monospace;color:#888}
-  .arrow-sep{color:#bbb;margin:0 .2rem}
-
-  .ex-detail-row td{background:#F5F5FF;padding:1rem 1.25rem}
-  .ex-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.6rem 1.2rem;margin-bottom:1rem}
-  .ex-detail-grid .dl{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.15rem}
-  .ex-detail-grid .dv{display:block;font-size:.85rem;color:#1a1a1a}
-  .ex-form{background:#fff;border:1px dashed #c9c9e8;border-radius:8px;padding:1rem}
-  .ex-form h4{font-size:.85rem;color:#2A3CD4;margin:0 0 .75rem;font-weight:700}
-
-  footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
-  footer a{color:#c9a96e;text-decoration:none}
+  /* Indicateur de synchro : js/sync-queue.js réécrit le texte de #sync-status
+     (et pose .pending) ; le point est donc dessiné ici, en ::before. */
+  #sync-status.pro-sync::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--pro-delta-hausse); flex: none; }
+  #sync-status.pro-sync.pending::before { background: var(--pro-ambre); }
+  @media (max-width: 40rem) { .tr-steppers { gap: 0.9rem; } .pro-input.tr-barcode { font-size: 1.25rem; } }
 </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
        qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
@@ -107,140 +85,173 @@
        rendu. Voir js/parent-page-height.js. -->
   <script src="js/parent-page-height.js"></script>
 </head>
-<body>
+<body class="pro">
 
-<section class="page-hero">
-  <div class="container">
-    <div>
-      <nav class="breadcrumb">Espace professionnel · Magasins</nav>
-      <h1 class="page-title">Transfert <em>2e étage → Réserve</em></h1>
-      <p class="page-lead">Préparez la liste des livres à ramener du 2e étage depuis le registre papier (souvent la seule source pour ces documents non catalogués), puis exemplarisez-les rapidement — nouvelle cote, code-barre, emplacement — une fois retrouvés en réserve.</p>
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace pro</a> › <a href="recolement.html">Récolement</a></p>
+      <h1 class="pro-head__h1">Transfert 2e étage → Réserve</h1>
     </div>
-    <div class="hero-actions">
-      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
-      <a href="admin.html">← Espace professionnel</a>
-      <button type="button" id="logout-btn">Se déconnecter</button>
+    <nav class="pro-tabs" role="tablist" aria-label="Sections du transfert" id="tr-tabs">
+      <button type="button" class="pro-tab" role="tab" data-tab="add" aria-selected="true">Ajouter depuis le registre</button>
+      <button type="button" class="pro-tab" role="tab" data-tab="pending">À exemplariser <span class="pro-tab__count" id="tab-count-pending" hidden>0</span></button>
+      <button type="button" class="pro-tab" role="tab" data-tab="done">Transférés</button>
+    </nav>
+    <div class="pro-head__actions">
+      <span class="pro-sync" id="sync-status" role="status" title="Synchronisation avec les autres postes (via R2)">Synchronisation…</span>
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="logout-btn">Déconnexion</button>
     </div>
   </div>
-</section>
+</header>
 
-<main>
-  <div class="section">
-    <div class="container">
+<main id="contenu" class="pro-main">
+  <div class="pro-wrap tr-main">
 
-      <p class="ex-note">
-        <strong>Comment ça marche :</strong> recopiez d'abord les livres à transférer depuis le registre papier du 2e étage
-        (bouton « Ajouter à la liste »). Chaque champ est étiqueté avec son tag UNIMARC pour rester lisible en cohérence avec le
-        reste du catalogue. Une fois sur place et le livre retrouvé, cliquez sur « Exemplariser » dans la liste d'attente pour
-        lui attribuer une nouvelle cote, un nouveau code-barre et un emplacement dans la réserve patrimoniale — il apparaît
-        alors immédiatement dans <a href="index.html">le catalogue</a>, <a href="recolement.html">le récolement</a> et
-        <a href="reserve.html">le plan de la réserve</a>, exactement comme un exemplaire créé depuis
-        <a href="exemplarisation.html">l'exemplarisation rapide</a>.
-      </p>
-
-      <div class="stats-row" id="stats-row"></div>
-
-      <div class="form-card">
-        <h2>Ajouter un livre à transférer</h2>
-        <form id="add-form">
-          <div class="form-grid">
-            <div class="form-field">
-              <label for="f-titre">Titre (200$a)</label>
-              <input type="text" id="f-titre" autocomplete="off" autofocus required>
-            </div>
-            <div class="form-field">
-              <label for="f-auteur">Auteur (700$a)</label>
-              <input type="text" id="f-auteur" autocomplete="off">
-            </div>
-            <div class="form-field">
-              <label for="f-lieuEdition">Lieu d'édition (210$a)</label>
-              <input type="text" id="f-lieuEdition" autocomplete="off">
-            </div>
-            <div class="form-field">
-              <label for="f-maisonEdition">Maison d'édition (210$c)</label>
-              <input type="text" id="f-maisonEdition" autocomplete="off">
-            </div>
-            <div class="form-field">
-              <label for="f-annee">Année (210$d)</label>
-              <input type="text" id="f-annee" autocomplete="off" placeholder="ex. 1875 ou [18xx]">
-            </div>
-            <div class="form-field">
-              <label for="f-importanceMat">Importance matérielle (215$a)</label>
-              <input type="text" id="f-importanceMat" autocomplete="off" placeholder="ex. 234 p.">
-            </div>
-            <div class="form-field">
-              <label for="f-dimensions">Dimensions (215$d)</label>
-              <input type="text" id="f-dimensions" autocomplete="off" placeholder="ex. 22 cm">
-            </div>
-            <div class="form-field">
-              <label for="f-cotePapier">Cote relevée sur le registre (930$g)</label>
-              <input type="text" id="f-cotePapier" autocomplete="off">
-            </div>
-            <div class="form-field">
-              <label for="f-lieuOrigine">Lieu d'origine (915$a)</label>
-              <input type="text" id="f-lieuOrigine" autocomplete="off">
-            </div>
-            <div class="form-field">
-              <label for="f-dateEntree">Date d'entrée à la bibliothèque (920$d)</label>
-              <input type="text" id="f-dateEntree" autocomplete="off" placeholder="JJ/MM/AAAA">
-            </div>
-          </div>
-
-          <div class="form-submit">
-            <button type="submit" class="btn-primary">Ajouter à la liste de transfert</button>
-          </div>
-          <div class="feedback" id="feedback"></div>
-        </form>
+    <details class="pro-help" id="tr-help" open>
+      <summary>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 11v5 M12 8h.01"/></svg>
+        <span>Comment ça marche</span>
+        <svg class="pro-help__chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="pro-help__body">
+        <p>Préparez la liste des livres à ramener du 2e étage depuis le registre papier (souvent la seule source pour ces documents non catalogués) : onglet « Ajouter depuis le registre ». Chaque champ porte son tag UNIMARC pour rester cohérent avec le reste du catalogue.</p>
+        <p>Une fois sur place et le livre retrouvé, ouvrez l'onglet « À exemplariser » et cliquez sur « Exemplariser » pour lui attribuer une nouvelle cote, un nouveau code-barre et un emplacement dans la réserve patrimoniale — il apparaît alors immédiatement dans <a href="index.html">le catalogue</a>, <a href="recolement.html">le récolement</a> et <a href="reserve.html">le plan de la réserve</a>, exactement comme un exemplaire créé depuis <a href="exemplarisation.html">l'exemplarisation rapide</a>.</p>
       </div>
+    </details>
 
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title" id="pending-title">Livres en attente de transfert</span>
+    <div id="stats-host">
+      <div class="pro-kpis" id="stats-row"></div>
+    </div>
+    <div class="pro-card pro-card--pad" id="progress-card" aria-labelledby="progress-title">
+      <p class="pro-label" id="progress-title">Avancement du transfert</p>
+      <div class="tr-progress" id="progress-chart" style="margin-top:.6rem"></div>
+    </div>
+
+    <!-- ── Onglet 1 : ajouter depuis le registre ── -->
+    <section data-tab="add" aria-label="Ajouter depuis le registre">
+      <form id="add-form" class="pro-card pro-card--pad">
+        <p class="pro-muted" style="margin:0 0 1.25rem">Seul le titre est obligatoire. Recopiez le reste tel qu'il figure sur le registre papier.</p>
+        <div class="tr-groups">
+          <fieldset class="tr-group">
+            <legend>Le document</legend>
+            <div class="tr-fields">
+              <div class="pro-field tr-wide">
+                <label class="pro-label" for="f-titre">Titre <span class="tr-req" aria-hidden="true">*</span><span class="pro-hint tr-tag">200$a</span></label>
+                <input type="text" id="f-titre" class="pro-input" autocomplete="off" autofocus required>
+              </div>
+              <div class="pro-field tr-wide">
+                <label class="pro-label" for="f-auteur">Auteur<span class="pro-hint tr-tag">700$a</span></label>
+                <input type="text" id="f-auteur" class="pro-input" autocomplete="off">
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="tr-group">
+            <legend>Publication</legend>
+            <div class="tr-fields">
+              <div class="pro-field">
+                <label class="pro-label" for="f-lieuEdition">Lieu d'édition<span class="pro-hint tr-tag">210$a</span></label>
+                <input type="text" id="f-lieuEdition" class="pro-input" autocomplete="off">
+              </div>
+              <div class="pro-field">
+                <label class="pro-label" for="f-maisonEdition">Maison d'édition<span class="pro-hint tr-tag">210$c</span></label>
+                <input type="text" id="f-maisonEdition" class="pro-input" autocomplete="off">
+              </div>
+              <div class="pro-field">
+                <label class="pro-label" for="f-annee">Année<span class="pro-hint tr-tag">210$d</span></label>
+                <input type="text" id="f-annee" class="pro-input" autocomplete="off" placeholder="ex. 1875 ou [18xx]">
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="tr-group">
+            <legend>Description</legend>
+            <div class="tr-fields">
+              <div class="pro-field">
+                <label class="pro-label" for="f-importanceMat">Importance matérielle<span class="pro-hint tr-tag">215$a</span></label>
+                <input type="text" id="f-importanceMat" class="pro-input" autocomplete="off" placeholder="ex. 234 p.">
+              </div>
+              <div class="pro-field">
+                <label class="pro-label" for="f-dimensions">Dimensions<span class="pro-hint tr-tag">215$d</span></label>
+                <input type="text" id="f-dimensions" class="pro-input" autocomplete="off" placeholder="ex. 22 cm">
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="tr-group">
+            <legend>Provenance</legend>
+            <div class="tr-fields">
+              <div class="pro-field">
+                <label class="pro-label" for="f-cotePapier">Cote du registre<span class="pro-hint tr-tag">930$g</span></label>
+                <input type="text" id="f-cotePapier" class="pro-input" autocomplete="off">
+              </div>
+              <div class="pro-field">
+                <label class="pro-label" for="f-lieuOrigine">Lieu d'origine<span class="pro-hint tr-tag">915$a</span></label>
+                <input type="text" id="f-lieuOrigine" class="pro-input" autocomplete="off">
+              </div>
+              <div class="pro-field">
+                <label class="pro-label" for="f-dateEntree">Date d'entrée<span class="pro-hint tr-tag">920$d</span></label>
+                <input type="text" id="f-dateEntree" class="pro-input" autocomplete="off" placeholder="JJ/MM/AAAA">
+              </div>
+            </div>
+          </fieldset>
         </div>
-        <div class="log-body log-table-wrap">
-          <table class="log-table">
+        <div class="tr-submit">
+          <button type="submit" class="pro-btn pro-btn--primary">Ajouter à la liste de transfert</button>
+          <span class="pro-hint" style="margin:0"><span class="tr-req" aria-hidden="true">*</span> champ obligatoire</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- ── Onglet 2 : à exemplariser ── -->
+    <section data-tab="pending" aria-label="Livres à exemplariser" id="pending-root">
+      <div id="ex-host"></div>
+      <div class="pro-card" style="margin-top:1rem">
+        <div class="pro-toolbar">
+          <h2 class="pro-h4" id="pending-title" style="margin-right:auto">Livres en attente de transfert</h2>
+        </div>
+        <div class="pro-table-wrap">
+          <table class="pro-table tr-table">
             <thead>
-              <tr>
-                <th>Cote (registre)</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Ajouté le</th><th></th>
-              </tr>
+              <tr><th scope="col">Cote (registre)</th><th scope="col">Titre</th><th scope="col">Auteur</th><th scope="col">Année</th><th scope="col">Ajouté le</th><th scope="col"><span class="pro-sr">Actions</span></th></tr>
             </thead>
             <tbody id="pending-tbody"></tbody>
           </table>
         </div>
       </div>
+    </section>
 
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title" id="done-title">Historique des transferts</span>
+    <!-- ── Onglet 3 : transférés ── -->
+    <section data-tab="done" aria-label="Livres transférés">
+      <div class="pro-card">
+        <div class="pro-toolbar">
+          <h2 class="pro-h4" id="done-title" style="margin-right:auto">Historique des transferts</h2>
         </div>
-        <div class="log-body log-table-wrap">
-          <table class="log-table">
+        <div class="pro-table-wrap">
+          <table class="pro-table tr-table">
             <thead>
-              <tr>
-                <th>Cote registre</th><th>Titre</th><th>Nouvelle cote</th><th>Nouveau code-barre</th><th>Emplacement</th><th>Transféré le</th>
-              </tr>
+              <tr><th scope="col">Cote registre</th><th scope="col">Titre</th><th scope="col">Nouvelle cote</th><th scope="col">Nouveau code-barre</th><th scope="col">Emplacement</th><th scope="col">Transféré le</th></tr>
             </thead>
             <tbody id="done-tbody"></tbody>
           </table>
         </div>
       </div>
+    </section>
 
-    </div>
   </div>
 </main>
 
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+<footer class="pro-foot">
+  <div class="pro-foot__inner">
+    <span>Bibliothèques de Douai — Réserve patrimoniale</span>
+    <a href="admin.html">← Espace professionnel</a>
   </div>
 </footer>
 
+<script src="js/admin-ui.js"></script>
+<script src="js/admin-charts.js"></script>
 <script>
-(function() {
-  if (localStorage.getItem('rp_admin_auth') !== '1') {
-    window.location.href = 'index.html';
-  }
-})();
 document.getElementById('logout-btn').addEventListener('click', function() {
   localStorage.removeItem('rp_admin_auth');
   localStorage.removeItem('rp_admin_token');
@@ -248,6 +259,10 @@ document.getElementById('logout-btn').addEventListener('click', function() {
 });
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+rpUI.help(document.getElementById('tr-help'), 'transfert-magasins');
+const tabsCtl = rpUI.tabs(document.getElementById('tr-tabs'), { hashPrefix: 'onglet-' });
+rpCharts.attachTooltips(document.getElementById('progress-card'));
 
 /* ════════════════════════════════════════════════════════════
    ÉTAT PARTAGÉ (R2 via /api/transferts) + codes-barres déjà connus
@@ -280,7 +295,12 @@ const LS_PENDING = 'rp_transferts_magasins_pending_sync';
    comme source de vérité locale, rejeu à la reconnexion, indicateur
    #sync-status). Ce bloc était auparavant recopié à l'identique dans chacune.
    Trois endpoints possibles (transferts, exemplaires-manuels,
-//   recolement) — voir endpointUrl() ci-dessus. */
+   recolement) — voir endpointUrl() ci-dessous. */
+function endpointUrl(name){
+  if(name === 'recolement') return '/api/recolement';
+  if(name === 'exemplaires-manuels') return '/api/exemplaires-manuels';
+  return '/api/transferts';
+}
 const syncQueue = createSyncQueue({
   storageKey: LS_PENDING,
   endpoint: item => endpointUrl(item.endpoint),
@@ -318,8 +338,8 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ syncFr
    exemplarisation.html/recolement.html (js/reserve-shared.js), mais
    réserve fixée à "patrimoniale" (pas de sélecteur) puisque c'est tout
    le sens de cet outil. Un seul panneau "Exemplariser" ouvert à la fois
-   (openId), redessiné à chaque render : ces fonctions manipulent l'état
-   exLoc partagé plutôt que des variables par ligne.
+   (openId) : ces fonctions manipulent l'état exLoc partagé plutôt que des
+   variables par ligne.
    ════════════════════════════════════════════════════════════ */
 let openId = null;
 let exLoc = null;
@@ -360,9 +380,12 @@ function exRefreshLoc(){
   const elTravee = document.getElementById('ex-val-travee');
   const elReadout = document.getElementById('ex-loc-readout');
   if(!elColonne) return;
+  const isEt = exLoc.locType === 'etagere';
+  document.getElementById('ex-lbl-colonne').textContent = isEt ? 'Colonne' : 'Meuble';
+  document.getElementById('ex-lbl-etage').textContent = isEt ? 'Étage' : (exLoc.locType === 'armoire' ? 'Niveau' : 'Tiroir');
   elColonne.textContent = colLetter(exLoc.colonne);
   elEtage.textContent = exLoc.etage;
-  if(exLoc.locType === 'etagere') elTravee.textContent = displayTraveeId(exLoc.travee);
+  if(isEt) elTravee.textContent = displayTraveeId(exLoc.travee);
   let readout;
   if(exLoc.locType === 'armoire') readout = `Armoire (bois) · Meuble ${colLetter(exLoc.colonne)} · Niveau ${exLoc.etage}`;
   else if(exLoc.locType === 'tiroir') readout = `Armoire à tiroirs · Meuble ${colLetter(exLoc.colonne)} · Tiroir ${exLoc.etage}`;
@@ -385,131 +408,173 @@ function renderStats(){
   const rows = Object.values(TRANSFERTS);
   const pending = rows.filter(r => r.status === 'pending').length;
   const done = rows.filter(r => r.status === 'done').length;
-  document.getElementById('stats-row').innerHTML = `
-    <div class="stat-card"><div class="stat-card-label">En attente de transfert</div><div class="stat-card-val">${pending.toLocaleString('fr-FR')}</div></div>
-    <div class="stat-card"><div class="stat-card-label">Déjà transférés</div><div class="stat-card-val">${done.toLocaleString('fr-FR')}</div></div>
-    <div class="stat-card"><div class="stat-card-label">Total dans la liste</div><div class="stat-card-val">${rows.length.toLocaleString('fr-FR')}</div></div>
-  `;
+  const kpi = (label, v, note) => `<div class="pro-kpi"><p class="pro-kpi__label">${label}</p><div class="pro-kpi__row"><span class="pro-kpi__value">${rpUI.fmt.n(v)}</span></div>${note ? `<p class="pro-kpi__note">${note}</p>` : ''}</div>`;
+  document.getElementById('stats-row').innerHTML =
+    kpi('En attente de transfert', pending, 'à exemplariser une fois retrouvés') +
+    kpi('Déjà transférés', done, 'exemplarisés dans la réserve') +
+    kpi('Total dans la liste', rows.length);
+
+  const chart = document.getElementById('progress-chart');
+  if(!rows.length){
+    chart.innerHTML = '<p class="pro-muted" style="margin:0">Aucun livre dans la liste pour le moment.</p>';
+  } else {
+    chart.innerHTML = rpCharts.stacked([
+      { label:'Transférés', value:done, color:'#2A3CD4', ink:'#fff' },
+      { label:'En attente', value:pending, color:'#e3e4ec', ink:'#3E3E52' },
+    ], { legend:'inline', height:28, title:'Avancement du transfert', total:rows.length });
+  }
+
+  const cnt = document.getElementById('tab-count-pending');
+  cnt.textContent = rpUI.fmt.n(pending);
+  cnt.hidden = pending === 0;
 }
 
 function locationLabel(l){
-  if(!l) return '<em style="color:#bbb">—</em>';
+  if(!l) return '<span class="pro-muted">—</span>';
   if(l.locType === 'armoire') return `Armoire · ${esc(l.colonne)} · niv. ${esc(l.etage)}`;
   if(l.locType === 'tiroir') return `Tiroir · ${esc(l.colonne)} · tir. ${esc(l.etage)}`;
   return `${esc(displayTraveeId(l.travee))} · ${esc(l.colonne)} · ét. ${esc(l.etage)}`;
 }
 
-function renderDetailRow(r){
-  return `
-    <tr class="ex-detail-row" id="detail-${esc(r.id)}">
-      <td colspan="6">
-        <div class="ex-detail-grid">
-          <div><span class="dl">Lieu d'édition (210$a)</span><span class="dv">${esc(r['210$a']) || '—'}</span></div>
-          <div><span class="dl">Maison d'édition (210$c)</span><span class="dv">${esc(r['210$c']) || '—'}</span></div>
-          <div><span class="dl">Importance matérielle (215$a)</span><span class="dv">${esc(r['215$a']) || '—'}</span></div>
-          <div><span class="dl">Dimensions (215$d)</span><span class="dv">${esc(r['215$d']) || '—'}</span></div>
-          <div><span class="dl">Lieu d'origine (915$a)</span><span class="dv">${esc(r['915$a']) || '—'}</span></div>
-          <div><span class="dl">Date d'entrée (920$d)</span><span class="dv">${esc(r['920$d']) || '—'}</span></div>
+const STEPPER_MINUS = rpUI.icon('minus', { size: 18, stroke: 2.4 });
+const STEPPER_PLUS = rpUI.icon('plus', { size: 18, stroke: 2.4 });
+function stepperGroup(field, wrapId, labelId, valId, label, init){
+  return `<div class="tr-stepper-group" id="${wrapId}" role="group" aria-labelledby="${labelId}">
+    <span class="pro-label" id="${labelId}">${label}</span>
+    <div class="pro-stepper">
+      <button type="button" class="pro-btn pro-btn--icon" data-step="${field}" data-dir="-1" aria-label="${label} précédent(e)">${STEPPER_MINUS}</button>
+      <span class="pro-stepper__val" id="${valId}">${init}</span>
+      <button type="button" class="pro-btn pro-btn--icon" data-step="${field}" data-dir="1" aria-label="${label} suivant(e)">${STEPPER_PLUS}</button>
+    </div>
+  </div>`;
+}
+
+/* Fiche d'exemplarisation : une carte large au-dessus de la liste. Rendue
+   seulement à l'ouverture/fermeture (pas à chaque synchro), pour ne pas
+   effacer ce que la personne est en train de saisir. */
+function renderExPanel(){
+  const host = document.getElementById('ex-host');
+  const r = openId ? TRANSFERTS[openId] : null;
+  if(!r || r.status !== 'pending'){ host.innerHTML = ''; return; }
+  const fact = (dl, v) => `<div><dt>${dl}</dt><dd>${esc(v) || '—'}</dd></div>`;
+  host.innerHTML = `
+    <section class="pro-card pro-card--pad tr-ex" aria-labelledby="tr-ex-h">
+      <div class="tr-ex-head">
+        <div>
+          <p class="pro-label">Exemplariser</p>
+          <h3 class="pro-h3" id="tr-ex-h">${esc(r['200$a']) || 'Sans titre'}</h3>
+          <p class="pro-muted" style="margin:.2rem 0 0">${[esc(r['700$a']), r['930$g'] ? 'cote registre ' + esc(r['930$g']) : ''].filter(Boolean).join(' · ') || ' '}</p>
         </div>
-        <form class="ex-form" id="ex-form" data-id="${esc(r.id)}">
-          <h4>Exemplariser — attribuer une nouvelle cote, un code-barre et un emplacement</h4>
-          <div class="form-grid">
-            <div class="form-field barcode">
-              <label for="ex-barcode">Nouveau code-barre</label>
-              <input type="text" id="ex-barcode" autocomplete="off" autofocus required>
-            </div>
-            <div class="form-field">
-              <label for="ex-cote">Nouvelle cote</label>
-              <input type="text" id="ex-cote" autocomplete="off" placeholder="ex. D104214" required>
-            </div>
-          </div>
-          <div class="form-warn" id="ex-dup-warn"></div>
-
-          <div class="loc-toggle">
-            <label><input type="checkbox" id="ex-loc-enabled" checked> J'indique l'emplacement maintenant</label>
-          </div>
-          <div id="ex-loc-block">
-            <div class="loc-fields">
-              <select class="loc-sel" id="ex-loctype">
-                <option value="etagere">Étagère</option>
-                <option value="armoire">Armoire</option>
-                <option value="tiroir">Tiroir</option>
-              </select>
-              <div class="stepper" id="ex-stp-travee-wrap">
-                <button type="button" data-step="travee" data-dir="-1">−</button>
-                <span id="ex-val-travee">I</span>
-                <button type="button" data-step="travee" data-dir="1">+</button>
+        <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="ex-close">Fermer</button>
+      </div>
+      <dl class="tr-facts">
+        ${fact("Lieu d'édition (210$a)", r['210$a'])}
+        ${fact("Maison d'édition (210$c)", r['210$c'])}
+        ${fact('Importance matérielle (215$a)', r['215$a'])}
+        ${fact('Dimensions (215$d)', r['215$d'])}
+        ${fact("Lieu d'origine (915$a)", r['915$a'])}
+        ${fact("Date d'entrée (920$d)", r['920$d'])}
+      </dl>
+      <form id="ex-form" data-id="${esc(r.id)}">
+        <div class="tr-cols">
+          <section aria-labelledby="tr-s1">
+            <h4 class="tr-sec" id="tr-s1"><span class="tr-num" aria-hidden="true">1</span>Nouvelle identité</h4>
+            <div class="tr-col">
+              <div class="pro-field">
+                <label class="pro-label" for="ex-barcode">Nouveau code-barre <span class="tr-req" aria-hidden="true">*</span></label>
+                <input type="text" id="ex-barcode" class="pro-input tr-barcode" autocomplete="off" placeholder="Scannez ou saisissez…" required>
               </div>
-              <div class="stepper" id="ex-stp-colonne-wrap">
-                <button type="button" data-step="colonne" data-dir="-1">−</button>
-                <span id="ex-val-colonne">1</span>
-                <button type="button" data-step="colonne" data-dir="1">+</button>
+              <div class="tr-warn" id="ex-dup-warn" role="status"></div>
+              <div class="pro-field">
+                <label class="pro-label" for="ex-cote">Nouvelle cote <span class="tr-req" aria-hidden="true">*</span></label>
+                <input type="text" id="ex-cote" class="pro-input" autocomplete="off" placeholder="ex. D104214" required>
               </div>
-              <div class="stepper" id="ex-stp-etage-wrap">
-                <button type="button" data-step="etage" data-dir="-1">−</button>
-                <span id="ex-val-etage">1</span>
-                <button type="button" data-step="etage" data-dir="1">+</button>
-              </div>
-              <span class="loc-readout" id="ex-loc-readout">—</span>
             </div>
-          </div>
-
-          <div class="form-submit">
-            <button type="submit" class="btn-primary">Valider le transfert</button>
-            <button type="button" class="btn-mini" id="ex-cancel">Annuler</button>
-          </div>
-        </form>
-      </td>
-    </tr>
-  `;
+          </section>
+          <section aria-labelledby="tr-s2">
+            <h4 class="tr-sec" id="tr-s2"><span class="tr-num" aria-hidden="true">2</span>Où il est rangé</h4>
+            <div class="tr-col">
+              <label class="pro-check" for="ex-loc-enabled"><input type="checkbox" id="ex-loc-enabled" checked> J'indique l'emplacement maintenant (Réserve patrimoniale)</label>
+              <div id="ex-loc-block" class="tr-col">
+                <div class="pro-field">
+                  <label class="pro-label" for="ex-loctype">Type d'emplacement</label>
+                  <select class="pro-input" id="ex-loctype">
+                    <option value="etagere">Étagère</option>
+                    <option value="armoire">Armoire</option>
+                    <option value="tiroir">Tiroir</option>
+                  </select>
+                </div>
+                <div class="tr-steppers">
+                  ${stepperGroup('travee', 'ex-stp-travee-wrap', 'ex-lbl-travee', 'ex-val-travee', 'Travée', 'I')}
+                  ${stepperGroup('colonne', 'ex-stp-colonne-wrap', 'ex-lbl-colonne', 'ex-val-colonne', 'Colonne', '1')}
+                  ${stepperGroup('etage', 'ex-stp-etage-wrap', 'ex-lbl-etage', 'ex-val-etage', 'Étage', '1')}
+                </div>
+                <div class="tr-readout" aria-live="polite">
+                  ${rpUI.icon('map', { size: 24 })}
+                  <span><small>Emplacement choisi</small><span id="ex-loc-readout">—</span></span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="tr-ex-actions">
+          <button type="submit" class="pro-btn pro-btn--primary" id="ex-submit">Valider le transfert</button>
+          <button type="button" class="pro-btn pro-btn--secondary" id="ex-cancel">Annuler</button>
+        </div>
+      </form>
+    </section>`;
+  syncExPanelUI();
 }
 
 function renderPending(){
   const rows = Object.values(TRANSFERTS).filter(r => r.status === 'pending').sort((a, b) => (b.ts || 0) - (a.ts || 0));
-  document.getElementById('pending-title').textContent = `Livres en attente de transfert (${rows.length})`;
+  document.getElementById('pending-title').textContent = `Livres en attente de transfert (${rpUI.fmt.n(rows.length)})`;
   const tbody = document.getElementById('pending-tbody');
   if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="6"><div class="log-empty">Aucun livre en attente pour le moment.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="pro-empty"><div class="pro-empty__title">Aucun livre en attente</div><p class="pro-empty__text">Recopiez des livres depuis le registre papier dans l'onglet « Ajouter depuis le registre ».</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(r => `
-    <tr>
-      <td class="log-cote">${esc(r['930$g']) || '—'}</td>
-      <td>${esc(r['200$a']) || '<em style="color:#bbb">Sans titre</em>'}</td>
+    <tr data-id="${esc(r.id)}"${openId === r.id ? ' class="is-current"' : ''}>
+      <td class="pro-cote-cell tr-cote">${esc(r['930$g']) || '—'}</td>
+      <td>${esc(r['200$a']) || '<span class="pro-muted">Sans titre</span>'}</td>
       <td>${esc(r['700$a']) || '—'}</td>
       <td>${esc(r['210$d']) || '—'}</td>
-      <td>${r.ts ? new Date(r.ts).toLocaleString('fr-FR') : '—'}</td>
-      <td>
-        <button type="button" class="btn-mini ex-toggle" data-id="${esc(r.id)}">${openId === r.id ? 'Fermer' : 'Exemplariser'}</button>
-        <button type="button" class="log-del ex-remove" data-id="${esc(r.id)}" title="Retirer de la liste">✕</button>
-      </td>
+      <td class="tr-nowrap">${r.ts ? new Date(r.ts).toLocaleString('fr-FR') : '—'}</td>
+      <td><div class="tr-actions">
+        <button type="button" class="pro-btn ${openId === r.id ? 'pro-btn--secondary' : 'pro-btn--primary'} pro-btn--sm ex-toggle" data-id="${esc(r.id)}" aria-expanded="${openId === r.id}">${openId === r.id ? 'Fermer' : 'Exemplariser'}</button>
+        <button type="button" class="pro-btn pro-btn--icon pro-btn--sm ex-remove" data-id="${esc(r.id)}" aria-label="Retirer « ${esc(r['200$a'] || r.id)} » de la liste" title="Retirer de la liste">${rpUI.icon('x', { size: 16 })}</button>
+      </div></td>
     </tr>
-    ${openId === r.id ? renderDetailRow(r) : ''}
   `).join('');
-  syncExPanelUI();
 }
 
 function renderDone(){
   const rows = Object.values(TRANSFERTS).filter(r => r.status === 'done').sort((a, b) => (b.doneTs || 0) - (a.doneTs || 0));
-  document.getElementById('done-title').textContent = `Historique des transferts (${rows.length})`;
+  document.getElementById('done-title').textContent = `Historique des transferts (${rpUI.fmt.n(rows.length)})`;
   const tbody = document.getElementById('done-tbody');
   if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="6"><div class="log-empty">Aucun transfert effectué pour le moment.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="pro-empty"><div class="pro-empty__title">Aucun transfert effectué</div><p class="pro-empty__text">Les livres exemplarisés apparaîtront ici.</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(r => `
     <tr>
-      <td class="log-cote">${esc(r['930$g']) || '—'}</td>
-      <td>${esc(r['200$a']) || '<em style="color:#bbb">Sans titre</em>'}</td>
-      <td class="log-cote">${esc(r.newCote) || '—'}</td>
-      <td class="log-bc">${esc(r.newBarcode) || '—'}</td>
-      <td>${locationLabel(r.location)}</td>
-      <td>${r.doneTs ? new Date(r.doneTs).toLocaleString('fr-FR') : '—'}</td>
+      <td class="pro-cote-cell tr-cote">${esc(r['930$g']) || '—'}</td>
+      <td>${esc(r['200$a']) || '<span class="pro-muted">Sans titre</span>'}</td>
+      <td class="pro-cote-cell tr-cote">${esc(r.newCote) || '—'}</td>
+      <td class="tr-bc">${esc(r.newBarcode) || '—'}</td>
+      <td class="tr-nowrap">${locationLabel(r.location)}</td>
+      <td class="tr-nowrap">${r.doneTs ? new Date(r.doneTs).toLocaleString('fr-FR') : '—'}</td>
     </tr>
   `).join('');
 }
 
-function renderAll(){ renderStats(); renderPending(); renderDone(); }
+function renderAll(){
+  // Si la fiche ouverte n'est plus en attente (retirée ou transférée depuis
+  // un autre poste), on la ferme ; sinon on ne touche pas à ce qui est saisi.
+  if(openId && !(TRANSFERTS[openId] && TRANSFERTS[openId].status === 'pending')){ openId = null; renderExPanel(); }
+  renderStats(); renderPending(); renderDone();
+}
 
 /* ════════════════════════════════════════════════════════════
    AJOUT D'UN LIVRE À TRANSFÉRER (formulaire, saisie manuelle)
@@ -542,9 +607,10 @@ document.getElementById('add-form').addEventListener('submit', function(e){
   renderAll();
   queuePatch({ endpoint: 'transferts', patch: { type: 'upsert', record } });
 
-  const fb = document.getElementById('feedback');
-  fb.className = 'feedback show ok';
-  fb.innerHTML = `<div class="fb-top"><span class="fb-badge">✓ Ajouté à la liste de transfert</span></div><div class="fb-titre">${esc(titre)}</div>`;
+  rpUI.toast({ title:'Ajouté à la liste de transfert.', text:`« ${titre} »` }, {
+    type:'ok',
+    action:{ label:'Voir la liste', onClick:() => { tabsCtl.select('pending'); } },
+  });
 
   ADD_FIELD_IDS.forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('f-titre').focus();
@@ -552,11 +618,27 @@ document.getElementById('add-form').addEventListener('submit', function(e){
 
 /* ════════════════════════════════════════════════════════════
    LISTE D'ATTENTE : retirer / exemplariser (délégation d'événements,
-   le contenu est redessiné à chaque changement d'état)
+   sur toute la section : la fiche est au-dessus du tableau)
    ════════════════════════════════════════════════════════════ */
-const pendingTbody = document.getElementById('pending-tbody');
+const pendingRoot = document.getElementById('pending-root');
 
-pendingTbody.addEventListener('click', function(e){
+function openExPanel(id){
+  openId = id;
+  resetExLoc();
+  renderExPanel();
+  renderPending();
+  const bc = document.getElementById('ex-barcode');
+  const panel = document.getElementById('ex-host');
+  if(panel && panel.scrollIntoView){ try { panel.scrollIntoView({ block:'nearest' }); } catch(e) {} }
+  if(bc) bc.focus({ preventScroll:true });
+}
+function closeExPanel(){
+  openId = null;
+  renderExPanel();
+  renderPending();
+}
+
+pendingRoot.addEventListener('click', function(e){
   const stepBtn = e.target.closest('[data-step]');
   if(stepBtn){
     const field = stepBtn.dataset.step, dir = parseInt(stepBtn.dataset.dir, 10);
@@ -578,16 +660,12 @@ pendingTbody.addEventListener('click', function(e){
   const toggleBtn = e.target.closest('.ex-toggle');
   if(toggleBtn){
     const id = toggleBtn.dataset.id;
-    openId = (openId === id) ? null : id;
-    if(openId) resetExLoc();
-    renderPending();
+    if(openId === id) closeExPanel(); else openExPanel(id);
     return;
   }
 
-  const cancelBtn = e.target.closest('#ex-cancel');
-  if(cancelBtn){
-    openId = null;
-    renderPending();
+  if(e.target.closest('#ex-cancel') || e.target.closest('#ex-close')){
+    closeExPanel();
     return;
   }
 
@@ -595,36 +673,44 @@ pendingTbody.addEventListener('click', function(e){
   if(removeBtn){
     const id = removeBtn.dataset.id;
     const rec = TRANSFERTS[id];
-    if(!confirm(`Retirer « ${rec ? (rec['200$a'] || id) : id} » de la liste de transfert ?`)) return;
-    delete TRANSFERTS[id];
-    if(openId === id) openId = null;
-    saveLocal();
-    renderAll();
-    queuePatch({ endpoint: 'transferts', patch: { type: 'delete', id } });
+    rpUI.confirmInline(removeBtn.closest('tr'), `Retirer « ${rec ? (rec['200$a'] || id) : id} » de la liste de transfert ?`, { danger:true, okLabel:'Retirer' }).then(ok => {
+      if(!ok) return;
+      delete TRANSFERTS[id];
+      if(openId === id){ openId = null; renderExPanel(); }
+      saveLocal();
+      renderAll();
+      queuePatch({ endpoint: 'transferts', patch: { type: 'delete', id } });
+      rpUI.toast('Livre retiré de la liste de transfert.', { type:'info' });
+    });
   }
 });
 
-pendingTbody.addEventListener('change', function(e){
+pendingRoot.addEventListener('change', function(e){
   if(e.target.id === 'ex-loctype'){ exSetLocType(e.target.value); }
   if(e.target.id === 'ex-loc-enabled'){
     document.getElementById('ex-loc-block').style.display = e.target.checked ? '' : 'none';
   }
 });
 
-pendingTbody.addEventListener('input', function(e){
+pendingRoot.addEventListener('input', function(e){
   if(e.target.id !== 'ex-barcode') return;
   const bc = e.target.value.trim();
   const dupWarn = document.getElementById('ex-dup-warn');
+  const btn = document.getElementById('ex-submit');
   const syr = bc ? SYRACUSE_BARCODES[bc] : null;
+  e.target.classList.toggle('pro-input--err', !!syr);
+  // Avertissement non bloquant : seul le libellé du bouton change.
   if(syr){
-    dupWarn.textContent = `⚠ Ce code-barre existe déjà : « ${syr.titre || '(sans titre)'} » (cote ${syr.cote || '—'}). Vérifiez qu'il ne s'agit pas d'une erreur avant de continuer.`;
+    dupWarn.innerHTML = rpUI.icon('warn', { size: 20 }) + `<span><strong>Ce code-barre existe déjà</strong> : « ${esc(syr.titre || '(sans titre)')} » (cote ${esc(syr.cote || '—')}). Vérifiez qu'il ne s'agit pas d'une erreur avant de continuer.</span>`;
     dupWarn.classList.add('show');
+    btn.textContent = 'Valider quand même';
   } else {
     dupWarn.classList.remove('show');
+    btn.textContent = 'Valider le transfert';
   }
 });
 
-pendingTbody.addEventListener('submit', function(e){
+pendingRoot.addEventListener('submit', function(e){
   const form = e.target.closest('#ex-form');
   if(!form) return;
   e.preventDefault();
@@ -696,8 +782,11 @@ pendingTbody.addEventListener('submit', function(e){
   TRANSFERTS[id] = doneRecord;
   saveLocal();
   openId = null;
+  renderExPanel();
   renderAll();
   queuePatch({ endpoint: 'transferts', patch: { type: 'upsert', record: doneRecord } });
+
+  rpUI.toast({ title:'Transfert enregistré.', text:`« ${manuelRecord.titre} » — code-barre ${newBarcode}, cote ${newCote}` }, { type:'ok' });
 });
 
 /* ════════════════════════════════════════════════════════════

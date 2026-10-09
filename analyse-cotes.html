@@ -4,124 +4,93 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
+  <!-- Contrôle d'accès de l'espace pro (même gate localStorage que les autres
+       pages protégées — voir « Sécurité » dans CLAUDE.md). En tête de <head>
+       pour rediriger avant tout rendu. -->
+  <script>
+    if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+  </script>
   <title>Analyse des cotes — Réserve patrimoniale</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/admin.css">
   <script src="js/exemplaires-manuels-shared.js"></script>
   <style>
-    :root {
-      --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+    /* Mise en page propre à l'analyse des cotes (préfixe ac-). Les composants
+       (en-tête, onglets, KPI, tableaux, pagination, graphique) viennent de
+       css/admin.css et de js/admin-ui.js / js/admin-charts.js. */
+
+    /* Les séries sont nombreuses (une par fonds et par tranche) : les onglets
+       passent sur leur propre ligne et reviennent à la ligne plutôt que de
+       défiler hors de vue. Sur écran étroit, ils défilent. */
+    .ac-head .pro-tabs { order: 3; flex-basis: 100%; flex-wrap: wrap; overflow: visible; gap: 0 0.25rem; }
+    .ac-head .pro-tab { padding: 0 0.85rem; min-height: 40px; font-size: 0.8rem; }
+    .ac-head .pro-tab svg { flex: none; }
+    .ac-head .pro-tabs:empty { display: none; }
+    .ac-head .pro-head__inner { padding-bottom: 0; }
+    .ac-head .pro-head__title { padding-bottom: 0.6rem; }
+    @media (max-width: 40rem) {
+      .ac-head .pro-tabs { flex-wrap: nowrap; overflow-x: auto; }
     }
-    body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--papier);margin:0;line-height:normal}
-    .page-hero{background:var(--bleu);color:#fff;padding:2.5rem 1.5rem 2rem}
-    .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-    .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.75rem;letter-spacing:.04em}
-    .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:400;margin:0 0 .5rem;line-height:1.15}
-    .page-lead{font-size:.9rem;color:rgba(255,255,255,0.7);margin:0;max-width:560px;line-height:1.6}
-    .hero-actions a, .hero-actions button {
-      font-family:inherit;font-size:.82rem;color:rgba(255,255,255,0.8);
-      background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
-      padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;
-      transition:all .15s;
+
+    .ac-note { margin: 0 0 1rem; font-size: 0.8rem; color: var(--pro-texte-doux); }
+    .ac-stack > * + * { margin-top: 0.875rem; }
+    .ac-kpi-range .pro-kpi__value { font-size: 1.35rem; line-height: 1.25; overflow-wrap: anywhere; }
+    .ac-panel-head { margin-top: 1.75rem; }
+
+    /* Carte de densité */
+    .ac-chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.4rem 1.2rem; margin-bottom: 0.9rem; }
+    .ac-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; font-size: 0.75rem; color: var(--pro-texte); }
+    .ac-legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+    .ac-legend i { display: block; width: 12px; height: 12px; background: var(--pro-bleu); }
+    .ac-legend i.is-free { background: var(--ac-free); border: 1px solid #E29AA8; }
+    .ac-dens { --ac-free: #F4C3CD; display: flex; gap: 0.5rem; }
+    .ac-dens__y { position: relative; flex: none; width: 3rem; height: var(--ac-h, 150px); }
+    .ac-dens__y span { position: absolute; right: 0; transform: translateY(50%); font-size: 0.72rem; color: var(--pro-texte-doux); line-height: 1; }
+    .ac-dens__plot { position: relative; flex: 1; min-width: 0; height: var(--ac-h, 150px); border-bottom: 1px solid var(--pro-texte-doux); border-left: 1px solid var(--pro-texte-doux); background: #fff; }
+    .ac-dens__plot svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .ac-dens__plot g { cursor: default; }
+    .ac-dens__plot g:hover rect { opacity: 0.8; }
+    .ac-dens__grid { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--pro-trait); pointer-events: none; }
+    .ac-dens__x { position: relative; height: 1.4rem; margin: 0.35rem 0 0 calc(3rem + 0.5rem); }
+    .ac-dens__x span { position: absolute; transform: translateX(-50%); font-size: 0.72rem; color: var(--pro-texte-doux); line-height: 1; white-space: nowrap; }
+    .ac-dens__x span.is-start { transform: none; }
+    .ac-dens__x span.is-end { transform: translateX(-100%); }
+    .ac-dens-cap { margin-top: 0.5rem; font-size: 0.72rem; color: var(--pro-texte-doux); }
+
+    /* Tableaux */
+    .ac-dup-table th, .ac-dup-table td { vertical-align: top; }
+    .ac-table-card .pro-table th { position: static; }
+    .ac-toolbar-spacer { flex: 1 1 auto; }
+    .ac-count { font-size: 0.8rem; color: var(--pro-texte); white-space: nowrap; }
+    .ac-count strong { color: var(--pro-bleu); }
+    .ac-neigh-title { display: block; margin-top: 0.15rem; font-size: 0.72rem; line-height: 1.35; color: var(--pro-texte-doux); max-width: 30rem; }
+    .ac-free-num { font: 700 0.9rem var(--pro-font-mono); color: var(--pro-bleu); }
+    .ac-free-num small { font-weight: 400; color: var(--pro-texte-doux); font-size: 0.7rem; }
+    .ac-dup-cote { font: 700 0.85rem var(--pro-font-mono); color: var(--pro-carmin-fonce); white-space: nowrap; }
+    .ac-titles { margin: 0; padding: 0; list-style: none; }
+    .ac-titles li { padding: 0.2rem 0; border-bottom: 1px dotted var(--pro-trait); font-size: 0.8rem; line-height: 1.4; }
+    .ac-titles li:first-child { padding-top: 0; }
+    .ac-titles li:last-child { border-bottom: 0; padding-bottom: 0; }
+    .ac-dup-table th:nth-child(1) { width: 11rem; }
+    .ac-dup-table th:nth-child(2) { width: 8rem; }
+    .ac-more { margin-top: 0.3rem; }
+    .ac-more > summary { cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--pro-carmin); min-height: 28px; display: flex; align-items: center; }
+    .ac-more[open] > summary { margin-bottom: 0.3rem; }
+    .ac-pagesize { height: 44px; width: auto; padding: 0 0.5rem; font-size: 0.8rem; }
+
+    /* Squelette de chargement */
+    .ac-skel-kpis { display: flex; flex-wrap: wrap; gap: 0.875rem; margin-top: 2rem; }
+    .ac-skel-kpis > span { flex: 1 1 200px; height: 5.5rem; }
+
+    @media (max-width: 40rem) {
+      .ac-dens__y { width: 2.4rem; }
+      .ac-dens__x { margin-left: calc(2.4rem + 0.5rem); }
+      .ac-toolbar-spacer { display: none; }
     }
-    .hero-actions a:hover, .hero-actions button:hover { background:rgba(255,255,255,0.2); color:#fff; }
-    .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
-    .csv-loader{background: var(--papier-ombre);border:1px dashed var(--trait-fort);border-radius:var(--radius-md);padding:1.5rem;text-align:center;margin:2rem auto;max-width:1100px}
-    .csv-loader p{font-size:.85rem;color:var(--text-light);margin:0 0 .5rem}
-    .spinner-row{display:flex;align-items:center;justify-content:center;gap:.4rem;font-size:.8rem;color:var(--text-light)}
-    .sp{width:7px;height:7px;border-radius:50%;background:var(--trait-fort);animation:sp 1.2s infinite}
-    .sp:nth-child(2){animation-delay:.2s}.sp:nth-child(3){animation-delay:.4s}
-    @keyframes sp{0%,80%,100%{opacity:.2}40%{opacity:1}}
-    footer{background:var(--encre);color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:3rem;font-size:.8rem;text-align:center}
-    footer a{color: var(--carmin);text-decoration:none}
-
-    /* ════ SECTION COTES ════ */
-    .cotes-section{padding:2rem 0 3rem}
-    .section-heading{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;font-weight:400;margin:0 0 .35rem;color:var(--encre)}
-    .section-subhead{font-size:.875rem;color:var(--text-light);margin:0 0 1.75rem}
-    .cotes-tabs{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.5rem;border-bottom:2px solid var(--trait);padding-bottom:.75rem}
-    .ctab{font-family:inherit;font-size:.78rem;padding:.35rem .9rem;border:1px solid var(--trait-fort);border-radius:20px;background:#fff;cursor:pointer;color:var(--text);transition:all .15s;white-space:nowrap}
-    .ctab:hover{border-color:var(--encre);color:var(--encre)}
-    .ctab.active{background:var(--encre);color:#fff;border-color:var(--encre)}
-    .ctab .ctab-badge{display:inline-block;margin-left:.35rem;font-size:.65rem;background:rgba(255,255,255,.25);padding:1px 5px;border-radius:10px}
-    .ctab.active .ctab-badge{background:rgba(255,255,255,.25)}
-    .ctab:not(.active) .ctab-badge{background:var(--papier-ombre);color:var(--text-light)}
-    .cotes-panels{}
-    .cotes-panel{display:none}
-    .cotes-panel.active{display:block}
-
-    /* Vue densité (timeline) */
-    .density-wrap{margin-bottom:1.5rem}
-    .density-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem}
-    .density-title{font-size:.78rem;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.05em}
-    .density-legend{display:flex;gap:.75rem;font-size:.7rem;color:var(--text-light);align-items:center;flex-wrap:wrap}
-    .dleg{display:flex;align-items:center;gap:.3rem}
-    .dleg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
-    .density-svg-wrap{overflow-x:auto;border:1px solid var(--trait);border-radius:8px;background:var(--papier-ombre)}
-    .density-svg-wrap svg{display:block}
-
-    /* Stats cotes */
-    .cotes-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem;margin-bottom:1.5rem}
-    .cstat{background:#fff;border:1px solid #E3DED4;border-radius:8px;padding:.75rem .9rem}
-    .cstat-lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);margin-bottom:.25rem}
-    .cstat-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1;color:var(--bleu)}
-    .cstat-val.warn{color:#d32f2f}
-    .cstat-val.ok{color:#2e7d32}
-
-    /* Table trous */
-    .gaps-wrap{background:#fff;border:1px solid #E3DED4;border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
-    .gaps-header{display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;background:var(--papier-ombre);border-bottom:1px solid var(--trait);flex-wrap:wrap;gap:.4rem}
-    .gaps-header-title{font-size:.75rem;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.05em}
-    .gaps-search{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid var(--trait-fort);border-radius:6px;padding:.25rem .6rem;font-size:.75rem}
-    .gaps-search input{border:none;outline:none;font-size:.75rem;background:transparent;width:120px;font-family:inherit;color:var(--text)}
-    .gaps-body{}
-    .gaps-table{width:100%;border-collapse:collapse;font-size:.78rem}
-    .gaps-table th{position:sticky;top:0;background:#fff;padding:.4rem .75rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);border-bottom:1px solid var(--trait);font-weight:600}
-    .gaps-table td{padding:.35rem .75rem;border-bottom:1px solid #F0ECE3;vertical-align:middle}
-    .gaps-table tr:last-child td{border-bottom:none}
-    .gaps-table tr:hover td{background:var(--papier-ombre)}
-    .gap-num{font-family:monospace;font-weight:600;color:var(--bleu)}
-    .gap-range{font-size:.68rem;color:var(--text-light)}
-    .gap-prev,.gap-next{font-size:.68rem;color:var(--text-light);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .gaps-empty{padding:1.25rem;text-align:center;color:var(--text-light);font-size:.8rem;font-style:italic}
-    .gaps-more{padding:.5rem .75rem;text-align:center;font-size:.72rem;color:var(--text-light);font-style:italic;border-top:1px solid var(--trait)}
-
-    /* Table doublons */
-    .dup-wrap{background:#fff;border:1px solid #ffe0e0;border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
-    .dup-header{display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;background:#fff5f5;border-bottom:1px solid #ffe0e0;flex-wrap:wrap;gap:.4rem}
-    .dup-header-title{font-size:.75rem;font-weight:600;color:#c62828;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:.4rem}
-    .dup-body{max-height:320px;overflow-y:auto}
-    .dup-table{width:100%;border-collapse:collapse;font-size:.78rem}
-    .dup-table th{position:sticky;top:0;background:#fff5f5;padding:.4rem .75rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#c62828;border-bottom:1px solid #ffe0e0;font-weight:600}
-    .dup-table td{padding:.35rem .75rem;border-bottom:1px solid #fff5f5;vertical-align:top}
-    .dup-table tr:last-child td{border-bottom:none}
-    .dup-table tr:hover td{background:#fffafa}
-    .dup-cote{font-family:monospace;font-weight:700;color:#c62828;white-space:nowrap}
-    .dup-count{display:inline-block;background:#ffcdd2;color:#c62828;font-size:.65rem;padding:1px 6px;border-radius:10px;font-weight:700;white-space:nowrap}
-    .dup-titles{font-size:.7rem;color:#555;line-height:1.5}
-    .dup-titles li{list-style:none;padding:0;margin:0;border-bottom:1px dotted #ffe0e0;padding-bottom:2px;margin-bottom:2px}
-    .dup-titles li:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
-    .dup-loc{font-size:.62rem;color:#bbb;font-style:italic}
-    .dup-empty{padding:1.25rem;text-align:center;color:#2e7d32;font-size:.8rem}
-
-    /* Bouton export */
-    .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid var(--trait-fort);border-radius:6px;background:#fff;cursor:pointer;color:var(--text);transition:all .15s;display:flex;align-items:center;gap:.3rem}
-    .export-btn:hover{background:var(--papier-ombre);border-color:#B0A99A}
-
-    /* Pagination */
-    .gaps-pagination{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-top:1px solid var(--trait);background:var(--papier-ombre);flex-wrap:wrap;gap:.5rem}
-    .pag-info{font-size:.72rem;color:var(--text-light)}
-    .pag-controls{display:flex;align-items:center;gap:.25rem}
-    .pag-btn{font-family:inherit;font-size:.72rem;padding:.2rem .55rem;border:1px solid var(--trait-fort);border-radius:5px;background:#fff;cursor:pointer;color:var(--text);transition:all .12s;min-width:28px;text-align:center;line-height:1.4}
-    .pag-btn:hover:not(:disabled){background:var(--papier-ombre);border-color:#B0A99A}
-    .pag-btn:disabled{opacity:.35;cursor:default}
-    .pag-btn.active{background:var(--encre);color:#fff;border-color:var(--encre);font-weight:600}
-    .pag-ellipsis{font-size:.72rem;color:var(--text-light);padding:0 .15rem}
-    .pag-perpage{font-family:inherit;font-size:.72rem;border:1px solid var(--trait-fort);border-radius:5px;padding:.2rem .4rem;background:#fff;color:var(--text);cursor:pointer}
-    .gaps-filter-info{font-size:.72rem;color:#666;font-style:italic;padding:.3rem .75rem;background:#fffde7;border-bottom:1px solid #fff9c4;display:none}
-    .gaps-filter-info.visible{display:block}
-    .export-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
   </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
        qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
@@ -129,53 +98,70 @@
        rendu. Voir js/parent-page-height.js. -->
   <script src="js/parent-page-height.js"></script>
 </head>
-<body>
+<body class="pro">
 
-<section class="page-hero">
-  <div class="container">
-    <div>
-      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
-      <h1 class="page-title">Analyse des <em>cotes</em></h1>
-      <p class="page-lead">Trous intercalaires, disponibilités et doublons de cotes, calculés à partir du récolement.</p>
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head ac-head" id="ac-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace pro</a> › Catalogue</p>
+      <h1 class="pro-head__h1">Analyse des cotes</h1>
     </div>
-    <div class="hero-actions">
-      <a href="admin.html">← Espace professionnel</a>
+    <div class="pro-head__actions">
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
     </div>
+    <div class="pro-tabs" role="tablist" aria-label="Doublons et séries de cotes" id="ac-tablist"></div>
   </div>
-</section>
+</header>
 
-<div class="csv-loader" id="csv-loader">
-  <p>Chargement du récolement depuis <code>data/inventaire.json</code>…</p>
-  <div class="spinner-row"><div class="sp"></div><div class="sp"></div><div class="sp"></div><span>Analyse en cours</span></div>
-</div>
+<main id="contenu" class="pro-main">
+  <div class="pro-wrap">
 
-<!-- ════════════ SECTION ANALYSE DES COTES ════════════ -->
-<section class="cotes-section">
-  <div class="container">
-    <p class="section-subhead" id="cotes-subhead"></p>
+    <!-- Chargement : squelette pendant la lecture de data/inventaire.json et le calcul -->
+    <div id="ac-loading" aria-busy="true" role="status">
+      <p class="pro-sr">Chargement et analyse des cotes en cours…</p>
+      <div class="ac-skel-kpis" aria-hidden="true">
+        <span class="pro-skeleton"></span><span class="pro-skeleton"></span><span class="pro-skeleton"></span><span class="pro-skeleton"></span>
+      </div>
+      <div class="pro-skeleton" style="height:12rem;margin-top:1.5rem" aria-hidden="true"></div>
+      <div class="pro-skeleton" style="height:18rem;margin-top:0.875rem" aria-hidden="true"></div>
+    </div>
 
-    <!-- Onglets séries -->
-    <div class="cotes-tabs" id="cotes-tabs"></div>
+    <div id="ac-error" hidden></div>
 
-    <!-- Panneau par série -->
-    <div class="cotes-panels" id="cotes-panels"></div>
+    <div id="ac-content" hidden>
+      <!-- Prochains numéros disponibles, un KPI par fonds -->
+      <section class="pro-section" aria-labelledby="h-next">
+        <div class="pro-section-head">
+          <h2 class="pro-eyebrow" id="h-next">Prochains numéros disponibles</h2>
+          <span class="pro-rule" aria-hidden="true"></span>
+          <span class="pro-section-note" id="ac-total-note"></span>
+        </div>
+        <div class="pro-kpis" id="ac-next"></div>
+      </section>
+
+      <div id="ac-panels"></div>
+    </div>
+
   </div>
-</section>
+</main>
 
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+<footer class="pro-foot">
+  <div class="pro-foot__inner">
+    <span>Bibliothèques de Douai — Réserve patrimoniale · Espace réservé à l'équipe</span>
+    <a href="admin.html">← Espace pro</a>
   </div>
 </footer>
 
+<script src="js/admin-ui.js"></script>
+<script src="js/admin-charts.js"></script>
 <script>
-(function() {
-  if (localStorage.getItem('rp_admin_auth') !== '1') {
-    window.location.href = 'index.html';
-  }
-})();
+(function () {
+'use strict';
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+var ui = window.rpUI, charts = window.rpCharts, fmt = ui.fmt, esc = ui.esc;
+function $(id) { return document.getElementById(id); }
 
 /* ════════════════════════════════════════════════════════════
    ANALYSE DES COTES — chargement depuis data/inventaire.json
@@ -188,506 +174,526 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
    périmètre — la notion de "trou" n'a pas de sens pour elles.
    ════════════════════════════════════════════════════════════ */
 
-const FONDS_DEF = [
-  { prefix:'D',   label:'Douaisien',      color:'#3a7ca5' },
-  { prefix:'P',   label:'Protestantisme', color:'#4a6a3a' },
-  { prefix:'MIN', label:'Mines',          color:'#5a5a5a' },
-  { prefix:'L',   label:'Littérature',    color:'#1a6a7a' },
+var FONDS_DEF = [
+  { prefix: 'D',   label: 'Douaisien' },
+  { prefix: 'P',   label: 'Protestantisme' },
+  { prefix: 'MIN', label: 'Mines' },
+  { prefix: 'L',   label: 'Littérature' }
 ];
 
 /* Au-delà de cet écart entre deux numéros utilisés consécutifs, on
    considère qu'il s'agit d'un nouveau bloc de cotes (campagne de
    numérotation différente) plutôt que d'un trou à combler. */
-const TRANCHE_GAP_THRESHOLD = 1000;
+var TRANCHE_GAP_THRESHOLD = 1000;
+
+var DUP_KEY = '__dup__';
 
 /* Données calculées */
-let SERIES = {};        /* clé "PREFIX__i" -> { label, color, min, max, used:Set, items:Map } */
-let ALL_COTES_MAP = {}; /* doublons, scopés aux fonds analysés */
-let FONDS_SUMMARY = []; /* pour la bannière "prochain numéro disponible" */
+var SERIES = {};        /* clé "PREFIX__i" -> { label, prefix, min, max, used:Set, items:Map, gaps? } */
+var SERIES_ORDER = [];
+var ALL_COTES_MAP = {}; /* doublons, scopés aux fonds analysés */
+var FONDS_SUMMARY = []; /* pour le bandeau "prochain numéro disponible" */
+var DUPS = [];          /* [[cote, [{titre}]]] triés */
 
-function parseCoteNumber(cote, prefix){
-  const up = (cote||'').split(',')[0].trim().toUpperCase();
-  if(!up.startsWith(prefix)) return null;
-  const m = /^(\d+)/.exec(up.slice(prefix.length));
+function parseCoteNumber(cote, prefix) {
+  var up = (cote || '').split(',')[0].trim().toUpperCase();
+  if (!up.startsWith(prefix)) return null;
+  var m = /^(\d+)/.exec(up.slice(prefix.length));
   return m ? parseInt(m[1], 10) : null;
 }
 
-function clusterTranches(usedSet, threshold){
-  const sorted = [...usedSet].sort((a,b)=>a-b);
-  const tranches = [];
-  let start = sorted[0], prev = sorted[0];
-  for(let i=1;i<sorted.length;i++){
-    const n = sorted[i];
-    if(n - prev > threshold){ tranches.push({min:start,max:prev}); start = n; }
+function clusterTranches(usedSet, threshold) {
+  var sorted = Array.from(usedSet).sort(function (a, b) { return a - b; });
+  var tranches = [];
+  var start = sorted[0], prev = sorted[0];
+  for (var i = 1; i < sorted.length; i++) {
+    var n = sorted[i];
+    if (n - prev > threshold) { tranches.push({ min: start, max: prev }); start = n; }
     prev = n;
   }
-  tranches.push({min:start, max:prev});
+  tranches.push({ min: start, max: prev });
   return tranches;
 }
 
-function buildCotesAnalysis(rows){
+function buildCotesAnalysis(rows) {
   SERIES = {};
+  SERIES_ORDER = [];
   ALL_COTES_MAP = {};
   FONDS_SUMMARY = [];
 
-  const fondsData = {};
-  FONDS_DEF.forEach(f => fondsData[f.prefix] = { used:new Set(), items:new Map() });
+  var fondsData = {};
+  FONDS_DEF.forEach(function (f) { fondsData[f.prefix] = { used: new Set(), items: new Map() }; });
 
-  rows.forEach(row => {
-    const cote  = (row['930$g'] || '').trim();
-    const titre = (row['200$a'] || '').trim().slice(0,100);
-    if(!cote) return;
+  rows.forEach(function (row) {
+    var cote  = (row['930$g'] || '').trim();
+    var titre = (row['200$a'] || '').trim().slice(0, 100);
+    if (!cote) return;
 
-    let matched = null, n1 = null;
-    for(const f of FONDS_DEF){
-      const num = parseCoteNumber(cote, f.prefix);
-      if(num !== null){ matched = f; n1 = num; break; }
+    var matched = null, n1 = null;
+    for (var k = 0; k < FONDS_DEF.length; k++) {
+      var num = parseCoteNumber(cote, FONDS_DEF[k].prefix);
+      if (num !== null) { matched = FONDS_DEF[k]; n1 = num; break; }
     }
-    if(!matched) return; /* fonds non séquentiel : hors périmètre de l'outil */
+    if (!matched) return; /* fonds non séquentiel : hors périmètre de l'outil */
 
-    if(!ALL_COTES_MAP[cote]) ALL_COTES_MAP[cote] = [];
-    ALL_COTES_MAP[cote].push({ titre });
+    if (!ALL_COTES_MAP[cote]) ALL_COTES_MAP[cote] = [];
+    ALL_COTES_MAP[cote].push({ titre: titre });
 
-    const fd = fondsData[matched.prefix];
+    var fd = fondsData[matched.prefix];
     fd.used.add(n1);
-    if(!fd.items.has(n1)) fd.items.set(n1, []);
-    fd.items.get(n1).push({ cote, titre });
+    if (!fd.items.has(n1)) fd.items.set(n1, []);
+    fd.items.get(n1).push({ cote: cote, titre: titre });
   });
 
   /* Construire une série par tranche détectée automatiquement */
-  FONDS_DEF.forEach(f => {
-    const fd = fondsData[f.prefix];
-    if(!fd.used.size) return;
-    const tranches = clusterTranches(fd.used, TRANCHE_GAP_THRESHOLD);
-    tranches.forEach((t, i) => {
-      const used  = new Set([...fd.used].filter(n => n >= t.min && n <= t.max));
-      const items = new Map([...fd.items].filter(([n]) => n >= t.min && n <= t.max));
-      const key = f.prefix + '__' + i;
+  FONDS_DEF.forEach(function (f) {
+    var fd = fondsData[f.prefix];
+    if (!fd.used.size) return;
+    var tranches = clusterTranches(fd.used, TRANCHE_GAP_THRESHOLD);
+    tranches.forEach(function (t, i) {
+      var used = new Set(Array.from(fd.used).filter(function (n) { return n >= t.min && n <= t.max; }));
+      var items = new Map(Array.from(fd.items).filter(function (e) { return e[0] >= t.min && e[0] <= t.max; }));
+      var key = f.prefix + '__' + i;
       SERIES[key] = {
-        label: tranches.length > 1
-          ? `${f.label} ${t.min.toLocaleString('fr-FR')} – ${t.max.toLocaleString('fr-FR')}`
-          : f.label,
-        color: f.color, min:t.min, max:t.max, used, items,
+        key: key,
+        label: tranches.length > 1 ? f.label + ' ' + fmt.n(t.min) + ' – ' + fmt.n(t.max) : f.label,
+        fonds: f.label, prefix: f.prefix, min: t.min, max: t.max, used: used, items: items
       };
+      SERIES_ORDER.push(key);
     });
-    FONDS_SUMMARY.push({ label:f.label, prefix:f.prefix, lastUsed:Math.max(...fd.used) });
+    var last = 0;
+    fd.used.forEach(function (n) { if (n > last) last = n; });
+    FONDS_SUMMARY.push({ label: f.label, prefix: f.prefix, lastUsed: last });
   });
 
-  const totalCotes = Object.keys(ALL_COTES_MAP).length;
-  const nextAvail = FONDS_SUMMARY
-    .map(f => `${f.label} — prochain n° : <strong>${f.prefix}${(f.lastUsed+1).toLocaleString('fr-FR')}</strong>`)
-    .join(' · ');
-  document.getElementById('cotes-subhead').innerHTML =
-    `${totalCotes.toLocaleString('fr-FR')} cotes analysées (fonds Douaisien, Protestantisme, Mines, Littérature). ${nextAvail}`;
-
-  const keys = Object.keys(SERIES);
-  renderCotesTabs(keys);
-  renderCotesPanels(keys);
-  activateCotesTab(keys[0] || '__dup__');
+  DUPS = Object.keys(ALL_COTES_MAP)
+    .filter(function (c) { return ALL_COTES_MAP[c].length > 1; })
+    .map(function (c) { return [c, ALL_COTES_MAP[c]]; })
+    .sort(function (a, b) { return b[1].length - a[1].length || a[0].localeCompare(b[0], 'fr'); });
 }
 
-/* ════ Onglets ════ */
-function renderCotesTabs(keys){
-  const container = document.getElementById('cotes-tabs');
-  container.innerHTML = '';
-
-  const dupCount = Object.values(ALL_COTES_MAP).filter(v=>v.length>1).length;
-  const dupBtn = document.createElement('button');
-  dupBtn.className = 'ctab';
-  dupBtn.dataset.prefix = '__dup__';
-  dupBtn.innerHTML = `⚠ Doublons <span class="ctab-badge">${dupCount}</span>`;
-  if(dupCount){ dupBtn.style.borderColor='#e57373'; dupBtn.style.color='#c62828'; }
-  dupBtn.onclick = () => activateCotesTab('__dup__');
-  container.appendChild(dupBtn);
-
-  keys.forEach(key => {
-    const s = SERIES[key];
-    const btn = document.createElement('button');
-    btn.className = 'ctab';
-    btn.dataset.prefix = key;
-    btn.innerHTML = `${s.label} <span class="ctab-badge">${s.used.size}</span>`;
-    btn.onclick = () => activateCotesTab(key);
-    container.appendChild(btn);
-  });
-}
-
-function activateCotesTab(prefix){
-  document.querySelectorAll('.ctab').forEach(b =>
-    b.classList.toggle('active', b.dataset.prefix === prefix));
-  document.querySelectorAll('.cotes-panel').forEach(p =>
-    p.classList.toggle('active', p.dataset.prefix === prefix));
-}
-
-/* ════ Panneaux ════ */
-function renderCotesPanels(keys){
-  const container = document.getElementById('cotes-panels');
-  container.innerHTML = '';
-  container.appendChild(buildDupPanel());
-  keys.forEach(key => container.appendChild(buildSeriesPanel(key)));
-}
-
-/* ════ Calcul trous ════ */
-function getGapsList(s){
-  const usedArr = [...s.used].sort((a,b)=>a-b);
-  const gaps = [];
-  for(let i = s.min; i <= s.max; i++){
-    if(!s.used.has(i)){
-      const prev = usedArr.filter(n=>n<i).at(-1);
-      const next = usedArr.find(n=>n>i);
-      gaps.push({
-        n: i,
-        prevN: prev, prevItem: prev != null ? s.items.get(prev) : null,
-        nextN: next, nextItem: next != null ? s.items.get(next) : null,
-      });
-    }
+/* ════ Calcul des trous (balayage linéaire) ════ */
+function getGaps(s) {
+  if (s.gaps) return s.gaps;
+  var usedArr = Array.from(s.used).sort(function (a, b) { return a - b; });
+  var gaps = [], j = 0, prev = null;
+  for (var i = s.min; i <= s.max; i++) {
+    if (s.used.has(i)) { prev = i; continue; }
+    while (j < usedArr.length && usedArr[j] <= i) j++;
+    var next = j < usedArr.length ? usedArr[j] : null;
+    gaps.push({
+      n: i,
+      prevN: prev, prevItem: prev != null ? s.items.get(prev) : null,
+      nextN: next, nextItem: next != null ? s.items.get(next) : null
+    });
   }
+  s.gaps = gaps;
   return gaps;
 }
 
-/* ════ Panneau série ════ */
-function buildSeriesPanel(key){
-  const s = SERIES[key];
-  const gaps = getGapsList(s);
-  const rangeSpan = s.max - s.min + 1;
-  const fillPct = rangeSpan > 0 ? Math.round(s.used.size / rangeSpan * 100) : 100;
+function itemCote(item, n) { return (item && item[0] && item[0].cote) || (n != null ? 'n°' + n : ''); }
+function itemTitre(item) { return (item && item[0] && item[0].titre) || ''; }
 
-  const div = document.createElement('div');
-  div.className = 'cotes-panel';
-  div.dataset.prefix = key;
-
-  div.innerHTML = `
-  <div class="cotes-stats">
-    <div class="cstat"><div class="cstat-lbl">Cotes utilisées</div><div class="cstat-val ok">${s.used.size.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Trous (libres)</div><div class="cstat-val ${gaps.length?'warn':'ok'}">${gaps.length.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Plage</div><div class="cstat-val">${s.min.toLocaleString('fr-FR')} – ${s.max.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Remplissage</div><div class="cstat-val">${fillPct} %</div></div>
-  </div>`;
-
-  div.appendChild(buildDensitySvg(s));
-  div.appendChild(buildGapsTable(gaps, key));
-  return div;
+/* ════ Onglets ════ */
+function renderTabs() {
+  var list = $('ac-tablist');
+  var html = '<button type="button" role="tab" class="pro-tab" data-tab="' + DUP_KEY + '" aria-controls="ac-p-' + DUP_KEY + '">' +
+    ui.icon('warn', { size: 16 }) + '<span>Doublons</span><span class="pro-tab__count">' + fmt.n(DUPS.length) + '</span></button>';
+  SERIES_ORDER.forEach(function (key) {
+    var s = SERIES[key];
+    html += '<button type="button" role="tab" class="pro-tab" data-tab="' + esc(key) + '" aria-controls="ac-p-' + esc(key) + '">' +
+      '<span>' + esc(s.label) + '</span><span class="pro-tab__count">' + fmt.n(s.used.size) + '</span></button>';
+  });
+  list.innerHTML = html;
 }
 
-/* ════ SVG densité ════ */
-function buildDensitySvg(s){
-  const wrap = document.createElement('div');
-  wrap.className = 'density-wrap';
+function renderPanelShells() {
+  var host = $('ac-panels');
+  var html = '<section class="ac-panel" id="ac-p-' + DUP_KEY + '" data-tab="' + DUP_KEY + '" hidden></section>';
+  SERIES_ORDER.forEach(function (key) {
+    html += '<section class="ac-panel" id="ac-p-' + esc(key) + '" data-tab="' + esc(key) + '" hidden></section>';
+  });
+  host.innerHTML = html;
+}
 
-  const rangeSpan = s.max - s.min + 1;
-  const color     = s.color;
-  const BUCKETS   = Math.min(400, rangeSpan);
-  const bSize     = rangeSpan / BUCKETS;
-  const counts    = new Array(BUCKETS).fill(0);
-  s.used.forEach(n => {
-    const b = Math.min(BUCKETS-1, Math.floor((n - s.min) / bSize));
+/* Les panneaux sont construits à la première ouverture : la plupart des
+   séries ne seront jamais consultées. */
+var BUILT = {};
+function ensurePanel(id) {
+  if (BUILT[id]) return;
+  BUILT[id] = true;
+  var el = $('ac-p-' + id);
+  if (!el) return;
+  if (id === DUP_KEY) buildDupPanel(el); else buildSeriesPanel(el, SERIES[id]);
+}
+
+/* ════ Bandeau « prochains numéros » ════ */
+function renderNext() {
+  $('ac-next').innerHTML = FONDS_SUMMARY.map(function (f) {
+    var next = f.prefix + (f.lastUsed + 1);
+    return '<div class="pro-kpi"><p class="pro-kpi__label">' + esc(f.label) + '</p>' +
+      '<div class="pro-kpi__row"><span class="pro-kpi__value pro-mono" style="font-family:var(--pro-font-display)">' + esc(next) + '</span></div>' +
+      '<p class="pro-kpi__note">Après ' + esc(f.prefix + f.lastUsed) + ', la plus haute cote utilisée</p></div>';
+  }).join('');
+  $('ac-total-note').textContent = fmt.n(Object.keys(ALL_COTES_MAP).length) + ' cotes analysées (fonds ' +
+    FONDS_DEF.map(function (f) { return f.label; }).join(', ') + ')';
+}
+
+/* ════ Pagination ════ */
+function pageList(cur, pages) {
+  if (pages <= 7) { var all = []; for (var p = 1; p <= pages; p++) all.push(p); return all; }
+  var set = {};
+  [1, pages, cur - 1, cur, cur + 1].forEach(function (p) { if (p >= 1 && p <= pages) set[p] = 1; });
+  return Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
+}
+
+/* Dessine la pagination dans `el` ; st = {page, perPage}, count = nombre de lignes. */
+function renderPager(el, st, count, noun, onChange) {
+  var pages = Math.max(1, Math.ceil(count / st.perPage));
+  if (st.page > pages) st.page = pages;
+  var start = (st.page - 1) * st.perPage;
+  var info = count ? fmt.n(start + 1) + '–' + fmt.n(Math.min(start + st.perPage, count)) + ' sur ' + fmt.n(count) + ' ' + noun + (count > 1 ? 's' : '') : 'Aucun résultat';
+  var nav = '<select class="pro-input ac-pagesize" aria-label="Lignes par page" data-size>' +
+    [25, 50, 100, 200].map(function (n) { return '<option value="' + n + '"' + (n === st.perPage ? ' selected' : '') + '>' + n + ' / page</option>'; }).join('') + '</select>';
+  nav += '<button type="button" class="pro-btn pro-btn--ghost pro-btn--icon" data-page="' + (st.page - 1) + '" aria-label="Page précédente"' + (st.page <= 1 ? ' disabled' : '') + '>' + ui.icon('chevLeft', { size: 18 }) + '</button>';
+  var prev = 0;
+  pageList(st.page, pages).forEach(function (p) {
+    if (p - prev > 1) nav += '<span class="pro-pager__gap" aria-hidden="true">…</span>';
+    nav += '<button type="button" class="pro-btn pro-btn--ghost pro-btn--icon" data-page="' + p + '" aria-label="Page ' + p + '"' + (p === st.page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    prev = p;
+  });
+  nav += '<button type="button" class="pro-btn pro-btn--ghost pro-btn--icon" data-page="' + (st.page + 1) + '" aria-label="Page suivante"' + (st.page >= pages ? ' disabled' : '') + '>' + ui.icon('chevRight', { size: 18 }) + '</button>';
+  el.innerHTML = '<span class="pro-pager__info">' + esc(info) + '</span><div class="pro-pager__nav">' + nav + '</div>';
+  el.hidden = false;
+  var sel = el.querySelector('[data-size]');
+  sel.addEventListener('change', function () { st.perPage = parseInt(sel.value, 10); st.page = 1; onChange(false); });
+  el.querySelectorAll('[data-page]').forEach(function (b) {
+    b.addEventListener('click', function () { st.page = parseInt(b.getAttribute('data-page'), 10); onChange(true); });
+  });
+}
+
+/* ════ Export CSV ════ */
+function csvCell(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+function downloadCsv(lines, filename, nbLines) {
+  var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  ui.toast({ title: 'Export prêt.', text: filename + ' — ' + fmt.n(nbLines) + ' ligne' + (nbLines > 1 ? 's' : '') + '.' }, { type: 'ok' });
+}
+
+var SEARCH_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>';
+
+/* ════ Panneau série ════ */
+function buildSeriesPanel(el, s) {
+  var gaps = getGaps(s);
+  var span = s.max - s.min + 1;
+  var fill = span > 0 ? s.used.size / span : 1;
+
+  el.innerHTML =
+    '<div class="pro-section-head ac-panel-head"><h2 class="pro-eyebrow">' + esc(s.label) + '</h2><span class="pro-rule" aria-hidden="true"></span></div>' +
+    '<div class="ac-stack">' +
+    '<div class="pro-kpis">' +
+      '<div class="pro-kpi"><p class="pro-kpi__label">Cotes utilisées</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.n(s.used.size) + '</span></div>' +
+        '<p class="pro-kpi__note">numéros distincts attribués</p></div>' +
+      '<div class="pro-kpi' + (gaps.length ? ' pro-kpi--alert' : '') + '"><p class="pro-kpi__label">Trous (libres)</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.n(gaps.length) + '</span></div>' +
+        '<p class="pro-kpi__note">' + (gaps.length ? 'numéros libres entre le premier et le dernier' : 'aucun numéro libre dans la plage') + '</p></div>' +
+      '<div class="pro-kpi ac-kpi-range"><p class="pro-kpi__label">Plage</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.n(s.min) + ' – ' + fmt.n(s.max) + '</span></div>' +
+        '<p class="pro-kpi__note">' + fmt.n(span) + ' numéro' + (span > 1 ? 's' : '') + ' de bout en bout</p></div>' +
+      '<div class="pro-kpi"><p class="pro-kpi__label">Remplissage</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.pct(fill, fill < 0.1 ? 1 : 0) + '</span></div>' +
+        '<p class="pro-kpi__note">part de la plage effectivement utilisée</p></div>' +
+    '</div>' +
+    '<div class="pro-card pro-card--pad" data-density></div>' +
+    '<div class="pro-card ac-table-card" data-gaps></div>' +
+    '</div>';
+
+  buildDensity(el.querySelector('[data-density]'), s);
+  buildGapsTable(el.querySelector('[data-gaps]'), s, gaps);
+}
+
+/* ════ Carte de densité : une colonne = un paquet de numéros consécutifs,
+   bleu = part utilisée, rose = part libre (trous). Infobulle au survol. ════ */
+function buildDensity(host, s) {
+  var span = s.max - s.min + 1;
+  var B = Math.min(240, span);
+  var lo = [];
+  for (var i = 0; i <= B; i++) lo.push(Math.ceil(i * span / B));
+  var counts = new Array(B).fill(0);
+  s.used.forEach(function (n) {
+    var b = Math.min(B - 1, Math.floor((n - s.min) * B / span));
     counts[b]++;
   });
 
-  const W = 780, H = 60, PAD = 2;
-  const bw = W / BUCKETS;
-  const maxC = Math.max(...counts, 1);
-
-  let bars = '';
-  counts.forEach((c, i) => {
-    const bh = c === 0 ? 4 : Math.max(6, Math.round(c / maxC * (H - PAD*2)));
-    const by = H - bh;
-    const fill = c === 0 ? '#e8f5e9' : color;
-    const stroke = c === 0 ? '#a5d6a7' : 'none';
-    bars += `<rect x="${(i*bw).toFixed(1)}" y="${by}" width="${Math.max(1,bw-.5).toFixed(1)}" height="${bh}" fill="${fill}" stroke="${stroke}" stroke-width="0.5"/>`;
-  });
-
-  const step = Math.max(1, Math.pow(10, Math.floor(Math.log10(rangeSpan/4))));
-  let labels = '';
-  for(let v = Math.ceil(s.min/step)*step; v <= s.max; v += step){
-    const x = ((v - s.min) / rangeSpan * W).toFixed(1);
-    labels += `<text x="${x}" y="${H+12}" font-size="9" fill="#bbb" text-anchor="middle" font-family="monospace">${v}</text>`;
+  var rects = '';
+  var fullFree = 0;
+  for (var b = 0; b < B; b++) {
+    var cap = lo[b + 1] - lo[b];
+    var c = counts[b];
+    var a = s.min + lo[b], z = s.min + lo[b + 1] - 1;
+    if (c === 0) fullFree++;
+    var title = (a === z ? 'N° ' + fmt.n(a) : 'N° ' + fmt.n(a) + ' – ' + fmt.n(z));
+    var tip = title + '\n' + fmt.n(c) + ' utilisé' + (c > 1 ? 's' : '') + ' · ' + fmt.n(cap - c) + ' libre' + (cap - c > 1 ? 's' : '') +
+      '\nRemplissage ' + fmt.pct(cap ? c / cap : 0, 0);
+    var h = cap ? c / cap * 100 : 0;
+    rects += '<g data-tip="' + esc(tip).replace(/\n/g, '&#10;') + '">' +
+      '<rect x="' + b + '" y="0" width="1" height="100" fill="#F4C3CD"/>' +
+      (h > 0 ? '<rect x="' + b + '" y="' + (100 - h).toFixed(2) + '" width="1" height="' + h.toFixed(2) + '" fill="#2A3CD4" stroke="#fff" stroke-width="0.6" vector-effect="non-scaling-stroke"/>' : '') +
+      '</g>';
   }
 
-  wrap.innerHTML = `
-  <div class="density-header">
-    <span class="density-title">Carte de densité — ${s.label}</span>
-    <div class="density-legend">
-      <div class="dleg"><div class="dleg-dot" style="background:${color}"></div><span>Cote utilisée</span></div>
-      <div class="dleg"><div class="dleg-dot" style="background:#e8f5e9;border:1px solid #a5d6a7"></div><span>Trou (libre)</span></div>
-    </div>
-  </div>
-  <div class="density-svg-wrap">
-    <svg viewBox="0 0 ${W} ${H+16}" width="100%" height="${H+16}" xmlns="http://www.w3.org/2000/svg" style="min-width:340px">
-      ${bars}${labels}
-    </svg>
-  </div>`;
-  return wrap;
+  /* Graduation X : valeurs rondes réparties sur la plage */
+  var step = charts.niceTicks(span, 5).step;
+  var xs = '';
+  for (var v = Math.ceil(s.min / step) * step; v <= s.max; v += step) {
+    var pos = (v - s.min) / span * 100;
+    xs += '<span class="' + (pos < 4 ? 'is-start' : pos > 96 ? 'is-end' : '') + '" style="left:' + pos.toFixed(2) + '%">' + fmt.n(v) + '</span>';
+  }
+
+  var aria = 'Carte de densité de ' + s.label + ' : ' + fmt.n(s.used.size) + ' numéros utilisés et ' + fmt.n(span - s.used.size) +
+    ' libres sur la plage ' + fmt.n(s.min) + ' à ' + fmt.n(s.max) + '. Le tableau des trous ci-dessous donne le détail.';
+
+  host.innerHTML =
+    '<div class="ac-chart-head"><h3 class="pro-label">Carte de densité — ' + esc(s.label) + '</h3>' +
+    '<div class="ac-legend" aria-hidden="true"><span><i></i>Numéros utilisés</span><span><i class="is-free"></i>Numéros libres (trous)</span></div></div>' +
+    '<div class="pro-chart" role="img" aria-label="' + esc(aria) + '">' +
+      '<div class="ac-dens" style="--ac-h:150px">' +
+        '<div class="ac-dens__y" aria-hidden="true"><span style="bottom:100%">100 %</span><span style="bottom:50%">50 %</span><span style="bottom:0">0 %</span></div>' +
+        '<div class="ac-dens__plot"><span class="ac-dens__grid" style="bottom:50%"></span>' +
+          '<svg viewBox="0 0 ' + B + ' 100" preserveAspectRatio="none" focusable="false">' + rects + '</svg></div>' +
+      '</div>' +
+      '<div class="ac-dens__x" aria-hidden="true">' + xs + '</div>' +
+    '</div>' +
+    '<p class="ac-dens-cap">Chaque colonne regroupe ' + (span / B >= 1.5 ? 'environ ' + fmt.n(Math.round(span / B)) : fmt.n(Math.max(1, Math.round(span / B)))) +
+    ' numéro' + (span / B >= 1.5 ? 's' : '') + ' consécutif' + (span / B >= 1.5 ? 's' : '') + ' : la part bleue est la part utilisée, la part rose la part libre. ' +
+    (fullFree ? fmt.n(fullFree) + ' colonne' + (fullFree > 1 ? 's' : '') + ' sur ' + fmt.n(B) + ' ne contien' + (fullFree > 1 ? 'nent' : 't') + ' aucune cote.' : 'Aucune colonne entièrement vide.') + '</p>';
 }
 
-/* ════ État de pagination (une entrée par tableau de trous) ════ */
-const GAPS_STATE = {};
+/* ════ Tableau des trous ════ */
+function buildGapsTable(host, s, gaps) {
+  var st = { page: 1, perPage: 25, q: '' };
+  var filtered = gaps;
+  var id = 'g-' + s.key;
 
-/* ════ Tableau des trous avec pagination ════ */
-function buildGapsTable(gaps, id){
-  const wrap  = document.createElement('div');
-  wrap.className = 'gaps-wrap';
-  const gapId = 'gaps-' + id;
+  if (!gaps.length) {
+    host.innerHTML = '<div class="pro-empty" style="border:0">' + ui.icon('checkCircle', { size: 32, stroke: 1.6 }) +
+      '<div class="pro-empty__title">Aucun numéro libre</div><div class="pro-empty__text">Tous les numéros de la plage ' +
+      esc(fmt.n(s.min) + ' – ' + fmt.n(s.max)) + ' sont attribués.</div></div>';
+    return;
+  }
 
-  GAPS_STATE[gapId] = { gaps, filtered: gaps, page: 1, perPage: 25 };
+  host.innerHTML =
+    '<div class="pro-toolbar">' +
+      '<label class="pro-search"><span class="pro-sr">Filtrer les numéros libres</span>' + SEARCH_ICON +
+        '<input type="search" class="pro-input" id="' + id + '-q" placeholder="Filtrer par numéro ou par cote voisine…" autocomplete="off"></label>' +
+      '<span class="ac-count" data-count aria-live="polite"></span>' +
+      '<span class="ac-toolbar-spacer"></span>' +
+      '<button type="button" class="pro-btn pro-btn--secondary" data-export>' + ui.icon('download', { size: 18 }) + '<span data-export-label>Exporter en CSV</span></button>' +
+    '</div>' +
+    '<div class="pro-table-wrap pro-table-wrap--free"><table class="pro-table">' +
+      '<caption class="pro-sr">Numéros libres de la série ' + esc(s.label) + '</caption>' +
+      '<thead><tr><th scope="col">N° libre</th><th scope="col">Cote précédente</th><th scope="col">Cote suivante</th></tr></thead>' +
+      '<tbody data-body></tbody></table></div>' +
+    '<div class="pro-pager" data-pager></div>';
 
-  wrap.innerHTML = `
-  <div class="gaps-header">
-    <span class="gaps-header-title">${gaps.length} numéro${gaps.length!==1?'s':''} libre${gaps.length!==1?'s':''}</span>
-    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-      <div class="gaps-search">
-        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="#999" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l2.5 2.5"/></svg>
-        <input type="text" id="${gapId}-search" placeholder="Filtrer par numéro…" oninput="filterGapsTable('${gapId}',this.value)" autocomplete="off">
-      </div>
-      <button class="export-btn" onclick="exportGapsCSV('${id}')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v9M4 6l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Exporter
-      </button>
-    </div>
-  </div>
-  <div class="gaps-filter-info" id="${gapId}-finfo"></div>
-  <div class="gaps-body" id="${gapId}-body">
-    ${gaps.length === 0
-      ? `<div class="gaps-empty">✓ Aucun numéro libre dans cette plage.</div>`
-      : `<table class="gaps-table">
-           <thead><tr>
-             <th>N° libre</th>
-             <th>Cote précédente</th>
-             <th>Cote suivante</th>
-           </tr></thead>
-           <tbody id="${gapId}-tbody"></tbody>
-         </table>`
+  var body = host.querySelector('[data-body]');
+  var pager = host.querySelector('[data-pager]');
+  var count = host.querySelector('[data-count]');
+  var exportLabel = host.querySelector('[data-export-label]');
+
+  function neighbour(item, n) {
+    if (!item) return '<span class="pro-muted">—</span>';
+    var t = itemTitre(item);
+    return '<span class="pro-cote">' + esc(itemCote(item, n)) + '</span>' +
+      (t ? '<span class="ac-neigh-title">' + esc(t.slice(0, 90)) + '</span>' : '');
+  }
+
+  function draw(scroll) {
+    var total = filtered.length;
+    var pages = Math.max(1, Math.ceil(total / st.perPage));
+    if (st.page > pages) st.page = pages;
+    var start = (st.page - 1) * st.perPage;
+    var slice = filtered.slice(start, start + st.perPage);
+    body.innerHTML = slice.length ? slice.map(function (g) {
+      return '<tr><td><span class="ac-free-num"><small>' + esc(s.prefix) + '</small>' + g.n + '</span></td>' +
+        '<td>' + neighbour(g.prevItem, g.prevN) + '</td><td>' + neighbour(g.nextItem, g.nextN) + '</td></tr>';
+    }).join('') : '<tr><td colspan="3" class="pro-muted" style="text-align:center;padding:1.5rem">Aucun numéro libre ne correspond à « ' + esc(st.q) + ' ».</td></tr>';
+    count.innerHTML = st.q ? '<strong>' + fmt.n(total) + '</strong> sur ' + fmt.n(gaps.length) + ' numéros libres'
+      : '<strong>' + fmt.n(total) + '</strong> numéro' + (total > 1 ? 's' : '') + ' libre' + (total > 1 ? 's' : '');
+    exportLabel.textContent = st.q ? 'Exporter la sélection (CSV)' : 'Exporter en CSV';
+    renderPager(pager, st, total, 'trou', draw);
+    if (scroll) host.scrollIntoView({ block: 'nearest' });
+  }
+
+  host.querySelector('#' + id + '-q').addEventListener('input', function (ev) {
+    var val = ev.target.value.trim();
+    st.q = val;
+    if (!val) filtered = gaps;
+    else if (/\d/.test(val)) {
+      var d = val.replace(/\D/g, '');
+      filtered = gaps.filter(function (g) { return String(g.n).indexOf(d) !== -1; });
+    } else {
+      var lv = val.toLowerCase();
+      filtered = gaps.filter(function (g) {
+        return (itemCote(g.prevItem, g.prevN) + ' ' + itemTitre(g.prevItem) + ' ' + itemCote(g.nextItem, g.nextN) + ' ' + itemTitre(g.nextItem)).toLowerCase().indexOf(lv) !== -1;
+      });
     }
-  </div>
-  ${gaps.length > 0 ? `<div class="gaps-pagination" id="${gapId}-pag"></div>` : ''}
-  `;
+    st.page = 1;
+    draw(false);
+  });
 
-  if(gaps.length > 0) setTimeout(() => renderGapsPage(gapId), 0);
-
-  return wrap;
-}
-
-/* ════ Rendu d'une page du tableau ════ */
-function renderGapsPage(gapId){
-  const st = GAPS_STATE[gapId];
-  if(!st) return;
-  const { filtered, page, perPage } = st;
-  const total   = filtered.length;
-  const pages   = Math.max(1, Math.ceil(total / perPage));
-  const curPage = Math.min(page, pages);
-  st.page = curPage;
-
-  const start = (curPage - 1) * perPage;
-  const slice = filtered.slice(start, start + perPage);
-
-  const tbody = document.getElementById(gapId + '-tbody');
-  if(tbody) tbody.innerHTML = renderGapsRows(slice);
-
-  const pagEl = document.getElementById(gapId + '-pag');
-  if(!pagEl) return;
-
-  const from = total === 0 ? 0 : start + 1;
-  const to   = Math.min(start + perPage, total);
-  const infoTxt = total === 0
-    ? 'Aucun résultat'
-    : `${from}–${to} sur ${total.toLocaleString('fr-FR')} trou${total>1?'s':''}`;
-
-  const btnPrev  = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',${curPage-1})" ${curPage<=1?'disabled':''}>‹</button>`;
-  const btnFirst = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',1)" ${curPage<=1?'disabled':''}>«</button>`;
-  const btnNext  = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',${curPage+1})" ${curPage>=pages?'disabled':''}>›</button>`;
-  const btnLast  = `<button class="pag-btn" onclick="gotoGapsPage('${gapId}',${pages})" ${curPage>=pages?'disabled':''}>»</button>`;
-
-  let pageButtons = '';
-  if(pages <= 7){
-    for(let p = 1; p <= pages; p++){
-      pageButtons += `<button class="pag-btn${p===curPage?' active':''}" onclick="gotoGapsPage('${gapId}',${p})">${p}</button>`;
-    }
-  } else {
-    const show = new Set([1, pages, curPage, curPage-1, curPage+1].filter(p=>p>=1&&p<=pages));
-    const sorted = [...show].sort((a,b)=>a-b);
-    let prev = 0;
-    sorted.forEach(p => {
-      if(p - prev > 1) pageButtons += `<span class="pag-ellipsis">…</span>`;
-      pageButtons += `<button class="pag-btn${p===curPage?' active':''}" onclick="gotoGapsPage('${gapId}',${p})">${p}</button>`;
-      prev = p;
+  host.querySelector('[data-export]').addEventListener('click', function () {
+    var lines = ['Numéro libre,Cote précédente,Titre précédent,Cote suivante,Titre suivant'];
+    filtered.forEach(function (g) {
+      lines.push([g.n, itemCote(g.prevItem, g.prevN), itemTitre(g.prevItem), itemCote(g.nextItem, g.nextN), itemTitre(g.nextItem)].map(csvCell).join(','));
     });
-  }
-
-  const perPageSel = `<select class="pag-perpage" onchange="changeGapsPerPage('${gapId}',this.value)" title="Lignes par page">
-    ${[25,50,100,200].map(n=>`<option value="${n}"${n===perPage?' selected':''}>${n} / page</option>`).join('')}
-  </select>`;
-
-  pagEl.innerHTML = `
-    <span class="pag-info">${infoTxt}</span>
-    <div class="pag-controls">
-      ${perPageSel}
-      ${btnFirst}${btnPrev}
-      ${pageButtons}
-      ${btnNext}${btnLast}
-    </div>`;
-}
-
-/* ════ Navigation ════ */
-window.gotoGapsPage = function(gapId, page){
-  const st = GAPS_STATE[gapId];
-  if(!st) return;
-  const pages = Math.max(1, Math.ceil(st.filtered.length / st.perPage));
-  st.page = Math.max(1, Math.min(page, pages));
-  renderGapsPage(gapId);
-  const el = document.getElementById(gapId + '-body');
-  if(el) el.scrollIntoView({ behavior:'smooth', block:'nearest' });
-};
-
-window.changeGapsPerPage = function(gapId, val){
-  const st = GAPS_STATE[gapId];
-  if(!st) return;
-  st.perPage = parseInt(val, 10);
-  st.page = 1;
-  renderGapsPage(gapId);
-};
-
-/* ════ Filtre texte ════ */
-window.filterGapsTable = function(gapId, q){
-  const st = GAPS_STATE[gapId];
-  if(!st) return;
-  const val = q.trim();
-  if(!val){
-    st.filtered = st.gaps;
-    const fi = document.getElementById(gapId+'-finfo');
-    if(fi){ fi.textContent=''; fi.classList.remove('visible'); }
-  } else {
-    st.filtered = st.gaps.filter(g => String(g.n).includes(val));
-    const fi = document.getElementById(gapId+'-finfo');
-    if(fi){
-      fi.textContent = `Filtre actif "${val}" — ${st.filtered.length} résultat${st.filtered.length!==1?'s':''} sur ${st.gaps.length} trous`;
-      fi.classList.add('visible');
-    }
-  }
-  st.page = 1;
-  renderGapsPage(gapId);
-};
-
-/* ════ Rendu des lignes ════ */
-function renderGapsRows(slice){
-  if(!slice.length) return `<tr><td colspan="3" style="text-align:center;color:#bbb;padding:1rem;font-style:italic">Aucun résultat.</td></tr>`;
-  return slice.map(g => {
-    const prevItem  = g.prevItem;
-    const nextItem  = g.nextItem;
-    const prevCote  = prevItem ? esc((prevItem[0]&&prevItem[0].cote)||('n°'+g.prevN)) : '—';
-    const prevTitre = prevItem ? esc((prevItem[0]&&prevItem[0].titre)||'') : '';
-    const nextCote  = nextItem ? esc((nextItem[0]&&nextItem[0].cote)||('n°'+g.nextN)) : '—';
-    const nextTitre = nextItem ? esc((nextItem[0]&&nextItem[0].titre)||'') : '';
-    return `<tr>
-      <td><span class="gap-num">${g.n}</span></td>
-      <td><span class="gap-prev" title="${prevTitre}">${prevCote}${prevTitre?` <span class="gap-range">${prevTitre.slice(0,45)}</span>`:''}</span></td>
-      <td><span class="gap-next" title="${nextTitre}">${nextCote}${nextTitre?` <span class="gap-range">${nextTitre.slice(0,45)}</span>`:''}</span></td>
-    </tr>`;
-  }).join('');
-}
-
-window.exportGapsCSV = function(id){
-  const src = SERIES[id];
-  if(!src) return;
-  const gaps  = getGapsList(src);
-  const lines = ['Numéro libre,Cote précédente,Titre précédent,Cote suivante,Titre suivant'];
-  gaps.forEach(g => {
-    const pc = (g.prevItem&&g.prevItem[0]&&g.prevItem[0].cote)||(g.prevN!=null?'n°'+g.prevN:'');
-    const pt = (g.prevItem&&g.prevItem[0]&&g.prevItem[0].titre)||'';
-    const nc = (g.nextItem&&g.nextItem[0]&&g.nextItem[0].cote)||(g.nextN!=null?'n°'+g.nextN:'');
-    const nt = (g.nextItem&&g.nextItem[0]&&g.nextItem[0].titre)||'';
-    lines.push([g.n,pc,pt,nc,nt].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+    downloadCsv(lines, 'trous_cotes_' + s.key + '.csv', filtered.length);
   });
-  const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `trous_cotes_${id}.csv`;
-  a.click();
-};
+
+  draw(false);
+}
+
+/* Une cote peut être portée par plusieurs dizaines de notices : on en montre
+   quelques-unes et le reste se déplie, pour garder des lignes lisibles. */
+var TITLES_SHOWN = 5;
+function titlesHtml(items) {
+  function li(it) { return '<li>' + esc(it.titre || '(sans titre)') + '</li>'; }
+  var html = '<ul class="ac-titles">' + items.slice(0, TITLES_SHOWN).map(li).join('') + '</ul>';
+  if (items.length > TITLES_SHOWN) {
+    var rest = items.length - TITLES_SHOWN;
+    html += '<details class="ac-more"><summary>… et ' + fmt.n(rest) + ' autre' + (rest > 1 ? 's' : '') + ' notice' + (rest > 1 ? 's' : '') + '</summary>' +
+      '<ul class="ac-titles">' + items.slice(TITLES_SHOWN).map(li).join('') + '</ul></details>';
+  }
+  return html;
+}
 
 /* ════ Panneau doublons ════ */
-function buildDupPanel(){
-  const div = document.createElement('div');
-  div.className = 'cotes-panel';
-  div.dataset.prefix = '__dup__';
+function buildDupPanel(el) {
+  var totalCotes = Object.keys(ALL_COTES_MAP).length;
+  var notices = DUPS.reduce(function (n, d) { return n + d[1].length; }, 0);
 
-  const dups = Object.entries(ALL_COTES_MAP)
-    .filter(([,v]) => v.length > 1)
-    .sort((a,b) => b[1].length - a[1].length || a[0].localeCompare(b[0],'fr'));
+  el.innerHTML =
+    '<div class="pro-section-head ac-panel-head"><h2 class="pro-eyebrow">Doublons de cotes</h2><span class="pro-rule" aria-hidden="true"></span></div>' +
+    '<div class="ac-stack">' +
+    '<div class="pro-kpis">' +
+      '<div class="pro-kpi"><p class="pro-kpi__label">Cotes totales</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.n(totalCotes) + '</span></div><p class="pro-kpi__note">cotes distinctes analysées</p></div>' +
+      '<div class="pro-kpi' + (DUPS.length ? ' pro-kpi--alert' : '') + '"><p class="pro-kpi__label">Cotes en doublon</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.n(DUPS.length) + '</span></div><p class="pro-kpi__note">attribuées à plusieurs notices</p></div>' +
+      '<div class="pro-kpi' + (DUPS.length ? ' pro-kpi--alert' : '') + '"><p class="pro-kpi__label">Notices concernées</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.n(notices) + '</span></div><p class="pro-kpi__note">à reclasser ou à corriger</p></div>' +
+      '<div class="pro-kpi"><p class="pro-kpi__label">Cotes uniques</p><div class="pro-kpi__row"><span class="pro-kpi__value">' + fmt.n(totalCotes - DUPS.length) + '</span></div><p class="pro-kpi__note">une seule notice</p></div>' +
+    '</div>' +
+    '<div class="pro-card ac-table-card" data-dups></div>' +
+    '</div>';
 
-  const totalCotes = Object.keys(ALL_COTES_MAP).length;
+  var host = el.querySelector('[data-dups]');
+  if (!DUPS.length) {
+    host.innerHTML = '<div class="pro-empty" style="border:0">' + ui.icon('checkCircle', { size: 32, stroke: 1.6 }) +
+      '<div class="pro-empty__title">Aucun doublon détecté</div><div class="pro-empty__text">Toutes les cotes analysées sont uniques.</div></div>';
+    return;
+  }
 
-  div.innerHTML = `
-  <div class="cotes-stats">
-    <div class="cstat"><div class="cstat-lbl">Cotes totales</div><div class="cstat-val">${totalCotes.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Cotes en doublon</div><div class="cstat-val ${dups.length?'warn':'ok'}">${dups.length.toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Notices concernées</div><div class="cstat-val ${dups.length?'warn':'ok'}">${dups.reduce((s,[,v])=>s+v.length,0).toLocaleString('fr-FR')}</div></div>
-    <div class="cstat"><div class="cstat-lbl">Cotes uniques</div><div class="cstat-val ok">${(totalCotes-dups.length).toLocaleString('fr-FR')}</div></div>
-  </div>
-  ${dups.length ? `
-  <div class="dup-wrap">
-    <div class="dup-header">
-      <span class="dup-header-title">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#c62828" stroke-width="2"><path d="M8 2v7M8 12v1" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5"/></svg>
-        ${dups.length} cote${dups.length>1?'s':''} attribuée${dups.length>1?'s':''} à plusieurs notices
-      </span>
-      <button class="export-btn" onclick="exportDupsCSV()" style="border-color:#e57373;color:#c62828">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v9M4 6l4 4 4-4M2 13h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Exporter
-      </button>
-    </div>
-    <div class="dup-body">
-      <table class="dup-table">
-        <thead><tr><th>Cote</th><th>Occurrences</th><th>Titres / notices</th></tr></thead>
-        <tbody>${dups.map(([cote,items]) => `
-          <tr>
-            <td><span class="dup-cote">${esc(cote)}</span></td>
-            <td><span class="dup-count">${items.length}×</span></td>
-            <td><ul class="dup-titles">${items.map(it=>`
-              <li>${esc(it.titre||'(sans titre)')}</li>`).join('')}
-            </ul></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-  </div>` : `<div class="dup-wrap"><div class="dup-empty">✓ Aucun doublon détecté — toutes les cotes sont uniques.</div></div>`}
-  `;
+  var st = { page: 1, perPage: 25, q: '' };
+  var filtered = DUPS;
 
-  return div;
+  host.innerHTML =
+    '<div class="pro-toolbar">' +
+      '<label class="pro-search"><span class="pro-sr">Filtrer les doublons</span>' + SEARCH_ICON +
+        '<input type="search" class="pro-input" id="dup-q" placeholder="Filtrer par cote ou par titre…" autocomplete="off"></label>' +
+      '<span class="ac-count" data-count aria-live="polite"></span>' +
+      '<span class="ac-toolbar-spacer"></span>' +
+      '<button type="button" class="pro-btn pro-btn--secondary" data-export>' + ui.icon('download', { size: 18 }) + '<span data-export-label>Exporter en CSV</span></button>' +
+    '</div>' +
+    '<div class="pro-table-wrap pro-table-wrap--free"><table class="pro-table ac-dup-table">' +
+      '<caption class="pro-sr">Cotes attribuées à plusieurs notices</caption>' +
+      '<thead><tr><th scope="col">Cote</th><th scope="col">Occurrences</th><th scope="col">Titres des notices</th></tr></thead>' +
+      '<tbody data-body></tbody></table></div>' +
+    '<div class="pro-pager" data-pager></div>';
+
+  var body = host.querySelector('[data-body]');
+  var pager = host.querySelector('[data-pager]');
+  var count = host.querySelector('[data-count]');
+  var exportLabel = host.querySelector('[data-export-label]');
+
+  function draw(scroll) {
+    var total = filtered.length;
+    var pages = Math.max(1, Math.ceil(total / st.perPage));
+    if (st.page > pages) st.page = pages;
+    var start = (st.page - 1) * st.perPage;
+    body.innerHTML = total ? filtered.slice(start, start + st.perPage).map(function (d) {
+      return '<tr><td><span class="ac-dup-cote">' + esc(d[0]) + '</span></td>' +
+        '<td><span class="pro-pill pro-pill--anomalie">' + d[1].length + '×</span></td>' +
+        '<td>' + titlesHtml(d[1]) + '</td></tr>';
+    }).join('') : '<tr><td colspan="3" class="pro-muted" style="text-align:center;padding:1.5rem">Aucun doublon ne correspond à « ' + esc(st.q) + ' ».</td></tr>';
+    count.innerHTML = st.q ? '<strong>' + fmt.n(total) + '</strong> sur ' + fmt.n(DUPS.length) + ' cotes en doublon'
+      : '<strong>' + fmt.n(total) + '</strong> cote' + (total > 1 ? 's' : '') + ' en doublon';
+    exportLabel.textContent = st.q ? 'Exporter la sélection (CSV)' : 'Exporter en CSV';
+    renderPager(pager, st, total, 'cote', draw);
+    if (scroll) host.scrollIntoView({ block: 'nearest' });
+  }
+
+  host.querySelector('#dup-q').addEventListener('input', function (ev) {
+    var val = ev.target.value.trim();
+    st.q = val;
+    var lv = val.toLowerCase();
+    filtered = !val ? DUPS : DUPS.filter(function (d) {
+      return d[0].toLowerCase().indexOf(lv) !== -1 || d[1].some(function (it) { return (it.titre || '').toLowerCase().indexOf(lv) !== -1; });
+    });
+    st.page = 1;
+    draw(false);
+  });
+
+  host.querySelector('[data-export]').addEventListener('click', function () {
+    var lines = ['Cote,Nb occurrences,Titre'];
+    var n = 0;
+    filtered.forEach(function (d) {
+      d[1].forEach(function (it) { lines.push([d[0], d[1].length, it.titre || ''].map(csvCell).join(',')); n++; });
+    });
+    downloadCsv(lines, 'doublons_cotes.csv', n);
+  });
+
+  draw(false);
 }
 
-window.exportDupsCSV = function(){
-  const dups = Object.entries(ALL_COTES_MAP).filter(([,v])=>v.length>1).sort((a,b)=>b[1].length-a[1].length);
-  const lines = ['Cote,Nb occurrences,Titre'];
-  dups.forEach(([cote,items]) => {
-    items.forEach(it => {
-      lines.push([cote,items.length,it.titre||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
-    });
-  });
-  const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'doublons_cotes.csv';
-  a.click();
-};
-
 /* ════════════ DÉMARRAGE ════════════ */
+function showError(message) {
+  $('ac-loading').hidden = true;
+  var box = $('ac-error');
+  box.hidden = false;
+  box.innerHTML = '<div class="pro-empty" style="margin-top:2rem" role="alert">' + ui.icon('error', { size: 32, stroke: 1.6 }) +
+    '<div class="pro-empty__title">Chargement impossible</div><div class="pro-empty__text">' + esc(message) + '</div>' +
+    '<button type="button" class="pro-btn pro-btn--secondary" id="ac-retry">Réessayer</button></div>';
+  $('ac-retry').addEventListener('click', function () { window.location.reload(); });
+}
+
+charts.attachTooltips(document.body);
+
 Promise.all([
-  fetch('data/inventaire.json').then(r => {
-    if(!r.ok) throw new Error('HTTP ' + r.status);
+  fetch('data/inventaire.json').then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }),
   // Exemplaires créés via exemplarisation.html (état partagé R2), fusionnés
   // pour que leur cote soit prise en compte dans l'analyse des trous/doublons
   // — voir js/exemplaires-manuels-shared.js.
-  fetchExemplairesManuelsAsCatalogRows(),
+  fetchExemplairesManuelsAsCatalogRows()
 ])
-  .then(([rows, manuels]) => {
-    document.getElementById('csv-loader').style.display = 'none';
-    buildCotesAnalysis(rows.concat(manuels));
+  .then(function (res) {
+    buildCotesAnalysis(res[0].concat(res[1]));
+    renderTabs();
+    renderPanelShells();
+    renderNext();
+    $('ac-loading').hidden = true;
+    $('ac-content').hidden = false;
+    var head = $('ac-head');
+    /* Le panneau ouvert est construit au moment de l'ouverture. */
+    head.addEventListener('rp-tab-change', function (ev) { ensurePanel(ev.detail.id); });
+    ui.tabs(head, { hashPrefix: 'serie-' });
   })
-  .catch(err => {
-    document.getElementById('csv-loader').innerHTML =
-      '<p style="color:#c62828">Erreur de chargement : ' + err.message + '</p>';
+  .catch(function (err) {
+    showError(err && err.message ? err.message : String(err));
   });
+})();
 </script>
 </body>
 </html>
