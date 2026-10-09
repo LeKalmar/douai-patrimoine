@@ -12,6 +12,7 @@
 <script src="js/columnar.js"></script>
 <script src="js/sync-queue.js"></script>
 <script src="js/reserve-shared.js"></script>
+<script src="js/dewey-labels.js"></script>
 <link rel="stylesheet" href="style.css">
 <style>
   :root{
@@ -210,6 +211,42 @@
   .pg-leg-n{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
   .pg-leg-pct{color:#888;font-variant-numeric:tabular-nums;text-align:right}
 
+  /* ── Répartition par thème (Dewey) ── bleu = livres, teal = prêts */
+  .dw-card{margin-bottom:1.5rem;--dw-livres:#2A3CD4;--dw-prets:#0f9d8a}
+  .dw-top{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:flex-start}
+  .dw-top .viz-sub{max-width:460px}
+  .dw-controls{display:flex;flex-direction:column;gap:.4rem;align-items:flex-end}
+  .dw-segs{display:inline-flex;border:1px solid #d9dbe6;border-radius:8px;overflow:hidden}
+  .dw-seg{font-family:inherit;font-size:.72rem;padding:.35rem .65rem;border:none;background:#fff;color:#555;cursor:pointer;border-right:1px solid #e6e7f0}
+  .dw-seg:last-child{border-right:none}
+  .dw-seg.on{background:#2A3CD4;color:#fff}
+  .dw-legend{display:flex;gap:1.2rem;flex-wrap:wrap;font-size:.74rem;color:#555;margin:.2rem 0 .6rem}
+  .dw-legend span{display:inline-flex;align-items:center;gap:.4rem}
+  .dw-sw{display:inline-block;width:12px;height:12px;border-radius:3px}
+  .dw-livres{background:var(--dw-livres)} .dw-prets{background:var(--dw-prets)}
+  .dw-list{display:flex;flex-direction:column}
+  .dw-row{display:grid;grid-template-columns:4.2rem minmax(120px,1.3fr) minmax(120px,2fr) 5.6rem 5.6rem 4.4rem;gap:.75rem;align-items:center;
+    font-family:inherit;text-align:left;background:none;border:none;border-bottom:1px solid #f0f0f5;padding:.45rem .4rem;cursor:pointer;color:#1a1a1a;border-radius:6px}
+  .dw-row:hover,.dw-row:focus-visible{background:#f5f6fd;outline:none}
+  .dw-row.active{background:#eceefe;box-shadow:inset 3px 0 0 #2A3CD4}
+  .dw-row.none .dw-label{color:#888;font-style:italic}
+  .dw-code{font-family:monospace;font-size:.82rem;color:#555}
+  .dw-label{font-size:.82rem;line-height:1.3}
+  .dw-bars{display:flex;flex-direction:column;gap:3px}
+  .dw-bar{display:block;height:8px;border-radius:0 4px 4px 0;min-width:2px}
+  .dw-num{font-size:.78rem;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dw-num b{font-weight:600}
+  .dw-num small{display:block;color:#888;font-size:.68rem}
+  .dw-ratio{color:#333}
+  .dw-more{font-family:inherit;font-size:.78rem;margin-top:.6rem;background:none;border:none;color:#2A3CD4;cursor:pointer;text-decoration:underline;padding:0}
+  .dw-chip{font-family:inherit;font-size:.74rem;background:#eceefe;color:#2A3CD4;border:1px solid #c9cdf0;border-radius:20px;padding:.2rem .7rem;cursor:pointer}
+  @media (max-width:640px){
+    .dw-controls{align-items:flex-start}
+    .dw-row{grid-template-columns:3.4rem 1fr 4.6rem 4.6rem;row-gap:.3rem}
+    .dw-bars{grid-column:1 / -1;order:5}
+    .dw-ratio{display:none}
+  }
+
   .rayon-table .log-body{max-height:560px}
   .rayon-table td:nth-child(3){min-width:220px}
 
@@ -331,6 +368,7 @@
               <input type="text" class="log-search" id="rayon-search" placeholder="Filtrer (titre, auteur, cote…)">
               <label><input type="checkbox" id="rayon-hide-treated"> Masquer les traités</label>
               <label><input type="checkbox" id="rayon-only-zero"> <span id="rayon-only-zero-label">Aucun prêt cette année</span></label>
+              <span id="rayon-dewey-chip"></span>
             </div>
             <div style="display:flex;gap:.4rem;flex-wrap:wrap">
               <button type="button" class="export-btn" id="rayon-export-csv">Exporter le rayon (.csv)</button>
@@ -835,6 +873,7 @@ function importRayon(id, col){
   try { localStorage.setItem(LS_RAYON_SEEN, JSON.stringify(seen)); } catch(e) {}
   const before = new Set(RAYON_CURRENT && RAYON_CURRENT.id === id && RAYON_CURRENT.col === (col||'') ? RAYON_ROWS.map(r => r.bc) : []);
   const wasOpen = before.size > 0;
+  if(!wasOpen) deweyFilter = null; // autre rayon : le filtre de thème ne s'applique plus
   RAYON_CURRENT = { id, col: col || '' };
   try { localStorage.setItem(LS_RAYON, JSON.stringify(RAYON_CURRENT)); } catch(e) {}
   RAYON_BY_BC = new Map();
@@ -859,6 +898,7 @@ function importRayon(id, col){
       parutionYear: yearOf(rec['210$d']),
       saisie: rec.dateSaisie || '',
       saisieKey: saisieKey(rec.dateSaisie),
+      dewey: dewey.deweyOf(rec.coteAffichee || s.cote),
       prets: absent ? null : p,
       an: absent ? null : (p.an || 0),
       avant: absent ? null : pretsAvant(p),
@@ -925,7 +965,8 @@ function rayonStatsHtml(rows){
     card('Catalogage médian', medSaisie ?? '—', 'année de saisie Syracuse'),
   ].join('');
   return `<div class="stats-row rayon-stats">${cards}</div>
-    <div class="viz-grid">${loansChartHtml(known)}${progressHtml(rows)}</div>`;
+    <div class="viz-grid">${loansChartHtml(known)}${progressHtml(rows)}</div>
+    ${deweyHtml(rows)}`;
 }
 
 /* Prêts par année : une colonne par année détaillée (une seule série, une
@@ -1016,6 +1057,98 @@ rayonStatsEl.addEventListener('mouseover', e => { const t = e.target.closest('[d
 rayonStatsEl.addEventListener('mouseout', e => { const t = e.target.closest('[data-tip]'); if(t) hideVizTip(t); });
 rayonStatsEl.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if(t) showVizTip(t); });
 rayonStatsEl.addEventListener('focusout', e => { const t = e.target.closest('[data-tip]'); if(t) hideVizTip(t); });
+rayonStatsEl.addEventListener('click', e => {
+  const lv = e.target.closest('[data-dw-level]');
+  if(lv){ deweyLevel = lv.dataset.dwLevel; renderRayon(); return; }
+  const ms = e.target.closest('[data-dw-measure]');
+  if(ms){ deweyMeasure = ms.dataset.dwMeasure; renderRayon(); return; }
+  if(e.target.closest('[data-dw-more]')){ deweyShowAll = !deweyShowAll; renderRayon(); return; }
+  const row = e.target.closest('[data-dw-key]');
+  if(row){
+    const key = row.dataset.dwKey;
+    const same = deweyFilter && deweyFilter.level === deweyLevel && deweyFilter.key === key;
+    deweyFilter = same ? null : { level: deweyLevel, key };
+    renderRayon();
+    if(deweyFilter) document.querySelector('#rayon-panel .rayon-table').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+});
+document.getElementById('rayon-dewey-chip').addEventListener('click', e => {
+  if(e.target.closest('#rayon-dewey-clear')){ deweyFilter = null; renderRayon(); }
+});
+
+/* ── Répartition par thème (indice Dewey de la cote, js/dewey-labels.js) ──
+   Pour chaque thème : sa part des livres du rayon face à sa part des prêts.
+   Un thème dont la part des prêts dépasse nettement sa part du rayon
+   « tourne » ; l'inverse signale un fonds peu demandé. Clic sur une ligne =
+   filtre du tableau sur ce thème. Bleu/teal validés (validate_palette). */
+let deweyLevel = 'indice';       // 'division' | 'indice' | 'precis'
+let deweyMeasure = 'cumules';    // 'cumules' (toutes années) | 'an' (année en cours)
+let deweyShowAll = false;
+let deweyFilter = null;          // { level, key } — key '' = sans indice Dewey
+const DEWEY_TOP = 12;
+const DEWEY_LEVELS = [['division','Division (94x)'],['indice','Indice (944)'],['precis','Précis (944.04)']];
+
+function fmtPct(n, total){
+  if(!total) return '0 %';
+  const v = n * 100 / total;
+  return (v > 0 && v < 10 ? v.toFixed(1).replace('.', ',') : Math.round(v)) + ' %';
+}
+function deweyGroups(rows){
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = dewey.deweyKey(r.dewey, deweyLevel) || '';
+    let g = groups.get(key);
+    if(!g){ g = { key, label: dewey.deweyLabel(key || null, deweyLevel), livres:0, known:0, prets:0 }; groups.set(key, g); }
+    g.livres++;
+    if(!r.absent){ g.known++; g.prets += (deweyMeasure === 'an' ? r.an : r.cumules) || 0; }
+  });
+  return [...groups.values()];
+}
+function deweyHtml(rows){
+  const Y = REFERENCE_YEAR;
+  const groups = deweyGroups(rows);
+  const totalLivres = rows.length;
+  const totalPrets = groups.reduce((t,g) => t + g.prets, 0);
+  const sorted = groups.filter(g => g.key)
+    .sort((a,b) => b.livres - a.livres || b.prets - a.prets || a.key.localeCompare(b.key));
+  const sans = groups.find(g => !g.key);
+  const shown = deweyShowAll ? sorted : sorted.slice(0, DEWEY_TOP);
+  if(sans) shown.push(sans);
+  const maxShare = Math.max(0.01, ...shown.map(g => Math.max(g.livres / (totalLivres||1), g.prets / (totalPrets||1))));
+  const measureLbl = deweyMeasure === 'an' ? `prêts ${Y}` : 'prêts (toutes années)';
+  const seg = (attr, val, cur, lbl) => `<button type="button" class="dw-seg ${val===cur?'on':''}" ${attr}="${val}">${lbl}</button>`;
+  const lines = shown.map(g => {
+    const pl = g.livres / (totalLivres||1), pp = g.prets / (totalPrets||1);
+    const ratio = g.known ? (g.prets / g.known) : null;
+    const active = deweyFilter && deweyFilter.level === deweyLevel && deweyFilter.key === g.key;
+    const tip = `${g.key || '—'} ${g.label} : ${g.livres} livre${g.livres>1?'s':''} (${fmtPct(g.livres, totalLivres)} du rayon) · ${fmt(g.prets)} ${measureLbl} (${fmtPct(g.prets, totalPrets)} des prêts)` +
+      (ratio != null ? ` · ${ratio.toFixed(1).replace('.', ',')} prêt${ratio>=2?'s':''} par livre` : '') + ' — cliquer pour filtrer le tableau';
+    return `<button type="button" class="dw-row ${active?'active':''} ${g.key?'':'none'}" data-dw-key="${esc(g.key)}" data-tip="${esc(tip)}">
+      <span class="dw-code">${esc(g.key || '—')}</span>
+      <span class="dw-label">${esc(g.label)}</span>
+      <span class="dw-bars"><span class="dw-bar dw-livres" style="width:${pl / maxShare * 100}%"></span><span class="dw-bar dw-prets" style="width:${pp / maxShare * 100}%"></span></span>
+      <span class="dw-num"><b>${g.livres}</b> livre${g.livres>1?'s':''}<small>${fmtPct(g.livres, totalLivres)}</small></span>
+      <span class="dw-num"><b>${fmt(g.prets)}</b> prêt${g.prets>1?'s':''}<small>${fmtPct(g.prets, totalPrets)}</small></span>
+      <span class="dw-num dw-ratio">${ratio != null ? ratio.toFixed(1).replace('.', ',') : '—'}<small>prêts/livre</small></span>
+    </button>`;
+  }).join('');
+  const more = sorted.length > DEWEY_TOP
+    ? `<button type="button" class="dw-more" data-dw-more="1">${deweyShowAll ? 'Afficher les ' + DEWEY_TOP + ' premiers thèmes' : `Afficher les ${sorted.length} thèmes`}</button>` : '';
+  return `<div class="viz-card dw-card">
+    <div class="dw-top">
+      <div><div class="viz-title">Répartition par thème (Dewey)</div>
+        <div class="viz-sub">Part de chaque thème dans le rayon et dans les prêts. Cliquez sur un thème pour n'afficher que ses livres dans le tableau.</div></div>
+      <div class="dw-controls">
+        <div class="dw-segs">${DEWEY_LEVELS.map(([v,l]) => seg('data-dw-level', v, deweyLevel, l)).join('')}</div>
+        <div class="dw-segs">${seg('data-dw-measure','cumules',deweyMeasure,'Prêts toutes années')}${seg('data-dw-measure','an',deweyMeasure,`Prêts ${Y}`)}</div>
+      </div>
+    </div>
+    <div class="dw-legend"><span><i class="dw-sw dw-livres"></i>Part des livres du rayon</span><span><i class="dw-sw dw-prets"></i>Part des ${measureLbl}</span></div>
+    <div class="dw-list">${lines || '<div class="log-empty">Aucun livre.</div>'}</div>
+    ${more}
+    <div class="viz-tip" role="tooltip"></div>
+  </div>`;
+}
 
 const RAYON_COLS = [
   { key:'empl',    label:'Empl.' },
@@ -1079,9 +1212,14 @@ function renderRayon(){
   const rows = RAYON_ROWS.filter(r => {
     if(hideTreated && TRAITEMENTS[r.bc]) return false;
     if(onlyZero && r.an !== 0) return false;
+    if(deweyFilter && (dewey.deweyKey(r.dewey, deweyFilter.level) || '') !== deweyFilter.key) return false;
     if(q && !(`${r.bc} ${r.cote} ${r.titre} ${r.auteur}`.toLowerCase().includes(q))) return false;
     return true;
   }).sort(compareRayonRows);
+
+  document.getElementById('rayon-dewey-chip').innerHTML = deweyFilter
+    ? `<button type="button" class="dw-chip" id="rayon-dewey-clear" title="Retirer le filtre de thème">Thème : ${esc(deweyFilter.key || 'sans indice')} ${esc(dewey.deweyLabel(deweyFilter.key || null, deweyFilter.level))} ✕</button>`
+    : '';
 
   const tbody = document.getElementById('rayon-tbody');
   if(!rows.length){
@@ -1148,6 +1286,7 @@ document.getElementById('rayon-close').addEventListener('click', () => {
   RAYON_CURRENT = null;
   RAYON_ROWS = [];
   RAYON_BY_BC = new Map();
+  deweyFilter = null;
   try { localStorage.removeItem(LS_RAYON); } catch(e) {}
   document.getElementById('rayon-panel').classList.remove('show');
 });
@@ -1155,9 +1294,9 @@ document.getElementById('rayon-export-csv').addEventListener('click', () => {
   if(!RAYON_ROWS.length) return;
   const Y = REFERENCE_YEAR;
   const q = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
-  const head = ['Code-barre','Colonne','Étagère','Cote','Titre','Auteur','Parution','Catalogué le',`Prêts ${Y}`,`Prêts avant ${Y}`,'Prêts cumulés','Dernière année de prêt','Décision'];
+  const head = ['Code-barre','Colonne','Étagère','Cote','Dewey','Thème','Titre','Auteur','Parution','Catalogué le',`Prêts ${Y}`,`Prêts avant ${Y}`,'Prêts cumulés','Dernière année de prêt','Décision'];
   const lines = [...RAYON_ROWS].sort(compareRayonRows).map(r => [
-    r.bc, r.colonne, r.etage, r.cote, r.titre, r.auteur, r.parution, r.saisie,
+    r.bc, r.colonne, r.etage, r.cote, dewey.deweyKey(r.dewey, 'precis') || '', dewey.deweyLabel(dewey.deweyKey(r.dewey, 'indice')), r.titre, r.auteur, r.parution, r.saisie,
     r.an, r.avant, r.cumules, r.dernier, TRAITEMENTS[r.bc] ? STATUT_LABEL[TRAITEMENTS[r.bc].statut] : '',
   ].map(q).join(';'));
   const label = document.getElementById('rayon-title').textContent.replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'');

@@ -1819,6 +1819,23 @@ indiscernable du rouge Pilon, et du vert Conserver en protanopie ; ordre
 Conserver → Braderie → Relocalisation → Pilon. L'ambre est peu contrasté sur
 blanc : texte sombre posé dessus, `--warn-ink` pour le texte ambre.
 
+**« Répartition par thème (Dewey) »** (`deweyHtml()`, 2026-10-09) : pour
+chaque thème, part des livres du rayon (bleu) face à part des prêts (teal
+`#0f9d8a`, paire validée), effectifs et prêts par livre ; trois niveaux
+(division 94x / indice 944 / précis 944.04, deux décimales au plus) et deux
+mesures (prêts toutes années = `cumules`, ou année en cours = `an`) ; 12
+thèmes affichés puis « Afficher les N thèmes », « Sans indice Dewey »
+toujours en dernier. Clic sur un thème = filtre du tableau (`deweyFilter`,
+pastille ✕ à côté des filtres), réinitialisé quand on change de rayon.
+L'indice vient de la cote (`dewey.deweyOf()` : premier groupe « 3 chiffres
+[.décimales] » isolé — « 944 DUP » comme « A10025 930.1 CLI » ; les numéros
+d'enregistrement 5/6 chiffres ne matchent pas). Libellés français dans
+`js/dewey-labels.js` : les 100 divisions, les 100 indices 9xx (choisis pour
+les rayons d'histoire, désherbés en premier) et quelques décimales d'histoire
+(940.3, 940.53, 944.01–944.08…) ; ailleurs, `deweyLabel()` remonte au niveau
+connu le plus proche. Ajouter un libellé = une ligne dans ce fichier. L'export
+.csv du rayon porte deux colonnes de plus (Dewey précis, thème).
+
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni
 stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
