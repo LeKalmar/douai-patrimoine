@@ -4,117 +4,122 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<!-- Contrôle d'accès de l'espace pro (même gate localStorage que les autres
+     pages protégées — voir « Sécurité » dans CLAUDE.md). En tête de <head>
+     pour rediriger avant tout rendu. -->
+<script>
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+</script>
 <title>Gestion des reliures — Réserve patrimoniale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts.css">
 <script src="js/sync-queue.js"></script>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/admin.css">
 <script src="js/reserve-shared.js"></script>
 <script src="js/exemplaires-manuels-shared.js"></script>
 <script src="js/reliures-manuelles-shared.js"></script>
 <style>
-  :root{
-    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
-    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  /* Mise en page propre à la gestion des reliures (préfixe rl-). Les composants
+     (en-tête, onglets, cartes, tableaux, pastilles, toasts, confirmation en
+     ligne) viennent de css/admin.css et de js/admin-ui.js. */
+
+  .rl-head .pro-tabs { order: 3; flex-basis: 100%; }
+  .rl-head .pro-head__inner { padding-bottom: 0; }
+  .rl-head .pro-head__title { padding-bottom: 0.6rem; }
+  /* Conflits en attente : compteur carmin cerclé de blanc pour rester lisible sur le bleu. */
+  .rl-tab-alert .pro-tab__count { background: var(--pro-carmin); color: #fff; box-shadow: 0 0 0 1.5px #fff; }
+  /* État de synchro posé par js/sync-queue.js (texte + classe .pending). */
+  #sync-status.pending { color: #FFD27A; }
+  #sync-status { white-space: normal; max-width: 22rem; }
+
+  .rl-panel { padding-top: 1.5rem; }
+  .rl-toolbar-spacer { flex: 1 1 auto; }
+  .rl-count { font-size: 0.8rem; color: var(--pro-texte); }
+  .rl-count strong { color: var(--pro-bleu); }
+  .rl-intro { margin: 0 0 1rem; font-size: 0.84rem; color: var(--pro-texte); max-width: 60rem; }
+  [data-icon] { display: inline-flex; }
+
+  /* ── Créer un groupe : deux étapes visibles ── */
+  .rl-steps { display: grid; gap: 0.875rem; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; margin-top: 1rem; }
+  .rl-step { padding: 1.25rem 1.375rem; }
+  .rl-step__head { display: flex; gap: 0.8rem; align-items: flex-start; margin-bottom: 1rem; }
+  .rl-step__head p { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--pro-texte-doux); }
+  .rl-num {
+    flex: none; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+    background: var(--pro-bleu); color: #fff; font: 700 0.95rem var(--pro-font-display);
   }
-  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
-  .page-hero{background:#2A3CD4;color:#fff;padding:1.75rem 1.5rem}
-  .page-hero .container{max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
-  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0;line-height:1.15}
-  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap}
-  .hero-actions a,.hero-actions button{
-    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
-    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
-    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
+  .rl-step.is-done .rl-num { background: var(--pro-ok); }
+  .rl-step.is-locked { background: var(--pro-papier-ombre); }
+  .rl-step.is-locked .rl-num { background: var(--pro-trait-fort); color: var(--pro-texte-doux); }
+  .rl-step.is-locked .pro-h4 { color: var(--pro-texte-doux); }
+  .rl-lock { display: flex; gap: 0.55rem; align-items: center; margin: 0 0 0.8rem; padding: 0.6rem 0.8rem; font-size: 0.82rem; background: #fff; border: 1px dashed var(--pro-trait-fort); color: var(--pro-texte); }
+  .rl-lock[hidden] { display: none; }
+  .rl-lock svg { flex: none; color: var(--pro-texte-doux); }
+  .rl-scan { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .rl-scan .pro-input { flex: 1 1 14rem; width: auto; height: 48px; font: 500 1rem var(--pro-font-mono); }
+  .rl-principal { margin-top: 1rem; padding: 0.9rem 1rem; background: var(--pro-bleu-pale); border-left: 4px solid var(--pro-bleu); }
+  .rl-principal.is-empty { background: #fff; border: 1px dashed var(--pro-trait-fort); color: var(--pro-texte-doux); font-size: 0.82rem; }
+  .rl-principal__titre { display: block; margin-top: 0.35rem; font-size: 0.9rem; color: var(--pro-texte); }
+  .rl-principal__meta { margin-top: 0.3rem; font-size: 0.72rem; color: var(--pro-texte-doux); }
+  .rl-principal__meta code { font: 600 0.72rem var(--pro-font-mono); }
+  .rl-fb { margin-top: 0.8rem; padding: 0.65rem 0.9rem; font-size: 0.85rem; border-left: 4px solid var(--pro-bleu); background: var(--pro-bleu-pale); }
+  .rl-fb[hidden] { display: none; }
+  .rl-fb.ok { border-left-color: var(--pro-ok); background: var(--pro-ok-fond); color: var(--pro-ok-encre); }
+  .rl-fb.warn { border-left-color: var(--pro-dec-braderie); background: #FFF6DF; color: var(--pro-dec-braderie-ink); }
+  .rl-fb.err { border-left-color: var(--pro-carmin); background: var(--pro-ko-fond); color: var(--pro-carmin-fonce); }
+  .rl-members { margin-top: 1rem; border: 1px solid var(--pro-carte-bord); }
+  .rl-members[hidden] { display: none; }
+  .rl-members-empty { margin-top: 1rem; padding: 0.9rem; text-align: center; font-size: 0.82rem; color: var(--pro-texte-doux); border: 1px dashed var(--pro-trait-fort); background: #fff; }
+  .rl-members-empty[hidden] { display: none; }
+  .rl-members-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-top: 1rem; font-size: 0.8rem; color: var(--pro-texte); }
+  .rl-members-head[hidden] { display: none; }
+  .rl-members-head strong { color: var(--pro-bleu); }
+
+  /* ── Groupes ── */
+  .rl-cell-sub { display: block; margin-top: 0.25rem; font-size: 0.74rem; color: var(--pro-texte-doux); }
+  .rl-cell-sub code { font: 600 0.72rem var(--pro-font-mono); }
+  .rl-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; white-space: nowrap; }
+  .rl-table-card .pro-table th { position: static; }
+  .rl-table-card .pro-table td { vertical-align: middle; }
+  .rl-code { font: 600 0.74rem var(--pro-font-mono); color: var(--pro-texte-doux); }
+
+  /* ── Conflits ── */
+  .rl-conflict { padding: 1.1rem 1.25rem; }
+  .rl-conflict + .rl-conflict { margin-top: 0.875rem; }
+  .rl-conflict__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; margin-bottom: 0.7rem; }
+  .rl-conflict__head .pro-h4 { color: var(--pro-carmin-fonce); }
+  .rl-conflict .pro-table-wrap { max-height: none; }
+  .rl-conflict .pro-table th { position: static; }
+  .rl-loc { font-weight: 700; color: var(--pro-bleu); }
+
+  /* ── Suggestions ── */
+  .rl-sugg { padding: 0.8rem 1rem; }
+  .rl-sugg + .rl-sugg { margin-top: 0.6rem; }
+  .rl-sugg__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.8rem; }
+  .rl-sugg__n { font-size: 0.8rem; color: var(--pro-texte-doux); }
+  .rl-sugg__list { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+  .rl-sugg__row { display: grid; grid-template-columns: 7.5rem 9rem minmax(0, 1fr) auto; gap: 0.2rem 0.8rem; align-items: center; padding: 0.35rem 0.5rem; border-top: 1px solid var(--pro-filet); font-size: 0.8rem; }
+  .rl-sugg__row.is-located { background: var(--pro-bleu-pale); border-top-color: var(--pro-bleu-bord); }
+  .rl-sugg__row .rl-t { min-width: 0; overflow-wrap: anywhere; }
+  .rl-missing { font-size: 0.75rem; font-style: italic; color: var(--pro-texte-faible); white-space: nowrap; }
+  .rl-ignored { margin-top: 1.5rem; background: #fff; border: 1px solid var(--pro-carte-bord); }
+  .rl-ignored > summary { cursor: pointer; display: flex; align-items: center; gap: 0.5rem; min-height: 44px; padding: 0 1rem; font-weight: 600; font-size: 0.85rem; color: var(--pro-bleu); }
+  .rl-ignored-row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.5rem 1rem; border-top: 1px solid var(--pro-filet); font-size: 0.8rem; }
+  .rl-ignored-row span { min-width: 0; overflow-wrap: anywhere; }
+  .rl-ignored-row code { font: 600 0.74rem var(--pro-font-mono); }
+  .rl-empty-note { padding: 1rem; text-align: center; font-size: 0.82rem; color: var(--pro-texte-doux); }
+
+  @media (max-width: 60rem) {
+    .rl-steps { grid-template-columns: 1fr; }
   }
-  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
-  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
-  .sync-status.pending{color:#ffcc80}
-  .container{max-width:1000px;margin:0 auto;padding:0 1.5rem}
-  .section{padding:1.5rem 0}
-  .intro{font-size:.88rem;color:#555;line-height:1.6;background:#F5F5FF;border:1px solid #e3e3f5;border-radius:var(--radius-md);padding:1rem 1.25rem;margin-bottom:1.5rem}
-  .intro strong{color:#2A3CD4}
-
-  .scan-zone{background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
-  .scan-zone h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.15rem;margin:0 0 .9rem;color:#2A3CD4}
-  .scan-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem}
-  .scan-row input[type=text]{flex:1;min-width:220px;font-size:1.1rem;font-family:'DM Mono',monospace,inherit;padding:.7rem .9rem;border:1px solid #ccc;border-radius:8px;outline:none}
-  .scan-row input[type=text]:focus{border-color:#2A3CD4;box-shadow:0 0 0 3px rgba(42,60,212,.12)}
-  .scan-row input[type=text]:disabled{background:#f5f5f5;color:#aaa}
-  .field-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:.3rem}
-
-  .principal-card{background:#F5F5FF;border:1px solid #ddd;border-radius:var(--radius-md);padding:.9rem 1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-  .principal-card.empty{color:#999;font-style:italic}
-  .principal-info .cote{font-family:monospace;font-weight:700;color:#2A3CD4;margin-right:.5rem}
-  .principal-info .titre{font-size:.85rem;color:#333}
-  .principal-info .meta{font-size:.72rem;color:#888;margin-top:.15rem}
-
-  .feedback{margin-top:.75rem;border-radius:var(--radius-md);padding:.75rem 1rem;display:none;font-size:.85rem}
-  .feedback.show{display:block}
-  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9;color:#1b5e20}
-  .feedback.warn{background:#fff8e1;border:1px solid #ffe0b2;color:#7a4a00}
-  .feedback.err{background:#ffebee;border:1px solid #ffcdd2;color:#b71c1c}
-
-  .members-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.5rem}
-  .members-table th{text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;padding:.4rem .6rem;border-bottom:1px solid #e8e8f0}
-  .members-table td{padding:.4rem .6rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
-  .members-table tr:hover td{background:#fafafa}
-  .members-empty{padding:.75rem;text-align:center;color:#bbb;font-style:italic;font-size:.8rem}
-  .row-del{font-family:inherit;font-size:.75rem;padding:.25rem .55rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#c62828}
-  .row-del:hover{background:#fff5f5}
-  .badge-unknown{font-size:.65rem;padding:1px 7px;border-radius:20px;background:#ffe0b2;color:#e65100;margin-left:.4rem}
-
-  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem}
-  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
-  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
-  .log-body{max-height:420px;overflow-y:auto}
-  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
-  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0}
-  .log-table td{padding:.35rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
-  .log-table tr:hover td{background:#fafafa}
-  .log-empty{padding:1rem;text-align:center;color:#bbb;font-style:italic;font-size:.8rem}
-  .tool-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #2A3CD4;border-radius:8px;background:#2A3CD4;color:#fff;cursor:pointer;display:inline-block;text-decoration:none}
-  .tool-btn:hover{background:#1c1fa0}
-  .tool-btn.secondary{background:#fff;color:#2A3CD4}
-  .tool-btn.secondary:hover{background:#F5F5FF}
-  .tool-btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
-  .tool-btn.danger:hover{background:#fff5f5}
-  .tool-btn:disabled{opacity:.6;cursor:default}
-
-  .conflict-block{border:1px solid #ffcdd2;background:#fff5f5;border-radius:var(--radius-md);padding:.9rem 1rem;margin-bottom:.9rem}
-  .conflict-block h4{margin:0 0 .5rem;font-size:.85rem;color:#b71c1c}
-  .conflict-block ul{margin:0;padding-left:1.1rem;font-size:.8rem;color:#444;line-height:1.7}
-  .conflict-block code{background:#fff;border:1px solid #eee;padding:1px 5px;border-radius:4px}
-
-  .adv-details{border-top:1px solid #e5e5e5;padding-top:.75rem;margin-top:.9rem}
-  .adv-details summary{cursor:pointer;font-size:.82rem;font-weight:600;color:#333;list-style:none}
-  .adv-details summary::-webkit-details-marker{display:none}
-  .adv-details summary::before{content:'▸ ';color:#999}
-  .adv-details[open] summary::before{content:'▾ '}
-  .adv-details summary .adv-count{font-weight:400;color:#888}
-  .log-header-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
-  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:200px}
-  .adv-pager{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.6rem .9rem;font-size:.75rem;color:#777;flex-wrap:wrap}
-  .adv-pager-btns{display:flex;align-items:center;gap:.4rem}
-  .adv-pager button{font-family:inherit;font-size:.75rem;padding:.3rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#333}
-  .adv-pager button:disabled{opacity:.4;cursor:default}
-  .adv-pager button:not(:disabled):hover{background:#f5f5f5}
-
-  .suggestion-block{border:1px solid #b2dfdb;background:#e0f2f1;border-radius:var(--radius-md);padding:.9rem 1rem;margin-bottom:.9rem}
-  .suggestion-block h4{margin:0 0 .5rem;font-size:.85rem;color:#00695c;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
-  .suggestion-block .base-cote{font-family:monospace;font-weight:700}
-  .suggestion-block ul{margin:0 0 .6rem;padding-left:1.1rem;font-size:.8rem;color:#444;line-height:1.7}
-  .suggestion-block code{background:#fff;border:1px solid #eee;padding:1px 5px;border-radius:4px}
-  .loc-found{color:#00695c;font-weight:600}
-  .loc-missing{color:#999;font-style:italic}
-  .suggestion-actions{display:flex;gap:.5rem;flex-wrap:wrap}
-  .ignored-row{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.4rem .2rem;border-bottom:1px solid #f0f0f0;font-size:.8rem}
-
-  footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
-  footer a{color:#c9a96e;text-decoration:none}
+  @media (max-width: 40rem) {
+    .rl-sugg__row { grid-template-columns: 1fr; }
+    .rl-toolbar-spacer { display: none; }
+    .rl-step { padding: 1rem; }
+  }
 </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
        qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
@@ -122,125 +127,183 @@
        rendu. Voir js/parent-page-height.js. -->
   <script src="js/parent-page-height.js"></script>
 </head>
-<body>
+<body class="pro">
 
-<section class="page-hero">
-  <div class="container">
-    <div>
-      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
-      <h1 class="page-title">Gestion des reliures</h1>
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head rl-head" id="rl-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace pro</a> › Récolement</p>
+      <h1 class="pro-head__h1">Gestion des reliures</h1>
     </div>
-    <div class="hero-actions">
-      <span class="sync-status" id="sync-status"></span>
-      <a href="admin.html">← Espace professionnel</a>
-      <button type="button" id="logout-btn">Se déconnecter</button>
+    <div class="pro-head__actions">
+      <span class="pro-sync" id="sync-status" role="status" aria-live="polite"></span>
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="logout-btn">Déconnexion</button>
+    </div>
+    <div class="pro-tabs" role="tablist" aria-label="Gestion des reliures">
+      <button type="button" role="tab" class="pro-tab" data-tab="create" id="tab-create"><span data-icon="plus" data-size="16"></span><span>Créer un groupe</span></button>
+      <button type="button" role="tab" class="pro-tab" data-tab="groups" id="tab-groups"><span>Groupes</span><span class="pro-tab__count" id="cnt-groups" hidden></span></button>
+      <button type="button" role="tab" class="pro-tab" data-tab="conflicts" id="tab-conflicts"><span>Conflits</span><span class="pro-tab__count" id="cnt-conflicts" hidden></span></button>
+      <button type="button" role="tab" class="pro-tab" data-tab="suggestions" id="tab-suggestions"><span>Suggestions</span><span class="pro-tab__count" id="cnt-suggestions" hidden></span></button>
     </div>
   </div>
-</section>
+</header>
 
-<main>
-  <div class="section">
-    <div class="container">
+<main id="contenu" class="pro-main">
+<div class="pro-wrap">
 
-      <p class="intro">
-        Certains documents catalogués séparément sont en réalité <strong>reliés dans un même volume physique</strong>
-        (recueils factices). Un premier lot est déjà détecté automatiquement dans Syracuse via les champs $481/$482 —
-        voir CLAUDE.md. Cet outil sert à en ajouter d'autres à la main, quand vous découvrez une reliure en réserve
-        sans attendre un prochain export Syracuse : définissez le <strong>code-barre principal</strong> du volume,
-        puis scannez chacun des autres documents qui y sont reliés. Ensuite, dans <a href="recolement.html">le récolement</a>,
-        scanner n'importe lequel des membres du groupe récole automatiquement tous les autres au même emplacement.
-      </p>
+  <!-- ══════════ Créer un groupe ══════════ -->
+  <section class="rl-panel" data-tab="create" aria-label="Créer un groupe">
+    <details class="pro-help" id="rl-help" open>
+      <summary><span data-icon="info" data-size="18"></span><span>Comment fonctionne une reliure ?</span><span class="pro-help__chev" data-icon="chevDown" data-size="18"></span></summary>
+      <div class="pro-help__body">
+        <p>Certains documents catalogués séparément sont en réalité <strong>reliés dans un même volume physique</strong> (recueils factices). Un premier lot est déjà détecté automatiquement dans Syracuse via les champs $481/$482.</p>
+        <p>Cet outil sert à en ajouter d'autres à la main, quand vous découvrez une reliure en réserve sans attendre un prochain export Syracuse : définissez le <strong>code-barre principal</strong> du volume, puis scannez chacun des autres documents qui y sont reliés.</p>
+        <p>Ensuite, dans <a class="pro-link" href="recolement.html">le récolement</a>, scanner n'importe lequel des membres du groupe récole automatiquement tous les autres au même emplacement.</p>
+      </div>
+    </details>
 
-      <div class="scan-zone">
-        <h2>1. Code-barre principal du volume</h2>
-        <div class="field-label">Celui qui « prend en charge » les autres (équivalent $481)</div>
-        <div class="scan-row">
-          <input type="text" id="principal-input" placeholder="Scannez ou tapez le code-barre principal" autocomplete="off" autofocus>
-          <button type="button" class="tool-btn secondary" id="btn-new-group">Nouveau groupe</button>
+    <div class="rl-steps">
+      <!-- Étape 1 -->
+      <article class="pro-card rl-step" id="rl-step1" aria-labelledby="rl-h1">
+        <div class="rl-step__head">
+          <span class="rl-num" id="rl-num1" aria-hidden="true">1</span>
+          <div>
+            <h2 class="pro-h4" id="rl-h1">Scanner le document principal</h2>
+            <p>Celui qui « prend en charge » les autres (équivalent $481).</p>
+          </div>
         </div>
-        <div class="principal-card empty" id="principal-card">Aucun groupe en cours — scannez un code-barre principal ci-dessus.</div>
-
-        <h2>2. Documents reliés à ce volume</h2>
-        <div class="field-label">Chacun reçoit un lien vers le principal (équivalent $482)</div>
-        <div class="scan-row">
-          <input type="text" id="member-input" placeholder="Scannez un document relié au principal" autocomplete="off" disabled>
+        <div class="rl-scan">
+          <input type="text" class="pro-input" id="principal-input" aria-label="Code-barre du document principal" placeholder="Scannez ou tapez le code-barre principal" autocomplete="off" autofocus>
+          <button type="button" class="pro-btn pro-btn--secondary" id="btn-new-group">Nouveau groupe</button>
         </div>
-        <div class="feedback" id="member-feedback"></div>
+        <div class="rl-principal is-empty" id="principal-card">Aucun groupe en cours — scannez un code-barre principal ci-dessus.</div>
+      </article>
 
-        <table class="members-table" id="members-table" style="display:none">
-          <thead><tr><th>Cote</th><th>Titre</th><th>Code-barre</th><th></th></tr></thead>
-          <tbody id="members-tbody"></tbody>
+      <!-- Étape 2 -->
+      <article class="pro-card rl-step is-locked" id="rl-step2" aria-labelledby="rl-h2">
+        <div class="rl-step__head">
+          <span class="rl-num" id="rl-num2" aria-hidden="true">2</span>
+          <div>
+            <h2 class="pro-h4" id="rl-h2">Scanner les documents reliés</h2>
+            <p>Chacun reçoit un lien vers le principal (équivalent $482).</p>
+          </div>
+        </div>
+        <p class="rl-lock" id="rl-lock"><span data-icon="lock" data-size="18"></span><span>Étape verrouillée : scannez d'abord le document principal (étape 1) pour pouvoir y relier d'autres documents.</span></p>
+        <div class="rl-scan">
+          <input type="text" class="pro-input" id="member-input" aria-label="Code-barre d'un document relié au principal" placeholder="Scannez un document relié au principal" autocomplete="off" disabled>
+        </div>
+        <div class="rl-fb" id="member-feedback" role="status" aria-live="polite" hidden></div>
+
+        <div class="rl-members-head" id="members-head" hidden><span>Documents reliés à ce volume : <strong id="members-n">0</strong></span></div>
+        <div class="rl-members pro-table-wrap pro-table-wrap--free" id="members-table" hidden>
+          <table class="pro-table">
+            <caption class="pro-sr">Documents reliés au document principal</caption>
+            <thead><tr><th scope="col">Cote</th><th scope="col">Titre</th><th scope="col">Code-barre</th><th scope="col"><span class="pro-sr">Retirer</span></th></tr></thead>
+            <tbody id="members-tbody"></tbody>
+          </table>
+        </div>
+        <div class="rl-members-empty" id="members-empty">Aucun document relié pour l'instant.</div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ══════════ Groupes ══════════ -->
+  <section class="rl-panel" data-tab="groups" aria-label="Groupes créés manuellement" hidden>
+    <div class="pro-section-head"><h2 class="pro-eyebrow">Groupes créés manuellement</h2><span class="pro-rule" aria-hidden="true"></span></div>
+    <div class="pro-card rl-table-card">
+      <div class="pro-toolbar">
+        <span class="rl-count" id="groups-count" aria-live="polite"></span>
+        <span class="rl-toolbar-spacer"></span>
+        <button type="button" class="pro-btn pro-btn--primary" id="btn-go-create"><span data-icon="plus" data-size="18"></span>Créer un groupe</button>
+      </div>
+      <div class="pro-table-wrap pro-table-wrap--free">
+        <table class="pro-table">
+          <caption class="pro-sr">Groupes de documents reliés créés à la main</caption>
+          <thead><tr><th scope="col">Principal</th><th scope="col">Membres</th><th scope="col">Créé le</th><th scope="col">Actions</th></tr></thead>
+          <tbody id="log-groups"><tr><td colspan="4"><div class="pro-skeleton" style="height:2.6rem"></div></td></tr></tbody>
         </table>
-        <div class="members-empty" id="members-empty">Aucun document relié pour l'instant.</div>
       </div>
-
-      <div class="log-wrap">
-        <div class="log-header"><span class="log-title">Tous les groupes créés manuellement</span></div>
-        <div class="log-body"><table class="log-table">
-          <thead><tr><th>Principal</th><th>Membres</th><th>Créé le</th><th></th></tr></thead>
-          <tbody id="log-groups"></tbody>
-        </table></div>
-      </div>
-
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title">Groupes en conflit d'emplacement</span>
-          <button type="button" class="tool-btn secondary" id="btn-refresh-analysis">↻ Rafraîchir</button>
-        </div>
-        <div id="conflicts-zone" style="padding:1rem">
-          <p class="log-empty" id="conflicts-empty">Chargement…</p>
-        </div>
-      </div>
-
-      <div class="log-wrap">
-        <div class="log-header"><span class="log-title" style="text-transform:none;font-weight:400;font-size:.85rem">Groupes potentiels détectés dans les cotes</span></div>
-        <div style="padding:1rem">
-          <p style="font-size:.8rem;color:#666;line-height:1.5;margin:0 0 1rem">
-            Détecté à partir de la forme des cotes (fonds Imprimés notamment : une cote de base
-            <code>I-XX-XXXX-X</code> suivie d'un suffixe <code>-X</code>, <code>-X bis/ter</code> ou <code>-X/X</code>
-            signale souvent un document trouvé ou relié avec un autre portant la même base). C'est un indice, pas une
-            certitude : vérifiez avant de créer le groupe, et écartez ce qui ne correspond à rien de réel — l'écart est
-            mémorisé durablement (survit à un nouveau récolement ou à un nouvel export Syracuse).
-          </p>
-          <details class="adv-details" id="adv-suggestions">
-            <summary>Suggestions à vérifier <span class="adv-count">(<span id="sugg-count">0</span>)</span></summary>
-            <div class="log-header-actions" style="margin:.75rem 0">
-              <input type="text" class="log-search" id="sugg-search" placeholder="Filtrer (cote, code-barre)…">
-            </div>
-            <div id="suggestions-zone"><p class="log-empty">Ouvrez ce panneau pour calculer les suggestions.</p></div>
-            <div class="adv-pager" id="sugg-pager"></div>
-          </details>
-          <details class="adv-details" id="adv-ignored">
-            <summary>Suggestions écartées <span class="adv-count">(<span id="ignored-count">0</span>)</span></summary>
-            <div id="ignored-zone" style="margin-top:.5rem"></div>
-          </details>
-        </div>
-      </div>
-
+      <div class="pro-pager" id="groups-pager" style="display:none"></div>
     </div>
-  </div>
+  </section>
+
+  <!-- ══════════ Conflits ══════════ -->
+  <section class="rl-panel" data-tab="conflicts" aria-label="Groupes en conflit d'emplacement" hidden>
+    <div class="pro-section-head">
+      <h2 class="pro-eyebrow">Groupes en conflit d'emplacement</h2><span class="pro-rule" aria-hidden="true"></span>
+      <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="btn-refresh-analysis"><span data-icon="refresh" data-size="16"></span>Rafraîchir</button>
+    </div>
+    <p class="rl-intro">Groupes (Syracuse $481/$482 ou créés ici) dont les membres déjà récolés ne sont pas au même emplacement : lien mal posé dans le catalogue, erreur de récolement, ou reliure physique modifiée depuis le catalogage.</p>
+    <div id="conflicts-zone">
+      <div class="pro-skeleton" style="height:9rem" aria-label="Chargement des conflits"></div>
+    </div>
+  </section>
+
+  <!-- ══════════ Suggestions ══════════ -->
+  <section class="rl-panel" data-tab="suggestions" aria-label="Groupes potentiels détectés dans les cotes" hidden>
+    <div class="pro-section-head"><h2 class="pro-eyebrow">Groupes potentiels détectés dans les cotes</h2><span class="pro-rule" aria-hidden="true"></span></div>
+    <details class="pro-help" id="rl-help-sugg">
+      <summary><span data-icon="info" data-size="18"></span><span>Comment lire ces suggestions ?</span><span class="pro-help__chev" data-icon="chevDown" data-size="18"></span></summary>
+      <div class="pro-help__body">
+        <p>Détecté à partir de la forme des cotes (fonds Imprimés notamment : une cote de base <code>I-XX-XXXX-X</code> suivie d'un suffixe <code>-X</code>, <code>-X bis/ter</code> ou <code>-X/X</code> signale souvent un document trouvé ou relié avec un autre portant la même base).</p>
+        <p>C'est un indice, pas une certitude : vérifiez avant de créer le groupe, et écartez ce qui ne correspond à rien de réel — l'écart est mémorisé durablement (il survit à un nouveau récolement ou à un nouvel export Syracuse). Les suggestions dont un membre est déjà localisé en réserve passent en premier.</p>
+      </div>
+    </details>
+    <div class="pro-card rl-table-card" style="margin-top:0.875rem">
+      <div class="pro-toolbar">
+        <label class="pro-search"><span class="pro-sr">Filtrer les suggestions</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+          <input type="search" class="pro-input" id="sugg-search" placeholder="Filtrer (cote, code-barre)…" autocomplete="off">
+        </label>
+        <span class="rl-count" id="sugg-count-text" aria-live="polite"></span>
+      </div>
+      <div style="padding:0.875rem 1rem" id="suggestions-zone"><p class="rl-empty-note">Calcul des suggestions…</p></div>
+      <div class="pro-pager" id="sugg-pager" style="display:none"></div>
+    </div>
+
+    <details class="rl-ignored" id="adv-ignored">
+      <summary>Suggestions écartées <span class="pro-pill pro-pill--pret" id="ignored-count">0</span></summary>
+      <div id="ignored-zone"></div>
+    </details>
+  </section>
+
+</div>
 </main>
 
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+<footer class="pro-foot">
+  <div class="pro-foot__inner">
+    <span>Bibliothèques de Douai — Réserve patrimoniale · Espace réservé à l'équipe</span>
+    <a href="admin.html">← Espace pro</a>
   </div>
 </footer>
 
+<script src="js/admin-ui.js"></script>
 <script>
 (function(){
+'use strict';
 /* ════════════ AUTH ════════════ */
 if (localStorage.getItem('rp_admin_auth') !== '1') {
-  window.location.href = 'index.html';
+  window.location.replace('index.html');
   return;
 }
+const ui = window.rpUI, fmt = ui.fmt, esc = ui.esc;
+const $ = id => document.getElementById(id);
+
 document.getElementById('logout-btn').addEventListener('click', function(){
   localStorage.removeItem('rp_admin_auth');
   localStorage.removeItem('rp_admin_token');
   window.location.href = 'index.html';
 });
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* Icônes du kit dans les éléments marqués data-icon */
+document.querySelectorAll('[data-icon]').forEach(el=>{
+  el.innerHTML = ui.icon(el.dataset.icon, { size: parseInt(el.dataset.size || '18', 10) });
+});
+ui.help($('rl-help'), 'reliures');
+ui.help($('rl-help-sugg'), 'reliures-suggestions');
 
 let audioCtx = null;
 function beep(freq, dur){
@@ -274,16 +337,32 @@ const LS_PENDING = 'rp_reliures_pending_sync';
 /* File de synchronisation : implémentation commune aux cinq pages qui
    écrivent dans un état partagé R2 — voir js/sync-queue.js (localStorage
    comme source de vérité locale, rejeu à la reconnexion, indicateur
-   #sync-status). Ce bloc était auparavant recopié à l'identique dans chacune.
-   Un patch de reliures est envoyé tel quel. */
+   #sync-status). Un patch de reliures est envoyé tel quel. */
 const syncQueue = createSyncQueue({
   storageKey: LS_PENDING,
   endpoint: '/api/reliures-manuelles',
 });
-const authHeaders = syncAuthHeaders;
 function queuePatch(item){ syncQueue.queue(item); }
 function flushPendingSync(){ return syncQueue.flush(); }
 function updateSyncIndicator(){ syncQueue.updateIndicator(); }
+
+/* ════════════ ONGLETS ════════════ */
+let currentTab = null;
+let suggestionsDirty = true;
+const head = $('rl-head');
+head.addEventListener('rp-tab-change', ev=>{
+  currentTab = ev.detail.id;
+  if(currentTab === 'suggestions' && suggestionsDirty && catalogReady) renderSuggestions(lastScansByBc);
+  if(currentTab === 'create') focusScan();
+});
+const tabsApi = ui.tabs(head, { hashPrefix: 'onglet-' });
+
+function setCount(id, n, opts){
+  const el = $(id);
+  if(n == null){ el.hidden = true; return; }
+  el.textContent = fmt.n(n);
+  el.hidden = !(n > 0);
+}
 
 /* ════════════ CATALOGUE + GROUPES ════════════ */
 let catalog = {};        // barcode -> {cote,titre,auteur}
@@ -291,6 +370,7 @@ let syracuseItems = [];  // data/inventaire.json brut (pour _relies)
 let manualGroups = {};   // principal -> {principal, members, ts}
 let ignoredSuggestions = {}; // signature -> {signature, base, barcodes, ts}
 let currentPrincipal = null;
+let catalogReady = false;
 
 function loadCatalogRow(it){
   const bc = (it['915$b'] || it['995$f'] || '').trim();
@@ -308,27 +388,81 @@ Promise.all([
   manuels.forEach(loadCatalogRow);
   manualGroups = state.groups || {};
   ignoredSuggestions = state.ignoredSuggestions || {};
+  catalogReady = true;
   renderGroupsTable();
   refreshAnalysis();
 }).catch(()=>{
-  document.getElementById('conflicts-empty').textContent = 'Catalogue indisponible.';
+  $('log-groups').innerHTML = '<tr><td colspan="4" class="rl-empty-note">Catalogue indisponible : impossible d\'afficher les groupes.</td></tr>';
+  $('conflicts-zone').innerHTML = emptyHtml('error', 'Catalogue indisponible', 'Impossible de charger data/inventaire.json. Rechargez la page.');
+  $('suggestions-zone').innerHTML = '<p class="rl-empty-note">Catalogue indisponible.</p>';
 });
 
+function emptyHtml(icon, title, text){
+  return '<div class="pro-empty">' + ui.icon(icon, { size: 32, stroke: 1.6 }) +
+    '<div class="pro-empty__title">' + esc(title) + '</div><div class="pro-empty__text" style="margin-bottom:0">' + esc(text) + '</div></div>';
+}
+
+/* Pagination commune (Précédent/Suivant + pages) */
+function pageList(cur, pages){
+  if(pages <= 7){ const all=[]; for(let p=1;p<=pages;p++) all.push(p); return all; }
+  const set = new Set([1, pages, cur-1, cur, cur+1].filter(p=>p>=1&&p<=pages));
+  return [...set].sort((a,b)=>a-b);
+}
+function renderPager(el, st, count, noun, onChange){
+  const pages = Math.max(1, Math.ceil(count / st.perPage));
+  if(count <= st.perPage){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  if(st.page > pages) st.page = pages;
+  const start = (st.page-1)*st.perPage;
+  let nav = `<button type="button" class="pro-btn pro-btn--ghost pro-btn--icon" data-page="${st.page-1}" aria-label="Page précédente"${st.page<=1?' disabled':''}>${ui.icon('chevLeft',{size:18})}</button>`;
+  let prev = 0;
+  pageList(st.page, pages).forEach(p=>{
+    if(p - prev > 1) nav += '<span class="pro-pager__gap" aria-hidden="true">…</span>';
+    nav += `<button type="button" class="pro-btn pro-btn--ghost pro-btn--icon" data-page="${p}" aria-label="Page ${p}"${p===st.page?' aria-current="page"':''}>${p}</button>`;
+    prev = p;
+  });
+  nav += `<button type="button" class="pro-btn pro-btn--ghost pro-btn--icon" data-page="${st.page+1}" aria-label="Page suivante"${st.page>=pages?' disabled':''}>${ui.icon('chevRight',{size:18})}</button>`;
+  el.innerHTML = `<span class="pro-pager__info">${fmt.n(start+1)}–${fmt.n(Math.min(start+st.perPage,count))} sur ${fmt.n(count)} ${noun}${count>1?'s':''}</span><div class="pro-pager__nav">${nav}</div>`;
+  el.style.display = '';
+  el.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click', ()=>{ st.page = parseInt(b.dataset.page,10); onChange(true); }));
+}
+
 /* ════════════ GROUPE EN COURS ════════════ */
-const principalInput = document.getElementById('principal-input');
-const memberInput = document.getElementById('member-input');
-const principalCard = document.getElementById('principal-card');
+const principalInput = $('principal-input');
+const memberInput = $('member-input');
+const principalCard = $('principal-card');
+
+function focusScan(){
+  setTimeout(()=>{ (currentPrincipal ? memberInput : principalInput).focus(); }, 0);
+}
 
 function ensureLocalGroup(principal){
   if(!manualGroups[principal]) manualGroups[principal] = { principal, members:[], ts: Date.now() };
   return manualGroups[principal];
 }
 
+let scanToast = null;
+function toastScan(msg, type){
+  if(scanToast) scanToast.close();
+  scanToast = ui.toast(msg, { type, timeout: 3500 });
+}
+
+/* Verrouille/déverrouille l'étape 2 selon la présence d'un principal. */
+function updateSteps(){
+  const has = !!currentPrincipal;
+  $('rl-step1').classList.toggle('is-done', has);
+  $('rl-num1').innerHTML = has ? ui.icon('check', { size: 18, stroke: 3 }) : '1';
+  $('rl-step2').classList.toggle('is-locked', !has);
+  $('rl-lock').hidden = has;
+  memberInput.disabled = !has;
+  memberInput.placeholder = has ? 'Scannez un document relié au principal' : 'Scannez d\'abord le document principal';
+}
+
 function setCurrentPrincipal(bc){
   currentPrincipal = bc;
   ensureLocalGroup(bc);
   queuePatch({ type:'ensureGroup', principal: bc, ts: Date.now() });
-  memberInput.disabled = false;
+  $('member-feedback').hidden = true;
+  updateSteps();
   renderPrincipalCard();
   renderMembersTable();
   renderGroupsTable();
@@ -337,30 +471,31 @@ function setCurrentPrincipal(bc){
 
 function renderPrincipalCard(){
   if(!currentPrincipal){
-    principalCard.className = 'principal-card empty';
+    principalCard.className = 'rl-principal is-empty';
     principalCard.innerHTML = 'Aucun groupe en cours — scannez un code-barre principal ci-dessus.';
     return;
   }
   const cat = catalog[currentPrincipal];
-  principalCard.className = 'principal-card';
+  principalCard.className = 'rl-principal';
   principalCard.innerHTML = `
-    <div class="principal-info">
-      <span class="cote">${esc(cat && cat.cote || '(cote inconnue)')}</span>
-      <span class="titre">${esc(cat && cat.titre || '(non catalogué)')}${!cat ? '<span class="badge-unknown">⚠ inconnu du catalogue</span>' : ''}</span>
-      <div class="meta">code-barre ${esc(currentPrincipal)}</div>
-    </div>`;
+    <span class="pro-label" style="margin-bottom:.35rem">Document principal</span>
+    <span class="pro-cote">${esc(cat && cat.cote || '(cote inconnue)')}</span>
+    ${!cat ? `<span class="pro-pill pro-pill--anomalie" style="margin-left:.4rem">${ui.icon('warn',{size:13})}Inconnu du catalogue</span>` : ''}
+    <span class="rl-principal__titre">${esc(cat && cat.titre || '(non catalogué)')}</span>
+    <div class="rl-principal__meta">code-barre <code>${esc(currentPrincipal)}</code></div>`;
 }
 
-document.getElementById('btn-new-group').addEventListener('click', ()=>{
+function resetCurrentGroup(){
   currentPrincipal = null;
-  memberInput.disabled = true;
   principalInput.value = '';
   memberInput.value = '';
-  document.getElementById('member-feedback').className = 'feedback';
+  $('member-feedback').hidden = true;
+  updateSteps();
   renderPrincipalCard();
   renderMembersTable();
   principalInput.focus();
-});
+}
+$('btn-new-group').addEventListener('click', resetCurrentGroup);
 
 principalInput.addEventListener('keydown', e=>{
   if(e.key !== 'Enter') return;
@@ -369,12 +504,15 @@ principalInput.addEventListener('keydown', e=>{
   principalInput.value = '';
   if(!bc) return;
   setCurrentPrincipal(bc);
+  const cat = catalog[bc];
+  toastScan({ title:'Groupe démarré.', text:`${cat && cat.cote || bc} est le document principal.` }, cat ? 'ok' : 'warn');
 });
 
 function showMemberFeedback(status, html){
-  const fb = document.getElementById('member-feedback');
-  fb.className = 'feedback show ' + status;
+  const fb = $('member-feedback');
+  fb.className = 'rl-fb ' + status;
   fb.innerHTML = html;
+  fb.hidden = false;
 }
 
 memberInput.addEventListener('keydown', e=>{
@@ -386,12 +524,14 @@ memberInput.addEventListener('keydown', e=>{
 
   if(bc === currentPrincipal){
     showMemberFeedback('err', 'Un document ne peut pas être relié à lui-même.');
+    toastScan({ title:'Refusé.', text:'Un document ne peut pas être relié à lui-même.' }, 'error');
     beepError();
     return;
   }
   const group = ensureLocalGroup(currentPrincipal);
   if(group.members.includes(bc)){
     showMemberFeedback('warn', `Déjà relié à ce groupe : ${esc(bc)}`);
+    toastScan({ title:'Déjà relié.', text:bc }, 'warn');
     beep(880,.12);
     return;
   }
@@ -404,7 +544,8 @@ memberInput.addEventListener('keydown', e=>{
   queuePatch({ type:'addMember', principal: currentPrincipal, barcode: bc, ts: Date.now() });
 
   const cat = catalog[bc];
-  showMemberFeedback('ok', `✓ Relié : ${esc(cat && cat.cote || bc)}${!cat ? '<span class="badge-unknown">⚠ inconnu du catalogue</span>' : ''}`);
+  showMemberFeedback('ok', `✓ Relié : ${esc(cat && cat.cote || bc)}${!cat ? ` <span class="pro-pill pro-pill--anomalie">${ui.icon('warn',{size:13})}Inconnu du catalogue</span>` : ''}`);
+  toastScan({ title:'Relié.', text:`${cat && cat.cote || bc}${cat && cat.titre ? ' — ' + cat.titre : ''}` }, cat ? 'ok' : 'warn');
   beep(880,.12);
   renderMembersTable();
   renderGroupsTable();
@@ -416,69 +557,95 @@ function removeMember(principal, barcode){
   if(!group) return;
   group.members = group.members.filter(b=>b!==barcode);
   queuePatch({ type:'removeMember', principal, barcode });
+  toastScan({ title:'Retiré du groupe.', text:barcode }, 'info');
   renderMembersTable();
   renderGroupsTable();
   refreshAnalysis();
 }
 
 function renderMembersTable(){
-  const table = document.getElementById('members-table');
-  const tbody = document.getElementById('members-tbody');
-  const empty = document.getElementById('members-empty');
+  const wrap = $('members-table');
+  const tbody = $('members-tbody');
+  const empty = $('members-empty');
+  const headEl = $('members-head');
   const group = currentPrincipal ? manualGroups[currentPrincipal] : null;
   const members = group ? group.members : [];
+  empty.hidden = members.length > 0 || !currentPrincipal;
+  if(!currentPrincipal) empty.hidden = true;
   if(!members.length){
-    table.style.display = 'none';
-    empty.style.display = '';
+    wrap.hidden = true;
+    headEl.hidden = true;
     return;
   }
-  table.style.display = '';
-  empty.style.display = 'none';
+  wrap.hidden = false;
+  headEl.hidden = false;
+  $('members-n').textContent = fmt.n(members.length);
   tbody.innerHTML = members.map(bc=>{
     const cat = catalog[bc];
     return `<tr>
-      <td style="font-family:monospace">${esc(cat && cat.cote || '—')}</td>
-      <td>${esc(cat && cat.titre || '(non catalogué)')}${!cat ? '<span class="badge-unknown">⚠</span>' : ''}</td>
-      <td style="font-family:monospace;color:#888">${esc(bc)}</td>
-      <td><button class="row-del" data-bc="${esc(bc)}">✕</button></td>
+      <td>${cat && cat.cote ? `<span class="pro-cote">${esc(cat.cote)}</span>` : '—'}</td>
+      <td>${esc(cat && cat.titre || '(non catalogué)')}${!cat ? ` <span class="pro-pill pro-pill--anomalie">${ui.icon('warn',{size:13})}Inconnu</span>` : ''}</td>
+      <td class="rl-code">${esc(bc)}</td>
+      <td><button type="button" class="pro-btn pro-btn--icon pro-btn--sm" data-bc="${esc(bc)}" aria-label="Retirer ${esc(bc)} du groupe">${ui.icon('x',{size:16})}</button></td>
     </tr>`;
   }).join('');
-  tbody.querySelectorAll('.row-del').forEach(b=>b.addEventListener('click', ()=>removeMember(currentPrincipal, b.dataset.bc)));
+  tbody.querySelectorAll('[data-bc]').forEach(b=>b.addEventListener('click', ()=>removeMember(currentPrincipal, b.dataset.bc)));
 }
 
 /* ════════════ TOUS LES GROUPES CRÉÉS MANUELLEMENT ════════════ */
-function deleteGroup(principal){
+const groupsState = { page: 1, perPage: 25 };
+
+async function deleteGroup(principal, anchor){
   const cat = catalog[principal];
-  if(!confirm(`Supprimer le groupe reliure « ${cat ? cat.cote || principal : principal} » (${(manualGroups[principal]?.members||[]).length} document(s) relié(s)) ? Cela ne supprime aucun scan déjà enregistré dans le récolement.`)) return;
+  const n = (manualGroups[principal]?.members||[]).length;
+  const ok = await ui.confirmInline(anchor,
+    `Supprimer le groupe « ${cat ? cat.cote || principal : principal} » (${n} document${n>1?'s':''} relié${n>1?'s':''}) ? Cela ne supprime aucun scan déjà enregistré dans le récolement.`,
+    { danger:true, okLabel:'Supprimer le groupe' });
+  if(!ok) return;
   delete manualGroups[principal];
   queuePatch({ type:'deleteGroup', principal });
-  if(currentPrincipal === principal) document.getElementById('btn-new-group').click();
+  if(currentPrincipal === principal) resetCurrentGroup();
+  ui.toast({ title:'Groupe supprimé.', text:cat && cat.cote || principal }, { type:'info' });
   renderGroupsTable();
   refreshAnalysis();
 }
 
-function renderGroupsTable(){
-  const tbody = document.getElementById('log-groups');
+function renderGroupsTable(scrollToTop){
+  const tbody = $('log-groups');
   const groups = Object.values(manualGroups).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  setCount('cnt-groups', groups.length);
+  $('groups-count').innerHTML = `<strong>${fmt.n(groups.length)}</strong> groupe${groups.length>1?'s':''} créé${groups.length>1?'s':''} à la main`;
   if(!groups.length){
-    tbody.innerHTML = '<tr><td class="log-empty" colspan="4">Aucun groupe créé manuellement pour l\'instant.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="4" style="padding:1.2rem">${emptyHtml('link','Aucun groupe créé manuellement','Les groupes détectés dans Syracuse ne figurent pas ici : seuls ceux que vous créez à la main sont listés.')}</td></tr>`;
+    $('groups-pager').style.display = 'none';
     return;
   }
-  tbody.innerHTML = groups.map(g=>{
+  const pages = Math.max(1, Math.ceil(groups.length/groupsState.perPage));
+  if(groupsState.page > pages) groupsState.page = pages;
+  const start = (groupsState.page-1)*groupsState.perPage;
+  tbody.innerHTML = groups.slice(start, start+groupsState.perPage).map(g=>{
     const cat = catalog[g.principal];
+    const n = g.members.length;
+    const sample = g.members.slice(0,4).map(b=>(catalog[b] && catalog[b].cote) || b).join(' · ');
     return `<tr>
-      <td style="font-family:monospace">${esc(cat && cat.cote || g.principal)}<div style="color:#888;font-size:.72rem">${esc(cat && cat.titre || '(non catalogué)')}</div></td>
-      <td>${g.members.length}</td>
-      <td>${g.ts ? new Date(g.ts).toLocaleDateString('fr-FR') : '—'}</td>
-      <td style="white-space:nowrap">
-        <button class="tool-btn secondary" style="padding:.25rem .6rem;font-size:.72rem" data-resume="${esc(g.principal)}">Reprendre</button>
-        <button class="row-del" data-del="${esc(g.principal)}">✕</button>
-      </td>
+      <td><span class="pro-cote">${esc(cat && cat.cote || g.principal)}</span>
+        <span class="rl-cell-sub">${esc(cat && cat.titre || '(non catalogué)')} · <code>${esc(g.principal)}</code></span></td>
+      <td><span class="pro-pill pro-pill--pret">${n} document${n>1?'s':''}</span>${sample ? `<span class="rl-cell-sub">${esc(sample)}${n>4?' …':''}</span>` : ''}</td>
+      <td>${g.ts ? fmt.date(g.ts) : '—'}</td>
+      <td><div class="rl-actions">
+        <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-resume="${esc(g.principal)}">${ui.icon('edit',{size:15})}Reprendre</button>
+        <button type="button" class="pro-btn pro-btn--danger pro-btn--sm" data-del="${esc(g.principal)}">Supprimer</button>
+      </div></td>
     </tr>`;
   }).join('');
-  tbody.querySelectorAll('[data-resume]').forEach(b=>b.addEventListener('click', ()=>setCurrentPrincipal(b.dataset.resume)));
-  tbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>deleteGroup(b.dataset.del)));
+  tbody.querySelectorAll('[data-resume]').forEach(b=>b.addEventListener('click', ()=>{
+    setCurrentPrincipal(b.dataset.resume);
+    tabsApi.select('create');
+  }));
+  tbody.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>deleteGroup(b.dataset.del, b.closest('tr'))));
+  renderPager($('groups-pager'), groupsState, groups.length, 'groupe', scroll=>{ renderGroupsTable(); });
 }
+$('btn-go-create').addEventListener('click', ()=>{ resetCurrentGroup(); tabsApi.select('create'); });
 
 /* ════════════ GROUPES EN CONFLIT (Syracuse $481/$482 + manuels, croisés avec le récolement) ════════════
    Même logique que scripts/backfill-reliure.mjs, mais en direct côté
@@ -511,8 +678,8 @@ let lastScansByBc = new Map();
 function locLabelOf(s){ return `${s.travee} · col. ${s.colonne} · étage/n° ${s.etage}`; }
 
 async function refreshAnalysis(){
-  const zone = document.getElementById('conflicts-zone');
-  zone.innerHTML = '<p class="log-empty">Chargement…</p>';
+  const zone = $('conflicts-zone');
+  if(!zone.querySelector('.rl-conflict')) zone.innerHTML = '<div class="pro-skeleton" style="height:9rem" aria-label="Chargement des conflits"></div>';
   let scans = [];
   try{
     const res = await fetch('/api/recolement');
@@ -525,10 +692,10 @@ async function refreshAnalysis(){
   renderSuggestions(lastScansByBc);
   renderIgnoredSuggestions();
 }
-document.getElementById('btn-refresh-analysis').addEventListener('click', refreshAnalysis);
+$('btn-refresh-analysis').addEventListener('click', refreshAnalysis);
 
 function renderConflicts(scansByBc){
-  const zone = document.getElementById('conflicts-zone');
+  const zone = $('conflicts-zone');
   const groups = buildAllGroups();
   const conflicts = [];
   groups.forEach(group=>{
@@ -540,19 +707,37 @@ function renderConflicts(scansByBc){
         const s = scansByBc.get(bc);
         const cat = catalog[bc];
         return { barcode:bc, cote: cat ? cat.cote : '', titre: cat ? cat.titre : '', loc: locLabelOf(s) };
-      }));
+      }).sort((a,b)=>a.loc.localeCompare(b.loc,'fr') || compareCotes(a.cote, b.cote)));
     }
   });
 
+  const tab = $('tab-conflicts');
+  setCount('cnt-conflicts', conflicts.length);
+  tab.classList.toggle('rl-tab-alert', conflicts.length > 0);
+
   if(!conflicts.length){
-    zone.innerHTML = '<p class="log-empty">Aucun conflit détecté — les membres déjà récolés de chaque groupe sont tous au même emplacement.</p>';
+    zone.innerHTML = emptyHtml('checkCircle', 'Aucun conflit détecté', 'Les membres déjà récolés de chaque groupe sont tous au même emplacement.');
     return;
   }
-  zone.innerHTML = conflicts.map(details=>`
-    <div class="conflict-block">
-      <h4>⚠ ${details.length} documents reliés, emplacements différents dans le récolement</h4>
-      <ul>${details.map(d=>`<li><code>${esc(d.barcode)}</code> ${esc(d.cote || '(cote inconnue)')} — ${esc(d.titre || '(non catalogué)')} → <strong>${esc(d.loc)}</strong></li>`).join('')}</ul>
-    </div>`).join('');
+  zone.innerHTML = conflicts.map(details=>{
+    const nLoc = new Set(details.map(d=>d.loc)).size;
+    return `
+    <article class="pro-card pro-card--alert rl-conflict">
+      <div class="rl-conflict__head">
+        <h3 class="pro-h4">${details.length} documents reliés, ${nLoc} emplacements différents</h3>
+        <span class="pro-pill pro-pill--anomalie">${ui.icon('warn',{size:13})}Conflit d'emplacement</span>
+      </div>
+      <div class="pro-table-wrap pro-table-wrap--free"><table class="pro-table">
+        <thead><tr><th scope="col">Membre</th><th scope="col">Cote</th><th scope="col">Titre</th><th scope="col">Emplacement récolé</th></tr></thead>
+        <tbody>${details.map(d=>`<tr>
+          <td class="rl-code">${esc(d.barcode)}</td>
+          <td>${d.cote ? `<span class="pro-cote">${esc(d.cote)}</span>` : '<span class="pro-muted">(cote inconnue)</span>'}</td>
+          <td>${esc(d.titre || '(non catalogué)')}</td>
+          <td><span class="rl-loc">${esc(d.loc)}</span></td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </article>`;
+  }).join('');
 }
 
 /* ════════════ GROUPES POTENTIELS (heuristique sur les cotes) ════════════
@@ -600,19 +785,17 @@ function buildCoteSuggestions(){
 }
 
 let suggestionsCache = [];
-let suggPage = 0;
-const SUGG_PAGE_SIZE = 20;
+const suggState = { page: 1, perPage: 20 };
 
 function renderSuggestions(scansByBc){
-  const details = document.getElementById('adv-suggestions');
   const raw = buildCoteSuggestions();
-  document.getElementById('sugg-count').textContent = raw.length.toLocaleString('fr-FR');
-  if(!details.open){
-    // Rendu paresseux : ne pas construire la liste tant que le panneau n'est
-    // pas ouvert (peut atteindre plusieurs centaines de suggestions).
-    return;
-  }
-  const q = (document.getElementById('sugg-search').value||'').trim().toLowerCase();
+  setCount('cnt-suggestions', raw.length);
+  suggestionsRaw = raw;
+  // Rendu paresseux : la liste n'est construite que si l'onglet est affiché
+  // (peut atteindre plusieurs centaines de suggestions).
+  if(currentTab !== 'suggestions'){ suggestionsDirty = true; return; }
+  suggestionsDirty = false;
+  const q = ($('sugg-search').value||'').trim().toLowerCase();
   suggestionsCache = (q
     ? raw.filter(s=>s.base.toLowerCase().includes(q) || s.entries.some(e=>(e.cote||'').toLowerCase().includes(q) || e.barcode.includes(q)))
     : raw
@@ -622,53 +805,58 @@ function renderSuggestions(scansByBc){
     if(aScan !== bScan) return aScan ? -1 : 1;
     return a.base.localeCompare(b.base);
   });
-  suggPage = Math.min(suggPage, Math.max(0, Math.ceil(suggestionsCache.length/SUGG_PAGE_SIZE)-1));
+  $('sugg-count-text').innerHTML = q
+    ? `<strong>${fmt.n(suggestionsCache.length)}</strong> sur ${fmt.n(raw.length)} suggestions`
+    : `<strong>${fmt.n(raw.length)}</strong> suggestion${raw.length>1?'s':''} à vérifier`;
+  suggState.page = Math.min(suggState.page, Math.max(1, Math.ceil(suggestionsCache.length/suggState.perPage)));
   renderSuggestionsPage(scansByBc);
 }
+let suggestionsRaw = [];
 
 function renderSuggestionsPage(scansByBc){
-  const zone = document.getElementById('suggestions-zone');
-  const pager = document.getElementById('sugg-pager');
+  const zone = $('suggestions-zone');
+  const pager = $('sugg-pager');
   if(!suggestionsCache.length){
-    zone.innerHTML = '<p class="log-empty">Aucune suggestion (ou tout a déjà été traité/écarté).</p>';
-    pager.innerHTML = '';
+    zone.innerHTML = '<p class="rl-empty-note">Aucune suggestion (ou tout a déjà été traité/écarté).</p>';
+    pager.style.display = 'none';
     return;
   }
-  const start = suggPage*SUGG_PAGE_SIZE;
-  const page = suggestionsCache.slice(start, start+SUGG_PAGE_SIZE);
+  const start = (suggState.page-1)*suggState.perPage;
+  const page = suggestionsCache.slice(start, start+suggState.perPage);
   zone.innerHTML = page.map(s=>{
-    const items = s.entries.map(e=>{
+    const located = s.entries.filter(e=>scansByBc.has(e.barcode)).length;
+    const rows = s.entries.map(e=>{
       const scan = scansByBc.get(e.barcode);
-      const locHtml = scan ? `<span class="loc-found">📍 ${esc(locLabelOf(scan))}</span>` : `<span class="loc-missing">pas encore récolé</span>`;
-      return `<li><code>${esc(e.barcode)}</code> ${esc(e.cote || '(cote inconnue)')} — ${esc(e.titre || '(non catalogué)')} → ${locHtml}</li>`;
+      const locHtml = scan
+        ? `<span class="pro-pill pro-pill--contre">${ui.icon('map',{size:13})}${esc(locLabelOf(scan))}</span>`
+        : `<span class="rl-missing">pas encore récolé</span>`;
+      return `<li class="rl-sugg__row${scan?' is-located':''}">
+        <span class="rl-code">${esc(e.barcode)}</span>
+        <span>${e.cote ? `<span class="pro-cote">${esc(e.cote)}</span>` : '<span class="pro-muted">(cote inconnue)</span>'}</span>
+        <span class="rl-t">${esc(e.titre || '(non catalogué)')}</span>
+        ${locHtml}
+      </li>`;
     }).join('');
-    return `<div class="suggestion-block">
-      <h4>🔎 Base <span class="base-cote">${esc(s.base)}</span> — ${s.entries.length} documents</h4>
-      <ul>${items}</ul>
-      <div class="suggestion-actions">
-        <button type="button" class="tool-btn secondary" style="padding:.35rem .8rem;font-size:.75rem" data-create="${esc(s.signature)}">✓ Créer ce groupe</button>
-        <button type="button" class="tool-btn secondary" style="padding:.35rem .8rem;font-size:.75rem;color:#c62828;border-color:#c62828" data-dismiss="${esc(s.signature)}">✕ Ignorer cette suggestion</button>
+    return `<article class="pro-card rl-sugg">
+      <div class="rl-sugg__head">
+        <span class="pro-label" style="display:inline">Base</span><span class="pro-cote">${esc(s.base)}</span>
+        <span class="rl-sugg__n">${s.entries.length} documents</span>
+        ${located ? `<span class="pro-pill pro-pill--contre">${ui.icon('map',{size:13})}${located} déjà localisé${located>1?'s':''}</span>` : ''}
+        <span class="rl-toolbar-spacer"></span>
+        <button type="button" class="pro-btn pro-btn--primary pro-btn--sm" data-create="${esc(s.signature)}">${ui.icon('check',{size:15})}Créer ce groupe</button>
+        <button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" style="color:var(--pro-carmin)" data-dismiss="${esc(s.signature)}">Ignorer</button>
       </div>
-    </div>`;
+      <ul class="rl-sugg__list">${rows}</ul>
+    </article>`;
   }).join('');
   zone.querySelectorAll('[data-create]').forEach(b=>b.addEventListener('click', ()=>createGroupFromSuggestion(b.dataset.create)));
   zone.querySelectorAll('[data-dismiss]').forEach(b=>b.addEventListener('click', ()=>dismissSuggestion(b.dataset.dismiss)));
-
-  const totalPages = Math.max(1, Math.ceil(suggestionsCache.length/SUGG_PAGE_SIZE));
-  pager.innerHTML = `
-    <span>${start+1}–${Math.min(start+SUGG_PAGE_SIZE, suggestionsCache.length)} sur ${suggestionsCache.length}</span>
-    <div class="adv-pager-btns">
-      <button type="button" id="sugg-prev" ${suggPage===0?'disabled':''}>← Précédent</button>
-      <span>Page ${suggPage+1}/${totalPages}</span>
-      <button type="button" id="sugg-next" ${suggPage>=totalPages-1?'disabled':''}>Suivant →</button>
-    </div>`;
-  const prevBtn = document.getElementById('sugg-prev');
-  const nextBtn = document.getElementById('sugg-next');
-  if(prevBtn) prevBtn.addEventListener('click', ()=>{ suggPage--; renderSuggestionsPage(scansByBc); });
-  if(nextBtn) nextBtn.addEventListener('click', ()=>{ suggPage++; renderSuggestionsPage(scansByBc); });
+  renderPager(pager, suggState, suggestionsCache.length, 'suggestion', scroll=>{
+    renderSuggestionsPage(scansByBc);
+    if(scroll) $('suggestions-zone').scrollIntoView({ block:'nearest' });
+  });
 }
-document.getElementById('adv-suggestions').addEventListener('toggle', function(){ if(this.open) renderSuggestions(lastScansByBc); });
-document.getElementById('sugg-search').addEventListener('input', ()=>{ suggPage=0; renderSuggestions(lastScansByBc); });
+$('sugg-search').addEventListener('input', ()=>{ suggState.page=1; renderSuggestions(lastScansByBc); });
 
 function findSuggestionBySignature(signature){
   return suggestionsCache.find(s=>s.signature===signature) || buildCoteSuggestions().find(s=>s.signature===signature);
@@ -688,6 +876,8 @@ function createGroupFromSuggestion(signature){
     if(!group.members.includes(e.barcode)) group.members.push(e.barcode);
     queuePatch({ type:'addMember', principal: principalEntry.barcode, barcode: e.barcode, ts: Date.now() });
   });
+  ui.toast({ title:'Groupe créé.', text:`${s.base} — ${s.entries.length} documents, principal : ${principalEntry.cote || principalEntry.barcode}.` },
+    { type:'ok', action:{ label:'Voir les groupes', onClick:()=>tabsApi.select('groups') } });
   renderGroupsTable();
   refreshAnalysis();
 }
@@ -698,6 +888,8 @@ function dismissSuggestion(signature){
   const base = s ? s.base : '';
   ignoredSuggestions[signature] = { signature, base, barcodes, ts: Date.now() };
   queuePatch({ type:'dismissSuggestion', signature, base, barcodes, ts: Date.now() });
+  ui.toast({ title:'Suggestion écartée.', text:base || '' },
+    { type:'info', action:{ label:'Annuler', onClick:()=>undismissSuggestion(signature) } });
   renderSuggestions(lastScansByBc);
   renderIgnoredSuggestions();
 }
@@ -710,25 +902,29 @@ function undismissSuggestion(signature){
 }
 
 function renderIgnoredSuggestions(){
-  const zone = document.getElementById('ignored-zone');
+  const zone = $('ignored-zone');
   const list = Object.values(ignoredSuggestions).sort((a,b)=>(b.ts||0)-(a.ts||0));
-  document.getElementById('ignored-count').textContent = list.length.toLocaleString('fr-FR');
+  $('ignored-count').textContent = fmt.n(list.length);
   if(!list.length){
-    zone.innerHTML = '<p class="log-empty">Aucune suggestion écartée.</p>';
+    zone.innerHTML = '<p class="rl-empty-note" style="border-top:1px solid var(--pro-filet)">Aucune suggestion écartée.</p>';
     return;
   }
   zone.innerHTML = list.map(s=>`
-    <div class="ignored-row">
-      <span><code>${esc(s.base || '—')}</code> — ${s.barcodes.length} document(s) (${s.barcodes.map(esc).join(', ')})</span>
-      <button type="button" class="tool-btn secondary" style="padding:.25rem .6rem;font-size:.72rem" data-undismiss="${esc(s.signature)}">↺ Réafficher</button>
+    <div class="rl-ignored-row">
+      <span><code>${esc(s.base || '—')}</code> — ${s.barcodes.length} document${s.barcodes.length>1?'s':''} (${s.barcodes.map(esc).join(', ')})</span>
+      <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-undismiss="${esc(s.signature)}">${ui.icon('refresh',{size:15})}Réafficher</button>
     </div>`).join('');
   zone.querySelectorAll('[data-undismiss]').forEach(b=>b.addEventListener('click', ()=>undismissSuggestion(b.dataset.undismiss)));
 }
 
+/* Scan : un clic dans le vide ramène le focus sur le champ de scan de l'onglet « Créer » */
 document.addEventListener('click', e=>{
-  if(!e.target.closest('input,select,button,a,label')) (currentPrincipal ? memberInput : principalInput).focus();
+  if(currentTab !== 'create') return;
+  if(!e.target.closest('input,select,button,a,label,summary,details,.pro-confirm')) (currentPrincipal ? memberInput : principalInput).focus();
 });
 
+updateSteps();
+renderMembersTable();
 updateSyncIndicator();
 flushPendingSync();
 })();
