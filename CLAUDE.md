@@ -169,6 +169,7 @@ nosniff` et `Referrer-Policy: strict-origin-when-cross-origin`.
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `rotobib.html` | Désherbage assisté par les statistiques de prêt : scan d'un code-barre, fiche + histogramme de prêts sur 4 ans, décision (conserver/pilon/braderie/relocalisation), export .txt par traitement — voir « Rotobib » | **Protégé** |
 | `desherbage-stats.html` | Vue d'ensemble purement statistique (lecture seule) de l'export de désherbage : prêts totaux par année, répartition par prêts cumulés, liste triable des exemplaires — voir « Rotobib » | **Protégé** |
+| `validation-desherbage.html` | Compte rendu en direct des décisions de Rotobib par rayon, pour le collègue qui valide la campagne : valider, contre-proposer un autre traitement, commenter — voir « Rotobib » | **Protégé** |
 | `voyageurs.html` | Exposition « Voyageurs douaisiens » : globe MapLibre 5, voyages animés jour par jour (`js/voyageurs.js`, données dans R2) — **en préparation**, non liée depuis le site public — voir « Exposition Voyageurs douaisiens » | **Protégé** (jusqu'à publication) |
 | `voyageurs-admin.html` | Éditeur de l'exposition « Voyageurs douaisiens » : fiches, tracé des voyages à la souris, étapes et récits | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
@@ -1850,6 +1851,28 @@ décision affiche directement le livre suivant au lieu de refermer la fiche
 (`navAfterDecision()`). Ligne courante surlignée dans le tableau. Un scan de
 code-barre ou « Fermer » le rayon quitte ce mode (`NAV = null`), et le scan
 retrouve son comportement d'origine (fiche refermée après décision).
+
+**Validation de la campagne (`validation-desherbage.html`, 2026-10-09).** Pour
+le collègue qui valide le désherbage : récapitulatif par rayon (`RY-…`, lus
+dans `/api/recolement` ; un livre décidé hors de tout rayon — scan direct de
+magasin, ou scan retiré du rayon — tombe dans « Magasins et hors rayon »),
+relu toutes les 30 s. Par livre : fiche (`data/desherbage.json`), décision de
+l'équipe, boutons « ✓ Valider » ou « ou plutôt : » un autre traitement, et un
+commentaire (enregistré en quittant le champ). « Valider tous les livres
+affichés » (patch `reviewMany`, par lots de 200), export .csv avec les avis.
+**Stockage : champ `validation` de la décision dans
+`desherbage-traitements.json`** (`{avis, commentaire, statutVu, par, ts}`,
+`avis` = `'valide'`, un autre statut, ou `null` pour un commentaire seul),
+patchs `review`/`reviewMany` d'`api/desherbage.mjs` — pas de clé R2 ni de
+fonction à part (plafond de 12 fonctions). Le patch `set` de Rotobib
+**conserve** une `validation` existante ; `clear` l'efface avec la décision.
+Si l'équipe change sa décision après l'avis (`statutVu` ≠ `statut`), l'avis
+s'affiche « à revoir » des deux côtés. Rotobib affiche l'avis dans la fiche
+(`avisHtml()`, bloc `#roto-avis`) et sous le titre dans le tableau du rayon.
+Un avis sur une décision annulée entre-temps est ignoré sans erreur : un 4xx
+bloquerait la file de `js/sync-queue.js`. Les avis envoyés depuis moins de
+2 min sont réappliqués localement (`RECENT`) : le CDN met `/api/desherbage`
+en cache 20 s, une relecture immédiate renverrait l'état d'avant.
 
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni

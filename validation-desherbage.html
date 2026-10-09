@@ -374,8 +374,8 @@ function groupLabel(id){
 }
 
 function renderSummary(){
+  // Seuls les rayons ayant au moins une décision dans Rotobib sont listés.
   const groups = new Map();
-  RAYONS.forEach(r => groups.set(r.id, { id:r.id, books:[] }));
   decidedBooks().forEach(t => {
     const g = groupOf(t.barcode);
     if(!groups.has(g)) groups.set(g, { id:g, books:[] });
@@ -384,7 +384,6 @@ function renderSummary(){
   const scanned = {};
   RAYON_OF.forEach(r => { scanned[r.id] = (scanned[r.id] || 0) + 1; });
   const list = [...groups.values()]
-    .filter(g => g.id !== HORS_RAYON || g.books.length)
     .sort((a, b) => (a.id === HORS_RAYON) - (b.id === HORS_RAYON) || groupLabel(a.id).localeCompare(groupLabel(b.id), 'fr', { numeric:true }));
   const tbody = document.getElementById('vd-sum-body');
   if(!list.length){
