@@ -4,7 +4,12 @@
  * videShelves, nonRangeShelves, lastShelves, noBarcodeCotes, rayons}, chaque
  * valeur un tableau). `rayons` = définitions des rayons en libre accès créés
  * à la volée depuis recolement.html ({id, label, colEtages, ts, deleted?},
- * voir TRAVEES_RAYONS dans js/reserve-shared.js).
+ * voir TRAVEES_RAYONS dans js/reserve-shared.js). `selections` = « rayons
+ * fictifs » de Rotobib : un nom + des zones de magasin (travée, colonnes,
+ * plage d'étagères) regroupées pour le désherbage ({id:"SEL-…", label,
+ * parts:[{travee, cols|null, etFrom|null, etTo|null}], ts, deleted?}, voir
+ * js/selections-desherbage.js). Rien n'est déplacé ni rescanné : ce n'est
+ * qu'un filtre nommé et partagé sur les scans des magasins.
  *
  * GET  → l'état courant (accessible sans authentification : mêmes données
  *        que celles déjà lisibles via data/recolement.json committé).
@@ -24,7 +29,7 @@ class BadRequest extends Error {
 }
 
 function emptyState() {
-  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], noBarcodeCotes: [], rayons: [] };
+  return { scans: [], nonCatalogues: [], videShelves: [], nonRangeShelves: [], lastShelves: [], noBarcodeCotes: [], rayons: [], selections: [] };
 }
 
 function locKey(row) {
@@ -56,6 +61,14 @@ function mergeRayon(rayons, r) {
   if (!existing || !existing.ts || (r.ts || 0) >= existing.ts) rayons[r.id] = r;
 }
 
+// Rayons fictifs (Rotobib) : même règle que les rayons — le plus récent
+// gagne, une suppression est un enregistrement `deleted:true`.
+function mergeSelection(selections, r) {
+  if (!r || typeof r.id !== 'string' || !r.id.startsWith('SEL-')) return;
+  const existing = selections[r.id];
+  if (!existing || !existing.ts || (r.ts || 0) >= existing.ts) selections[r.id] = r;
+}
+
 function toMap(arr, keyFn) {
   const m = {};
   (arr || []).forEach(r => {
@@ -71,7 +84,7 @@ function fromMap(m) {
 // tirées de l'état courant) — factorisé pour être rejoué plusieurs fois de
 // suite par le cas 'batch' ci-dessous sans relire/réécrire R2 à chaque fois.
 function applyOne(maps, patch) {
-  const { scans, nonCat, vide, nonrange, lastShelf, nobarcode, rayons } = maps;
+  const { scans, nonCat, vide, nonrange, lastShelf, nobarcode, rayons, selections } = maps;
   switch (patch.type) {
     case 'scan':
       if (!patch.record || !patch.record.barcode) throw new BadRequest('scan : record.barcode requis.');
@@ -119,6 +132,15 @@ function applyOne(maps, patch) {
       }
       mergeRayon(rayons, patch.record);
       break;
+    case 'selection':
+      if (!patch.record || typeof patch.record.id !== 'string' || !patch.record.id.startsWith('SEL-')) {
+        throw new BadRequest('selection : record.id (préfixé "SEL-") requis.');
+      }
+      if (!patch.record.deleted && (!Array.isArray(patch.record.parts) || !patch.record.parts.length)) {
+        throw new BadRequest('selection : record.parts (tableau non vide) requis.');
+      }
+      mergeSelection(selections, patch.record);
+      break;
     case 'bulkMerge': {
       // Fusionne un lot entier (import d'une sauvegarde JSON) dans l'état
       // partagé — jamais un écrasement : chaque entrée est ajoutée ou mise à
@@ -134,6 +156,7 @@ function applyOne(maps, patch) {
       const incomingNoBarcode = Array.isArray(patch.data.noBarcodeCotes) ? patch.data.noBarcodeCotes : [];
       const incomingRayons = Array.isArray(patch.data.rayons) ? patch.data.rayons : [];
       incomingRayons.forEach(r => mergeRayon(rayons, r));
+      (Array.isArray(patch.data.selections) ? patch.data.selections : []).forEach(r => mergeSelection(selections, r));
 
       incomingScans.forEach(r => {
         if (!r.barcode) return;
@@ -173,6 +196,7 @@ function applyPatch(state, patch) {
     lastShelf: toMap(state.lastShelves, colKey),
     nobarcode: toMap(state.noBarcodeCotes, coteKey),
     rayons: toMap(state.rayons, r => r.id),
+    selections: toMap(state.selections, r => r.id),
   };
 
   if (patch.type === 'batch') {
@@ -193,6 +217,7 @@ function applyPatch(state, patch) {
     lastShelves: fromMap(maps.lastShelf),
     noBarcodeCotes: fromMap(maps.nobarcode),
     rayons: fromMap(maps.rayons),
+    selections: fromMap(maps.selections),
   };
 }
 
@@ -203,3 +228,5 @@ export default createPatchEndpoint({
   emptyState,
   applyPatch,
 });
+
+export { applyPatch };

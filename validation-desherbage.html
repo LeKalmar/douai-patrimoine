@@ -12,6 +12,7 @@
 <script src="js/columnar.js"></script>
 <script src="js/sync-queue.js"></script>
 <script src="js/reserve-shared.js"></script>
+<script src="js/selections-desherbage.js"></script>
 <link rel="stylesheet" href="style.css">
 <style>
   :root{
@@ -246,7 +247,7 @@ const HORS_RAYON = '_hors';
 const PAGE_SIZE = 40;
 
 let TRAITEMENTS = {};          // état serveur + avis locaux non encore envoyés
-let RAYONS = [];               // définitions des rayons (récolement)
+let RAYONS = [];               // rayons du récolement + rayons fictifs des magasins ({id, label})
 let RAYON_OF = new Map();      // code-barre → { id, colonne, etage, cote, titre, auteur }
 let REFERENCE_YEAR = new Date().getFullYear();
 let RAW = null;
@@ -323,13 +324,25 @@ async function loadRecolement(){
   const res = await fetch('/api/recolement');
   if(!res.ok) throw new Error('HTTP ' + res.status);
   const state = await res.json();
-  RAYONS = applyRayonRecords(state.rayons || []).slice();
+  // Rayons fictifs des magasins (créés dans Rotobib, js/selections-desherbage.js) :
+  // un scan de magasin compte dans le premier rayon fictif (par nom) qui le
+  // contient ; hors de tout rayon fictif, il reste « hors rayon ».
+  const SD = selectionsDesherbage;
+  const selections = SD.applySelectionRecords(state.selections || []);
+  RAYONS = [...applyRayonRecords(state.rayons || []), ...selections].map(r => ({ id:r.id, label:r.label }));
   RAYON_OF = new Map();
   (state.scans || []).forEach(s => {
-    if(!s || !isRayonTravee(s.travee)) return;
+    if(!s) return;
+    let id = null;
+    if(isRayonTravee(s.travee)) id = s.travee;
+    else if(SD.isMagasinTraveeId(s.travee)){
+      const sel = selections.find(sel => SD.selectionMatches(sel, s));
+      if(sel) id = sel.id;
+    }
+    if(!id) return;
     const prev = RAYON_OF.get(s.barcode);
     if(!prev || String(s.ts || '') > String(prev.ts || '')){
-      RAYON_OF.set(s.barcode, { id:s.travee, colonne:s.colonne, etage:s.etage, cote:s.cote||'', titre:s.titre||'', auteur:s.auteur||'', ts:s.ts });
+      RAYON_OF.set(s.barcode, { id, travee: SD.isMagasinTraveeId(s.travee) ? s.travee : null, colonne:s.colonne, etage:s.etage, cote:s.cote||'', titre:s.titre||'', auteur:s.auteur||'', ts:s.ts });
     }
   });
 }
@@ -490,7 +503,7 @@ function fmtDate(iso){
 function bookHtml(b){
   const t = b.t, v = t.validation || null, st = reviewState(t);
   const Y = REFERENCE_YEAR;
-  const empl = b.scan.id ? `${b.scan.colonne != null ? 'colonne ' + esc(b.scan.colonne) : ''}${b.scan.etage != null ? ', étagère ' + esc(b.scan.etage) : ''}` : '';
+  const empl = b.scan.id ? `${b.scan.travee ? esc(selectionsDesherbage.traveeName(b.scan.travee)) + ', ' : ''}${b.scan.colonne != null ? 'colonne ' + esc(b.scan.colonne) : ''}${b.scan.etage != null ? ', étagère ' + esc(b.scan.etage) : ''}` : '';
   const meta = [
     b.cote ? `<b>Cote</b> ${esc(b.cote)}` : '',
     b.parution ? `<b>Parution</b> ${esc(b.parution)}` : '',

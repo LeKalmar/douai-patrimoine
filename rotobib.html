@@ -12,6 +12,7 @@
 <script src="js/columnar.js"></script>
 <script src="js/sync-queue.js"></script>
 <script src="js/reserve-shared.js"></script>
+<script src="js/selections-desherbage.js"></script>
 <script src="js/dewey-labels.js"></script>
 <link rel="stylesheet" href="style.css">
 <style>
@@ -176,6 +177,26 @@
   .rayon-btn.ghost{background:#fff;color:#2A3CD4}
   .rayon-btn:disabled{opacity:.5;cursor:default}
   .rayon-msg{font-size:.8rem;color:#888;margin:.6rem 0 0}
+  /* Éditeur de rayon fictif (zones de magasin). */
+  .sel-editor{display:none;margin-top:1rem;padding:1rem;border:1px dashed #b8bff0;border-radius:var(--radius-md);background:#f8f9ff}
+  .sel-editor.show{display:block}
+  .sel-editor h3{font-size:.95rem;margin:0 0 .75rem;color:#2A3CD4;font-weight:600}
+  .sel-field{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.7rem;font-size:.85rem}
+  .sel-field > span:first-child{min-width:90px;color:#555;font-weight:600}
+  .sel-field input[type=text]{font-family:inherit;font-size:.9rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:6px;min-width:260px}
+  .sel-field select,.sel-field input[type=number]{font-family:inherit;font-size:.85rem;padding:.4rem .5rem;border:1px solid #ccc;border-radius:6px;background:#fff}
+  .sel-field input[type=number]{width:64px}
+  .sel-cols{display:flex;flex-wrap:wrap;gap:3px}
+  .sel-col{font-family:inherit;font-size:.78rem;width:30px;height:28px;border:1px solid #ccc;background:#fff;border-radius:5px;cursor:pointer;padding:0}
+  .sel-col.on{background:#2A3CD4;border-color:#2A3CD4;color:#fff}
+  .sel-hint{font-size:.72rem;color:#888}
+  .sel-parts{list-style:none;margin:.25rem 0 .75rem;padding:0}
+  .sel-parts li{display:flex;justify-content:space-between;align-items:center;gap:.5rem;background:#fff;border:1px solid #e3e5f5;border-radius:6px;padding:.4rem .6rem;margin-bottom:4px;font-size:.82rem}
+  .sel-parts li .n{color:#888;font-size:.75rem;white-space:nowrap}
+  .sel-parts button{background:none;border:none;color:#c62828;cursor:pointer;font-size:1rem}
+  .sel-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .sel-actions .danger{border-color:#c62828;color:#c62828;background:#fff;margin-left:auto}
+  .sel-err{color:#c62828;font-size:.8rem;margin-top:.5rem}
   .rayon-panel{display:none;margin-bottom:1.5rem}
   .rayon-panel.show{display:block}
   .rayon-panel h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.3rem;color:#2A3CD4;margin:0 0 .25rem}
@@ -344,8 +365,37 @@
           <select id="rayon-col-select" disabled><option value="">Toutes les colonnes</option></select>
           <button type="button" class="rayon-btn" id="rayon-import-btn" disabled>Importer</button>
           <button type="button" class="rayon-btn ghost" id="rayon-refresh-btn" title="Relire le récolement (nouveaux scans, nouveaux rayons)">↻</button>
+          <button type="button" class="rayon-btn ghost" id="sel-new-btn" title="Regrouper des étagères de magasin sous un nom (ex. les Que sais-je ? du 5e)">+ Rayon fictif (magasins)</button>
+          <button type="button" class="rayon-btn ghost" id="sel-edit-btn" style="display:none">✎ Modifier ce rayon fictif</button>
         </div>
-        <p class="rayon-msg" id="rayon-msg">Les rayons sont ceux créés dans <a href="recolement.html">le récolement</a> (« Rayons (libre accès) »). Tous les livres scannés dans le rayon sont importés avec leurs statistiques de prêt.</p>
+        <p class="rayon-msg" id="rayon-msg">Rayons en libre accès créés dans <a href="recolement.html">le récolement</a>, et rayons fictifs des magasins (étagères choisies avec « + Rayon fictif »). Tous les livres scannés dans le rayon sont importés avec leurs statistiques de prêt.</p>
+        <div class="sel-editor" id="sel-editor">
+          <h3 id="sel-editor-title">Nouveau rayon fictif</h3>
+          <div class="sel-field"><span>Nom</span><input type="text" id="sel-name" maxlength="80" placeholder="ex. Que sais-je ? (5e)"></div>
+          <div class="sel-field">
+            <span>Zone</span>
+            <select id="sel-travee"></select>
+            <span class="sel-hint">étagères de</span>
+            <input type="number" id="sel-et-from" min="1" max="30" placeholder="1">
+            <span class="sel-hint">à</span>
+            <input type="number" id="sel-et-to" min="1" max="30" placeholder="6">
+            <span class="sel-hint">(vide = toutes)</span>
+          </div>
+          <div class="sel-field">
+            <span>Colonnes</span>
+            <div class="sel-cols" id="sel-cols"></div>
+            <span class="sel-hint">aucune cochée = toutes</span>
+          </div>
+          <div class="sel-field"><span></span><button type="button" class="rayon-btn ghost" id="sel-add-part">+ Ajouter cette zone</button><span class="sel-hint" id="sel-zone-count"></span></div>
+          <ul class="sel-parts" id="sel-parts"></ul>
+          <div class="sel-actions">
+            <button type="button" class="rayon-btn" id="sel-save">Enregistrer</button>
+            <button type="button" class="rayon-btn ghost" id="sel-cancel">Annuler</button>
+            <span class="sel-hint" id="sel-total"></span>
+            <button type="button" class="rayon-btn danger" id="sel-delete" style="display:none">Supprimer ce rayon fictif</button>
+          </div>
+          <div class="sel-err" id="sel-err"></div>
+        </div>
       </div>
 
       <div class="roto-flash" id="roto-flash"></div>
@@ -1011,9 +1061,11 @@ async function loadRecolement(){
     const res = await fetch('/api/recolement', { cache:'no-cache' });
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const state = await res.json();
+    // Scans des rayons en libre accès ET des magasins (rayons fictifs).
     RECOL = {
       rayons: applyRayonRecords(state.rayons || []).slice(),
-      scans: (state.scans || []).filter(s => s && isRayonTravee(s.travee)),
+      selections: selectionsDesherbage.applySelectionRecords(state.selections || []),
+      scans: (state.scans || []).filter(s => s && (isRayonTravee(s.travee) || selectionsDesherbage.isMagasinTraveeId(s.travee))),
     };
   }catch(e){
     RECOL = null;
@@ -1021,22 +1073,48 @@ async function loadRecolement(){
     rayonMsg.textContent = 'Impossible de lire le récolement partagé (/api/recolement) — vérifiez la connexion puis ↻.';
     return;
   }
+  renderSourcesList(RAYON_CURRENT ? RAYON_CURRENT.id : (loadSavedRayon() || {}).id);
+}
+
+/* Liste déroulante : rayons du récolement, puis rayons fictifs des magasins. */
+function renderSourcesList(selectId){
   const counts = {};
   RECOL.scans.forEach(s => { counts[s.travee] = (counts[s.travee]||0) + 1; });
-  if(!RECOL.rayons.length){
-    rayonSelect.innerHTML = '<option value="">Aucun rayon créé dans le récolement</option>';
+  RECOL.selections.forEach(sel => { counts[sel.id] = RECOL.scans.filter(sc => selectionsDesherbage.selectionMatches(sel, sc)).length; });
+  if(!RECOL.rayons.length && !RECOL.selections.length){
+    rayonSelect.innerHTML = '<option value="">Aucun rayon — créez-en un dans le récolement ou avec « + Rayon fictif »</option>';
+    updateSelEditBtn();
     return;
   }
-  const prev = RAYON_CURRENT ? RAYON_CURRENT.id : (loadSavedRayon() || {}).id;
-  rayonSelect.innerHTML = '<option value="">Choisir un rayon…</option>' + RECOL.rayons.map(r =>
-    `<option value="${esc(r.id)}"${r.id===prev?' selected':''}>${esc(r.label)} — ${counts[r.id]||0} livre${(counts[r.id]||0)>1?'s':''}</option>`
-  ).join('');
+  const prev = selectId;
+  const opt = r => `<option value="${esc(r.id)}"${r.id===prev?' selected':''}>${esc(r.label)} — ${counts[r.id]||0} livre${(counts[r.id]||0)>1?'s':''}</option>`;
+  rayonSelect.innerHTML = '<option value="">Choisir un rayon…</option>' +
+    (RECOL.rayons.length ? `<optgroup label="Rayons (libre accès)">${RECOL.rayons.map(opt).join('')}</optgroup>` : '') +
+    (RECOL.selections.length ? `<optgroup label="Rayons fictifs (magasins)">${RECOL.selections.map(opt).join('')}</optgroup>` : '');
   rayonSelect.disabled = false;
   fillColSelect();
 }
 
+/* Rayon du récolement OU rayon fictif des magasins (id "SEL-…"). */
+function sourceDef(id){
+  if(!RECOL) return null;
+  return RECOL.rayons.find(r => r.id === id) || RECOL.selections.find(r => r.id === id) || null;
+}
+function sourceScans(def){
+  return selectionsDesherbage.isSelectionId(def.id)
+    ? RECOL.scans.filter(s => selectionsDesherbage.selectionMatches(def, s))
+    : RECOL.scans.filter(s => s.travee === def.id);
+}
+
 function fillColSelect(){
-  const def = RECOL && RECOL.rayons.find(r => r.id === rayonSelect.value);
+  updateSelEditBtn();
+  const def = sourceDef(rayonSelect.value);
+  if(def && selectionsDesherbage.isSelectionId(def.id)){
+    // Rayon fictif : ses zones définissent déjà les colonnes retenues.
+    rayonColSelect.innerHTML = '<option value="">Toutes ses zones</option>';
+    rayonColSelect.disabled = true; rayonImportBtn.disabled = false;
+    return;
+  }
   if(!def){
     rayonColSelect.innerHTML = '<option value="">Toutes les colonnes</option>';
     rayonColSelect.disabled = true; rayonImportBtn.disabled = true;
@@ -1057,10 +1135,12 @@ function loadSavedRayon(){ try { return JSON.parse(localStorage.getItem(LS_RAYON
 
 function importRayon(id, col){
   if(!RECOL) return;
-  const def = RECOL.rayons.find(r => r.id === id);
+  const def = sourceDef(id);
   if(!def) return;
+  const isSel = selectionsDesherbage.isSelectionId(id);
+  if(isSel) col = '';
   const inCol = s => !col || String(s.colonne) === col;
-  const scans = RECOL.scans.filter(s => s.travee === id && inCol(s));
+  const scans = sourceScans(def).filter(inCol);
   /* Réimport = fusion, pas remplacement (demande explicite : le désherbage
      avance en même temps que le récolement). Les décisions vivent dans
      TRAITEMENTS, indépendamment de cette liste ; ce qu'il faut préserver,
@@ -1073,7 +1153,7 @@ function importRayon(id, col){
   const seenRayon = seen[id] || {};
   const current = new Set(scans.map(s => s.barcode));
   const kept = Object.values(seenRayon).filter(s => !current.has(s.barcode) && TRAITEMENTS[s.barcode] && inCol(s));
-  scans.forEach(s => { seenRayon[s.barcode] = { barcode:s.barcode, colonne:s.colonne, etage:s.etage, cote:s.cote||'', titre:s.titre||'', auteur:s.auteur||'' }; });
+  scans.forEach(s => { seenRayon[s.barcode] = { barcode:s.barcode, travee:s.travee, colonne:s.colonne, etage:s.etage, cote:s.cote||'', titre:s.titre||'', auteur:s.auteur||'' }; });
   seen[id] = seenRayon;
   try { localStorage.setItem(LS_RAYON_SEEN, JSON.stringify(seen)); } catch(e) {}
   const before = new Set(RAYON_CURRENT && RAYON_CURRENT.id === id && RAYON_CURRENT.col === (col||'') ? RAYON_ROWS.map(r => r.bc) : []);
@@ -1096,6 +1176,9 @@ function importRayon(id, col){
     return {
       bc: s.barcode, rec, absent, horsRayon: !!s.horsRayon,
       colonne: s.colonne, etage: s.etage,
+      // Rayon fictif : plusieurs travées possibles, affichées dans « Empl. ».
+      travee: isSel && s.travee ? selectionsDesherbage.traveeName(s.travee).replace('Travée ', '') : '',
+      traveeOrder: isSel ? TRAVEES_ALL.findIndex(t => t.id === s.travee) : -1,
       cote: rec.coteAffichee || s.cote || '',
       titre: rec['200$a'] || s.titre || '',
       auteur: rec['700$a'] || s.auteur || '',
@@ -1129,7 +1212,7 @@ function loadSeen(){ try { return JSON.parse(localStorage.getItem(LS_RAYON_SEEN)
    immédiatement. */
 async function refreshRayonFromRecolement(){
   await loadRecolement();
-  if(RAYON_CURRENT && RECOL && RECOL.rayons.some(r => r.id === RAYON_CURRENT.id)){
+  if(RAYON_CURRENT && sourceDef(RAYON_CURRENT.id)){
     await desherbReady;
     importRayon(RAYON_CURRENT.id, RAYON_CURRENT.col);
   }
@@ -1368,7 +1451,8 @@ const RAYON_COLS = [
 ];
 function rayonSortValue(r, key){
   switch(key){
-    case 'empl': return [String(r.colonne||''), Number(r.etage)||0];
+    // Travée dans l'ordre du plan (chiffres romains : un tri alphabétique mettrait XVII avant VII).
+    case 'empl': return [(r.traveeOrder >= 0 ? String(r.traveeOrder).padStart(3,'0') + ' ' : '') + String(r.colonne||''), Number(r.etage)||0];
     case 'parution': return r.parutionYear;
     case 'saisie': return r.saisieKey;
     case 'dernier': return yearOf(r.dernier);
@@ -1438,7 +1522,7 @@ function renderRayon(){
     const btns = STATUTS.map(s => `<button type="button" class="mini-btn ${t && t.statut===s ? 'active' : ''}" data-statut="${s}" data-bc="${esc(r.bc)}" title="${STATUT_LABEL[s]}${t && t.statut===s ? ' (cliquer pour annuler)' : ''}">${{conserver:'✓',pilon:'🗑️',braderie:'🏷️',relocalisation:'📦'}[s]}</button>`).join('');
     const cur = NAV && NAV.order[NAV.index] === r.bc;
     return `<tr data-bc="${esc(r.bc)}" class="${t?'treated':''} ${cur?'current':''}">
-      <td class="log-bc">${esc(r.colonne ?? '')}${r.etage != null ? '-' + esc(r.etage) : ''}</td>
+      <td class="log-bc">${r.travee ? esc(r.travee) + ' · ' : ''}${esc(r.colonne ?? '')}${r.etage != null ? '-' + esc(r.etage) : ''}</td>
       <td class="log-bc">${esc(r.cote)}</td>
       <td><button type="button" class="ttl" data-open="${esc(r.bc)}">${esc(r.titre || '(titre inconnu)')}</button>
         ${r.auteur ? `<div class="aut">${esc(r.auteur)}</div>` : ''}
@@ -1512,10 +1596,162 @@ document.getElementById('rayon-export-csv').addEventListener('click', () => {
   downloadTxt('﻿' + [head.map(q).join(';'), ...lines].join('\r\n') + '\r\n', `rotobib-rayon-${label}.csv`);
 });
 
+/* ════════════════════════════════════════════════════════════
+   RAYONS FICTIFS DES MAGASINS
+   ────────────────────────────────────────────────────────────
+   Un nom + des zones (travée, colonnes, plage d'étagères) choisies dans les
+   magasins d'étage — voir js/selections-desherbage.js. Enregistré dans
+   l'état partagé du récolement (patch `selection`, api/recolement.mjs) pour
+   que tous les postes, et validation-desherbage.html, le voient. Envoi
+   direct (pas de file hors ligne) : une action rare, dont on affiche
+   l'échec plutôt que de la mettre en attente.
+   ════════════════════════════════════════════════════════════ */
+const SD = selectionsDesherbage;
+let SEL_EDIT = null; // { id|null, parts:[...] }
+const selEditor = document.getElementById('sel-editor');
+const selTravee = document.getElementById('sel-travee');
+let selCols = new Set();
+
+function updateSelEditBtn(){
+  document.getElementById('sel-edit-btn').style.display = selectionsDesherbage.isSelectionId(rayonSelect.value) ? '' : 'none';
+}
+selTravee.innerHTML = SD.MAGASINS.map(m =>
+  `<optgroup label="Magasin — ${m.label}">${m.travees.map(t => `<option value="${t.id}">${esc(SD.traveeName(t.id))} (${t.nbCols} col.)</option>`).join('')}</optgroup>`
+).join('');
+
+function selScanCount(parts){
+  if(!RECOL) return null;
+  const sel = { parts: parts.map(SD.normalizePart).filter(Boolean) };
+  return RECOL.scans.filter(sc => SD.selectionMatches(sel, sc)).length;
+}
+function currentZone(){
+  return SD.normalizePart({
+    travee: selTravee.value,
+    cols: [...selCols],
+    etFrom: document.getElementById('sel-et-from').value,
+    etTo: document.getElementById('sel-et-to').value,
+  });
+}
+function renderSelCols(){
+  document.getElementById('sel-cols').innerHTML = SD.colLetters(selTravee.value).map(c =>
+    `<button type="button" class="sel-col ${selCols.has(c)?'on':''}" data-col="${c}">${c}</button>`).join('');
+  const n = selScanCount([currentZone()]);
+  document.getElementById('sel-zone-count').textContent = n == null ? '' : `${n} livre${n>1?'s':''} scanné${n>1?'s':''} dans cette zone`;
+}
+function renderSelParts(){
+  const ul = document.getElementById('sel-parts');
+  ul.innerHTML = SEL_EDIT.parts.length
+    ? SEL_EDIT.parts.map((p, i) => {
+        const n = selScanCount([p]);
+        return `<li><span>${esc(SD.partLabel(p))}</span><span class="n">${n ?? '—'} livre${n>1?'s':''} <button type="button" data-del="${i}" title="Retirer cette zone">✕</button></span></li>`;
+      }).join('')
+    : `<li style="color:#888">Aucune zone pour l'instant : choisissez une travée, ses colonnes et ses étagères, puis « + Ajouter cette zone ».</li>`;
+  const total = selScanCount(SEL_EDIT.parts);
+  document.getElementById('sel-total').textContent = SEL_EDIT.parts.length && total != null ? `Total : ${total} livre${total>1?'s':''} scanné${total>1?'s':''}` : '';
+}
+function openSelEditor(def){
+  SEL_EDIT = { id: def ? def.id : null, parts: def ? def.parts.map(p => ({ ...p })) : [] };
+  document.getElementById('sel-editor-title').textContent = def ? 'Modifier le rayon fictif' : 'Nouveau rayon fictif';
+  document.getElementById('sel-name').value = def ? def.label : '';
+  document.getElementById('sel-delete').style.display = def ? '' : 'none';
+  document.getElementById('sel-err').textContent = '';
+  if(def && def.parts.length) selTravee.value = def.parts[def.parts.length-1].travee;
+  selCols = new Set();
+  document.getElementById('sel-et-from').value = '';
+  document.getElementById('sel-et-to').value = '';
+  renderSelCols();
+  renderSelParts();
+  selEditor.classList.add('show');
+  document.getElementById('sel-name').focus({ preventScroll:true });
+}
+function closeSelEditor(){ SEL_EDIT = null; selEditor.classList.remove('show'); }
+
+document.getElementById('sel-new-btn').addEventListener('click', () => openSelEditor(null));
+document.getElementById('sel-edit-btn').addEventListener('click', () => {
+  const def = sourceDef(rayonSelect.value);
+  if(def && SD.isSelectionId(def.id)) openSelEditor(def);
+});
+document.getElementById('sel-cancel').addEventListener('click', closeSelEditor);
+selTravee.addEventListener('change', () => { selCols = new Set(); renderSelCols(); });
+['sel-et-from','sel-et-to'].forEach(id => document.getElementById(id).addEventListener('input', renderSelCols));
+document.getElementById('sel-cols').addEventListener('click', e => {
+  const b = e.target.closest('[data-col]');
+  if(!b) return;
+  if(selCols.has(b.dataset.col)) selCols.delete(b.dataset.col); else selCols.add(b.dataset.col);
+  renderSelCols();
+});
+document.getElementById('sel-add-part').addEventListener('click', () => {
+  const z = currentZone();
+  if(!z) return;
+  SEL_EDIT.parts.push(z);
+  selCols = new Set();
+  renderSelCols();
+  renderSelParts();
+});
+document.getElementById('sel-parts').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]');
+  if(!b) return;
+  SEL_EDIT.parts.splice(Number(b.dataset.del), 1);
+  renderSelParts();
+});
+
+async function saveSelectionRecord(record){
+  const res = await fetch('/api/recolement', { method:'POST', headers: syncAuthHeaders(), body: JSON.stringify({ type:'selection', record }) });
+  if(res.status === 401) throw new Error(`non authentifié — déconnectez-vous puis reconnectez-vous depuis l'espace professionnel`);
+  if(!res.ok) throw new Error('erreur serveur (' + res.status + ')');
+}
+/* Après un enregistrement : relit le récolement, puis remplace localement la
+   définition — le cache CDN de /api/recolement (20 s) peut encore renvoyer
+   l'état d'avant. `record.deleted` → retirée. */
+async function reloadWithSelection(record){
+  await loadRecolement();
+  if(!RECOL) return;
+  const others = RECOL.selections.filter(r => r.id !== record.id);
+  RECOL.selections = record.deleted ? others : SD.applySelectionRecords([...others, record]);
+  renderSourcesList(record.deleted ? '' : record.id);
+}
+document.getElementById('sel-save').addEventListener('click', async () => {
+  const err = document.getElementById('sel-err');
+  const label = document.getElementById('sel-name').value.trim();
+  // Zone préparée mais pas encore ajoutée : on l'ajoute plutôt que de la perdre.
+  if(!SEL_EDIT.parts.length){ const z = currentZone(); if(z) SEL_EDIT.parts.push(z); }
+  if(!label){ err.textContent = 'Donnez un nom au rayon.'; return; }
+  if(!SEL_EDIT.parts.length){ err.textContent = 'Ajoutez au moins une zone.'; return; }
+  const record = { id: SEL_EDIT.id || SD.newSelectionId(), label, parts: SEL_EDIT.parts, ts: Date.now() };
+  const btn = document.getElementById('sel-save');
+  btn.disabled = true; err.textContent = '';
+  try{
+    await saveSelectionRecord(record);
+    closeSelEditor();
+    await reloadWithSelection(record);
+    await desherbReady;
+    importRayon(record.id, '');
+    rayonMsg.textContent = `Rayon fictif « ${label} » enregistré et importé.`;
+  }catch(e){
+    err.textContent = 'Enregistrement impossible : ' + e.message;
+  }finally{
+    btn.disabled = false;
+  }
+});
+document.getElementById('sel-delete').addEventListener('click', async () => {
+  if(!SEL_EDIT || !SEL_EDIT.id) return;
+  if(!confirm('Supprimer ce rayon fictif ? Les livres et les décisions déjà prises ne sont pas touchés : seul le regroupement disparaît.')) return;
+  const id = SEL_EDIT.id;
+  try{
+    await saveSelectionRecord({ id, deleted:true, ts: Date.now() });
+    closeSelEditor();
+    if(RAYON_CURRENT && RAYON_CURRENT.id === id) document.getElementById('rayon-close').click();
+    await reloadWithSelection({ id, deleted:true });
+    rayonMsg.textContent = 'Rayon fictif supprimé.';
+  }catch(e){
+    document.getElementById('sel-err').textContent = 'Suppression impossible : ' + e.message;
+  }
+});
+
 // Réimporte au chargement le dernier rayon ouvert sur ce poste.
 loadRecolement().then(async () => {
   const saved = loadSavedRayon();
-  if(saved && RECOL && RECOL.rayons.some(r => r.id === saved.id)){
+  if(saved && sourceDef(saved.id)){
     await desherbReady;
     importRayon(saved.id, saved.col);
   }
