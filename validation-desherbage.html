@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Validation du désherbage — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css">
+<script src="js/columnar.js"></script>
+<script src="js/sync-queue.js"></script>
+<script src="js/reserve-shared.js"></script>
+<link rel="stylesheet" href="style.css">
+<style>
+  :root{
+    /* Mêmes couleurs de traitement que rotobib.html (Braderie en ambre,
+       --warn-ink pour du texte ambre sur blanc). */
+    --ok:#2e7d32; --warn:#e8a200; --warn-ink:#8a5f00; --danger:#c62828;
+    --blue:#2A3CD4; --todo:#e3e4ec;
+    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
+  }
+  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
+  .page-hero{background:#2A3CD4;color:#fff;padding:1.75rem 1.5rem}
+  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
+  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0 0 .4rem;line-height:1.15}
+  .page-lead{font-size:.85rem;color:rgba(255,255,255,0.7);margin:0;max-width:640px;line-height:1.6}
+  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .hero-actions a,.hero-actions button{font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:.4rem .9rem;text-decoration:none;cursor:pointer}
+  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);white-space:nowrap}
+  .sync-status.pending{color:#ffcc80}
+  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+  main{padding:1.5rem 0 2rem}
+
+  .vd-bar{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.85rem}
+  .vd-bar label{display:flex;gap:.4rem;align-items:center}
+  .vd-bar input[type=text]{font-family:inherit;font-size:.85rem;padding:.35rem .6rem;border:1px solid #ccc;border-radius:6px;width:180px}
+  .vd-live{margin-left:auto;color:#777;font-size:.78rem}
+  .vd-live .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:.35rem;vertical-align:middle}
+  .vd-live.err .dot{background:var(--danger)}
+  .vd-msg{color:#665c00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;display:none}
+  .vd-msg.show{display:block}
+
+  h2.vd-h{font-family:'Moret','DM Serif Display',serif;font-weight:400;color:#2A3CD4;font-size:1.35rem;margin:0 0 .75rem}
+
+  /* ── Tableau récapitulatif par rayon ── */
+  .vd-sum{width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:1.75rem}
+  .vd-sum th{background:#F5F5FF;padding:.5rem .7rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:#777;border-bottom:1px solid #e8e8f0;white-space:nowrap}
+  .vd-sum td{padding:.55rem .7rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+  .vd-sum td.num,.vd-sum th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .vd-sum tr.clickable{cursor:pointer}
+  .vd-sum tr.clickable:hover td{background:#fafaff}
+  .vd-sum tr.sel td{background:#eef0ff}
+  .vd-sum .rname{font-weight:600;color:#2A3CD4}
+  .vd-progress{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--todo);min-width:120px}
+  .vd-progress span{display:block;height:100%}
+  .pill{display:inline-block;font-size:.7rem;padding:1px 8px;border-radius:20px;font-weight:600;margin:1px 2px 1px 0;white-space:nowrap}
+  .pill.conserver{background:var(--ok);color:#fff}
+  .pill.pilon{background:var(--danger);color:#fff}
+  .pill.braderie{background:var(--warn);color:#2b1d00}
+  .pill.relocalisation{background:#2A3CD4;color:#fff}
+  .pill.todo{background:#fff3e0;color:#8a5f00;border:1px solid #ffe0a3}
+  .pill.ok{background:#e8f5e9;color:var(--ok);border:1px solid #c8e6c9}
+  .pill.disagree{background:#fdecea;color:var(--danger);border:1px solid #f5c6cb}
+  .pill.stale{background:#fff8e1;color:#8a5f00;border:1px solid #ffe0a3}
+
+  /* ── Détail d'un rayon ── */
+  .vd-panel{display:none;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
+  .vd-panel.show{display:block}
+  .vd-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:.75rem}
+  .vd-panel-sub{font-size:.8rem;color:#777;margin:.15rem 0 0}
+  .vd-tools{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;font-size:.82rem;margin-bottom:1rem}
+  .vd-tools select,.vd-tools input[type=search]{font-family:inherit;font-size:.82rem;padding:.35rem .55rem;border:1px solid #ccc;border-radius:6px}
+  .vd-tools input[type=search]{min-width:200px}
+  .btn{font-family:inherit;font-size:.8rem;padding:.4rem .85rem;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer}
+  .btn:hover{border-color:#888}
+  .btn.primary{background:var(--ok);border-color:var(--ok);color:#fff}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.5;cursor:default}
+
+  .vd-book{display:grid;grid-template-columns:auto 1fr minmax(260px,330px);gap:1rem;padding:1rem 0;border-top:1px solid #eee}
+  .vd-book:first-child{border-top:none}
+  .vd-thumb{width:56px;height:76px;object-fit:cover;border-radius:4px;border:1px solid #ddd;background:#f2f2f5;cursor:zoom-in;transition:width .15s,height .15s}
+  .vd-thumb.big{width:220px;height:auto;max-height:320px;object-fit:contain;cursor:zoom-out}
+  .vd-thumb-ph{width:56px;height:76px;border-radius:4px;background:#f2f2f5;border:1px dashed #ddd}
+  .vd-title{font-weight:600;color:#1a1a1a;margin:0 0 .15rem;line-height:1.3}
+  .vd-author{font-size:.85rem;color:#444;margin:0 0 .35rem}
+  .vd-meta{font-size:.76rem;color:#777;line-height:1.7}
+  .vd-meta b{color:#555;font-weight:600}
+  .vd-team{margin-top:.45rem;font-size:.8rem}
+  .vd-review{background:#fafafa;border:1px solid #eee;border-radius:var(--radius-md);padding:.65rem .75rem;font-size:.8rem}
+  .vd-review.done{background:#f3faf3;border-color:#d6ecd7}
+  .vd-review.disagree{background:#fff6f5;border-color:#f5d0cc}
+  .vd-review.stale{background:#fffbea;border-color:#ffe0a3}
+  .vd-avis{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.5rem}
+  .avis-btn{font-family:inherit;font-size:.74rem;padding:.3rem .55rem;border-radius:5px;border:1px solid #ccc;background:#fff;cursor:pointer;white-space:nowrap}
+  .avis-btn:hover{border-color:#888}
+  .avis-btn.valide.active{background:var(--ok);border-color:var(--ok);color:#fff}
+  .avis-btn.conserver.active{background:var(--ok);border-color:var(--ok);color:#fff}
+  .avis-btn.pilon.active{background:var(--danger);border-color:var(--danger);color:#fff}
+  .avis-btn.braderie.active{background:var(--warn);border-color:var(--warn);color:#2b1d00}
+  .avis-btn.relocalisation.active{background:#2A3CD4;border-color:#2A3CD4;color:#fff}
+  .avis-sep{font-size:.7rem;color:#999;align-self:center;margin:0 2px}
+  .vd-review textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:.8rem;padding:.4rem .5rem;border:1px solid #ccc;border-radius:5px;resize:vertical;min-height:44px}
+  .vd-review-foot{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.35rem;font-size:.7rem;color:#888}
+  .vd-review-foot .saved{color:var(--ok)}
+  .vd-review-foot .unsaved{color:#8a5f00}
+  .vd-stale{font-size:.74rem;color:#8a5f00;margin-bottom:.4rem}
+  .vd-empty{color:#888;font-size:.85rem;padding:1rem 0}
+  .vd-more{text-align:center;margin-top:1rem}
+
+  @media (max-width:760px){
+    .vd-book{grid-template-columns:auto 1fr}
+    .vd-review{grid-column:1 / -1}
+    .vd-sum .hide-sm{display:none}
+    .vd-live{margin-left:0}
+  }
+
+  footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
+  footer a{color:#c9a96e;text-decoration:none}
+</style>
+  <!-- Publication en iframe : voir js/parent-page-height.js (sans defer). -->
+  <script src="js/parent-page-height.js"></script>
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div>
+      <nav class="breadcrumb">Espace professionnel · Désherbage</nav>
+      <h1 class="page-title">Validation du désherbage</h1>
+      <p class="page-lead">Compte rendu en direct des décisions prises dans Rotobib, rayon par rayon. Pour chaque livre : validez la décision, proposez-en une autre, et laissez un commentaire à l'équipe si besoin.</p>
+    </div>
+    <div class="hero-actions">
+      <span class="sync-status" id="sync-status" title="Envoi de vos avis (via R2)"></span>
+      <a href="rotobib.html">Rotobib</a>
+      <a href="admin.html">← Espace professionnel</a>
+      <button type="button" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="container">
+    <div class="vd-bar">
+      <label>Votre nom : <input type="text" id="vd-name" placeholder="ex. Jean D." maxlength="80"></label>
+      <span style="color:#888;font-size:.78rem">Affiché à l'équipe à côté de vos avis.</span>
+      <span class="vd-live" id="vd-live"><span class="dot"></span>Chargement…</span>
+    </div>
+    <div class="vd-msg" id="vd-msg"></div>
+
+    <h2 class="vd-h">Avancement par rayon</h2>
+    <table class="vd-sum">
+      <thead>
+        <tr>
+          <th>Rayon</th>
+          <th class="num hide-sm">Livres scannés</th>
+          <th>Décisions de l'équipe</th>
+          <th class="hide-sm">Traités</th>
+          <th>Votre validation</th>
+        </tr>
+      </thead>
+      <tbody id="vd-sum-body"><tr><td colspan="5" class="vd-empty">Chargement…</td></tr></tbody>
+    </table>
+
+    <section class="vd-panel" id="vd-panel">
+      <div class="vd-panel-head">
+        <div>
+          <h2 class="vd-h" id="vd-panel-title" style="margin:0"></h2>
+          <p class="vd-panel-sub" id="vd-panel-sub"></p>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button type="button" class="btn" id="vd-export">⬇ Exporter (.csv)</button>
+          <button type="button" class="btn" id="vd-close">Fermer</button>
+        </div>
+      </div>
+      <div class="vd-tools">
+        <select id="vd-f-statut">
+          <option value="">Toutes les décisions</option>
+          <option value="pilon">Pilon</option>
+          <option value="braderie">Braderie</option>
+          <option value="relocalisation">Relocalisation</option>
+          <option value="conserver">Conserver</option>
+        </select>
+        <select id="vd-f-avis">
+          <option value="todo">À valider</option>
+          <option value="">Tous les livres</option>
+          <option value="valide">Validés</option>
+          <option value="disagree">Contre-propositions</option>
+          <option value="comment">Avec commentaire</option>
+        </select>
+        <input type="search" id="vd-f-q" placeholder="Titre, auteur, cote, code-barre…">
+        <button type="button" class="btn primary" id="vd-bulk" title="Valide la décision de l'équipe pour chaque livre affiché qui n'a pas encore d'avis">✓ Valider tous les livres affichés</button>
+      </div>
+      <div id="vd-books"></div>
+      <div class="vd-more" id="vd-more"></div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  if (localStorage.getItem('rp_admin_auth') !== '1') {
+    window.location.href = 'index.html';
+  }
+})();
+document.getElementById('logout-btn').addEventListener('click', function() {
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+/* ════════════════════════════════════════════════════════════
+   VALIDATION DU DÉSHERBAGE
+   ────────────────────────────────────────────────────────────
+   Lecture en direct de deux états partagés (ETag/304, quasi gratuit à vide) :
+   - /api/desherbage : les décisions prises dans rotobib.html, et l'avis du
+     validateur (champ `validation` de chaque décision — voir
+     api/desherbage.mjs) ;
+   - /api/recolement : les rayons en libre accès et leurs scans, pour savoir
+     dans quel rayon se trouve chaque livre décidé.
+   Un livre décidé qui n'est scanné dans aucun rayon (scan direct d'un livre
+   de magasin dans Rotobib, ou scan retiré du rayon depuis) est regroupé dans
+   « Magasins et hors rayon ».
+   Fiches (titre, auteur, prêts…) : data/desherbage.json, comme Rotobib.
+   Écriture : patchs `review`/`reviewMany` vers /api/desherbage, via la file
+   commune js/sync-queue.js (hors ligne toléré, rejouée à la reconnexion).
+   ════════════════════════════════════════════════════════════ */
+function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const STATUTS = ['conserver','pilon','braderie','relocalisation'];
+const STATUT_LABEL = { conserver:'Conserver', pilon:'Pilon', braderie:'Braderie', relocalisation:'Relocalisation' };
+const STATUT_COLOR = { conserver:'var(--ok)', pilon:'var(--danger)', braderie:'var(--warn)', relocalisation:'#2A3CD4' };
+// Pilon / braderie d'abord : ce sont les décisions qui engagent le plus.
+const STATUT_ORDER = { pilon:0, braderie:1, relocalisation:2, conserver:3 };
+const HORS_RAYON = '_hors';
+const PAGE_SIZE = 40;
+
+let TRAITEMENTS = {};          // état serveur + avis locaux non encore envoyés
+let RAYONS = [];               // définitions des rayons (récolement)
+let RAYON_OF = new Map();      // code-barre → { id, colonne, etage, cote, titre, auteur }
+let REFERENCE_YEAR = new Date().getFullYear();
+let RAW = null;
+let IDX = new Map();           // code-barre → ligne de data/desherbage.json
+let current = null;            // id du rayon ouvert
+let shown = PAGE_SIZE;
+let lastOk = null, lastErr = false;
+
+const nameInput = document.getElementById('vd-name');
+try { nameInput.value = localStorage.getItem('rp_desherbage_validateur') || ''; } catch(e) {}
+nameInput.addEventListener('input', () => {
+  try { localStorage.setItem('rp_desherbage_validateur', nameInput.value.trim()); } catch(e) {}
+});
+
+/* ── Synchronisation des avis ── */
+const syncQueue = createSyncQueue({
+  storageKey: 'rp_desherbage_validation_pending_sync',
+  endpoint: '/api/desherbage',
+});
+function pendingReviews(){
+  // Dernier avis en attente par code-barre (la file est rejouée dans l'ordre).
+  const m = new Map();
+  syncQueue.items.forEach(p => {
+    if(p.type === 'review') m.set(p.barcode, p.validation);
+    else if(p.type === 'reviewMany') p.items.forEach(it => m.set(it.barcode, it.validation));
+  });
+  return m;
+}
+/* Avis envoyés récemment : /api/desherbage est mis en cache 20 s par le CDN
+   (voir lib/patch-endpoint.mjs) — juste après l'envoi, une relecture peut
+   encore renvoyer l'état d'avant, et l'avis semblerait disparaître. On
+   réapplique donc tout avis local de moins de 2 min que le serveur ne
+   reflète pas encore. */
+const RECENT = new Map();      // code-barre → { validation, at }
+const RECENT_MS = 120000;
+function setLocalReview(bc, validation){
+  const t = TRAITEMENTS[bc];
+  if(!t) return;
+  if(validation && (validation.avis || validation.commentaire)) t.validation = validation;
+  else delete t.validation;
+}
+
+/* ── Chargements ── */
+const dataReady = Promise.all([
+  fetch('data/desherbage.json').then(r => r.ok ? r.json() : null),
+  fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : {}),
+]).then(([data, report]) => {
+  if(data){
+    RAW = data;
+    columnar.forEachRow(data, (r, i) => { IDX.set(r._barcode, i); });
+  }
+  if(report && report.stats && report.stats.referenceYear) REFERENCE_YEAR = report.stats.referenceYear;
+}).catch(() => {});
+function recordOf(bc){
+  const i = IDX.get(bc);
+  return (RAW && i !== undefined) ? columnar.readRow(RAW, i) : null;
+}
+
+async function loadDecisions(){
+  const res = await fetch('/api/desherbage');
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const state = await res.json();
+  // Copie profonde : setLocalReview() modifie les enregistrements.
+  TRAITEMENTS = JSON.parse(JSON.stringify(state || {}));
+  const now = Date.now();
+  RECENT.forEach((r, bc) => {
+    if(now - r.at > RECENT_MS){ RECENT.delete(bc); return; }
+    const sv = TRAITEMENTS[bc] && TRAITEMENTS[bc].validation;
+    if(!sv || !r.validation || sv.ts < r.validation.ts) setLocalReview(bc, r.validation);
+  });
+  pendingReviews().forEach((v, bc) => setLocalReview(bc, v));
+}
+async function loadRecolement(){
+  const res = await fetch('/api/recolement');
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const state = await res.json();
+  RAYONS = applyRayonRecords(state.rayons || []).slice();
+  RAYON_OF = new Map();
+  (state.scans || []).forEach(s => {
+    if(!s || !isRayonTravee(s.travee)) return;
+    const prev = RAYON_OF.get(s.barcode);
+    if(!prev || String(s.ts || '') > String(prev.ts || '')){
+      RAYON_OF.set(s.barcode, { id:s.travee, colonne:s.colonne, etage:s.etage, cote:s.cote||'', titre:s.titre||'', auteur:s.auteur||'', ts:s.ts });
+    }
+  });
+}
+
+async function refresh(){
+  try{
+    await Promise.all([loadDecisions(), loadRecolement()]);
+    lastOk = new Date(); lastErr = false;
+  }catch(e){
+    lastErr = true;
+  }
+  updateLive();
+  renderSummary();
+  if(current) renderBooks(false);
+}
+function updateLive(){
+  const el = document.getElementById('vd-live');
+  el.classList.toggle('err', lastErr);
+  el.innerHTML = '<span class="dot"></span>' + (lastErr
+    ? 'Connexion impossible — nouvel essai dans 30 s' + (lastOk ? ` (dernière mise à jour ${lastOk.toLocaleTimeString('fr-FR')})` : '')
+    : `En direct · mis à jour à ${lastOk.toLocaleTimeString('fr-FR')}`);
+}
+
+/* ── Modèle : livres décidés, groupés par rayon ── */
+function reviewState(t){
+  const v = t.validation;
+  if(!v || !v.avis) return v && v.commentaire ? 'comment' : 'todo';
+  if(v.statutVu && v.statutVu !== t.statut) return 'stale';
+  return v.avis === 'valide' || v.avis === t.statut ? 'valide' : 'disagree';
+}
+function decidedBooks(){
+  return Object.values(TRAITEMENTS).filter(t => t && STATUTS.includes(t.statut));
+}
+function groupOf(bc){
+  const r = RAYON_OF.get(bc);
+  return r ? r.id : HORS_RAYON;
+}
+function groupLabel(id){
+  if(id === HORS_RAYON) return 'Magasins et hors rayon';
+  const def = RAYONS.find(r => r.id === id);
+  return def ? def.label : id.replace(/^RY-/, '');
+}
+
+function renderSummary(){
+  const groups = new Map();
+  RAYONS.forEach(r => groups.set(r.id, { id:r.id, books:[] }));
+  decidedBooks().forEach(t => {
+    const g = groupOf(t.barcode);
+    if(!groups.has(g)) groups.set(g, { id:g, books:[] });
+    groups.get(g).books.push(t);
+  });
+  const scanned = {};
+  RAYON_OF.forEach(r => { scanned[r.id] = (scanned[r.id] || 0) + 1; });
+  const list = [...groups.values()]
+    .filter(g => g.id !== HORS_RAYON || g.books.length)
+    .sort((a, b) => (a.id === HORS_RAYON) - (b.id === HORS_RAYON) || groupLabel(a.id).localeCompare(groupLabel(b.id), 'fr', { numeric:true }));
+  const tbody = document.getElementById('vd-sum-body');
+  if(!list.length){
+    tbody.innerHTML = `<tr><td colspan="5" class="vd-empty">${lastErr && !lastOk ? 'Impossible de lire les données partagées.' : 'Aucune décision de désherbage pour l\'instant.'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(g => {
+    const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
+    const rv = { todo:0, valide:0, disagree:0, stale:0, comment:0 };
+    g.books.forEach(t => { counts[t.statut]++; rv[reviewState(t)]++; });
+    const n = g.books.length;
+    const total = g.id === HORS_RAYON ? null : (scanned[g.id] || 0);
+    const pills = STATUTS.filter(s => counts[s]).sort((a,b) => STATUT_ORDER[a]-STATUT_ORDER[b])
+      .map(s => `<span class="pill ${s}">${STATUT_LABEL[s]} ${counts[s]}</span>`).join('') || '<span style="color:#aaa">—</span>';
+    // Barre : part de livres scannés déjà traités (rayons uniquement).
+    let bar = '<span style="color:#aaa">—</span>';
+    if(total){
+      const seg = STATUTS.map(s => counts[s] ? `<span style="width:${counts[s]/Math.max(total,n)*100}%;background:${STATUT_COLOR[s]}" title="${STATUT_LABEL[s]} : ${counts[s]}"></span>` : '').join('');
+      bar = `<div class="vd-progress" title="${n} traité${n>1?'s':''} sur ${total} scanné${total>1?'s':''}">${seg}</div><div style="font-size:.7rem;color:#888;margin-top:2px">${n} / ${total}</div>`;
+    }
+    const todo = rv.todo + rv.comment + rv.stale;
+    const valid = [
+      todo ? `<span class="pill todo">${todo} à valider</span>` : (n ? '<span class="pill ok">✓ tout validé</span>' : ''),
+      rv.valide && todo ? `<span class="pill ok">${rv.valide} validé${rv.valide>1?'s':''}</span>` : '',
+      rv.disagree ? `<span class="pill disagree">${rv.disagree} contre-proposition${rv.disagree>1?'s':''}</span>` : '',
+      rv.stale ? `<span class="pill stale" title="La décision a changé depuis votre avis">${rv.stale} à revoir</span>` : '',
+    ].join('');
+    return `<tr class="clickable ${g.id===current?'sel':''}" data-g="${esc(g.id)}">
+      <td><span class="rname">${esc(groupLabel(g.id))}</span></td>
+      <td class="num hide-sm">${total == null ? '—' : total}</td>
+      <td>${pills}</td>
+      <td class="hide-sm">${bar}</td>
+      <td>${valid || '<span style="color:#aaa">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+document.getElementById('vd-sum-body').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-g]');
+  if(!tr) return;
+  openGroup(tr.dataset.g);
+});
+
+/* ── Détail d'un rayon ── */
+async function openGroup(id){
+  current = id;
+  shown = PAGE_SIZE;
+  document.getElementById('vd-panel').classList.add('show');
+  renderSummary();
+  await dataReady;
+  renderBooks(true);
+  document.getElementById('vd-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+document.getElementById('vd-close').addEventListener('click', () => {
+  current = null;
+  document.getElementById('vd-panel').classList.remove('show');
+  renderSummary();
+});
+
+function bookInfo(t){
+  const rec = recordOf(t.barcode);
+  const scan = RAYON_OF.get(t.barcode) || {};
+  const p = (rec && rec.prets) || null;
+  return {
+    t, rec, scan,
+    cote: (rec && rec.coteAffichee) || scan.cote || '',
+    titre: (rec && rec['200$a']) || scan.titre || '(titre inconnu)',
+    auteur: (rec && rec['700$a']) || scan.auteur || '',
+    parution: (rec && rec['210$d']) || '',
+    an: p ? (p.an || 0) : null,
+    avant: p ? Math.max(0, (p.cumules || 0) - (p.an || 0)) : null,
+    dernier: (rec && rec.derniereAnneePret) || '',
+    imagette: rec && rec.imagette,
+  };
+}
+
+function filteredBooks(){
+  const fs = document.getElementById('vd-f-statut').value;
+  const fa = document.getElementById('vd-f-avis').value;
+  const q = document.getElementById('vd-f-q').value.toLowerCase().trim();
+  return decidedBooks()
+    .filter(t => groupOf(t.barcode) === current)
+    .map(bookInfo)
+    .filter(b => {
+      if(fs && b.t.statut !== fs) return false;
+      const st = reviewState(b.t);
+      if(fa === 'todo' && !(st === 'todo' || st === 'comment' || st === 'stale')) return false;
+      if(fa === 'valide' && st !== 'valide') return false;
+      if(fa === 'disagree' && st !== 'disagree') return false;
+      if(fa === 'comment' && !(b.t.validation && b.t.validation.commentaire)) return false;
+      if(q && !`${b.t.barcode} ${b.cote} ${b.titre} ${b.auteur}`.toLowerCase().includes(q)) return false;
+      return true;
+    })
+    .sort((a, b) => STATUT_ORDER[a.t.statut] - STATUT_ORDER[b.t.statut]
+      || String(a.scan.colonne ?? '').localeCompare(String(b.scan.colonne ?? ''), 'fr', { numeric:true })
+      || (a.scan.etage ?? 0) - (b.scan.etage ?? 0)
+      || a.cote.localeCompare(b.cote, 'fr', { numeric:true }));
+}
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+}
+
+function bookHtml(b){
+  const t = b.t, v = t.validation || null, st = reviewState(t);
+  const Y = REFERENCE_YEAR;
+  const empl = b.scan.id ? `${b.scan.colonne != null ? 'colonne ' + esc(b.scan.colonne) : ''}${b.scan.etage != null ? ', étagère ' + esc(b.scan.etage) : ''}` : '';
+  const meta = [
+    b.cote ? `<b>Cote</b> ${esc(b.cote)}` : '',
+    b.parution ? `<b>Parution</b> ${esc(b.parution)}` : '',
+    b.an != null ? `<b>Prêts ${Y}</b> ${b.an}` : '',
+    b.avant != null ? `<b>Prêts avant ${Y}</b> ${b.avant}` : '',
+    b.dernier ? `<b>Dernier prêt</b> ${esc(b.dernier)}` : '',
+    empl ? `<b>Emplacement</b> ${empl}` : '',
+    `<b>Code-barre</b> ${esc(t.barcode)}`,
+  ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+  const avisBtns =
+    `<button type="button" class="avis-btn valide ${st==='valide'?'active':''}" data-avis="valide">✓ Valider</button>` +
+    `<span class="avis-sep">ou plutôt :</span>` +
+    STATUTS.filter(s => s !== t.statut).map(s =>
+      `<button type="button" class="avis-btn ${s} ${v && v.avis===s && st!=='stale' ? 'active' : ''}" data-avis="${s}">${STATUT_LABEL[s]}</button>`
+    ).join('');
+  const cls = st === 'valide' ? 'done' : st === 'disagree' ? 'disagree' : st === 'stale' ? 'stale' : '';
+  const stale = st === 'stale'
+    ? `<div class="vd-stale">⚠ L'équipe a changé sa décision depuis votre avis (vous aviez vu « ${STATUT_LABEL[v.statutVu]} », votre avis : ${v.avis === 'valide' ? 'validé' : STATUT_LABEL[v.avis] || '—'}).</div>` : '';
+  const who = v ? `${v.par ? esc(v.par) + ' · ' : ''}${fmtDate(v.ts)}` : '';
+  return `<div class="vd-book" data-bc="${esc(t.barcode)}">
+    <div>${b.imagette ? `<img class="vd-thumb" src="${esc(b.imagette)}" alt="Couverture" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'vd-thumb-ph'}))">` : '<div class="vd-thumb-ph"></div>'}</div>
+    <div>
+      <p class="vd-title">${esc(b.titre)}</p>
+      ${b.auteur ? `<p class="vd-author">${esc(b.auteur)}</p>` : ''}
+      <div class="vd-meta">${meta}</div>
+      <div class="vd-team">Décision de l'équipe : <span class="pill ${t.statut}">${STATUT_LABEL[t.statut]}</span> <span style="color:#999;font-size:.72rem">${fmtDate(t.ts)}</span></div>
+    </div>
+    <div class="vd-review ${cls}">
+      ${stale}
+      <div class="vd-avis">${avisBtns}</div>
+      <textarea placeholder="Commentaire pour l'équipe (facultatif)…" maxlength="2000">${esc(v ? v.commentaire : '')}</textarea>
+      <div class="vd-review-foot">
+        <span class="state">${who ? 'Enregistré · ' + who : ''}</span>
+        <button type="button" class="btn save-comment" style="padding:.25rem .6rem;font-size:.72rem">Enregistrer le commentaire</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* `full` = reconstruire tout le panneau. Au rafraîchissement automatique
+   (toutes les 30 s), on ne reconstruit pas si une saisie est en cours dans
+   un commentaire : on perdrait le texte et le focus. */
+function renderBooks(full){
+  if(!current) return;
+  const active = document.activeElement;
+  if(!full && active && active.tagName === 'TEXTAREA' && active.closest('#vd-books')) return;
+  if(!full && document.querySelector('#vd-books textarea.dirty')) return;
+  const books = filteredBooks();
+  const all = decidedBooks().filter(t => groupOf(t.barcode) === current);
+  document.getElementById('vd-panel-title').textContent = groupLabel(current);
+  const total = current === HORS_RAYON ? null : [...RAYON_OF.values()].filter(r => r.id === current).length;
+  document.getElementById('vd-panel-sub').textContent =
+    `${all.length} décision${all.length>1?'s':''}` + (total != null ? ` sur ${total} livre${total>1?'s':''} scanné${total>1?'s':''} dans ce rayon` : ' prises hors rayon (scan direct dans Rotobib)') +
+    ` · ${books.length} affiché${books.length>1?'s':''} avec les filtres.`;
+  const el = document.getElementById('vd-books');
+  if(!books.length){
+    el.innerHTML = `<p class="vd-empty">${all.length ? 'Aucun livre ne correspond aux filtres.' : 'Aucune décision dans ce rayon pour l\'instant.'}</p>`;
+    document.getElementById('vd-more').innerHTML = '';
+    return;
+  }
+  el.innerHTML = books.slice(0, shown).map(bookHtml).join('');
+  document.getElementById('vd-more').innerHTML = books.length > shown
+    ? `<button type="button" class="btn" id="vd-more-btn">Afficher ${Math.min(PAGE_SIZE, books.length - shown)} livres de plus (${books.length - shown} restants)</button>` : '';
+  document.getElementById('vd-bulk').disabled = !books.some(b => reviewState(b.t) === 'todo' || reviewState(b.t) === 'stale');
+}
+document.getElementById('vd-more').addEventListener('click', e => {
+  if(e.target.id === 'vd-more-btn'){ shown += PAGE_SIZE; renderBooks(true); }
+});
+['vd-f-statut','vd-f-avis','vd-f-q'].forEach(id =>
+  document.getElementById(id).addEventListener('input', () => { shown = PAGE_SIZE; renderBooks(true); }));
+
+/* ── Saisie d'un avis ── */
+function makeValidation(t, avis, commentaire){
+  return {
+    avis: avis || null,
+    commentaire: commentaire || '',
+    statutVu: t.statut,
+    par: nameInput.value.trim(),
+    ts: new Date().toISOString(),
+  };
+}
+function sendReview(bc, validation){
+  setLocalReview(bc, validation);
+  RECENT.set(bc, { validation, at: Date.now() });
+  syncQueue.queue({ type:'review', barcode: bc, validation });
+}
+
+document.getElementById('vd-books').addEventListener('click', e => {
+  const thumb = e.target.closest('.vd-thumb');
+  if(thumb){ thumb.classList.toggle('big'); return; }
+  const card = e.target.closest('.vd-book');
+  if(!card) return;
+  const bc = card.dataset.bc, t = TRAITEMENTS[bc];
+  if(!t) return;
+  const textarea = card.querySelector('textarea');
+  const avisBtn = e.target.closest('.avis-btn');
+  if(avisBtn){
+    const v = t.validation;
+    const st = reviewState(t);
+    let avis = avisBtn.dataset.avis;
+    // Recliquer l'avis actif le retire (le commentaire reste).
+    const isActive = avisBtn.classList.contains('active');
+    if(isActive && st !== 'stale') avis = null;
+    sendReview(bc, makeValidation(t, avis, textarea.value.trim()));
+    textarea.classList.remove('dirty');
+    afterChange(card, bc);
+    return;
+  }
+  if(e.target.closest('.save-comment')){
+    saveComment(card);
+  }
+});
+function saveComment(card){
+  const bc = card.dataset.bc, t = TRAITEMENTS[bc];
+  if(!t) return;
+  const textarea = card.querySelector('textarea');
+  const txt = textarea.value.trim();
+  const v = t.validation;
+  if((v ? v.commentaire : '') === txt){ textarea.classList.remove('dirty'); return; }
+  // On garde l'avis existant, sauf s'il portait sur une ancienne décision.
+  const avis = v && v.avis && reviewState(t) !== 'stale' ? v.avis : null;
+  sendReview(bc, makeValidation(t, avis, txt));
+  textarea.classList.remove('dirty');
+  afterChange(card, bc);
+}
+document.getElementById('vd-books').addEventListener('input', e => {
+  if(e.target.tagName !== 'TEXTAREA') return;
+  e.target.classList.add('dirty');
+  const s = e.target.closest('.vd-book').querySelector('.state');
+  s.className = 'state unsaved';
+  s.textContent = 'Commentaire non enregistré';
+});
+// Enregistrement automatique en quittant le champ.
+document.getElementById('vd-books').addEventListener('focusout', e => {
+  if(e.target.tagName === 'TEXTAREA' && e.target.classList.contains('dirty')) saveComment(e.target.closest('.vd-book'));
+});
+function afterChange(card, bc){
+  // Remplace la carte seule (garde la position de lecture), puis le récap.
+  const b = bookInfo(TRAITEMENTS[bc]);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = bookHtml(b);
+  const fresh = tmp.firstElementChild;
+  fresh.querySelector('.state').className = 'state saved';
+  card.replaceWith(fresh);
+  renderSummary();
+}
+
+document.getElementById('vd-bulk').addEventListener('click', () => {
+  const targets = filteredBooks().filter(b => { const s = reviewState(b.t); return s === 'todo' || s === 'stale' || s === 'comment'; });
+  if(!targets.length) return;
+  if(!confirm(`Valider la décision de l'équipe pour ${targets.length} livre${targets.length>1?'s':''} affiché${targets.length>1?'s':''} (y compris ceux des pages suivantes) ? Les commentaires déjà écrits sont conservés.`)) return;
+  const items = targets.map(b => ({
+    barcode: b.t.barcode,
+    validation: makeValidation(b.t, 'valide', b.t.validation ? b.t.validation.commentaire : ''),
+  }));
+  const now = Date.now();
+  items.forEach(it => { setLocalReview(it.barcode, it.validation); RECENT.set(it.barcode, { validation: it.validation, at: now }); });
+  // Lots de 200 : un seul aller-retour (et une seule réécriture R2) par lot.
+  for(let i = 0; i < items.length; i += 200) syncQueue.queue({ type:'reviewMany', items: items.slice(i, i + 200) });
+  renderSummary();
+  renderBooks(true);
+});
+
+/* ── Export ── */
+document.getElementById('vd-export').addEventListener('click', () => {
+  if(!current) return;
+  const Y = REFERENCE_YEAR;
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const head = ['Code-barre','Colonne','Étagère','Cote','Titre','Auteur','Parution',`Prêts ${Y}`,`Prêts avant ${Y}`,'Dernier prêt','Décision équipe','Avis','Proposition','Commentaire','Validé par','Date avis'];
+  const rows = decidedBooks().filter(t => groupOf(t.barcode) === current).map(bookInfo)
+    .sort((a, b) => a.cote.localeCompare(b.cote, 'fr', { numeric:true }))
+    .map(b => {
+      const v = b.t.validation || {}, st = reviewState(b.t);
+      const avis = { valide:'Validé', disagree:'Contre-proposition', stale:'À revoir (décision changée)', todo:'À valider', comment:'À valider' }[st];
+      return [b.t.barcode, b.scan.colonne, b.scan.etage, b.cote, b.titre, b.auteur, b.parution, b.an, b.avant, b.dernier,
+        STATUT_LABEL[b.t.statut], avis, st === 'disagree' ? STATUT_LABEL[v.avis] : '', v.commentaire || '', v.par || '', v.ts ? fmtDate(v.ts) : ''];
+    });
+  const csv = '﻿' + [head, ...rows].map(r => r.map(q).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = `validation-desherbage-${groupLabel(current).replace(/[^\p{L}\p{N}]+/gu, '-')}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+/* ── Démarrage + direct ── */
+syncQueue.updateIndicator();
+syncQueue.flush();
+refresh();
+setInterval(() => { if(!document.hidden) refresh(); }, 30000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
+</script>
+</body>
+</html>

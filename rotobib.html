@@ -65,7 +65,19 @@
   .roto-detail{display:none;background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem}
   .roto-detail.show{display:block}
   .roto-head{display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:.5rem}
-  .roto-cover{width:88px;height:118px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f2f2f5;flex-shrink:0}
+  .roto-cover{width:88px;height:118px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f2f2f5;flex-shrink:0;cursor:zoom-in}
+  .roto-cover:hover{border-color:#2A3CD4}
+  /* Agrandissement de la couverture (clic sur la vignette). */
+  .roto-zoom{position:fixed;inset:0;z-index:1000;background:rgba(20,20,30,.82);display:none;align-items:center;justify-content:center;flex-direction:column;gap:.75rem;padding:1.5rem;cursor:zoom-out}
+  .roto-zoom.show{display:flex}
+  .roto-zoom img{max-width:min(92vw,700px);max-height:80vh;min-width:280px;object-fit:contain;border-radius:6px;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .roto-zoom-cap{color:#fff;font-size:.9rem;text-align:center;max-width:700px}
+  .roto-zoom-hint{color:#bbb;font-size:.75rem}
+  .roto-zoom-close{position:absolute;top:.75rem;right:1rem;background:none;border:none;color:#fff;font-size:2rem;line-height:1;cursor:pointer}
+  /* En iframe, position:fixed se cale sur l'iframe entière (voir CLAUDE.md,
+     « Publication en iframe ») : surcouche ancrée au niveau de la fiche. */
+  html.rp-embedded .roto-zoom{position:absolute;top:var(--zoom-top,0);bottom:auto;min-height:620px}
+  html.rp-embedded .roto-zoom img{max-height:540px}
   .roto-headcol{flex:1;min-width:240px}
   .roto-titre{font-family:'Moret','DM Serif Display',serif;font-size:1.35rem;color:#2A3CD4;margin:0 0 .25rem;line-height:1.25}
   .roto-soustitre{font-size:.85rem;color:#777;margin:0 0 .5rem;font-style:italic}
@@ -75,6 +87,18 @@
   .roto-badge{display:inline-block;font-size:.68rem;padding:2px 9px;border-radius:20px;margin-right:.35rem;font-weight:600}
   .roto-badge-cote{background:#F5F5FF;color:#2A3CD4;font-family:monospace}
   .roto-badge-excl{background:#ffebee;color:#c62828;border:1px solid #ffcdd2}
+  /* Avis du validateur (validation-desherbage.html). */
+  .roto-avis{margin-top:.6rem;padding:.5rem .7rem;border-radius:8px;background:#fafafa;border:1px solid #eee;font-size:.8rem}
+  .avis-tag{display:inline-block;font-weight:600;font-size:.75rem;padding:1px 8px;border-radius:20px;margin-right:.4rem}
+  .avis-tag.valide{background:#e8f5e9;color:var(--ok)}
+  .avis-tag.disagree{background:#fdecea;color:var(--danger)}
+  .avis-tag.stale,.avis-tag.comment{background:#fff8e1;color:var(--warn-ink)}
+  .avis-by{font-size:.72rem;color:#888}
+  .avis-comment{margin-top:.35rem;color:#333;white-space:pre-wrap;font-style:italic}
+  .avis-line{font-size:.7rem;margin-top:2px;font-weight:600}
+  .avis-line.valide{color:var(--ok)}
+  .avis-line.disagree{color:var(--danger)}
+  .avis-line.stale,.avis-line.comment{color:var(--warn-ink)}
   .roto-badge-statut{color:#fff}
   .roto-badge-statut.conserver{background:var(--ok)}
   .roto-badge-statut.pilon{background:var(--danger)}
@@ -327,6 +351,12 @@
       <div class="roto-flash" id="roto-flash"></div>
       <div class="roto-notfound" id="roto-notfound"></div>
 
+      <div class="roto-zoom" id="roto-zoom" role="dialog" aria-modal="true" aria-label="Couverture agrandie">
+        <button type="button" class="roto-zoom-close" aria-label="Fermer">×</button>
+        <img id="roto-zoom-img" alt="Couverture agrandie">
+        <div class="roto-zoom-cap" id="roto-zoom-cap"></div>
+        <div class="roto-zoom-hint">Clic ou Échap pour fermer · ← → livre précédent / suivant</div>
+      </div>
       <div class="roto-detail" id="roto-detail">
         <div class="roto-nav" id="roto-nav" style="display:none">
           <button type="button" class="roto-nav-btn" id="roto-prev" title="Livre précédent (flèche ←)">◀ Précédent</button>
@@ -337,13 +367,14 @@
           <button type="button" class="roto-nav-btn" id="roto-next" title="Livre suivant (flèche →)">Suivant ▶</button>
         </div>
         <div class="roto-head">
-          <img class="roto-cover" id="roto-cover" style="display:none">
+          <img class="roto-cover" id="roto-cover" style="display:none" alt="Couverture" title="Cliquer pour agrandir">
           <div class="roto-headcol">
             <p class="roto-titre" id="roto-titre"></p>
             <p class="roto-soustitre" id="roto-soustitre" style="display:none"></p>
             <p class="roto-auteur" id="roto-auteur"></p>
             <div id="roto-badges"></div>
             <p class="roto-meta" id="roto-meta"></p>
+            <div class="roto-avis" id="roto-avis" style="display:none"></div>
           </div>
         </div>
 
@@ -618,7 +649,7 @@ scanInput.addEventListener('keydown', e => {
   if(e.key === 'Enter'){ e.preventDefault(); handleScanLookup(scanInput.value); }
 });
 document.addEventListener('click', e => {
-  if(!e.target.closest('input,select,button,a,.log-body')) scanInput.focus();
+  if(!e.target.closest('input,select,button,a,.log-body')) scanInput.focus({ preventScroll: true });
 });
 
 function showDetail(rec){
@@ -627,6 +658,10 @@ function showDetail(rec){
   const cover = document.getElementById('roto-cover');
   if(rec.imagette){ cover.src = rec.imagette; cover.style.display = ''; cover.onerror = () => { cover.style.display = 'none'; }; }
   else cover.style.display = 'none';
+  // Agrandissement ouvert pendant la navigation ← → : il suit le livre affiché.
+  if(document.getElementById('roto-zoom').classList.contains('show')){
+    if(rec.imagette) fillZoom(rec); else closeZoom();
+  }
 
   document.getElementById('roto-titre').textContent = titreComplet(rec);
   const st = sousTitre(rec);
@@ -689,6 +724,37 @@ function highlightButtons(){
     b.classList.toggle('active', !!t && b.dataset.statut === t.statut);
   });
   document.getElementById('roto-undo-row').style.display = t ? '' : 'none';
+  const avisEl = document.getElementById('roto-avis');
+  const avis = avisHtml(t);
+  avisEl.innerHTML = avis;
+  avisEl.style.display = avis ? '' : 'none';
+}
+
+/* Avis du collègue qui valide la campagne (validation-desherbage.html,
+   champ `validation` de la décision — voir api/desherbage.mjs). */
+function avisState(t){
+  const v = t && t.validation;
+  if(!v) return null;
+  if(!v.avis) return v.commentaire ? 'comment' : null;
+  if(v.statutVu && v.statutVu !== t.statut) return 'stale';
+  return v.avis === 'valide' || v.avis === t.statut ? 'valide' : 'disagree';
+}
+function avisHtml(t, compact){
+  const st = avisState(t);
+  if(!st) return '';
+  const v = t.validation;
+  const label = {
+    valide: '✓ Validé',
+    disagree: `↪ Propose : ${STATUT_LABEL[v.avis]}`,
+    stale: `⚠ Avis donné sur « ${STATUT_LABEL[v.statutVu] || '?'} », décision changée depuis`,
+    comment: '💬 Commentaire',
+  }[st];
+  const by = v.par ? ` — ${esc(v.par)}` : '';
+  if(compact){
+    return `<div class="avis-line ${st}" title="${esc(v.commentaire || '')}">${esc(label)}${v.commentaire && st !== 'comment' ? ' 💬' : ''}</div>`;
+  }
+  return `<span class="avis-tag ${st}">${esc(label)}</span><span class="avis-by">Validation${by}</span>` +
+    (v.commentaire ? `<div class="avis-comment">${esc(v.commentaire)}</div>` : '');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -696,9 +762,12 @@ function highlightButtons(){
    ════════════════════════════════════════════════════════════ */
 function setTraitement(bc, statut){
   const record = { barcode: bc, statut, ts: new Date().toISOString() };
+  // L'avis du validateur (validation-desherbage.html) survit à un changement
+  // de décision — le serveur le conserve aussi (patch `set`, api/desherbage.mjs).
+  if(TRAITEMENTS[bc] && TRAITEMENTS[bc].validation) record.validation = TRAITEMENTS[bc].validation;
   TRAITEMENTS[bc] = record;
+  queuePatch({ type:'set', record: { barcode: bc, statut, ts: record.ts } });
   saveLocal();
-  queuePatch({ type:'set', record });
   updateStats();
   highlightButtons();
   renderLog();
@@ -805,6 +874,35 @@ document.addEventListener('keydown', e => {
   if(typing && !(t === scanInput && !scanInput.value)) return;
   e.preventDefault();
   showNavAt(NAV.index + (e.key === 'ArrowRight' ? 1 : -1));
+});
+
+// ── Agrandissement de la couverture ──
+// Fonctions (hissées) plutôt que const : showDetail() les appelle.
+function fillZoom(rec){
+  document.getElementById('roto-zoom-img').src = rec.imagette;
+  document.getElementById('roto-zoom-cap').textContent = titreComplet(rec);
+}
+function openZoom(){
+  if(!currentRecord || !currentRecord.imagette) return;
+  const zoom = document.getElementById('roto-zoom');
+  fillZoom(currentRecord);
+  const embedded = document.documentElement.classList.contains('rp-embedded');
+  if(embedded){
+    const parent = zoom.offsetParent || document.body;
+    const top = document.getElementById('roto-detail').getBoundingClientRect().top - parent.getBoundingClientRect().top;
+    zoom.style.setProperty('--zoom-top', Math.max(0, top) + 'px');
+  }
+  zoom.classList.add('show');
+  if(embedded) zoom.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function closeZoom(){
+  document.getElementById('roto-zoom').classList.remove('show');
+  document.getElementById('roto-zoom-img').removeAttribute('src');
+}
+document.getElementById('roto-cover').addEventListener('click', openZoom);
+document.getElementById('roto-zoom').addEventListener('click', closeZoom);
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && document.getElementById('roto-zoom').classList.contains('show')) closeZoom();
 });
 
 document.getElementById('roto-undo').addEventListener('click', () => {
@@ -1345,7 +1443,8 @@ function renderRayon(){
       <td><button type="button" class="ttl" data-open="${esc(r.bc)}">${esc(r.titre || '(titre inconnu)')}</button>
         ${r.auteur ? `<div class="aut">${esc(r.auteur)}</div>` : ''}
         ${r.absent ? `<div class="absent">absent de l'export Syracuse — pas de statistiques</div>` : ''}
-        ${r.horsRayon ? `<div class="absent">plus scanné dans ce rayon — gardé car déjà traité</div>` : ''}</td>
+        ${r.horsRayon ? `<div class="absent">plus scanné dans ce rayon — gardé car déjà traité</div>` : ''}
+        ${avisHtml(t, true)}</td>
       <td>${esc(r.parution || '—')}</td>
       <td>${esc(r.saisie || '—')}</td>
       ${numCell(r.an)}
