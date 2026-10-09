@@ -1852,6 +1852,29 @@ décision affiche directement le livre suivant au lieu de refermer la fiche
 code-barre ou « Fermer » le rayon quitte ce mode (`NAV = null`), et le scan
 retrouve son comportement d'origine (fiche refermée après décision).
 
+**Rayons fictifs des magasins** (2026-10-09) : dans les magasins d'étage, un
+rayon au sens du désherbage (ex. les Que sais-je ? du 5e) n'est qu'une partie
+d'une ou plusieurs travées. Bouton « + Rayon fictif (magasins) » du panneau
+d'import : un nom + des zones (travée `M2-`/`M5-`/`M6-`, colonnes cochées —
+aucune = toutes —, plage d'étagères — vide = toutes), avec le nombre de livres
+scannés par zone. Stocké dans **`recolement.json`, catégorie `selections`**
+(`{id:"SEL-…", label, parts:[{travee, cols|null, etFrom, etTo}], ts,
+deleted?}`, patch `selection` d'`api/recolement.mjs`, aussi accepté par
+`bulkMerge` ; le plus récent gagne, suppression = `deleted:true`, comme les
+rayons). Un simple filtre nommé sur les scans existants : rien n'est déplacé,
+`recolement.html`/`reserve.html` l'ignorent. Logique partagée (normalisation,
+appartenance d'un scan, libellés) dans `js/selections-desherbage.js`, chargé
+après `js/reserve-shared.js` dont il lit `TRAVEES_MAGASIN2/5/6` **par leur
+nom nu** (des `const` de premier niveau ne sont pas sur `window`). Dans
+Rotobib, la liste déroulante a deux groupes (rayons / rayons fictifs),
+`sourceDef()`/`sourceScans()` traitent les deux ; pour un rayon fictif, le
+filtre de colonne est désactivé et « Empl. » affiche la travée (tri dans
+l'ordre du plan, pas alphabétique). Enregistrement par `fetch` direct (pas de
+file hors ligne : action rare, échec affiché) puis injection locale de la
+définition, le CDN pouvant renvoyer l'état d'avant pendant 20 s. Dans
+`validation-desherbage.html`, un scan de magasin compte dans le premier rayon
+fictif (par nom) qui le contient, sinon dans « Magasins et hors rayon ».
+
 **Validation de la campagne (`validation-desherbage.html`, 2026-10-09).** Pour
 le collègue qui valide le désherbage : récapitulatif par rayon (`RY-…`, lus
 dans `/api/recolement` ; un livre décidé hors de tout rayon — scan direct de
