@@ -104,6 +104,17 @@
   .roto-btn[data-statut="braderie"].active{background:var(--warn);color:#2b1d00}
   .roto-btn[data-statut="relocalisation"].active{background:#2A3CD4}
   .roto-undo-row{margin-top:.6rem}
+  .roto-nav{display:flex;align-items:center;gap:.75rem;margin:-.25rem 0 1.1rem;padding-bottom:.9rem;border-bottom:1px dashed #e0e0e0}
+  .roto-nav-btn{font-family:inherit;font-size:.85rem;padding:.55rem 1rem;border-radius:8px;border:1px solid #2A3CD4;background:#fff;color:#2A3CD4;cursor:pointer;white-space:nowrap}
+  .roto-nav-btn:hover:not(:disabled){background:#eceefe}
+  .roto-nav-btn:disabled{opacity:.35;cursor:default}
+  .roto-nav-mid{flex:1;text-align:center;min-width:0}
+  .roto-nav-pos{font-size:.85rem;color:#333;font-weight:600}
+  .roto-nav-pos small{display:block;font-weight:400;color:#888;font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .roto-nav-auto{font-size:.72rem;color:#666;display:inline-flex;gap:.3rem;align-items:center;margin-top:.25rem;cursor:pointer}
+  @media (max-width:520px){ .roto-nav-btn{padding:.55rem .6rem;font-size:.78rem} }
+  .rayon-table tr.current td{background:#eceefe !important;color:#1a1a1a}
+  .rayon-table tr.current td:first-child{box-shadow:inset 3px 0 0 #2A3CD4}
   .roto-undo{font-size:.78rem;color:#888;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0}
 
   .roto-flash{display:none;margin-bottom:1.5rem;border-radius:var(--radius-md);padding:.9rem 1rem;background:#e8f5e9;border:1px solid #c8e6c9;color:#1b5e20;font-size:.88rem}
@@ -317,6 +328,14 @@
       <div class="roto-notfound" id="roto-notfound"></div>
 
       <div class="roto-detail" id="roto-detail">
+        <div class="roto-nav" id="roto-nav" style="display:none">
+          <button type="button" class="roto-nav-btn" id="roto-prev" title="Livre précédent (flèche ←)">◀ Précédent</button>
+          <div class="roto-nav-mid">
+            <div class="roto-nav-pos" id="roto-nav-pos"></div>
+            <label class="roto-nav-auto"><input type="checkbox" id="roto-auto-next"> Passer au suivant après une décision</label>
+          </div>
+          <button type="button" class="roto-nav-btn" id="roto-next" title="Livre suivant (flèche →)">Suivant ▶</button>
+        </div>
         <div class="roto-head">
           <img class="roto-cover" id="roto-cover" style="display:none">
           <div class="roto-headcol">
@@ -588,7 +607,9 @@ function handleScanLookup(raw){
     return;
   }
   document.getElementById('roto-notfound').classList.remove('show');
+  NAV = null; // un scan quitte la navigation dans le rayon
   showDetail(rec);
+  updateNav();
   scanInput.value = '';
   scanInput.focus();
 }
@@ -695,9 +716,95 @@ document.querySelectorAll('.roto-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if(!currentRecord) return;
     const statut = btn.dataset.statut;
-    setTraitement(currentRecord._barcode, statut);
-    flashTreated(currentRecord, statut);
+    const rec = currentRecord;
+    setTraitement(rec._barcode, statut);
+    if(NAV) navAfterDecision(rec, statut);
+    else flashTreated(rec, statut);
   });
+});
+
+/* ════════════════════════════════════════════════════════════
+   NAVIGATION LIVRE PAR LIVRE DANS UN RAYON IMPORTÉ
+   ────────────────────────────────────────────────────────────
+   Une fiche ouverte depuis le tableau du rayon garde l'ordre du tableau
+   (tri + filtres en cours, thème Dewey compris) pour passer au précédent /
+   suivant (boutons ou flèches ← →). Cet ordre est FIGÉ à l'ouverture
+   (NAV.order) : avec « Masquer les traités », le livre qu'on vient de
+   traiter disparaît du tableau, et un ordre recalculé décalerait la
+   position. Recliquer un titre du tableau reprend l'ordre courant.
+   Un scan de code-barre quitte ce mode (NAV = null).
+   ════════════════════════════════════════════════════════════ */
+let NAV = null;          // { order:[barcode], index }
+let RAYON_VIEW = [];     // codes-barres du tableau du rayon, dans l'ordre affiché
+const LS_AUTO_NEXT = 'rp_rotobib_auto_next';
+const autoNextBox = document.getElementById('roto-auto-next');
+try { autoNextBox.checked = localStorage.getItem(LS_AUTO_NEXT) !== '0'; } catch(e) { autoNextBox.checked = true; }
+autoNextBox.addEventListener('change', () => {
+  try { localStorage.setItem(LS_AUTO_NEXT, autoNextBox.checked ? '1' : '0'); } catch(e) {}
+});
+
+function openFromRayon(bc){
+  const order = RAYON_VIEW.includes(bc) ? RAYON_VIEW.slice() : [bc];
+  NAV = { order, index: order.indexOf(bc) };
+  showNavAt(NAV.index);
+}
+function showNavAt(i){
+  if(!NAV || i < 0 || i >= NAV.order.length) return;
+  NAV.index = i;
+  const bc = NAV.order[i];
+  const rec = RAYON_BY_BC.get(bc) || recordOf(bc);
+  if(!rec) return;
+  document.getElementById('roto-notfound').classList.remove('show');
+  showDetail(rec);
+  updateNav();
+  const detail = document.getElementById('roto-detail');
+  if(detail.getBoundingClientRect().top < 0) detail.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function updateNav(){
+  const bar = document.getElementById('roto-nav');
+  if(!NAV){ bar.style.display = 'none'; markCurrentRow(); return; }
+  bar.style.display = '';
+  const n = NAV.order.length, i = NAV.index;
+  const restants = NAV.order.filter(bc => !TRAITEMENTS[bc]).length;
+  const ctx = [document.getElementById('rayon-title').textContent];
+  if(deweyFilter) ctx.push('thème ' + (deweyFilter.key || 'sans indice'));
+  document.getElementById('roto-nav-pos').innerHTML =
+    `Livre ${i+1} / ${n}<small>${esc(ctx.join(' · '))} · ${restants} non traité${restants>1?'s':''} dans cette liste</small>`;
+  document.getElementById('roto-prev').disabled = i <= 0;
+  document.getElementById('roto-next').disabled = i >= n - 1;
+  markCurrentRow();
+}
+function markCurrentRow(){
+  const cur = NAV ? NAV.order[NAV.index] : null;
+  document.querySelectorAll('#rayon-tbody tr[data-bc]').forEach(tr => tr.classList.toggle('current', tr.dataset.bc === cur));
+}
+function navAfterDecision(rec, statut){
+  const fl = document.getElementById('roto-flash');
+  const last = NAV.index >= NAV.order.length - 1;
+  if(autoNextBox.checked && !last){
+    fl.textContent = `✓ « ${titreComplet(rec)} » marqué « ${STATUT_LABEL[statut]} ». Livre suivant affiché.`;
+    fl.classList.add('show');
+    showNavAt(NAV.index + 1);
+  }else{
+    fl.textContent = `✓ « ${titreComplet(rec)} » marqué « ${STATUT_LABEL[statut]} ».` + (last ? ' C\'était le dernier livre de la liste.' : '');
+    fl.classList.add('show');
+    updateNav();
+  }
+}
+document.getElementById('roto-prev').addEventListener('click', () => { if(NAV) showNavAt(NAV.index - 1); });
+document.getElementById('roto-next').addEventListener('click', () => { if(NAV) showNavAt(NAV.index + 1); });
+// Flèches ← → : seulement si aucun champ de saisie n'est en cours d'usage —
+// le champ de scan garde le focus en permanence, on l'accepte s'il est vide.
+// (Pas de raccourcis chiffrés pour les décisions : une scannette tape des
+// chiffres dans ce même champ.)
+document.addEventListener('keydown', e => {
+  if(!NAV || !document.getElementById('roto-detail').classList.contains('show')) return;
+  if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const t = e.target;
+  const typing = t && t.matches && t.matches('input:not([type=checkbox]),select,textarea');
+  if(typing && !(t === scanInput && !scanInput.value)) return;
+  e.preventDefault();
+  showNavAt(NAV.index + (e.key === 'ArrowRight' ? 1 : -1));
 });
 
 document.getElementById('roto-undo').addEventListener('click', () => {
@@ -1021,15 +1128,15 @@ function progressHtml(rows){
   const parts = [...PROGRESS_ORDER.map(s => ({ key:s, label:STATUT_LABEL[s], icon:STATUT_ICON[s], n:counts[s] })),
                  { key:'todo', label:'Non traité', icon:'○', n: total - treated }];
   const segs = parts.filter(p => p.n > 0).map(p =>
-    `<div class="pg-seg pg-${p.key}" style="flex-grow:${p.n}" tabindex="0" data-tip="${esc(`${p.label} : ${p.n} livre${p.n>1?'s':''} (${pctOf(p.n, total)} %)`)}"></div>`
+    `<div class="pg-seg pg-${p.key}" style="flex-grow:${p.n}" tabindex="0" data-tip="${esc(`${p.label} : ${p.n} livre${p.n>1?'s':''} (${fmtPct(p.n, total)})`)}"></div>`
   ).join('');
   const legend = parts.map(p => `<div class="pg-leg ${p.n ? '' : 'zero'}">
       <span class="pg-sw pg-${p.key}"></span><span class="pg-leg-lbl">${p.icon} ${p.label}</span>
-      <span class="pg-leg-n">${p.n}</span><span class="pg-leg-pct">${pctOf(p.n, total)} %</span>
+      <span class="pg-leg-n">${p.n}</span><span class="pg-leg-pct">${fmtPct(p.n, total)}</span>
     </div>`).join('');
   return `<div class="viz-card">
     <div class="viz-title">Avancement du traitement</div>
-    <div class="pg-head"><span class="pg-big">${pctOf(treated, total)} %</span>
+    <div class="pg-head"><span class="pg-big">${fmtPct(treated, total)}</span>
       <span class="pg-head-sub">${treated} livre${treated>1?'s':''} traité${treated>1?'s':''} sur ${total}</span></div>
     <div class="pg-bar">${segs || '<div class="pg-seg pg-todo" style="flex-grow:1"></div>'}</div>
     <div class="pg-legend">${legend}</div>
@@ -1216,6 +1323,7 @@ function renderRayon(){
     if(q && !(`${r.bc} ${r.cote} ${r.titre} ${r.auteur}`.toLowerCase().includes(q))) return false;
     return true;
   }).sort(compareRayonRows);
+  RAYON_VIEW = rows.map(r => r.bc);
 
   document.getElementById('rayon-dewey-chip').innerHTML = deweyFilter
     ? `<button type="button" class="dw-chip" id="rayon-dewey-clear" title="Retirer le filtre de thème">Thème : ${esc(deweyFilter.key || 'sans indice')} ${esc(dewey.deweyLabel(deweyFilter.key || null, deweyFilter.level))} ✕</button>`
@@ -1230,7 +1338,8 @@ function renderRayon(){
   tbody.innerHTML = rows.map(r => {
     const t = TRAITEMENTS[r.bc];
     const btns = STATUTS.map(s => `<button type="button" class="mini-btn ${t && t.statut===s ? 'active' : ''}" data-statut="${s}" data-bc="${esc(r.bc)}" title="${STATUT_LABEL[s]}${t && t.statut===s ? ' (cliquer pour annuler)' : ''}">${{conserver:'✓',pilon:'🗑️',braderie:'🏷️',relocalisation:'📦'}[s]}</button>`).join('');
-    return `<tr class="${t?'treated':''}">
+    const cur = NAV && NAV.order[NAV.index] === r.bc;
+    return `<tr data-bc="${esc(r.bc)}" class="${t?'treated':''} ${cur?'current':''}">
       <td class="log-bc">${esc(r.colonne ?? '')}${r.etage != null ? '-' + esc(r.etage) : ''}</td>
       <td class="log-bc">${esc(r.cote)}</td>
       <td><button type="button" class="ttl" data-open="${esc(r.bc)}">${esc(r.titre || '(titre inconnu)')}</button>
@@ -1245,6 +1354,7 @@ function renderRayon(){
       <td><div class="mini-btns">${btns}</div></td>
     </tr>`;
   }).join('');
+  if(NAV) updateNav(); // compteur « non traités » de la barre de navigation
 }
 
 document.getElementById('rayon-thead').addEventListener('click', e => {
@@ -1265,11 +1375,9 @@ document.getElementById('rayon-tbody').addEventListener('click', e => {
   }
   const open = e.target.closest('[data-open]');
   if(open){
-    const rec = RAYON_BY_BC.get(open.dataset.open);
-    if(!rec) return;
+    if(!RAYON_BY_BC.has(open.dataset.open)) return;
     document.getElementById('roto-flash').classList.remove('show');
-    document.getElementById('roto-notfound').classList.remove('show');
-    showDetail(rec);
+    openFromRayon(open.dataset.open);
     document.getElementById('roto-detail').scrollIntoView({ behavior:'smooth', block:'start' });
   }
 });
@@ -1287,6 +1395,7 @@ document.getElementById('rayon-close').addEventListener('click', () => {
   RAYON_ROWS = [];
   RAYON_BY_BC = new Map();
   deweyFilter = null;
+  if(NAV){ NAV = null; updateNav(); }
   try { localStorage.removeItem(LS_RAYON); } catch(e) {}
   document.getElementById('rayon-panel').classList.remove('show');
 });

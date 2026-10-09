@@ -1836,6 +1836,21 @@ les rayons d'histoire, désherbés en premier) et quelques décimales d'histoire
 connu le plus proche. Ajouter un libellé = une ligne dans ce fichier. L'export
 .csv du rayon porte deux colonnes de plus (Dewey précis, thème).
 
+**Navigation livre par livre** (2026-10-09) : une fiche ouverte depuis le
+tableau du rayon affiche une barre « ◀ Précédent · Livre i / n · Suivant ▶ »
+(flèches ← → aussi, acceptées quand le champ de scan a le focus mais est
+vide ; volontairement pas de raccourcis chiffrés pour les décisions, une
+scannette tape des chiffres dans ce champ). L'ordre suivi est celui du
+tableau au moment du clic (tri, filtres, thème Dewey) et reste **figé**
+(`NAV.order`) : avec « Masquer les traités », le livre traité disparaît du
+tableau et un ordre recalculé décalerait la position ; recliquer un titre
+reprend l'ordre courant (`RAYON_VIEW`). Case « Passer au suivant après une
+décision » (cochée par défaut, `localStorage` `rp_rotobib_auto_next`) : une
+décision affiche directement le livre suivant au lieu de refermer la fiche
+(`navAfterDecision()`). Ligne courante surlignée dans le tableau. Un scan de
+code-barre ou « Fermer » le rayon quitte ce mode (`NAV = null`), et le scan
+retrouve son comportement d'origine (fiche refermée après décision).
+
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni
 stockée (pas d'écriture vers R2, pas d'API) — juste une lecture de
