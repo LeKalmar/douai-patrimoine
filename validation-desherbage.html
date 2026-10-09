@@ -203,6 +203,9 @@
     .vd-aside{flex-basis:100%;margin-left:0;border-left:0;border-top:1px solid var(--pro-carte-bord)}
   }
   @media (max-width:40rem){
+    .vd-panel-head{flex-wrap:wrap;gap:.4rem .6rem}
+    .vd-panel-head .pro-rule{display:none}
+    .vd-panel-head .pro-eyebrow{white-space:normal;flex:1 1 100%}
     .vd-step__arrow{display:none}
     .vd-by input{width:120px}
     .vd-ray__todo{flex-basis:auto;text-align:left;display:flex;align-items:baseline;gap:.4rem}
@@ -271,7 +274,7 @@
 
   <!-- ── Revue d'un rayon ── -->
   <section class="pro-wrap pro-section" id="vd-panel" aria-labelledby="vd-panel-title" hidden>
-    <div class="pro-section-head">
+    <div class="pro-section-head vd-panel-head">
       <h2 class="pro-eyebrow" id="vd-panel-title">Revue</h2>
       <span class="pro-rule" aria-hidden="true"></span>
       <button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" id="vd-export">⬇ Exporter (.csv)</button>

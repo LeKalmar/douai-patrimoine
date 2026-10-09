@@ -41,6 +41,8 @@
   .rl-count strong { color: var(--pro-bleu); }
   .rl-intro { margin: 0 0 1rem; font-size: 0.84rem; color: var(--pro-texte); max-width: 60rem; }
   [data-icon] { display: inline-flex; }
+  details.pro-help > summary > [data-icon] { flex: none; }
+  .rl-scan .pro-input::placeholder { font: 400 0.88rem var(--pro-font-body); }
 
   /* ── Créer un groupe : deux étapes visibles ── */
   .rl-steps { display: grid; gap: 0.875rem; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; margin-top: 1rem; }
@@ -176,7 +178,7 @@
           </div>
         </div>
         <div class="rl-scan">
-          <input type="text" class="pro-input" id="principal-input" aria-label="Code-barre du document principal" placeholder="Scannez ou tapez le code-barre principal" autocomplete="off" autofocus>
+          <input type="text" class="pro-input" id="principal-input" aria-label="Code-barre du document principal" placeholder="Scannez le code-barre principal" autocomplete="off" autofocus>
           <button type="button" class="pro-btn pro-btn--secondary" id="btn-new-group">Nouveau groupe</button>
         </div>
         <div class="rl-principal is-empty" id="principal-card">Aucun groupe en cours — scannez un code-barre principal ci-dessus.</div>
@@ -234,9 +236,9 @@
   <section class="rl-panel" data-tab="conflicts" aria-label="Groupes en conflit d'emplacement" hidden>
     <div class="pro-section-head">
       <h2 class="pro-eyebrow">Groupes en conflit d'emplacement</h2><span class="pro-rule" aria-hidden="true"></span>
-      <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="btn-refresh-analysis"><span data-icon="refresh" data-size="16"></span>Rafraîchir</button>
     </div>
     <p class="rl-intro">Groupes (Syracuse $481/$482 ou créés ici) dont les membres déjà récolés ne sont pas au même emplacement : lien mal posé dans le catalogue, erreur de récolement, ou reliure physique modifiée depuis le catalogage.</p>
+    <p style="margin:0 0 .875rem"><button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="btn-refresh-analysis"><span data-icon="refresh" data-size="16"></span>Rafraîchir l'analyse</button></p>
     <div id="conflicts-zone">
       <div class="pro-skeleton" style="height:9rem" aria-label="Chargement des conflits"></div>
     </div>
@@ -397,6 +399,7 @@ Promise.all([
   $('suggestions-zone').innerHTML = '<p class="rl-empty-note">Catalogue indisponible.</p>';
 });
 
+function trunc(s, n){ s = String(s||""); return s.length > n ? s.slice(0, n-1) + "…" : s; }
 function emptyHtml(icon, title, text){
   return '<div class="pro-empty">' + ui.icon(icon, { size: 32, stroke: 1.6 }) +
     '<div class="pro-empty__title">' + esc(title) + '</div><div class="pro-empty__text" style="margin-bottom:0">' + esc(text) + '</div></div>';
@@ -629,7 +632,7 @@ function renderGroupsTable(scrollToTop){
     const sample = g.members.slice(0,4).map(b=>(catalog[b] && catalog[b].cote) || b).join(' · ');
     return `<tr>
       <td><span class="pro-cote">${esc(cat && cat.cote || g.principal)}</span>
-        <span class="rl-cell-sub">${esc(cat && cat.titre || '(non catalogué)')} · <code>${esc(g.principal)}</code></span></td>
+        <span class="rl-cell-sub">${esc(trunc(cat && cat.titre || "(non catalogué)", 110))} · <code>${esc(g.principal)}</code></span></td>
       <td><span class="pro-pill pro-pill--pret">${n} document${n>1?'s':''}</span>${sample ? `<span class="rl-cell-sub">${esc(sample)}${n>4?' …':''}</span>` : ''}</td>
       <td>${g.ts ? fmt.date(g.ts) : '—'}</td>
       <td><div class="rl-actions">

@@ -4,12 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<script>
+  // Contrôle d'accès de l'espace pro (même gate localStorage que les autres pages protégées — voir « Sécurité » dans CLAUDE.md).
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+</script>
 <title>Récolement — Réserve patrimoniale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/admin.css">
 <script src="js/reserve-shared.js"></script>
 <script src="js/exemplaires-manuels-shared.js"></script>
 <script src="js/reliures-manuelles-shared.js"></script>
@@ -17,233 +22,310 @@
 <script src="js/catalog-cache.js"></script>
 <script src="js/syracuse-sync-shared.js"></script>
 <style>
+  /* Récolement — mise en page propre à la page (préfixe rc-). Les composants
+     communs (en-tête, onglets, boutons, champs, tableaux, KPI, graphiques,
+     toasts, confirmations) viennent de css/admin.css (classes pro-*). Les
+     classes mp-*, exp-*, fb-*, log-* ci-dessous sont celles que génère le JS
+     de la page. */
   :root{
-    --red:#E8445A; --ok:#2e7d32; --warn:#e65100; --danger:#c62828;
-    --radius-sm:4px; --radius-md:8px; --radius-lg:12px;
     /* Mêmes couleurs que le code couleur catégoriel de reserve.html (voir
-       CLAUDE.md), pour que le mini-plan ci-dessous se lise de façon
-       cohérente avec le plan complet. */
+       CLAUDE.md) — palette du plan, ne pas changer. */
     --plan-free:#c8e6c9; --plan-free-brd:#388e3c;
-    --plan-cat:#1A1E99; --plan-manuel:#F9A825; --plan-noncat:#c54545; --plan-nonrange:#8E24AA;
+    --plan-cat:#1A1E99; --plan-manuel:#F9A825; --plan-noncat:#c62828; --plan-nonrange:#8E24AA;
     --plan-unknown:#e0e0e0; --plan-unknown-brd:#bdbdbd;
   }
-  body{font-family:'DM Sans',sans-serif;color:#1a1a1a;background:#fff;margin:0}
-  .page-hero{background:#2A3CD4;color:#fff;padding:1.75rem 1.5rem}
-  .page-hero .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-  .breadcrumb{font-size:.8rem;color:rgba(255,255,255,0.5);margin-bottom:.5rem;letter-spacing:.04em}
-  .page-title{font-family:'Moret','DM Serif Display',serif;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:400;margin:0;line-height:1.15}
-  .hero-actions{display:flex;gap:.5rem;flex-wrap:wrap}
-  .hero-actions a,.hero-actions button{
-    font-family:inherit;font-size:.8rem;color:rgba(255,255,255,0.85);
-    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
-    padding:.5rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;transition:all .15s;
-  }
-  .hero-actions a:hover,.hero-actions button:hover{background:rgba(255,255,255,0.2);color:#fff}
-  .sync-status{font-size:.75rem;color:rgba(255,255,255,0.75);display:flex;align-items:center;white-space:nowrap}
-  .sync-status.pending{color:#ffcc80}
-  .container{max-width:1100px;margin:0 auto;padding:0 1.5rem}
+  .rc-wrap{max-width:var(--pro-max);margin:0 auto;padding-left:var(--pro-gutter);padding-right:var(--pro-gutter)}
+  .rc-small{font-size:.76rem}
+  .rc-ell{max-width:34rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pro-table td.is-act{text-align:right;width:1%;white-space:nowrap}
+  .log-empty{padding:1.2rem;text-align:center;color:var(--pro-texte-faible);font-style:italic}
+  .pro-pager:empty{display:none}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
 
-  .locbar{position:sticky;top:0;z-index:20;background:#F5F5FF;border-bottom:1px solid #ddd;padding:.75rem 0;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-  main{display:block;padding-top:1rem}
-  .locbar .container{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
-  .loc-sel{font-family:inherit;font-size:.85rem;padding:.4rem .6rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a}
-  .stepper{display:flex;align-items:center;gap:.3rem;background:#fff;border:1px solid #ccc;border-radius:8px;padding:.15rem .3rem}
-  .stepper button{width:26px;height:26px;border:none;background:#f0f0f0;border-radius:5px;font-size:.95rem;cursor:pointer;color:#333;line-height:1}
-  .stepper button:hover{background:#e0e0e0}
-  .stepper span{min-width:22px;text-align:center;font-size:.85rem;font-weight:600;color:#2A3CD4}
-  .loc-readout{margin-left:auto;font-size:.85rem;color:#2A3CD4;font-weight:600;background:#fff;border:1px solid #ccc;border-radius:20px;padding:.4rem 1rem}
+  /* — Bandeau de position (collant) — */
+  .rc-locbar{position:sticky;top:0;z-index:20;background:var(--pro-papier-ombre);border-top:1px solid var(--pro-trait);border-bottom:1px solid var(--pro-trait)}
+  html.rp-embedded .rc-locbar{position:static}
+  .rc-locbar__in{max-width:var(--pro-max);margin:0 auto;padding:.6rem var(--pro-gutter);display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6rem 1rem}
+  .rc-locbar .pro-stepper__val{min-width:48px;font-size:1.25rem}
+  .rc-locbar .rc-sel{max-width:15rem}
+  .rc-field{display:flex;flex-direction:column;gap:.3rem;min-width:0}
+  .rc-field .pro-label{font-weight:600;color:var(--pro-texte)}
+  .rc-sel{height:44px;border:1px solid var(--pro-trait-fort);background:#fff;color:var(--pro-bleu);font:700 .9rem var(--pro-font-body);padding:0 .7rem;border-radius:0;max-width:100%}
+  .rc-sel:disabled{color:var(--pro-texte-faible)}
+  .rc-rayonbar{display:flex;flex-wrap:wrap;gap:.4rem;align-items:flex-end}
+  .rc-prog{flex:1 1 230px;max-width:380px;margin-left:auto;display:flex;flex-direction:column;gap:.35rem;min-width:0}
+  .rc-prog__top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.1rem .7rem}
+  .rc-prog__pct{font-family:var(--pro-font-display);font-weight:700;font-size:1.25rem;color:var(--pro-bleu);line-height:1}
+  .rc-prog__tot{font-size:.8rem;color:var(--pro-texte)}
+  .rc-prog__bar{display:flex;height:8px;background:#D9D4C8;overflow:hidden}
+  .rc-prog__seg{height:100%;min-width:0;transition:width .4s}
+  .rc-prog__seg.notice-recolees{background:var(--pro-bleu)}
+  .rc-prog__seg.notice-noncat{background:var(--plan-manuel)}
+  .rc-prog__seg.notice-jamais{background:#C6C6D0}
+  .rc-prog__leg{display:flex;flex-wrap:wrap;gap:.1rem .9rem;font-size:.7rem;color:var(--pro-texte-doux)}
+  .rc-prog__leg i{display:inline-block;width:8px;height:8px;margin-right:.3rem}
+  .rc-prog__leg b{color:var(--pro-texte)}
+  .rc-prog__leg span span{display:none}
+  .rc-prog__lbl{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--pro-texte-doux)}
 
-  .section{padding:1.5rem 0}
-  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem}
-  .stat-card{background:#F5F5FF;border:1px solid #ebebeb;border-radius:var(--radius-md);padding:.9rem 1rem}
-  .stat-card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.3rem}
-  .stat-card-val{font-family:'Moret','DM Serif Display',serif;font-size:1.6rem;line-height:1}
+  /* — Zone de travail Saisie — */
+  .rc-main{padding-top:1.1rem;padding-bottom:1rem}
+  .rc-work{display:flex;flex-wrap:wrap;gap:1.2rem;align-items:flex-start}
+  .rc-col{flex:1 1 620px;min-width:0;display:flex;flex-direction:column;gap:1rem}
+  .rc-side{flex:0 1 400px;min-width:min(100%,320px);display:flex;flex-direction:column;gap:1rem}
+  .rc-note{font-size:.84rem;color:#6b4300;background:#FFF4D6;border-left:4px solid var(--pro-ambre);padding:.8rem 1rem;margin-bottom:.8rem;line-height:1.5}
 
-  .scan-layout{display:flex;gap:1.25rem;align-items:stretch;flex-wrap:wrap;margin-bottom:1.25rem}
-  .scan-layout .scan-zone{flex:2 1 340px;margin-bottom:0}
-  .travee-mini-panel{flex:1 1 230px;max-width:320px;background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1rem;display:flex;flex-direction:column}
-  .mp-header{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.75rem}
-  .mp-title{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1rem;color:#2A3CD4;line-height:1.25}
-  .mp-occ{font-size:.75rem;color:#888;white-space:nowrap}
-  .mp-actions{display:flex;justify-content:flex-end;margin-bottom:.5rem}
-  .mp-actions .export-btn{font-size:.68rem;padding:.25rem .6rem}
-  .mp-room{flex:1;display:flex;align-items:center;justify-content:center;overflow-x:auto;min-height:120px;padding-bottom:.25rem}
-  .mp-box{border:1px solid #ccc;border-radius:var(--radius-sm);padding:4px;background:#fafafa;display:flex;flex-direction:row;gap:4px}
+  .rc-scancard{border-top:3px solid var(--pro-bleu);padding:.9rem 1.25rem .6rem}
+  .rc-scancard__head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:.2rem .8rem}
+  .rc-scancard__head label{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--pro-carmin);font-weight:600}
+  .rc-scanbox{display:flex;margin-top:.6rem;border:3px solid var(--pro-bleu);background:#fff}
+  .rc-scanbox__ico{width:60px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--pro-bleu);background:var(--pro-bleu-pale)}
+  #scan-input{flex:1;min-width:0;height:60px;border:0;outline:0;font:500 1.45rem var(--pro-font-mono);letter-spacing:.04em;padding:0 1rem;color:var(--pro-bleu);background:#fff;border-radius:0}
+  #scan-input::placeholder{font:400 1rem var(--pro-font-body);letter-spacing:0;color:var(--pro-texte-faible)}
+  .rc-scanbox:focus-within{box-shadow:0 0 0 4px rgba(42,60,212,.18)}
+  .rc-scanbox .pro-btn{height:auto;min-height:60px;padding:0 1.4rem}
+  .rc-scanopts{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:0 1.4rem;margin-top:.15rem}
+
+  /* — Retour de scan : grande carte à aplat — */
+  .feedback{display:none}
+  .feedback.show{display:flex;flex-wrap:wrap;gap:.9rem 1.5rem;align-items:center;padding:1.1rem 1.4rem;border:2px solid transparent;min-height:9.5rem}
+  .fb-idle{background:#fff;color:var(--pro-texte-doux);border:2px dashed var(--pro-trait-fort)!important}
+  .fb-idle .fb-body{display:flex;flex-direction:column;gap:.15rem}
+  .fb-idle .fb-verb{font-size:1.2rem;color:var(--pro-bleu)}
+  .fb-ok{background:#2e7d32;color:#fff;border-color:#1b5e20!important}
+  .fb-dup{background:#E6E8F7;color:#2A3CD4;border-color:#BFC4EC!important}
+  .fb-moved{background:#e8a200;color:#2b1d00;border-color:#b88000!important}
+  .fb-anom{background:#B4213C;color:#fff;border-color:#8E1A30!important}
+  .fb-unknown{background:#6B6B7B;color:#fff;border-color:#4d4d5b!important}
+  .fb-icon{width:84px;height:84px;flex:none;align-self:flex-start;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.18)}
+  .fb-dup .fb-icon{background:rgba(42,60,212,.1)}
+  .fb-moved .fb-icon{background:rgba(43,29,0,.12)}
+  .fb-body{flex:1 1 280px;min-width:0}
+  .fb-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.1rem .9rem}
+  .fb-verb{font-family:var(--pro-font-display);font-weight:700;font-size:1.5rem;line-height:1.15}
+  .fb-time{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+  .fb-cote{font-family:var(--pro-font-display);font-weight:700;font-size:2.3rem;line-height:1.1;margin-top:.15rem;word-break:break-word}
+  .fb-titre{font-size:1.05rem;font-weight:600;margin-top:.25rem;line-height:1.3}
+  .fb-meta{font-size:.86rem;opacity:.92;margin-top:.1rem}
+  .fb-pills{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.55rem}
+  .fb-pill{font-size:.72rem;font-weight:600;padding:.12rem .6rem;border:1px solid currentColor;border-radius:20px}
+  .fb-note{font-size:.82rem;margin-top:.55rem;line-height:1.45}
+  .fb-prev{margin-top:.6rem;padding:.5rem .8rem;background:rgba(255,255,255,.4);display:flex;flex-wrap:wrap;align-items:baseline;gap:.2rem .7rem}
+  .fb-prev strong{font-family:var(--pro-font-display);font-size:1.35rem}
+  .fb-lbl{display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+  .fb-prev .fb-lbl{flex-basis:100%}
+  .fb-side{flex:0 0 auto;border-left:1px solid currentColor;padding-left:1.2rem;display:flex;flex-direction:column;gap:.7rem;opacity:.95}
+  .fb-val{display:block;font-family:var(--pro-font-display);font-weight:700;font-size:1.3rem;line-height:1.2}
+  .fb-mono{font-family:var(--pro-font-mono);font-size:.95rem;font-weight:600}
+  .fb-manual{margin-top:.7rem}
+  .fb-manual label{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase}
+  .fb-manual-row{display:flex;margin-top:.25rem;max-width:22rem}
+  .fb-manual input{flex:1;min-width:0;height:40px;border:0;padding:0 .7rem;font:400 .9rem var(--pro-font-body);color:var(--pro-texte);border-radius:0}
+  .fb-manual button{height:40px;padding:0 1rem;border:0;background:var(--pro-bleu);color:#fff;font:700 .8rem var(--pro-font-body);border-radius:0}
+  @keyframes rcflash{0%{filter:brightness(1.35);transform:scale(1.012)}100%{filter:none;transform:none}}
+  .feedback.flash{animation:rcflash .55s ease-out}
+  @media (prefers-reduced-motion:reduce){.feedback.flash{animation:none}}
+  .rc-ncfb{display:none;font-size:.78rem;color:var(--pro-ok-encre);margin-top:.5rem}
+  .rc-ncfb.show{display:block}
+
+  /* — Scans récents / journaux — */
+  .rc-recent__head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.2rem 1rem;padding:.8rem 1.1rem;border-bottom:1px solid var(--pro-trait)}
+  .rc-recent .pro-table td{padding:.3rem .8rem}
+  .pro-cote-cell{white-space:nowrap}
+  .rc-recent .pro-table th{padding:.35rem .8rem}
+  .rc-recent .pro-table-wrap{max-height:none}
+  .rc-recent .pro-btn--sm{min-height:34px}
+
+  /* — Colonne latérale — */
+  .rc-card{padding:1rem 1.15rem 1.1rem}
+  .rc-card--top{border-top:3px solid var(--pro-bleu)}
+  .rc-eyebrow{margin:0;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--pro-carmin);font-weight:600}
+  .rc-readout{font-size:.82rem;color:var(--pro-texte);margin:.25rem 0 0;line-height:1.4}
+  #vide-row.pro-seg{display:flex;margin-top:.8rem;width:100%}
+  #vide-row.pro-seg button{flex:1 1 0;min-height:52px;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.3rem .5rem;line-height:1.2;font-size:.8rem}
+  #vide-row.pro-seg button svg{flex:none}
+  #btn-vide[aria-pressed="true"]{background:var(--plan-free-brd);color:#fff}
+  #btn-nonrange[aria-pressed="true"]{background:var(--plan-nonrange);color:#fff}
+  .rc-sub{margin-top:.9rem;padding-top:.8rem;border-top:1px solid var(--pro-filet)}
+  .rc-sub__row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem .9rem}
+  .rc-sub__t{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--pro-texte)}
+  .rc-sub__d{font-size:.76rem;color:var(--pro-texte-doux);margin-top:.1rem}
+  #stp-noncat-wrap .pro-btn--icon{border:0}
+  #noncat-input{width:64px;height:44px;text-align:center;border:0;border-left:1px solid var(--pro-carte-bord);border-right:1px solid var(--pro-carte-bord);font:700 1.5rem var(--pro-font-display);color:var(--plan-noncat);background:#fff;-moz-appearance:textfield;border-radius:0}
+  #noncat-input::-webkit-inner-spin-button,#noncat-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .rc-inline{display:flex;margin-top:.4rem}
+  .rc-inline .pro-input{flex:1;min-width:0;border-right:0}
+
+  /* Mini-plan */
+  .mp-header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.1rem .7rem}
+  .mp-title{font-family:var(--pro-font-display);font-weight:600;font-size:1.15rem;color:var(--pro-bleu);line-height:1.25}
+  .mp-occ{font-size:.76rem;color:var(--pro-texte-doux);white-space:nowrap}
+  .mp-actions{display:flex;justify-content:flex-end;margin:.2rem 0 0}
+  .mp-room{display:flex;justify-content:center;overflow-x:auto;min-height:100px;padding:.6rem .3rem .5rem}
+  .mp-box{display:flex;flex-direction:row;gap:5px;padding:5px;background:#fafafa;border:1px solid var(--pro-trait);min-width:min-content}
   .mp-col{display:flex;flex-direction:column;gap:2px;align-items:center}
-  .mp-slot{border-radius:1px}
-  .mp-slot.cur{outline:2px solid var(--red);outline-offset:1px;position:relative;z-index:2}
-  .mp-collbl{font-size:8px;color:#aaa;text-align:center;margin-top:3px;line-height:1}
-  .mp-collbl.cur{color:var(--red);font-weight:700}
-  .mp-legend{display:flex;flex-wrap:wrap;gap:.35rem .7rem;font-size:.64rem;color:#666;margin-top:.75rem}
-  .mp-leg{display:flex;align-items:center;gap:.3rem}
-  .mp-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
-  .mp-hint{font-size:.72rem;color:#999;font-style:italic;margin:.5rem 0 0;text-align:center}
+  .mp-slot{display:block;padding:0;margin:0;border:1px solid rgba(0,0,0,.18);border-radius:1px;cursor:pointer}
+  .mp-slot:hover{outline:2px solid var(--pro-bleu);outline-offset:0;z-index:1;position:relative}
+  .mp-slot.cur{outline:3px solid var(--pro-carmin);outline-offset:1px;position:relative;z-index:2}
+  .mp-collbl{font-size:.7rem;color:var(--pro-texte-doux);text-align:center;margin-top:3px;line-height:1}
+  .mp-collbl.cur{color:var(--pro-carmin);font-weight:700}
+  .mp-legend{display:flex;flex-wrap:wrap;gap:.3rem .8rem;font-size:.72rem;color:var(--pro-texte);margin-top:.5rem;padding-top:.6rem;border-top:1px solid var(--pro-filet)}
+  .mp-leg{display:flex;align-items:center;gap:.35rem}
+  .mp-dot{width:12px;height:12px;flex-shrink:0}
+  .mp-hint{font-size:.76rem;color:var(--pro-texte-doux);margin:.5rem 0 0;text-align:center}
 
-  .scan-zone{background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
-  .scan-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
-  #scan-input{flex:1;min-width:220px;font-size:1.2rem;font-family:'DM Mono',monospace,inherit;padding:.75rem 1rem;border:1px solid #ccc;border-radius:8px;outline:none}
-  #scan-input:focus{border-color:#2A3CD4;box-shadow:0 0 0 3px rgba(42,60,212,.12)}
-  .sound-toggle{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#666;white-space:nowrap}
-  .vide-row{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
-  .vide-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#555;cursor:pointer;transition:all .15s}
-  .vide-btn:hover{background:#f5f5f5}
-  .vide-btn.active{background:var(--ok);border-color:var(--ok);color:#fff}
-  .vide-btn.nonrange.active{background:#8E24AA;border-color:#8E24AA;color:#fff}
-  .vide-btn.lastshelf.active{background:#455A64;border-color:#455A64;color:#fff}
-  .vide-note{font-size:.75rem;color:#888;flex-basis:100%}
-  .horsreserve-note{font-size:.8rem;color:#7a4a00;background:#fff8e1;border:1px solid #ffe0a3;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;line-height:1.5}
+  /* Attendu ici */
+  details.rc-expected{padding:0}
+  details.rc-expected > summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.2rem .8rem;padding:.9rem 1.15rem;min-height:44px}
+  details.rc-expected > summary::-webkit-details-marker{display:none}
+  .rc-expected__t{font-family:var(--pro-font-display);font-weight:600;font-size:1.15rem;color:var(--pro-bleu)}
+  .rc-expected__t::before{content:'▸ ';color:var(--pro-texte-faible);font-size:.85em}
+  details.rc-expected[open] .rc-expected__t::before{content:'▾ '}
+  .expected-count{font-size:.8rem;color:var(--pro-texte)}
+  .exp-list{max-height:240px;overflow-y:auto;font-size:.82rem;padding:0 1.15rem 1rem}
+  .exp-row{display:flex;align-items:center;gap:.6rem;padding:.3rem 0;border-bottom:1px solid var(--pro-filet);min-height:34px}
+  .exp-row:last-child{border-bottom:none}
+  .exp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .exp-dot.conf{background:var(--pro-ok)}.exp-dot.moved{background:var(--pro-dec-braderie)}.exp-dot.missing{background:#ccc}
+  .exp-cote{font-family:var(--pro-font-mono);font-weight:600;min-width:84px;color:var(--pro-bleu);font-size:.78rem}
+  .exp-titre{flex:1;color:var(--pro-texte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .exp-empty{font-size:.82rem;color:var(--pro-texte-doux);font-style:italic;margin:0}
 
-  /* Rayons (libre accès) créés à la volée — voir section "RAYONS" du script */
-  .loc-btn{font-family:inherit;font-size:.8rem;padding:.4rem .75rem;border:1px solid #2A3CD4;border-radius:8px;background:#fff;color:#2A3CD4;cursor:pointer;white-space:nowrap}
-  .loc-btn:hover{background:#eef0ff}
-  #rayon-actions{display:inline-flex;gap:.4rem;flex-wrap:wrap}
-  .rayon-editor{background:#fff;border:2px solid #2A3CD4;border-radius:var(--radius-lg);padding:1.1rem 1.25rem;margin-bottom:1.25rem}
-  .rayon-editor h2{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1.25rem;color:#2A3CD4;margin:0 0 .85rem}
-  .rayon-form-row{display:flex;flex-wrap:wrap;gap:.75rem 1rem;align-items:flex-end;margin-bottom:.9rem}
-  .rayon-form-row label{display:flex;flex-direction:column;gap:.25rem;font-size:.75rem;color:#555;font-weight:600}
-  .rayon-form-row input{font-family:inherit;font-size:.9rem;padding:.45rem .6rem;border:1px solid #ccc;border-radius:8px}
-  .rayon-form-row input[type=text]{min-width:220px}
-  .rayon-form-row input[type=number]{width:80px}
-  .rayon-cols-label{font-size:.75rem;color:#555;font-weight:600;margin-bottom:.4rem}
+  /* Éditeur de rayon */
+  .rc-rayon{padding:1.1rem 1.3rem;margin-bottom:1rem;border-top:3px solid var(--pro-bleu)}
+  .rc-rayon h2{margin:0 0 .8rem;font-family:var(--pro-font-display);font-weight:600;font-size:1.25rem;color:var(--pro-bleu)}
+  .rayon-form-row{display:flex;flex-wrap:wrap;gap:.7rem 1rem;align-items:flex-end;margin-bottom:.9rem}
+  .rayon-form-row label{display:flex;flex-direction:column;gap:.25rem;font-size:.75rem;color:var(--pro-texte);font-weight:600}
+  .rayon-form-row input[type=text]{min-width:min(100%,260px)}
+  .rayon-form-row input[type=number]{width:90px}
+  .rayon-cols-label{font-size:.78rem;color:var(--pro-texte);font-weight:600;margin-bottom:.4rem}
   .rayon-cols{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.9rem}
-  .rayon-col{display:flex;flex-direction:column;align-items:center;gap:.2rem;font-size:.75rem;font-weight:700;color:#2A3CD4}
-  .rayon-col input{width:52px;text-align:center;font-family:inherit;font-size:.9rem;padding:.35rem .2rem;border:1px solid #ccc;border-radius:6px}
+  .rayon-col{display:flex;flex-direction:column;align-items:center;gap:.2rem;font-size:.78rem;font-weight:700;color:var(--pro-bleu)}
+  .rayon-col input{width:58px;text-align:center}
   .rayon-preview{display:flex;justify-content:flex-start;margin-bottom:.9rem;overflow-x:auto}
   .rayon-editor-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
-  .rayon-editor-actions button{font-family:inherit;font-size:.85rem;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;background:#fff;color:#333;cursor:pointer}
-  .rayon-editor-actions button.primary{background:#2A3CD4;border-color:#2A3CD4;color:#fff}
-  .rayon-editor-actions button.danger{margin-left:auto;color:#c62828;border-color:#f0b4b4}
-  .rayon-editor-msg{font-size:.8rem;color:#c62828;margin:.6rem 0 0;min-height:1em}
-  #noncat-mode-zone{margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #e0e0e0}
-  .noncat-label{font-size:.9rem;color:#333}
-  #stp-noncat-wrap{padding:.15rem .3rem}
-  #noncat-input{width:56px;text-align:center;border:none;font-size:1rem;font-weight:600;color:#2A3CD4;background:transparent;font-family:inherit;-moz-appearance:textfield}
-  #noncat-input::-webkit-inner-spin-button,#noncat-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .rayon-editor-actions .rc-push{margin-left:auto}
+  .rayon-editor-msg{font-size:.82rem;color:var(--pro-carmin);margin:.6rem 0 0;min-height:1em;font-weight:600}
 
-  .feedback{margin-top:1rem;border-radius:var(--radius-md);padding:.9rem 1rem;display:none}
-  .feedback.show{display:block}
-  .feedback.ok{background:#e8f5e9;border:1px solid #c8e6c9}
-  .feedback.warn{background:#fff8e1;border:1px solid #ffe0b2}
-  .feedback.dup{background:#e3f2fd;border:1px solid #bbdefb}
-  .fb-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
-  .fb-badge{font-size:.68rem;padding:2px 9px;border-radius:20px;font-weight:600}
-  .fb-badge.ok{background:#c8e6c9;color:#1b5e20}
-  .fb-badge.warn{background:#ffe0b2;color:#e65100}
-  .fb-badge.dup{background:#bbdefb;color:#0d47a1}
-  .fb-badge.abime{background:#f3e5f5;color:#6a1b9a}
-  .fb-cote{font-family:monospace;font-weight:700;color:#2A3CD4}
-  .fb-titre{font-size:.92rem;color:#1a1a1a;margin:.15rem 0}
-  .fb-meta{font-size:.75rem;color:#888}
-  .fb-manual{margin-top:.5rem;display:flex;gap:.4rem;align-items:center}
-  .fb-manual input{font-size:.8rem;padding:.35rem .6rem;border:1px solid #ccc;border-radius:6px;flex:1;max-width:220px}
-  .fb-manual button{font-size:.78rem;padding:.35rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer}
+  /* — Tableau de bord — */
+  .rc-scope{background:var(--pro-papier-ombre);border-bottom:1px solid var(--pro-trait)}
+  .rc-scope__in{max-width:var(--pro-max);margin:0 auto;padding:.7rem var(--pro-gutter);display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1.2rem}
+  .rc-scope__note{margin-left:auto;font-size:.8rem;color:var(--pro-texte-doux)}
+  .rc-scope .pro-seg{flex-wrap:wrap}
+  .rc-scope .pro-seg button{min-height:40px;padding:0 .9rem;font-size:.8rem}
+  .rc-dash{padding-top:1.5rem;padding-bottom:1rem}
+  .rc-dsec{padding-top:2rem}
+  .rc-herobar{height:8px;background:rgba(255,255,255,.22);margin-top:.7rem}
+  .rc-herobar span{display:block;height:100%;background:#fff}
+  .rc-cardhead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.2rem .9rem;margin-bottom:.9rem}
+  .rc-curve-legend{display:flex;flex-wrap:wrap;gap:.3rem 1.4rem;font-size:.8rem;margin-bottom:.3rem}
+  .rc-curve-legend span{display:inline-flex;align-items:center;gap:.5rem}
+  .rc-lg{display:inline-block;width:26px;height:0;border-top:3px solid var(--pro-bleu)}
+  .rc-lg--dash{border-top:3px dashed var(--pro-carmin)}
+  .rc-curve-wrap{padding:3rem 1.2rem 2.2rem 3.6rem}
+  .rc-curve{position:relative;height:260px}
+  .rc-curve > svg{display:block;position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
+  .rc-curve__gl{position:absolute;left:0;right:0;border-top:1px solid var(--pro-carte-bord)}
+  .rc-curve__yl{position:absolute;right:calc(100% + .5rem);transform:translateY(-50%);font-size:.72rem;color:var(--pro-texte-doux);line-height:1}
+  .rc-curve__xl{position:absolute;top:calc(100% + .6rem);transform:translateX(-50%);font-size:.72rem;color:var(--pro-texte-doux);white-space:nowrap;line-height:1}
+  .rc-curve__xl:first-of-type{transform:none}
+  .rc-curve__dot{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--pro-bleu);border:3px solid #fff;box-shadow:0 0 0 1px var(--pro-bleu)}
+  .rc-curve__enddot{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--pro-carmin);border:3px solid #fff;box-shadow:0 0 0 1px var(--pro-carmin)}
+  .rc-curve__tag{position:absolute;background:#fff;border:1px solid var(--pro-trait);padding:.35rem .6rem;font-size:.76rem;line-height:1.35;white-space:nowrap;display:flex;flex-direction:column}
+  .rc-curve__tag strong{color:var(--pro-bleu)}
+  .rc-curve__tag--r{transform:translate(18px,-50%)}
+  .rc-curve__tag--l{transform:translate(calc(-100% - 18px),-50%);text-align:right}
+  .rc-curve__end{position:absolute;bottom:calc(100% + .8rem);text-align:right;white-space:nowrap;font-size:.76rem;line-height:1.35;display:flex;flex-direction:column}
+  .rc-curve__end strong{font-family:var(--pro-font-display);font-size:1rem;color:var(--pro-carmin)}
+  .rc-curve__end span{color:var(--pro-texte-doux)}
+  .rc-twocol{display:flex;flex-wrap:wrap;gap:.9rem;align-items:stretch}
+  .rc-col-main{flex:1.45 1 520px;min-width:0;display:flex;flex-direction:column;gap:.9rem}
+  .rc-col-side{flex:1 1 360px;min-width:0}
+  .rc-time{display:flex;flex-wrap:wrap;align-items:center;gap:.8rem 2rem}
+  .rc-time__txt{flex:1 1 260px;font-size:.84rem;line-height:1.55}
+  .rc-cover{column-width:430px;column-gap:2.6rem}
+  .rc-cover__row{display:flex;align-items:center;gap:.7rem;padding:.2rem .4rem;margin:0 -.4rem;break-inside:avoid;color:var(--pro-texte);text-decoration:none}
+  .rc-cover__row:hover{background:var(--pro-papier-ombre);color:var(--pro-texte)}
+  .rc-cover__name{flex:0 0 8.2rem;font-size:.8rem;font-weight:600;color:var(--pro-bleu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rc-cover__bar{flex:1;min-width:0}
+  .rc-cover__bar .pro-chart-stack{background:#e0e0e0}
+  .rc-cover__pct{flex:0 0 3rem;text-align:right;font-size:.78rem;font-weight:600;color:var(--pro-bleu)}
+  .rc-todogrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.9rem}
+  .rc-todo{border-top:3px solid var(--pro-bleu);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.5rem}
+  .rc-todo__name{margin:0;font-size:.9rem;font-weight:700;color:var(--pro-bleu)}
+  .rc-todo__val{font-family:var(--pro-font-display);font-weight:700;font-size:2.4rem;line-height:1;color:var(--pro-carmin)}
+  .rc-todo__val.is-zero{color:var(--pro-ok)}
+  .rc-todo__txt{margin:0;font-size:.82rem;line-height:1.5;color:var(--pro-texte);flex:1}
+  .rc-todo .pro-btn{align-self:flex-start}
 
-  .expected-panel{background:#fafafa;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem;margin-bottom:1.25rem}
-  .expected-title{font-size:.8rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
-  .expected-count{font-weight:400;text-transform:none;letter-spacing:0;color:#888;font-size:.78rem}
-  /* Panneaux repliables "Attendu à cet emplacement"/"Scans récents ici"/
-     "Tous les scans" (2026-09-01) : <details>/<summary> natifs, même
-     mécanique que .adv-details plus bas — mais le marqueur ▸/▾ est posé sur
-     le premier enfant du <summary> plutôt que sur le <summary> lui-même
-     (qui reste en display:flex/space-between hérité de .expected-title/
-     .log-header) : le poser directement dessus en ferait un item flex à
-     part entière, écarté du titre par justify-content:space-between.
-     summary::marker natif retiré (list-style:none + masquage webkit) pour
-     ne garder que ce marqueur maison, cohérent visuellement avec .adv-details. */
-  .expected-panel > summary, .log-wrap > summary{cursor:pointer;list-style:none}
-  .expected-panel > summary::-webkit-details-marker, .log-wrap > summary::-webkit-details-marker{display:none}
-  .expected-panel > summary > .expected-title-text::before, .log-wrap > summary > .log-title::before{content:'▸ ';color:#999}
-  .expected-panel[open] > summary > .expected-title-text::before, .log-wrap[open] > summary > .log-title::before{content:'▾ '}
-  .adv-group-title{font-size:.95rem;font-weight:700;color:#2A3CD4;margin:1.5rem 0 .75rem;padding-top:1.25rem;border-top:2px solid #ddd}
-  .adv-group-title:first-child{margin-top:0;padding-top:0;border-top:none}
-  .adv-details{border-top:1px solid #e5e5e5;padding-top:.75rem;margin-top:.9rem}
-  .adv-details summary{cursor:pointer;font-size:.82rem;font-weight:600;color:#333;list-style:none}
-  .adv-details summary::-webkit-details-marker{display:none}
-  .adv-details summary::before{content:'▸ ';color:#999}
-  .adv-details[open] summary::before{content:'▾ '}
-  .adv-details summary .adv-count{font-weight:400;color:#888}
-  .adv-details .log-wrap{margin:.6rem 0 0}
-  .log-header-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
-  .log-toggle{font-size:.72rem;color:#666;display:flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer}
-  .export-btn{font-family:inherit;font-size:.75rem;padding:.3rem .8rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#555;transition:all .15s;white-space:nowrap}
-  .export-btn:hover{background:#f5f5f5;border-color:#999}
-  .adv-pager{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.5rem .9rem;border-top:1px solid #e8e8e8;font-size:.75rem;color:#777;flex-wrap:wrap}
-  .adv-pager-btns{display:flex;align-items:center;gap:.4rem}
-  .adv-pager button{font-family:inherit;font-size:.75rem;padding:.3rem .7rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;color:#333}
-  .adv-pager button:disabled{opacity:.4;cursor:default}
-  .adv-pager button:not(:disabled):hover{background:#f5f5f5}
-  .exp-list{max-height:220px;overflow-y:auto;font-size:.8rem}
-  .exp-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem;border-bottom:1px solid #f0f0f0}
-  .exp-row:last-child{border-bottom:none}
-  .exp-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-  .exp-dot.conf{background:var(--ok)}.exp-dot.moved{background:var(--warn)}.exp-dot.missing{background:#ccc}
-  .exp-cote{font-family:monospace;min-width:80px;color:#2A3CD4}
-  .exp-titre{flex:1;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .exp-empty{font-size:.8rem;color:#999;font-style:italic}
+  /* — Anomalies — */
+  .rc-anom{padding-top:1.5rem;padding-bottom:1rem}
+  .rc-anom__intro{font-size:.82rem;color:var(--pro-texte-doux);margin:0 0 1rem;max-width:60rem}
+  details.rc-adv{margin-bottom:.6rem}
+  .rc-adv__sum{list-style:none;cursor:pointer;display:flex;align-items:center;gap:.6rem;min-height:52px;padding:.4rem 1rem;background:#fff;border:1px solid var(--pro-carte-bord)}
+  .rc-adv__sum::-webkit-details-marker{display:none}
+  .rc-adv__sum:hover{background:var(--pro-papier-ombre)}
+  .rc-adv__chev{display:inline-flex;color:var(--pro-texte-doux);transition:transform .2s}
+  details.rc-adv[open] .rc-adv__chev{transform:rotate(90deg)}
+  details.rc-adv[open] .rc-adv__sum{border-bottom-color:var(--pro-trait);background:var(--pro-papier-ombre)}
+  .rc-adv__title{font-weight:600;color:var(--pro-bleu);font-size:.9rem}
+  .rc-adv__count{margin-left:.2rem;background:var(--pro-bleu);color:#fff}
+  .rc-adv__body{border-top:0}
+  .rc-adv .pro-table td{max-width:26rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rc-adv__desc{margin:0;padding:.8rem 1rem .2rem;font-size:.8rem;color:var(--pro-texte-doux);max-width:62rem}
+  .rc-adv__exports{display:flex;flex-wrap:wrap;gap:.4rem;margin-left:auto}
+  .rc-adv .pro-toolbar{border-top:0}
+  .rc-adv .pro-check{min-height:40px;font-size:.82rem}
 
-  .shelf-bar-block{margin-bottom:1.1rem}
-  .shelf-bar-heading{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap}
-  .shelf-bar-heading-label{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
-  .shelf-bar-heading-total{font-size:.78rem;color:#999}
-  .shelf-bar{display:flex;height:16px;border-radius:20px;overflow:hidden;background:#eceef7;box-shadow:inset 0 0 0 1px #e2e2ee}
-  .shelf-bar-seg{height:100%;min-width:0;transition:width .4s cubic-bezier(.4,0,.2,1);position:relative}
-  .shelf-bar-seg.recoled{background:linear-gradient(90deg,#2A3CD4,#2b30c9)}
-  .shelf-bar-seg.vide{background:linear-gradient(90deg,#2e7d32,#4caf50)}
-  .shelf-bar-seg.nonrange{background:linear-gradient(90deg,#6a1b9a,#8E24AA)}
-  .shelf-bar-seg.nontraite{background:#e4e4ec}
-  .shelf-legend{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;margin-top:.65rem}
-  .shelf-legend-item{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#555}
-  .shelf-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-  .shelf-legend-dot.recoled{background:#2A3CD4}
-  .shelf-legend-dot.vide{background:var(--ok)}
-  .shelf-legend-dot.nonrange{background:#8E24AA}
-  .shelf-legend-dot.nontraite{background:#c2c2cc}
-  .shelf-legend-val{font-weight:700;color:#1a1a1a}
-  .shelf-legend-pct{color:#999}
-  .shelf-bar-seg.notice-recolees{background:linear-gradient(90deg,#2A3CD4,#2b30c9)}
-  .shelf-bar-seg.notice-noncat{background:linear-gradient(90deg,#f9a825,#ffca28)}
-  .shelf-bar-seg.notice-jamais{background:#c6c6d0}
-  .shelf-legend-dot.notice-recolees{background:#2A3CD4}
-  .shelf-legend-dot.notice-noncat{background:#f9a825}
-  .shelf-legend-dot.notice-jamais{background:#c6c6d0}
-  .notice-progress-block{margin-bottom:1.5rem}
-
-  .log-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem}
-  .log-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#F5F5FF;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;gap:.4rem}
-  .log-title{font-size:.78rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.04em}
-  .log-search{font-size:.78rem;padding:.3rem .6rem;border:1px solid #ccc;border-radius:6px;width:160px}
-  .log-table{width:100%;border-collapse:collapse;font-size:.78rem}
-  .log-table th{position:sticky;top:0;background:#F5F5FF;padding:.4rem .7rem;text-align:left;font-size:.65rem;text-transform:uppercase;color:#888;border-bottom:1px solid #e8e8f0}
-  .log-table td{padding:.35rem .7rem;border-bottom:1px solid #f5f5f5;vertical-align:middle}
-  .log-table tr:hover td{background:#fafafa}
-  .log-body{max-height:340px;overflow-y:auto}
-  .log-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:.85rem;padding:2px 6px}
-  .log-empty{padding:1rem;text-align:center;color:#bbb;font-style:italic;font-size:.8rem}
-
-  .tools-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem;margin-bottom:2rem}
-  .tool-card{background:#fff;border:1px solid #e0e0e0;border-radius:var(--radius-md);padding:1rem}
-  .tool-card h3{font-family:'Moret','DM Serif Display',serif;font-weight:400;font-size:1rem;margin:0 0 .5rem;color:#2A3CD4}
-  .tool-card p{font-size:.78rem;color:#888;margin:0 0 .7rem;line-height:1.4}
-  .tool-btn{font-family:inherit;font-size:.8rem;padding:.5rem .9rem;border:1px solid #2A3CD4;border-radius:8px;background:#2A3CD4;color:#fff;cursor:pointer;display:inline-block;text-decoration:none}
-  .tool-btn:hover{background:#1c1fa0}
-  .tool-btn.secondary{background:#fff;color:#2A3CD4}
-  .tool-btn.secondary:hover{background:#F5F5FF}
-  .tool-btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
-  .tool-btn.danger:hover{background:#fff5f5}
-  .tool-btn:disabled{opacity:.6;cursor:default}
-  .tool-btn-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-  .backup-list{margin-top:.6rem;border:1px solid #eee;border-radius:8px;overflow:hidden;display:none}
-  .backup-item{padding:.45rem .7rem;font-size:.78rem;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;gap:.5rem;transition:background .1s}
+  /* — Données — */
+  .rc-data{padding-top:1.5rem;padding-bottom:1rem}
+  .rc-dcard{display:flex;flex-direction:column;gap:.5rem}
+  .rc-dcard h3{margin:0;font-family:var(--pro-font-display);font-weight:600;font-size:1.1rem;color:var(--pro-bleu)}
+  .rc-dcard p{margin:0;font-size:.8rem;line-height:1.5;color:var(--pro-texte-doux)}
+  .rc-dbtns{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:auto;padding-top:.4rem}
+  .rc-filebtn:focus-within{outline:2px solid var(--pro-carmin);outline-offset:2px}
+  .backup-list{margin-top:.4rem;border:1px solid var(--pro-carte-bord);display:none}
+  .backup-item{padding:.5rem .8rem;font-size:.8rem;border-bottom:1px solid var(--pro-filet);cursor:pointer;display:flex;justify-content:space-between;gap:.5rem;min-height:40px;align-items:center}
   .backup-item:last-child{border-bottom:none}
-  .backup-item:hover{background:#F5F5FF}
-  .backup-item.disabled{cursor:default;color:#999}
+  .backup-item:hover{background:var(--pro-bleu-pale)}
+  .backup-item.disabled{cursor:default;color:var(--pro-texte-faible)}
   .backup-item.disabled:hover{background:none}
-  .backup-item-arrow{color:#bbb;flex-shrink:0}
-  input[type=file]{display:none}
+  .backup-item-arrow{color:var(--pro-texte-faible);flex-shrink:0}
+  .rc-reset{margin-top:.8rem;padding:1rem 1.2rem;background:var(--pro-ko-fond);border:1px solid var(--pro-ko-bord);border-left:4px solid var(--pro-carmin)}
+  .rc-reset[hidden]{display:none}
+  .rc-reset p{margin:0 0 .6rem;font-size:.84rem;color:var(--pro-texte)}
+  .rc-reset__row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+  .rc-reset__row .pro-input{width:12rem}
+  .rc-log{margin-top:1.2rem}
+  .rc-log .pro-table-wrap{max-height:30rem}
 
-  footer{background:#2A3CD4;color:rgba(255,255,255,0.7);padding:2rem 1.5rem;margin-top:1rem;font-size:.8rem;text-align:center}
-  footer a{color:#c9a96e;text-decoration:none}
-  @media(max-width:640px){.loc-readout{margin-left:0;order:99;width:100%;text-align:center}.travee-mini-panel{max-width:none}}
+  @media (max-width:40rem){
+    .rc-locbar{position:static}
+    .rc-locbar__in{gap:.6rem .9rem}
+    .rc-locbar .pro-stepper__val{min-width:40px}
+    .pro-tabs{gap:0}
+    .pro-tab{padding:0 .42rem;font-size:.78rem;gap:.3rem}
+    .rc-recent .pro-cote-cell{white-space:normal;word-break:break-all}
+    .rc-recent .rc-ell{max-width:8rem}
+    .rc-recent .pro-table-wrap > .pro-table{min-width:0}
+    .rc-recent .pro-table th:nth-child(1),.rc-recent .pro-table td:nth-child(1),
+    .rc-recent .pro-table th:nth-child(4),.rc-recent .pro-table td:nth-child(4){display:none}
+    .rc-recent .pro-table td.log-empty{display:table-cell}
+    .rc-recent .pro-table td:has(> .pro-confirm){display:table-cell}
+    .rc-prog{max-width:none;flex-basis:100%}
+    #scan-input{font-size:1.2rem}
+    .rc-scanbox__ico{display:none}
+    .rc-scanbox .pro-btn{padding:0 1rem}
+    .fb-icon{width:60px;height:60px}
+    .fb-icon svg{width:36px;height:36px}
+    .fb-cote{font-size:1.8rem}
+    .fb-side{border-left:0;border-top:1px solid currentColor;padding:.7rem 0 0;flex-basis:100%;flex-direction:row;gap:1.5rem}
+    .rc-curve-wrap{padding:3.4rem .6rem 2.2rem 2.8rem}
+    .rc-cover__name{flex-basis:6rem}
+    .rc-scope__note{margin-left:0;flex-basis:100%}
+    .rc-ell{max-width:12rem}
+    .rc-todogrid{grid-template-columns:1fr}
+  }
 </style>
   <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
        qu'il redimensionne l'iframe (un seul défilement, celui du site hôte).
@@ -258,240 +340,345 @@
        Statistiques avancées sans attendre le prochain export XML. -->
   <script src="js/syracuse-sync-trigger.js" defer></script>
 </head>
-<body>
+<body class="pro">
 
-<section class="page-hero">
-  <div class="container">
-    <div>
-      <nav class="breadcrumb">Espace professionnel · Réserve</nav>
-      <h1 class="page-title">Récolement</h1>
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace professionnel</a> › Réserve</p>
+      <h1 class="pro-head__h1">Récolement</h1>
     </div>
-    <div class="hero-actions">
-      <span class="sync-status" id="sync-status" title="Synchronisation avec les autres postes (via R2)"></span>
-      <a href="reserve.html">Plan des magasins</a>
-      <a href="admin.html">← Espace professionnel</a>
-      <button type="button" id="logout-btn">Se déconnecter</button>
+    <div class="pro-tabs" role="tablist" aria-label="Sections du récolement" id="rc-tabs">
+      <button type="button" class="pro-tab" role="tab" data-tab="saisie" id="tab-saisie" aria-controls="panel-saisie" aria-selected="true">Saisie</button>
+      <button type="button" class="pro-tab" role="tab" data-tab="tableau" id="tab-tableau" aria-controls="panel-tableau" aria-selected="false">Tableau de bord</button>
+      <button type="button" class="pro-tab" role="tab" data-tab="anomalies" id="tab-anomalies" aria-controls="panel-anomalies" aria-selected="false">Anomalies <span class="pro-tab__count" id="tab-anom-count" hidden>0</span></button>
+      <button type="button" class="pro-tab" role="tab" data-tab="donnees" id="tab-donnees" aria-controls="panel-donnees" aria-selected="false">Données</button>
+    </div>
+    <div class="pro-head__actions">
+      <span class="pro-sync pro-sync--wait" id="sync-status" role="status" title="Synchronisation avec les autres postes (via R2)"><span class="pro-sync__dot" aria-hidden="true"></span><span id="sync-text">Synchronisation…</span></span>
+      <a class="pro-btn pro-btn--ghost" href="reserve.html">Plan des magasins</a>
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="logout-btn">Déconnexion</button>
     </div>
   </div>
-</section>
+</header>
 
-<div class="locbar">
-  <div class="container">
-    <select class="loc-sel" id="sel-reserve"></select>
-    <select class="loc-sel" id="sel-loctype">
-      <option value="etagere">Étagère</option>
-      <option value="armoire">Armoire</option>
-      <option value="tiroir">Tiroir</option>
-    </select>
-
-    <div class="stepper" id="stp-travee-wrap">
-      <button type="button" data-step="travee" data-dir="-1">−</button>
-      <span id="val-travee">I</span>
-      <button type="button" data-step="travee" data-dir="1">+</button>
-    </div>
-    <select class="loc-sel" id="sel-rayon" aria-label="Rayon" style="display:none"></select>
-    <span id="rayon-actions" style="display:none">
-      <button type="button" class="loc-btn" id="btn-rayon-new">+ Nouveau rayon</button>
-      <button type="button" class="loc-btn" id="btn-rayon-edit">✎ Modifier ce rayon</button>
-    </span>
-    <div class="stepper" id="stp-colonne-wrap">
-      <button type="button" data-step="colonne" data-dir="-1">−</button>
-      <span id="val-colonne">1</span>
-      <button type="button" data-step="colonne" data-dir="1">+</button>
-    </div>
-    <div class="stepper" id="stp-etage-wrap">
-      <button type="button" data-step="etage" data-dir="-1">−</button>
-      <span id="val-etage">1</span>
-      <button type="button" data-step="etage" data-dir="1">+</button>
-    </div>
-
-    <span class="loc-readout" id="loc-readout">—</span>
+<!-- Périmètre des onglets « Tableau de bord » et « Anomalies » (voir buildScopeBar()) -->
+<div class="rc-scope" id="scope-bar" hidden>
+  <div class="rc-scope__in">
+    <span class="pro-label" id="scope-label">Périmètre</span>
+    <div class="pro-seg" id="scope-seg" role="group" aria-labelledby="scope-label"></div>
+    <span class="rc-scope__note" id="scope-note"></span>
   </div>
 </div>
 
-<main>
-  <div class="section">
-    <div class="container">
+<main id="contenu" class="pro-main">
 
-      <div class="rayon-editor" id="rayon-editor" style="display:none">
-        <h2 id="rayon-editor-title">Nouveau rayon</h2>
-        <div class="rayon-form-row">
-          <label>Nom du rayon
-            <input type="text" id="rayon-label" maxlength="60" placeholder="ex. Romans adultes A–F" autocomplete="off">
-          </label>
-          <label>Nombre de colonnes
-            <input type="number" id="rayon-nbcols" min="1" max="26" step="1" value="4" inputmode="numeric">
-          </label>
-          <label>Étagères par colonne
-            <input type="number" id="rayon-default-et" min="1" max="30" step="1" value="6" inputmode="numeric">
-          </label>
-          <button type="button" class="loc-btn" id="rayon-apply-all">Appliquer à toutes les colonnes</button>
-        </div>
-        <div class="rayon-cols-label">Nombre d'étagères de chaque colonne (à ajuster si une colonne en a plus ou moins) :</div>
-        <div class="rayon-cols" id="rayon-cols"></div>
-        <div class="rayon-preview" id="rayon-preview"></div>
-        <div class="rayon-editor-actions">
-          <button type="button" class="primary" id="rayon-save">Enregistrer le rayon</button>
-          <button type="button" id="rayon-cancel">Annuler</button>
-          <button type="button" class="danger" id="rayon-delete">Supprimer ce rayon</button>
-        </div>
-        <p class="rayon-editor-msg" id="rayon-editor-msg"></p>
+<!-- ═══════════════ SAISIE ═══════════════ -->
+<div id="panel-saisie" data-tab="saisie">
+
+  <div class="rc-locbar">
+    <div class="rc-locbar__in">
+      <div class="rc-field">
+        <label class="pro-label" for="sel-reserve">Local</label>
+        <select class="rc-sel" id="sel-reserve"></select>
+      </div>
+      <div class="rc-field" id="fld-loctype">
+        <label class="pro-label" for="sel-loctype">Type</label>
+        <select class="rc-sel" id="sel-loctype">
+          <option value="etagere">Étagère</option>
+          <option value="armoire">Armoire</option>
+          <option value="tiroir">Tiroir</option>
+        </select>
       </div>
 
-      <div class="horsreserve-note" id="rayon-empty-note" style="display:none">
-        Aucun rayon pour l'instant. Créez-en un avec « + Nouveau rayon » : donnez-lui un nom, indiquez son nombre de colonnes et le nombre d'étagères de chaque colonne. Il apparaîtra aussitôt pour tous les collègues, ici et sur le plan des magasins.
-      </div>
-
-      <div class="notice-progress-block shelf-bar-block">
-        <div class="shelf-bar-heading">
-          <span class="shelf-bar-heading-label" id="notice-progress-label">Progression — Réserve</span>
-          <span class="shelf-bar-heading-total" id="notice-progress-total"></span>
-        </div>
-        <div class="shelf-bar" id="notice-progress-bar">
-          <div class="shelf-bar-seg notice-recolees" id="seg-notice-recolees" style="width:0%" title="Récolées"></div>
-          <div class="shelf-bar-seg notice-noncat" id="seg-notice-noncat" style="width:0%" title="À cataloguer"></div>
-          <div class="shelf-bar-seg notice-jamais" id="seg-notice-jamais" style="width:0%" title="Jamais récolées"></div>
-        </div>
-        <div class="shelf-legend">
-          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-recolees"></span>Récolées : <span class="shelf-legend-val" id="leg-notice-recolees">0</span> <span class="shelf-legend-pct" id="leg-notice-recolees-pct"></span></span>
-          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-noncat"></span>À cataloguer : <span class="shelf-legend-val" id="leg-notice-noncat">0</span> <span class="shelf-legend-pct" id="leg-notice-noncat-pct"></span></span>
-          <span class="shelf-legend-item"><span class="shelf-legend-dot notice-jamais"></span>Jamais récolées : <span class="shelf-legend-val" id="leg-notice-jamais">0</span> <span class="shelf-legend-pct" id="leg-notice-jamais-pct"></span></span>
+      <div class="rc-field" id="stp-travee-wrap">
+        <span class="pro-label" id="lbl-travee">Travée</span>
+        <div class="pro-stepper" role="group" aria-labelledby="lbl-travee">
+          <button type="button" class="pro-btn pro-btn--icon" data-step="travee" data-dir="-1" aria-label="Travée précédente"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+          <span class="pro-stepper__val" id="val-travee" role="status">I</span>
+          <button type="button" class="pro-btn pro-btn--icon" data-step="travee" data-dir="1" aria-label="Travée suivante"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
         </div>
       </div>
 
-      <div class="scan-layout">
-        <div class="scan-zone">
-          <div class="horsreserve-note" id="horsreserve-note" style="display:none">
+      <div class="rc-field" id="fld-rayon" style="display:none">
+        <label class="pro-label" for="sel-rayon">Rayon</label>
+        <select class="rc-sel" id="sel-rayon"></select>
+      </div>
+      <span id="rayon-actions" class="rc-rayonbar" style="display:none">
+        <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="btn-rayon-new">+ Nouveau rayon</button>
+        <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="btn-rayon-edit">✎ Modifier ce rayon</button>
+      </span>
+
+      <div class="rc-field" id="stp-colonne-wrap">
+        <span class="pro-label" id="lbl-colonne">Colonne</span>
+        <div class="pro-stepper" role="group" aria-labelledby="lbl-colonne">
+          <button type="button" class="pro-btn pro-btn--icon" data-step="colonne" data-dir="-1" aria-label="Colonne précédente"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+          <span class="pro-stepper__val" id="val-colonne" role="status">A</span>
+          <button type="button" class="pro-btn pro-btn--icon" data-step="colonne" data-dir="1" aria-label="Colonne suivante"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+      </div>
+      <div class="rc-field" id="stp-etage-wrap">
+        <span class="pro-label" id="lbl-etage">Étagère</span>
+        <div class="pro-stepper" role="group" aria-labelledby="lbl-etage">
+          <button type="button" class="pro-btn pro-btn--icon" data-step="etage" data-dir="-1" aria-label="Étagère précédente"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+          <span class="pro-stepper__val" id="val-etage" role="status">1</span>
+          <button type="button" class="pro-btn pro-btn--icon" data-step="etage" data-dir="1" aria-label="Étagère suivante"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Progression du local (ids lus par updateNoticeProgressBar()) -->
+      <div class="rc-prog" id="notice-progress-block">
+        <span class="rc-prog__lbl" id="notice-progress-label">Réserve</span>
+        <div class="rc-prog__top">
+          <span class="rc-prog__pct" id="np-pct">—</span>
+          <span class="rc-prog__tot" id="notice-progress-total"></span>
+        </div>
+        <div class="rc-prog__bar" id="notice-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Progression du local">
+          <div class="rc-prog__seg notice-recolees" id="seg-notice-recolees" style="width:0%" title="Récolées"></div>
+          <div class="rc-prog__seg notice-noncat" id="seg-notice-noncat" style="width:0%" title="À cataloguer"></div>
+          <div class="rc-prog__seg notice-jamais" id="seg-notice-jamais" style="width:0%" title="Jamais récolées"></div>
+        </div>
+        <div class="rc-prog__leg">
+          <span><i style="background:var(--pro-bleu)"></i>Récolées <b id="leg-notice-recolees">0</b> <span id="leg-notice-recolees-pct"></span></span>
+          <span><i style="background:var(--plan-manuel)"></i>À cataloguer <b id="leg-notice-noncat">0</b> <span id="leg-notice-noncat-pct"></span></span>
+          <span><i style="background:#C6C6D0"></i>Jamais récolées <b id="leg-notice-jamais">0</b> <span id="leg-notice-jamais-pct"></span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rc-wrap rc-main">
+
+    <div class="pro-card rc-rayon" id="rayon-editor" style="display:none">
+      <h2 id="rayon-editor-title">Nouveau rayon</h2>
+      <div class="rayon-form-row">
+        <label>Nom du rayon
+          <input type="text" class="pro-input" id="rayon-label" maxlength="60" placeholder="ex. Romans adultes A–F" autocomplete="off">
+        </label>
+        <label>Nombre de colonnes
+          <input type="number" class="pro-input" id="rayon-nbcols" min="1" max="26" step="1" value="4" inputmode="numeric">
+        </label>
+        <label>Étagères par colonne
+          <input type="number" class="pro-input" id="rayon-default-et" min="1" max="30" step="1" value="6" inputmode="numeric">
+        </label>
+        <button type="button" class="pro-btn pro-btn--secondary" id="rayon-apply-all">Appliquer à toutes les colonnes</button>
+      </div>
+      <div class="rayon-cols-label">Nombre d'étagères de chaque colonne (à ajuster si une colonne en a plus ou moins) :</div>
+      <div class="rayon-cols" id="rayon-cols"></div>
+      <div class="rayon-preview" id="rayon-preview"></div>
+      <div class="rayon-editor-actions" id="rayon-actions-bar">
+        <button type="button" class="pro-btn pro-btn--primary" id="rayon-save">Enregistrer le rayon</button>
+        <button type="button" class="pro-btn pro-btn--secondary" id="rayon-cancel">Annuler</button>
+        <button type="button" class="pro-btn pro-btn--danger rc-push" id="rayon-delete">Supprimer ce rayon</button>
+      </div>
+      <p class="rayon-editor-msg" id="rayon-editor-msg" role="alert"></p>
+    </div>
+
+    <div class="rc-note" id="rayon-empty-note" style="display:none">
+      Aucun rayon pour l'instant. Créez-en un avec « + Nouveau rayon » : donnez-lui un nom, indiquez son nombre de colonnes et le nombre d'étagères de chaque colonne. Il apparaîtra aussitôt pour tous les collègues, ici et sur le plan des magasins.
+    </div>
+
+    <div class="rc-work" id="scan-layout">
+
+      <!-- Colonne principale : scan, retour, scans récents -->
+      <div class="rc-col">
+        <section class="pro-card rc-scancard" aria-label="Scan">
+          <div class="rc-note" id="horsreserve-note" style="display:none;margin-top:.4rem">
             Scannez ici un exemplaire retrouvé hors de la réserve (posé ailleurs dans le bâtiment, par exemple). S'il a déjà été récolé auparavant et qu'un récolement de référence est chargé, son emplacement d'origine s'affichera pour le remettre en place. Sinon, rangez-le à l'emplacement indiqué par sa cote puis rescannez-le une fois en rayon, avec le bon emplacement sélectionné, pour l'ajouter au récolement principal.
           </div>
-          <div id="scan-mode-zone">
-            <div class="scan-row">
-              <input type="text" id="scan-input" placeholder="Scannez ou tapez un code-barre" autocomplete="off" autofocus>
-              <label class="sound-toggle" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> Code-barre endommagé</label>
-            </div>
-            <div class="feedback" id="feedback"></div>
-            <div class="scan-row" id="nobarcode-row">
-              <input type="text" id="nobarcode-input" placeholder="Cote d'un livre sans code-barre" autocomplete="off">
-              <button type="button" class="tool-btn" id="nobarcode-save">Ajouter</button>
-            </div>
+          <div class="rc-scancard__head">
+            <label for="scan-input">Code-barre</label>
+            <span class="pro-muted rc-small">Scannette prête · le curseur reste dans ce champ</span>
           </div>
-          <div class="vide-row" id="vide-row">
-            <button type="button" class="vide-btn" id="btn-vide">Emplacement vide</button>
-            <button type="button" class="vide-btn nonrange" id="btn-nonrange">Emplacement non rangé</button>
-            <button type="button" class="vide-btn lastshelf" id="btn-lastshelf">Dernière étagère de cette colonne</button>
+          <div class="rc-scanbox">
+            <span class="rc-scanbox__ico" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5v14M7 5v14M11 5v14M14 5v14M18 5v14M20.5 5v14"/></svg></span>
+            <input type="text" id="scan-input" inputmode="numeric" placeholder="Scannez ou tapez un code-barre, puis Entrée" autocomplete="off" autofocus>
+            <button type="button" class="pro-btn pro-btn--primary" id="scan-submit">Enregistrer <span class="pro-kbd" style="color:var(--pro-bleu)" aria-hidden="true">↵</span></button>
           </div>
-          <div id="noncat-mode-zone">
-            <div class="scan-row">
-              <span class="noncat-label">Livres non catalogués sur cette étagère :</span>
-              <div class="stepper" id="stp-noncat-wrap">
-                <button type="button" id="noncat-minus">−</button>
-                <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric">
-                <button type="button" id="noncat-plus">+</button>
-              </div>
-            </div>
-            <div class="feedback" id="noncat-feedback"></div>
+          <div class="rc-scanopts">
+            <label class="pro-check" title="À cocher si vous saisissez ce code-barre à la main parce qu'il est endommagé ou illisible au scanner"><input type="checkbox" id="damaged-toggle"> <span><strong>Code-barre endommagé</strong> <span class="pro-muted">— saisi à la main</span></span></label>
           </div>
+        </section>
+
+        <div class="feedback show fb-idle" id="feedback" role="status" aria-live="polite" aria-atomic="true">
+          <div class="fb-body"><span class="fb-verb">En attente du prochain scan</span><span class="rc-small">Le résultat du scan s'affiche ici : enregistré, déjà scanné, déplacé, anomalie de classement ou inconnu du catalogue.</span></div>
         </div>
 
-        <div class="travee-mini-panel" id="travee-mini-panel">
+        <section class="pro-card rc-recent" aria-label="Scans récents de cet emplacement">
+          <div class="rc-recent__head">
+            <h2 class="pro-h4" style="font-size:1.1rem">Scans récents ici</h2>
+            <span class="pro-muted rc-small"><span id="here-count"></span> · <a class="pro-link" href="#donnees" data-goto-tab="donnees">Tous les scans →</a></span>
+          </div>
+          <div class="pro-table-wrap"><table class="pro-table">
+            <thead><tr><th scope="col">Heure</th><th scope="col">Cote</th><th scope="col">Titre</th><th scope="col">Code-barre</th><th scope="col"><span class="pro-sr">Annuler</span></th></tr></thead>
+            <tbody id="log-here"></tbody>
+          </table></div>
+        </section>
+      </div>
+
+      <!-- Colonne latérale : marquage de l'étagère, plan, attendu -->
+      <aside class="rc-side" aria-label="Cette étagère">
+        <section class="pro-card rc-card rc-card--top" aria-label="Marquer cette étagère">
+          <h2 class="rc-eyebrow" id="shelf-here-label">Cette étagère</h2>
+          <p class="rc-readout" id="loc-readout">—</p>
+          <div class="pro-seg" id="vide-row" role="group" aria-label="Marquage de l'étagère">
+            <button type="button" id="btn-vide" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16v10H4z"/></svg><span class="rc-seg-label">Vide</span></button>
+            <button type="button" id="btn-nonrange" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4"/></svg><span class="rc-seg-label">Non rangé</span></button>
+            <button type="button" id="btn-lastshelf" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4M6 5h12l-3 4 3 4H6"/></svg><span class="rc-seg-label">Dernière étagère</span></button>
+          </div>
+
+          <div class="rc-sub" id="noncat-mode-zone">
+            <div class="rc-sub__row">
+              <div>
+                <div class="rc-sub__t" id="nc-label">Non catalogués</div>
+                <div class="rc-sub__d">Livres sans notice sur cette étagère</div>
+              </div>
+              <div class="pro-stepper" id="stp-noncat-wrap" role="group" aria-labelledby="nc-label">
+                <button type="button" class="pro-btn pro-btn--icon" id="noncat-minus" aria-label="Retirer un non catalogué"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+                <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric" aria-labelledby="nc-label">
+                <button type="button" class="pro-btn pro-btn--icon" id="noncat-plus" aria-label="Ajouter un non catalogué"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+            </div>
+            <div class="rc-ncfb" id="noncat-feedback" role="status"></div>
+          </div>
+
+          <div class="rc-sub" id="nobarcode-row">
+            <label class="rc-sub__t" for="nobarcode-input">Livre sans code-barre (cote)</label>
+            <div class="rc-inline">
+              <input type="text" class="pro-input" id="nobarcode-input" placeholder="Cote ou numéro seul, ex. 136854" autocomplete="off">
+              <button type="button" class="pro-btn pro-btn--primary" id="nobarcode-save">Récoler</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="pro-card rc-card" id="travee-mini-panel" aria-label="Plan de la travée">
           <div class="mp-header">
             <span class="mp-title" id="mp-title">—</span>
             <span class="mp-occ" id="mp-occ"></span>
           </div>
           <div class="mp-actions" id="mp-actions">
-            <button type="button" class="export-btn" id="mp-export-btn">⬇ Exporter (.txt)</button>
+            <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="mp-export-btn">⬇ Exporter les codes-barres (.txt)</button>
           </div>
-          <div class="mp-room" id="mp-room"></div>
+          <div class="mp-room" id="mp-room" role="group" aria-label="Cases de la travée : un clic se rend à cet emplacement"></div>
           <div class="mp-legend" id="mp-legend">
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-cat)"></span>Catalogué</span>
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-manuel)"></span>Exemplarisé rapide</span>
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-noncat)"></span>Non catalogué (estimé)</span>
-            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></span>Vide</span>
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-nonrange)"></span>Non rangé</span>
+            <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-free);border:1px solid var(--plan-free-brd)"></span>Vide</span>
             <span class="mp-leg"><span class="mp-dot" style="background:var(--plan-unknown);border:1px solid var(--plan-unknown-brd)"></span>Non inventorié</span>
           </div>
           <p class="mp-hint" id="mp-hint" style="display:none"></p>
-        </div>
-      </div>
+          <p class="mp-hint" id="mp-click-hint">Un clic sur une case se rend à cette colonne / étagère.</p>
+        </section>
 
-      <details class="expected-panel">
-        <summary class="expected-title">
-          <span class="expected-title-text">Attendu à cet emplacement <span class="expected-count" id="exp-count"></span></span>
-        </summary>
-        <div class="exp-list" id="exp-list"><p class="exp-empty">Aucune donnée de référence importée — chargez un récolement de référence pour comparer.</p></div>
-      </details>
-
-      <details class="log-wrap">
-        <summary class="log-header">
-          <span class="log-title">Scans récents ici</span>
-        </summary>
-        <div class="log-body"><table class="log-table">
-          <thead><tr><th>Cote</th><th>Titre</th><th>Heure</th><th>Code-barre</th><th></th></tr></thead>
-          <tbody id="log-here"></tbody>
-        </table></div>
-      </details>
-
-      <details class="log-wrap">
-        <summary class="log-header">
-          <span class="log-title">Tous les scans</span>
-        </summary>
-        <div class="log-header-actions" style="padding:.5rem .9rem;border-bottom:1px solid #e0e0e0">
-          <input type="text" class="log-search" id="log-search" placeholder="Filtrer (cote, titre, code-barre)…">
-        </div>
-        <div class="log-body"><table class="log-table">
-          <thead><tr><th>Cote</th><th>Titre</th><th>Emplacement</th><th>Code-barre</th><th></th></tr></thead>
-          <tbody id="log-all"></tbody>
-        </table></div>
-      </details>
-
-      <div class="expected-panel">
-        <div class="expected-title"><span>Statistiques avancées du récolement</span></div>
-        <p style="font-size:.75rem;color:#888;margin:0 0 .5rem;line-height:1.5">Le temps de travail réel additionne les intervalles entre deux scans consécutifs, sauf si l'écart dépasse 1 h : ces trous (pauses, changements de jour…) ne sont pas comptés dans la durée réelle. Le nombre de sessions correspond au nombre de fois où un tel écart d'au moins 1 h a été détecté, plus une.</p>
-        <div id="adv-groups"><!-- généré par renderAdvGroups(), voir "LISTES AVANCÉES" plus bas --></div>
-      </div>
-
-      <div class="tools-row">
-        <div class="tool-card">
-          <h3>Exporter</h3>
-          <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués, des emplacements marqués vides ou non rangés et des dernières étagères de colonne marquées. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
-          <div class="tool-btn-row">
-            <button type="button" class="tool-btn" id="btn-export">⬇ Exporter (fichier local)</button>
-            <button type="button" class="tool-btn secondary" id="btn-save-server">☁ Sauvegarder ce récolement</button>
-          </div>
-        </div>
-        <div class="tool-card">
-          <h3>Reprendre une session</h3>
-          <p>Importe un export JSON précédent (scans, non-catalogués, emplacements vides ou non rangés, dernières étagères de colonne) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
-          <label class="tool-btn secondary" for="file-resume">⬆ Importer et fusionner</label>
-          <input type="file" id="file-resume" accept="application/json">
-        </div>
-        <div class="tool-card">
-          <h3>Récolement de référence</h3>
-          <p>Charge un récolement précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher à la session en cours — soit un fichier, soit l'une des 5 dernières sauvegardes serveur.</p>
-          <div class="tool-btn-row">
-            <label class="tool-btn secondary" for="file-baseline">⬆ Charger un fichier</label>
-            <input type="file" id="file-baseline" accept="application/json">
-            <button type="button" class="tool-btn secondary" id="btn-backup-list-toggle">🕘 Dernières sauvegardes</button>
-          </div>
-          <div class="backup-list" id="backup-list"></div>
-        </div>
-        <div class="tool-card">
-          <h3>Réinitialiser</h3>
-          <p>Efface tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
-          <button type="button" class="tool-btn danger" id="btn-reset">✕ Tout effacer</button>
-        </div>
-      </div>
-
+        <details class="pro-card rc-expected" id="expected-panel">
+          <summary>
+            <span class="rc-expected__t">Attendu à cet emplacement</span>
+            <span class="expected-count" id="exp-count"></span>
+          </summary>
+          <div class="exp-list" id="exp-list"><p class="exp-empty">Aucune donnée de référence importée — chargez un récolement de référence pour comparer.</p></div>
+        </details>
+      </aside>
     </div>
   </div>
+</div>
+
+<!-- ═══════════════ TABLEAU DE BORD ═══════════════ -->
+<div id="panel-tableau" data-tab="tableau" hidden>
+  <div class="rc-wrap rc-dash" id="dash-root"></div>
+</div>
+
+<!-- ═══════════════ ANOMALIES ═══════════════ -->
+<div id="panel-anomalies" data-tab="anomalies" hidden>
+  <div class="rc-wrap rc-anom">
+    <p class="rc-anom__intro">Les listes ci-dessous reflètent l'état brut des données du périmètre choisi : un exemplaire sort d'une liste dès qu'il est traité (scanné, catalogué…). Chaque liste se déplie pour être filtrée et exportée en .txt (un code-barre par ligne).</p>
+    <div id="adv-groups"><!-- généré par advGroupTemplate(), voir « LISTES AVANCÉES » plus bas --></div>
+  </div>
+</div>
+
+<!-- ═══════════════ DONNÉES ═══════════════ -->
+<div id="panel-donnees" data-tab="donnees" hidden>
+  <div class="rc-wrap rc-data">
+    <div class="pro-grid">
+      <section class="pro-card pro-card--pad rc-dcard" aria-label="Exporter">
+        <h3>Exporter</h3>
+        <p>Télécharge en un seul JSON l'ensemble des scans, des comptages de non-catalogués, des emplacements marqués vides ou non rangés et des dernières étagères de colonne marquées. Déposez ensuite le fichier sous <code>data/recolement.json</code> et commitez-le pour que le plan de la réserve se mette à jour.</p>
+        <div class="rc-dbtns">
+          <button type="button" class="pro-btn pro-btn--primary" id="btn-export">⬇ Exporter (fichier local)</button>
+          <button type="button" class="pro-btn pro-btn--secondary" id="btn-save-server">☁ Sauvegarder ce récolement</button>
+        </div>
+      </section>
+      <section class="pro-card pro-card--pad rc-dcard" aria-label="Reprendre une session">
+        <h3>Reprendre une session</h3>
+        <p>Importe un export JSON précédent (scans, non-catalogués, emplacements vides ou non rangés, dernières étagères de colonne) et le fusionne avec la session en cours (pour continuer un récolement interrompu, éventuellement sur un autre appareil).</p>
+        <div class="rc-dbtns">
+          <label class="pro-btn pro-btn--secondary rc-filebtn" for="file-resume">⬆ Importer et fusionner</label>
+          <input type="file" id="file-resume" accept="application/json">
+        </div>
+      </section>
+      <section class="pro-card pro-card--pad rc-dcard" aria-label="Récolement de référence">
+        <h3>Récolement de référence</h3>
+        <p>Charge un récolement précédent comme référence pour le panneau « Attendu à cet emplacement », sans toucher à la session en cours — soit un fichier, soit l'une des 5 dernières sauvegardes serveur.</p>
+        <div class="rc-dbtns">
+          <label class="pro-btn pro-btn--secondary rc-filebtn" for="file-baseline">⬆ Charger un fichier</label>
+          <input type="file" id="file-baseline" accept="application/json">
+          <button type="button" class="pro-btn pro-btn--secondary" id="btn-backup-list-toggle">🕘 Dernières sauvegardes</button>
+        </div>
+        <div class="backup-list" id="backup-list"></div>
+      </section>
+      <section class="pro-card pro-card--pad rc-dcard" aria-label="Réinitialiser">
+        <h3>Réinitialiser</h3>
+        <p>Efface tous les scans, tous les comptages de livres non catalogués et tous les emplacements marqués vides ou non rangés enregistrés sur cet appareil. Pensez à exporter avant, cette action est irréversible.</p>
+        <div class="rc-dbtns">
+          <button type="button" class="pro-btn pro-btn--danger" id="btn-reset">✕ Tout effacer…</button>
+        </div>
+        <div class="rc-reset" id="reset-confirm" hidden role="alertdialog" aria-label="Confirmer l'effacement">
+          <p><strong>Cette action efface les données de cet appareil.</strong> Elle n'efface pas ce qui est déjà synchronisé sur R2 : les autres postes gardent leur copie. Pour confirmer, tapez <strong>EFFACER</strong>.</p>
+          <div class="rc-reset__row">
+            <label class="pro-sr" for="reset-word">Tapez EFFACER pour confirmer</label>
+            <input type="text" class="pro-input" id="reset-word" autocomplete="off" placeholder="EFFACER">
+            <button type="button" class="pro-btn pro-btn--danger" id="reset-go" disabled>Effacer définitivement</button>
+            <button type="button" class="pro-btn pro-btn--secondary" id="reset-cancel">Annuler</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="pro-card rc-log" aria-label="Tous les scans">
+      <div class="pro-toolbar">
+        <h2 class="pro-h4" style="font-size:1.1rem;margin-right:auto">Tous les scans <span class="pro-muted rc-small" id="all-count" style="font-family:var(--pro-font-body);font-weight:400"></span></h2>
+        <label class="pro-search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+          <span class="pro-sr">Filtrer les scans</span>
+          <input type="search" class="pro-input" id="log-search" placeholder="Filtrer (cote, titre, code-barre)…" autocomplete="off">
+        </label>
+      </div>
+      <div class="pro-table-wrap"><table class="pro-table">
+        <thead><tr><th scope="col">Cote</th><th scope="col">Titre</th><th scope="col">Emplacement</th><th scope="col">Code-barre</th><th scope="col"><span class="pro-sr">Supprimer</span></th></tr></thead>
+        <tbody id="log-all"></tbody>
+      </table></div>
+    </section>
+  </div>
+</div>
+
 </main>
 
-<footer>
-  <div class="container">
-    <p>Bibliothèques de Douai — Réserve patrimoniale · <a href="admin.html">← Espace professionnel</a></p>
+<footer class="pro-foot">
+  <div class="pro-foot__inner">
+    <span>Réserve patrimoniale · Bibliothèques de Douai-Cuincy · Espace réservé à l'équipe</span>
+    <a href="admin.html">← Espace professionnel</a>
   </div>
 </footer>
 
+
+<!-- Kit commun des pages pro (css/admin.css) : chargés sans defer, avant le
+     script de la page qui utilise window.rpUI / window.rpCharts. -->
+<script src="js/admin-ui.js"></script>
+<script src="js/admin-charts.js"></script>
 <script>
 (async function(){
 /* ════════════ AUTH ════════════ */
@@ -1531,6 +1718,7 @@ let advCounts = {};
 let heavyCountsTimer = null;
 let dashTimer = null, dashDirty = true, dashSig = '', dashLast = 0;
 let allLogDirty = true;
+const HERE_LOG_LINES = 8;   // « Scans récents ici » : liste compacte, 6–10 lignes (lu par renderHereLog() pendant l'init)
 
 /* "Notices récolées" par magasin physique distinct (2e/5e/6e étage) — un
    stat-card dédié dans chacun des 3 panneaux magasin ci-dessus.
@@ -1953,7 +2141,7 @@ function applyReserveVisibility(){
   // hors réserve — on masque tout ce qui présuppose un emplacement (dont le
   // comptage de non-catalogués, forcément lié à une étagère précise) et on
   // cache le panneau "Attendu à cet emplacement".
-  selLocType.style.display = isHorsReserve ? 'none' : '';
+  document.getElementById('fld-loctype').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('stp-colonne-wrap').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('stp-etage-wrap').style.display = isHorsReserve ? 'none' : '';
   if(isHorsReserve) document.getElementById('stp-travee-wrap').style.display = 'none';
@@ -1966,9 +2154,9 @@ function applyReserveVisibility(){
   // sans aucun rayon, plus rien à scanner tant qu'il n'en existe pas un.
   if(isRayons){
     document.getElementById('stp-travee-wrap').style.display = 'none';
-    selLocType.style.display = 'none';
+    document.getElementById('fld-loctype').style.display = 'none';
   }
-  selRayon.style.display = (isRayons && !noRayon) ? '' : 'none';
+  document.getElementById('fld-rayon').style.display = (isRayons && !noRayon) ? '' : 'none';
   document.getElementById('rayon-actions').style.display = isRayons ? '' : 'none';
   document.getElementById('btn-rayon-edit').style.display = (isRayons && !noRayon) ? '' : 'none';
   document.getElementById('stp-colonne-wrap').style.display = (isHorsReserve || noRayon) ? 'none' : '';
@@ -2142,6 +2330,7 @@ function renderRayonCols(values){
     const lbl = document.createElement('label'); lbl.className = 'rayon-col';
     lbl.innerHTML = `<span>${colLetter(i+1)}</span>`;
     const inp = document.createElement('input');
+    inp.className = 'pro-input';
     inp.type = 'number'; inp.min = '1'; inp.max = String(RAYON_MAX_ETAGES); inp.step = '1'; inp.inputMode = 'numeric';
     inp.value = prev[i]!=null && prev[i]!=='' ? prev[i] : def;
     inp.setAttribute('aria-label', `Étagères de la colonne ${colLetter(i+1)}`);
@@ -3188,14 +3377,6 @@ function renderExpected(){
 }
 
 /* ════════════ LOGS ════════════ */
-const HERE_LOG_LINES = 8;   // « Scans récents ici » : liste compacte, 6–10 lignes
-function logBarcodeCell(r){
-  return `<td class="pro-mono pro-muted">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#8a5f00">≈</span>':''}</td>`;
-}
-function logDelCell(r, label){
-  return `<td class="is-act"><button type="button" class="pro-btn pro-btn--secondary pro-btn--sm log-del" data-bc="${esc(r.barcode)}" aria-label="Supprimer le scan ${esc(r.cote||r.barcode)}">${label}</button></td>`;
-}
-const HERE_LOG_LINES = 8;   // « Scans récents ici » : liste compacte, 6–10 lignes
 function logBarcodeCell(r){
   return `<td class="pro-mono pro-muted">${esc(r.barcode)}${r.barcodeAbime?' <span title="Code-barre endommagé, saisi manuellement" style="color:#6a1b9a">✎</span>':''}${r.viaReliure?` <span title="Récolé automatiquement (relié avec le code-barre ${esc(r.viaReliure)})" style="color:#00897b">🔗</span>`:''}${r.coteApprox?' <span title="Retrouvé par le numéro de la cote tapée dans « Livre sans code-barre », pas une correspondance exacte" style="color:#8a5f00">≈</span>':''}</td>`;
 }
@@ -3652,7 +3833,7 @@ function renderDashboard(force){
       let delta = '';
       if(curve && curve.cum7!=null){
         const pts = (curve.cumNow - curve.cum7) / catStats.total * 100;
-        delta = pts>0 ? `<span class="pro-delta pro-delta--up">+${RF.n(pts,1)} pts</span> ` : '';
+        delta = pts>=0.05 ? `<span class="pro-delta pro-delta--up">+${RF.n(pts,1)} pts</span> ` : '<strong>0 pt</strong> ';
       }
       heroNote = `${delta}sur les 7 derniers jours · reste ${RF.n(reste)} notice${reste>1?'s':''}`;
     } else {
@@ -3688,7 +3869,7 @@ function renderDashboard(force){
     </div>
     <div class="pro-kpi">
       <p class="pro-kpi__label">Rythme</p>
-      <div class="pro-kpi__row"><span class="pro-kpi__value">${rythme!=null ? RF.n(rythme, rythme<10?1:0) : '—'}</span><span class="pro-kpi__unit">scans / jour</span>
+      <div class="pro-kpi__row"><span class="pro-kpi__value">${rythme!=null ? RF.n(rythme, rythme>0 && rythme<10 ? 1 : 0) : '—'}</span><span class="pro-kpi__unit">scans / jour</span>
         ${tstat.n ? `<span style="margin-left:auto">${rpCharts.miniBars(last7, {labels:last7Labels, title:'Scans des 7 derniers jours', lastColor:false})}</span>` : ''}</div>
       <p class="pro-kpi__note">${tstat.n ? 'Moyenne sur les 7 derniers jours' : 'Aucun scan pour l\'instant'}</p>
     </div>
@@ -3715,7 +3896,7 @@ function renderDashboard(force){
     for(let h=0;h<24;h++) if(hv[h]>0){ lo = Math.min(lo,h); hi = Math.max(hi,h); }
     const hItems = [];
     let peak = 0;
-    for(let h=lo;h<=hi;h++){ if(hv[h]>hv[peak]) peak = h; hItems.push({ label:h+' h', value:hv[h], tip:`${h} h – ${h+1} h\n${RF.n(hv[h])} scans` }); }
+    for(let h=lo;h<=hi;h++){ if(hv[h]>hv[peak]) peak = h; hItems.push({ label:String(h), value:hv[h], tip:`${h} h – ${h+1} h\n${RF.n(hv[h])} scans` }); }
     const real = tstat.real, sessions = tstat.sessions;
     activity = `<div class="rc-twocol">
       <div class="rc-col-main">
@@ -3735,7 +3916,7 @@ function renderDashboard(force){
       <div class="pro-card pro-card--pad rc-col-side">
         <div class="rc-cardhead"><h3 class="pro-h4">Heures de la journée</h3><span class="pro-muted rc-small">Pic à ${peak} h</span></div>
         ${rpCharts.bars(hItems, {height:200, axis:true, unit:'scans'})}
-        <p class="pro-chart__caption" style="text-align:center">Scans cumulés depuis le début du récolement, par heure de la journée</p>
+        <p class="pro-chart__caption" style="text-align:center">Scans cumulés depuis le début du récolement, par heure de la journée (heure de début, en h)</p>
       </div>
     </div>`;
   }
@@ -4076,78 +4257,49 @@ function noBarcodeCount(group){
 function advDetailsTemplate(id, spec, opts){
   const showAllExport = !!(opts && opts.showAllExport);
   const rangeExports = (opts && opts.rangeExports) || [];
+  const exportIcon = rpUI.icon('download', {size:15});
   return `
-    <details class="adv-details" id="adv-${id}">
-      <summary>${esc(spec.title)} <span class="adv-count">(<span id="sum-${id}-count">0</span>)</span></summary>
-      <div class="log-wrap">
-        <div class="log-header">
-          <span class="log-title">${esc(spec.desc)}</span>
-          <div class="log-header-actions">
-            <input type="text" class="log-search" id="${id}-search" placeholder="${esc(spec.placeholder)}">
-            ${spec.showCorrectionFilter ? `<label class="adv-corr-filter" style="font-size:.75rem;display:inline-flex;align-items:center;gap:.3em;white-space:nowrap">
-              <input type="checkbox" id="${id}-export-uncorrected">
-              Exclure les corrigés (Syracuse)
-            </label>` : ''}
-            <button type="button" class="export-btn" id="${id}-export">⬇ Exporter (.txt)</button>
-            ${showAllExport ? `<button type="button" class="export-btn" id="${id}-export-all" title="Réunit les codes-barres de cette catégorie pour les 3 magasins (2e/5e/6e), sans tenir compte de la recherche en cours">⬇ Exporter tous les magasins</button>` : ''}
-            ${rangeExports.map(rg=>`<button type="button" class="export-btn" id="${id}-export-${rg.key}" title="N'exporte que les codes-barres de ${esc(rg.label)}, en respectant la recherche en cours">⬇ ${esc(rg.label)}</button>`).join('')}
-          </div>
+    <details class="rc-adv" id="adv-${id}">
+      <summary class="rc-adv__sum">
+        <span class="rc-adv__chev" aria-hidden="true">${rpUI.icon('chevRight', {size:16})}</span>
+        <span class="rc-adv__title">${esc(spec.title)}</span>
+        <span class="pro-tab__count rc-adv__count" id="sum-${id}-count">${spec.needsCatalog ? '—' : '0'}</span>
+      </summary>
+      <div class="pro-card rc-adv__body">
+        <p class="rc-adv__desc">${esc(spec.desc)}</p>
+        <div class="pro-toolbar">
+          <label class="pro-search">${rpUI.icon('search', {size:18})}<span class="pro-sr">Filtrer la liste</span>
+            <input type="search" class="pro-input" id="${id}-search" placeholder="${esc(spec.placeholder)}" autocomplete="off"></label>
+          ${spec.showCorrectionFilter ? `<label class="pro-check adv-corr-filter"><input type="checkbox" id="${id}-export-uncorrected"> Exclure les corrigés (Syracuse)</label>` : ''}
+          <span class="rc-adv__exports">
+            <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="${id}-export">${exportIcon} Exporter (.txt)</button>
+            ${showAllExport ? `<button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="${id}-export-all" title="Réunit les codes-barres de cette catégorie pour les 3 magasins (2e/5e/6e), sans tenir compte de la recherche en cours">${exportIcon} Tous les magasins</button>` : ''}
+            ${rangeExports.map(rg=>`<button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="${id}-export-${rg.key}" title="N'exporte que les codes-barres de ${esc(rg.label)}, en respectant la recherche en cours">${exportIcon} ${esc(rg.label)}</button>`).join('')}
+          </span>
         </div>
-        <div class="log-body"><table class="log-table">
-          <thead><tr>${spec.headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
+        <div class="pro-table-wrap"><table class="pro-table">
+          <thead><tr>${spec.headers.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead>
           <tbody id="log-${id}"></tbody>
         </table></div>
-        <div class="adv-pager" id="${id}-pager"></div>
+        <div class="pro-pager" id="${id}-pager"></div>
       </div>
     </details>`;
 }
 
+// Un panneau par groupe de statistiques (ADV_GROUPS), un seul visible à la
+// fois (applyAdvGroupVisibility()). Ne contient plus que les listes : la
+// progression, les temps et la couverture sont dans le Tableau de bord
+// (renderDashboard()). Les identifiants `adv-<cat>-<groupe>`,
+// `<cat>-<groupe>-search/-export/…`, `log-…`, `…-pager` et `sum-…-count` sont
+// lus par refreshAdvList(), updateAdvListsCount() et les boucles d'écouteurs
+// ci-dessous : à changer ensemble.
 function advGroupTemplate(g){
   const gid = g.id;
   const isMagasin = gid.startsWith('magasin-');
-  return `
-    <h3 class="adv-group-title">${esc(g.label)}</h3>
-
-    <div class="shelf-bar-block">
-      <div class="shelf-bar-heading">
-        <span class="shelf-bar-heading-label">Répartition des emplacements</span>
-        <span class="shelf-bar-heading-total" id="shelf-bar-total-${gid}"></span>
-      </div>
-      <div class="shelf-bar" id="shelf-bar-${gid}">
-        <div class="shelf-bar-seg recoled" id="seg-recoled-${gid}" style="width:0%" title="Récolés"></div>
-        <div class="shelf-bar-seg vide" id="seg-vide-${gid}" style="width:0%" title="Vides"></div>
-        <div class="shelf-bar-seg nonrange" id="seg-nonrange-${gid}" style="width:0%" title="Non rangés"></div>
-        <div class="shelf-bar-seg nontraite" id="seg-nontraite-${gid}" style="width:0%" title="Jamais traités"></div>
-      </div>
-      <div class="shelf-legend" id="shelf-legend-${gid}">
-        <span class="shelf-legend-item"><span class="shelf-legend-dot recoled"></span>Récolés : <span class="shelf-legend-val" id="leg-recoled-${gid}">0</span> <span class="shelf-legend-pct" id="leg-recoled-pct-${gid}"></span></span>
-        <span class="shelf-legend-item"><span class="shelf-legend-dot vide"></span>Vides : <span class="shelf-legend-val" id="leg-vide-${gid}">0</span> <span class="shelf-legend-pct" id="leg-vide-pct-${gid}"></span></span>
-        <span class="shelf-legend-item"><span class="shelf-legend-dot nonrange"></span>Non rangés : <span class="shelf-legend-val" id="leg-nonrange-${gid}">0</span> <span class="shelf-legend-pct" id="leg-nonrange-pct-${gid}"></span></span>
-        <span class="shelf-legend-item"><span class="shelf-legend-dot nontraite"></span>Jamais traités : <span class="shelf-legend-val" id="leg-nontraite-${gid}">0</span> <span class="shelf-legend-pct" id="leg-nontraite-pct-${gid}"></span></span>
-      </div>
-    </div>
-
-    <div class="stats-row" style="margin-bottom:0">
-      <div class="stat-card"><div class="stat-card-label">Codes-barres endommagés</div><div class="stat-card-val" id="st-abime-${gid}">0</div></div>
-      <div class="stat-card"><div class="stat-card-label">Non catalogués, cote manuelle</div><div class="stat-card-val" id="st-manualcote-${gid}">—</div></div>
-      <div class="stat-card"><div class="stat-card-label">Jamais scannés (catalogue)</div><div class="stat-card-val" id="st-notscanned-${gid}">—</div></div>
-      <div class="stat-card"><div class="stat-card-label">Probablement perdus</div><div class="stat-card-val" id="st-perdus-${gid}">—</div></div>
-      <div class="stat-card"><div class="stat-card-label">Récolés (codes-barres scannés)</div><div class="stat-card-val" id="st-scanned-${gid}">0</div></div>
-      <div class="stat-card"><div class="stat-card-label">Mauvais numéro / code-barre absent</div><div class="stat-card-val" id="st-nobarcode-${gid}">0</div></div>
-      <div class="stat-card"><div class="stat-card-label">Anomalies de classement</div><div class="stat-card-val" id="st-horssection-${gid}">0</div></div>
-      ${isMagasin ? `<div class="stat-card"><div class="stat-card-label">Notices récolées</div><div class="stat-card-val" id="st-etage-${gid}" style="font-size:1.2rem">—</div></div>` : ''}
-      <div class="stat-card"><div class="stat-card-label">Début du récolement</div><div class="stat-card-val" id="st-start-${gid}" style="font-size:1rem">—</div></div>
-      <div class="stat-card"><div class="stat-card-label">Dernier scan</div><div class="stat-card-val" id="st-last-${gid}" style="font-size:1rem">—</div></div>
-      <div class="stat-card"><div class="stat-card-label">Durée écoulée (calendaire)</div><div class="stat-card-val" id="st-span-${gid}" style="font-size:1.2rem">—</div></div>
-      <div class="stat-card"><div class="stat-card-label">Temps de travail réel (estimé)</div><div class="stat-card-val" id="st-realtime-${gid}" style="font-size:1.2rem">—</div></div>
-      <div class="stat-card"><div class="stat-card-label">Sessions de travail détectées</div><div class="stat-card-val" id="st-sessions-${gid}">—</div></div>
-    </div>
-
-    ${Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey], {
+  return Object.keys(ADV_CATS).map(catKey=>advDetailsTemplate(`${catKey}-${gid}`, ADV_CATS[catKey], {
       showAllExport:isMagasin,
       rangeExports: (gid==='magasin-5e' && catKey==='scanned') ? MAGASIN5_TRAVEE_RANGES : []
-    })).join('')}
-  `;
+    })).join('');
 }
 
 // Pagination plutôt qu'un plafond fixe (300) avec message "affinez la
@@ -4177,16 +4329,19 @@ function renderAdvTable(tbodyId, pagerId, category, rows, filterFields, filter, 
   tbody.innerHTML = filtered.slice(start, start+ADV_PAGE_SIZE).map(rowHtml).join('');
 
   pager.innerHTML = `
-    <span>${filtered.length.toLocaleString('fr-FR')} résultat${filtered.length>1?'s':''} — page ${curPage} / ${totalPages}</span>
-    <span class="adv-pager-btns">
-      <button type="button" id="${pagerId}-prev" ${curPage<=1?'disabled':''}>‹ Précédent</button>
-      <button type="button" id="${pagerId}-next" ${curPage>=totalPages?'disabled':''}>Suivant ›</button>
+    <span class="pro-pager__info">${rpUI.fmt.n(filtered.length)} résultat${filtered.length>1?'s':''} — page ${curPage} / ${totalPages}</span>
+    <span class="pro-pager__nav">
+      <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="${pagerId}-prev" ${curPage<=1?'disabled':''}>‹ Précédent</button>
+      <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="${pagerId}-next" ${curPage>=totalPages?'disabled':''}>Suivant ›</button>
     </span>`;
   if(curPage>1) document.getElementById(`${pagerId}-prev`).addEventListener('click', ()=>onPageChange(curPage-1));
   if(curPage<totalPages) document.getElementById(`${pagerId}-next`).addEventListener('click', ()=>onPageChange(curPage+1));
 }
 
+// Rendu paresseux : un tableau n'est construit que si l'onglet Anomalies est
+// actif ET la catégorie dépliée (le groupe, lui, est le seul visible).
 function refreshAdvList(group, catKey){
+  if(activeTab!=='anomalies') return;
   const spec = ADV_CATS[catKey];
   const id = `${catKey}-${group}`;
   if(!document.getElementById('adv-'+id).open) return;
@@ -4203,50 +4358,62 @@ function refreshAdvList(group, catKey){
 ADV_GROUPS.forEach(g=>{
   Object.keys(ADV_CATS).forEach(catKey=>{
     const id = `${catKey}-${g.id}`;
-    document.getElementById('adv-'+id).addEventListener('toggle', ()=>refreshAdvList(g.id, catKey));
+    document.getElementById('adv-'+id).addEventListener('toggle', ()=>{ refreshAdvList(g.id, catKey); if(window.rpEmbed) rpEmbed.refresh(); });
     document.getElementById(id+'-search').addEventListener('input', function(){ advPage[g.id][catKey]=1; refreshAdvList(g.id, catKey); });
   });
 });
 
-function updateAdvListsCount(){
-  // Idem updateStats() : seul le panneau visible est recalculé. C'était le
-  // point chaud du scan — pour chacun des 3 groupes magasin,
-  // notScannedCount() et probablyLostCount() parcourent le catalogue entier,
-  // soit ~1 million de lectures par scan pour des chiffres masqués.
-  const visibleId = visibleAdvGroupId();
-  ADV_GROUPS.filter(g=>g.id===visibleId).forEach(g=>{
-    const nAbime = damagedCount(g.id);
-    document.getElementById('st-abime-'+g.id).textContent = nAbime.toLocaleString('fr-FR');
-    document.getElementById('sum-abime-'+g.id+'-count').textContent = nAbime.toLocaleString('fr-FR');
-
-    const nScanned = scannedCount(g.id);
-    document.getElementById('st-scanned-'+g.id).textContent = nScanned.toLocaleString('fr-FR');
-    document.getElementById('sum-scanned-'+g.id+'-count').textContent = nScanned.toLocaleString('fr-FR');
-
-    if(catalogByGroup[catalogGroupOf(g.id)]){
-      const nManualCote = manualCoteCount(g.id);
-      document.getElementById('st-manualcote-'+g.id).textContent = nManualCote.toLocaleString('fr-FR');
-      document.getElementById('sum-manualcote-'+g.id+'-count').textContent = nManualCote.toLocaleString('fr-FR');
-
-      const nNotScanned = notScannedCount(g.id);
-      document.getElementById('st-notscanned-'+g.id).textContent = nNotScanned.toLocaleString('fr-FR');
-      document.getElementById('sum-notscanned-'+g.id+'-count').textContent = nNotScanned.toLocaleString('fr-FR');
-
-      const nPerdus = probablyLostCount(g.id);
-      document.getElementById('st-perdus-'+g.id).textContent = nPerdus.toLocaleString('fr-FR');
-      document.getElementById('sum-perdus-'+g.id+'-count').textContent = nPerdus.toLocaleString('fr-FR');
-    }
-
-    const nNobarcode = noBarcodeCount(g.id);
-    document.getElementById('st-nobarcode-'+g.id).textContent = nNobarcode.toLocaleString('fr-FR');
-    document.getElementById('sum-nobarcode-'+g.id+'-count').textContent = nNobarcode.toLocaleString('fr-FR');
-
-    const nHorsSection = horsSectionCount(g.id);
-    document.getElementById('st-horssection-'+g.id).textContent = nHorsSection.toLocaleString('fr-FR');
-    document.getElementById('sum-horssection-'+g.id+'-count').textContent = nHorsSection.toLocaleString('fr-FR');
-
-    Object.keys(ADV_CATS).forEach(catKey=>refreshAdvList(g.id, catKey));
+/* Compteurs d'anomalies du périmètre visible (visibleAdvGroupId()), rangés
+   dans advCounts puis peints dans les en-têtes de catégorie, le badge de
+   l'onglet « Anomalies » et les cartes « À traiter » du tableau de bord.
+   Les deux compteurs qui parcourent tout le catalogue (« jamais scannés »,
+   « probablement perdus » : ~200 000 entrées sur les magasins) ne sont
+   calculés qu'onglet Tableau/Anomalies visible ; sinon, seulement après 4 s
+   de calme (scheduleHeavyCounts) pour garnir le badge — jamais à chaque scan. */
+function computeHeavyCounts(gid){
+  const c = advCounts[gid] || (advCounts[gid] = {});
+  if(!catalogByGroup[catalogGroupOf(gid)]) return;
+  c.notscanned = notScannedCount(gid);
+  c.perdus = probablyLostCount(gid);
+}
+function scheduleHeavyCounts(){
+  if(heavyCountsTimer) clearTimeout(heavyCountsTimer);
+  heavyCountsTimer = setTimeout(()=>{
+    heavyCountsTimer = null;
+    const g = visibleAdvGroupId();
+    computeHeavyCounts(g);
+    paintAdvCounts(g);
+  }, 4000);
+}
+function paintAdvCounts(gid){
+  const c = advCounts[gid] || {};
+  Object.keys(ADV_CATS).forEach(k=>{
+    const el = document.getElementById(`sum-${k}-${gid}-count`);
+    if(el && c[k]!=null) el.textContent = rpUI.fmt.n(c[k]);
   });
+  // Badge de l'onglet : ce qui reste à traiter (hors « Récolés », qui n'est
+  // pas une anomalie, et hors « Jamais scannés », simple reste du travail).
+  const total = (c.abime||0) + (c.manualcote||0) + (c.perdus||0) + (c.nobarcode||0) + (c.horssection||0);
+  const badge = document.getElementById('tab-anom-count');
+  badge.textContent = rpUI.fmt.n(total);
+  badge.hidden = !total;
+  badge.title = `${rpUI.fmt.n(total)} anomalie${total>1?'s':''} à traiter dans ce périmètre`;
+}
+function updateAdvListsCount(){
+  const gid = visibleAdvGroupId();
+  const c = advCounts[gid] || (advCounts[gid] = {});
+  c.abime = damagedCount(gid);
+  c.scanned = scannedCount(gid);
+  c.nobarcode = noBarcodeCount(gid);
+  c.horssection = horsSectionCount(gid);
+  if(catalogByGroup[catalogGroupOf(gid)]){
+    c.manualcote = manualCoteCount(gid);
+    if(activeTab==='tableau' || activeTab==='anomalies') computeHeavyCounts(gid);
+    else scheduleHeavyCounts();
+  }
+  paintAdvCounts(gid);
+  if(activeTab==='anomalies') Object.keys(ADV_CATS).forEach(catKey=>refreshAdvList(gid, catKey));
+  else if(activeTab==='tableau') scheduleDashboard();
 }
 
 /* Export .txt : un code-barre par ligne, respectant le filtre de recherche
@@ -4265,7 +4432,7 @@ function exportAdvBarcodes(rows, filterFields, filter, filenamePrefix, field, ex
   const q = (filter||'').trim().toLowerCase();
   let filtered = q ? rows.filter(r => filterFields.some(f => String(r[f]||'').toLowerCase().includes(q))) : rows;
   if(extraFilterFn) filtered = filtered.filter(extraFilterFn);
-  if(!filtered.length){ alert('Aucun élément à exporter pour ce filtre.'); return; }
+  if(!filtered.length){ rpAlert('Aucun élément à exporter pour ce filtre.'); return; }
   const d = new Date(), pad = n => String(n).padStart(2,'0');
   downloadTxt(filtered.map(r=>r[field||'barcode']).join('\n'),
     `${filenamePrefix}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
@@ -4365,13 +4532,13 @@ document.getElementById('btn-save-server').addEventListener('click', async ()=>{
   btn.disabled = true; btn.textContent = 'Sauvegarde en cours…';
   try{
     const res = await fetch('/api/recolement-backups', { method:'POST', headers: authHeaders(), body: JSON.stringify(exportPayload()) });
-    if(res.status===401){ alert('Non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel pour sauvegarder sur le serveur.'); return; }
-    if(res.status===503){ alert('R2 non configuré côté serveur (variables Vercel manquantes).'); return; }
-    if(!res.ok){ const err = await res.json().catch(()=>({})); alert('Erreur lors de la sauvegarde : '+(err.error||res.status)); return; }
+    if(res.status===401){ rpAlert('Non authentifié — déconnectez-vous puis reconnectez-vous depuis l\'espace professionnel pour sauvegarder sur le serveur.'); return; }
+    if(res.status===503){ rpAlert('R2 non configuré côté serveur (variables Vercel manquantes).'); return; }
+    if(!res.ok){ const err = await res.json().catch(()=>({})); rpAlert('Erreur lors de la sauvegarde : '+(err.error||res.status)); return; }
     const data = await res.json();
-    alert('Récolement sauvegardé sur le serveur ('+data.key+').');
+    rpAlert('Récolement sauvegardé sur le serveur ('+data.key+').');
   }catch(e){
-    alert('Sauvegarde impossible : hors ligne ou serveur injoignable.');
+    rpAlert('Sauvegarde impossible : hors ligne ou serveur injoignable.');
   }finally{
     btn.disabled=false; btn.textContent=original;
   }
@@ -4393,10 +4560,10 @@ async function loadBackupAsReference(key){
     rows.forEach(r=>{ if(r.barcode) baseline[r.barcode]=r; });
     saveBaseline();
     document.getElementById('backup-list').style.display='none';
-    alert(`Référence chargée depuis la sauvegarde du ${formatBackupLabel({key,lastModified:null})} : ${Object.keys(baseline).length} emplacements connus.`);
+    rpAlert(`Référence chargée depuis la sauvegarde du ${formatBackupLabel({key,lastModified:null})} : ${Object.keys(baseline).length} emplacements connus.`);
     renderExpected();
   }catch(e){
-    alert('Impossible de charger cette sauvegarde (hors ligne ou serveur injoignable).');
+    rpAlert('Impossible de charger cette sauvegarde (hors ligne ou serveur injoignable).');
   }
 }
 
@@ -4500,8 +4667,8 @@ document.getElementById('file-resume').addEventListener('change', function(e){
     try{
       const data = JSON.parse(ev.target.result);
       const r = mergeIncomingData(data, { syncToServer:true });
-      alert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s), ${r.lastShelf} dernière(s) étagère(s) de colonne fusionnée(s), ${r.noBarcode} cote(s) sans code-barre fusionnée(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
-    }catch(err){ alert('Fichier invalide : '+err.message); }
+      rpAlert(`Import terminé : ${r.added} nouveaux scans, ${r.updated} mis à jour, ${r.nonCat} emplacement(s) non catalogué(s) fusionné(s), ${r.vide} étagère(s) vide(s) fusionnée(s), ${r.nonrange} emplacement(s) non rangé(s) fusionné(s), ${r.lastShelf} dernière(s) étagère(s) de colonne fusionnée(s), ${r.noBarcode} cote(s) sans code-barre fusionnée(s).\n\nCe lot a aussi été envoyé vers le stockage partagé (R2) pour que les autres postes en bénéficient.`);
+    }catch(err){ rpAlert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
   e.target.value='';
@@ -4517,16 +4684,30 @@ document.getElementById('file-baseline').addEventListener('change', function(e){
       baseline = {};
       rows.forEach(r=>{ if(r.barcode) baseline[r.barcode]=r; });
       saveBaseline();
-      alert(`Référence chargée : ${Object.keys(baseline).length} emplacements connus.`);
+      rpAlert(`Référence chargée : ${Object.keys(baseline).length} emplacements connus.`);
       renderExpected();
-    }catch(err){ alert('Fichier invalide : '+err.message); }
+    }catch(err){ rpAlert('Fichier invalide : '+err.message); }
   };
   reader.readAsText(file);
   e.target.value='';
 });
 
+// Réinitialisation : confirmation renforcée — le bouton ouvre un encart qui
+// exige de taper « EFFACER » avant que l'action destructive soit possible.
+const resetBox = document.getElementById('reset-confirm');
+const resetInput = document.getElementById('reset-word');
+const resetGo = document.getElementById('reset-go');
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  if(!confirm("Effacer tous les scans, tous les comptages de livres non catalogués, tous les emplacements marqués vides ou non rangés, toutes les dernières étagères de colonne marquées et toutes les cotes sans code-barre sur cet appareil ? Cette action est irréversible — pensez à exporter avant. Elle n'efface pas les données déjà synchronisées sur R2 (les autres postes gardent leur copie).")) return;
+  resetBox.hidden = false;
+  resetInput.value = ''; resetGo.disabled = true;
+  resetInput.focus();
+  if(window.rpEmbed) rpEmbed.refresh();
+});
+resetInput.addEventListener('input', ()=>{ resetGo.disabled = resetInput.value.trim().toUpperCase() !== 'EFFACER'; });
+document.getElementById('reset-cancel').addEventListener('click', ()=>{ resetBox.hidden = true; resetInput.value = ''; });
+resetGo.addEventListener('click', ()=>{
+  if(resetInput.value.trim().toUpperCase() !== 'EFFACER') return;
+  resetBox.hidden = true; resetInput.value = '';
   scans = {}; clearAllScanRecords();
   nonCat = {}; saveNonCat();
   videShelves = {}; saveVideShelves();
@@ -4535,11 +4716,55 @@ document.getElementById('btn-reset').addEventListener('click', ()=>{
   noBarcodeCotes = {}; saveNoBarcodeCotes();
   pendingSync = []; savePendingSync(); updateSyncIndicator();
   renderExpected(); renderHereLog(); renderAllLog(''); updateStats(); updateNonCatInput(); updateVideUI(); updateNonRangeUI(); updateLastShelfUI(); buildMiniPlan();
+  rpUI.toast('Données de cet appareil effacées. Les données déjà synchronisées sur R2 restent intactes.', {type:'ok'});
 });
 
+// Remplace alert() : le ton du message (erreur / avertissement / succès) se
+// lit dans son texte.
+function rpAlert(msg){
+  const type = /impossible|erreur|invalide|non authentifi|non configur/i.test(msg) ? 'error' : /^aucun/i.test(msg) ? 'warn' : 'ok';
+  rpUI.toast(String(msg), { type, timeout: msg.length>140 ? 15000 : 6000 });
+}
+
+/* ════════════ ONGLETS : changement d'onglet ════════════
+   Chaque onglet ne calcule/rend que ce qu'il affiche (voir renderDashboard(),
+   refreshAdvList(), renderAllLog()). Le hash (#saisie, #tableau, #anomalies,
+   #donnees) est tenu à jour à la main : rpUI.tabs() ne gère pas un hash sans
+   préfixe. */
+function onTabChange(){
+  document.getElementById('scope-bar').hidden = !(activeTab==='tableau' || activeTab==='anomalies');
+  if(activeTab==='saisie'){
+    scanInput.focus({preventScroll:true});
+  } else if(activeTab==='tableau'){
+    applyAdvGroupVisibility();
+    updateAdvListsCount();
+    renderDashboard(true);
+  } else if(activeTab==='anomalies'){
+    applyAdvGroupVisibility();
+    updateAdvListsCount();
+  } else if(activeTab==='donnees'){
+    renderAllLog(document.getElementById('log-search').value);
+  }
+  if(window.rpEmbed) rpEmbed.refresh();
+}
+document.getElementById('rc-tabs').addEventListener('rp-tab-change', e=>{
+  activeTab = e.detail.id;
+  try{ history.replaceState(null, '', '#' + activeTab); }catch(err){ /* file:// */ }
+  onTabChange();
+});
+window.addEventListener('hashchange', ()=>{
+  const h = (location.hash||'').slice(1);
+  if(TAB_IDS.includes(h) && h!==activeTab && tabsApi) tabsApi.select(h);
+});
+document.querySelectorAll('[data-goto-tab]').forEach(el=>el.addEventListener('click', e=>{
+  e.preventDefault();
+  if(tabsApi) tabsApi.select(el.dataset.gotoTab);
+}));
+
 /* ════════════ DÉMARRAGE ════════════ */
+applyAdvGroupVisibility();
+onTabChange();
 renderAllLog('');
-scanInput.focus();
 updateSyncIndicator();
 syncFromServer();
 flushPendingSync();

@@ -228,11 +228,11 @@
           <div class="fnwrap"><input type="text" id="fn" placeholder="code-barre ou saisie manuelle" autocomplete="off" spellcheck="false" /><span class="fnext">.jpg</span></div>
         </div>
         <div class="arow">
-          <div class="mc"><label for="ms">Marge</label> <input type="range" id="ms" min="0" max="80" value="8" step="1" /> <span class="mv" id="mv">8</span>px</div>
+          <div class="mc"><label for="ms">Marge</label> <input type="range" id="ms" min="0" max="80" value="8" step="1" /> <span><span class="mv" id="mv">8</span> px</span></div>
           <button type="button" class="pro-btn pro-btn--ghost" id="br" title="Relancer la détection des bords et la lecture du code-barre">Re-détecter</button>
           <button type="button" class="pro-btn pro-btn--secondary" id="bsk" title="Passer à l'image suivante sans la valider">Passer →</button>
           <button type="button" class="pro-btn pro-btn--primary" id="bs" title="Valider ce rognage et ce nom, puis passer à l'image suivante">✓ Valider</button>
-          <button type="button" class="pro-btn pro-btn--secondary mla" id="bdl" disabled title="Validez d'abord au moins une image : le téléchargement regroupe toutes les images validées.">⬇ Télécharger tout (<span id="vc">0</span>)</button>
+          <button type="button" class="pro-btn pro-btn--secondary mla" id="bdl" disabled title="Validez d'abord au moins une image : le téléchargement regroupe toutes les images validées."><span>⬇ Télécharger tout (<span id="vc">0</span>)</span></button>
         </div>
       </div>
       <div class="sbar"><span id="sm">Prêt</span><span class="sep">·</span><span id="pm"></span><span class="sep">·</span><span id="gm">Aucune image validée</span></div>
@@ -319,11 +319,15 @@ function getHandles() {
   const ry = Math.max(0, cropR.y - m) * sc;
   const rw = Math.min(origImg.width, cropR.w + m * 2) * sc;
   const rh = Math.min(origImg.height, cropR.h + m * 2) * sc;
+  // Gardées à l'intérieur du canvas : une poignée posée sur le bord de l'image
+  // serait coupée de moitié (et plus difficile à saisir au doigt).
+  const cl = (v, max) => Math.max(HANDLE_R, Math.min(max - HANDLE_R, v));
+  const W = overlay.width, H = overlay.height;
   return [
-    { x: rx + rw/2, y: ry,         edge: 'top'    },
-    { x: rx + rw/2, y: ry + rh,    edge: 'bottom' },
-    { x: rx,        y: ry + rh/2,  edge: 'left'   },
-    { x: rx + rw,   y: ry + rh/2,  edge: 'right'  },
+    { x: cl(rx + rw/2, W), y: cl(ry, H),          edge: 'top'    },
+    { x: cl(rx + rw/2, W), y: cl(ry + rh, H),     edge: 'bottom' },
+    { x: cl(rx, W),        y: cl(ry + rh/2, H),   edge: 'left'   },
+    { x: cl(rx + rw, W),   y: cl(ry + rh/2, H),   edge: 'right'  },
   ];
 }
 
@@ -385,7 +389,7 @@ function updateProgress() {
   const pct = total ? Math.round(n / total * 100) : 0;
   $('sd-prog-bar').style.width = pct + '%';
   $('sd-prog').setAttribute('aria-valuenow', String(pct));
-  gm.textContent = total ? `${n} / ${total} image${total > 1 ? 's' : ''} validée${n > 1 ? 's' : ''} ou passée${n > 1 ? 's' : ''}` : 'Aucune image validée';
+  gm.textContent = total ? `${n} / ${total} images traitées (validées ou passées)` : 'Aucune image validée';
 }
 
 function updateDlButton(state) {
@@ -397,7 +401,7 @@ function updateDlButton(state) {
     bdl.title = 'Téléchargement en cours…';
     return;
   }
-  bdl.innerHTML = '⬇ Télécharger tout (<span id="vc">' + n + '</span>)';
+  bdl.innerHTML = '<span>⬇ Télécharger tout (<span id="vc">' + n + '</span>)</span>';
   bdl.disabled = n === 0;
   bdl.title = n === 0
     ? "Validez d'abord au moins une image : le téléchargement regroupe toutes les images validées."
@@ -548,11 +552,7 @@ function drawOverlay() {
   ctx.strokeStyle = '#2A3CD4'; ctx.lineWidth = 2; ctx.setLineDash([]);
   ctx.strokeRect(rx, ry, rw, rh);
   // Poignées (grandes : saisie tactile)
-  const handles = [
-    [rx + rw/2, ry], [rx + rw/2, ry + rh],
-    [rx, ry + rh/2], [rx + rw, ry + rh/2]
-  ];
-  handles.forEach(([hx, hy]) => {
+  getHandles().forEach(({x: hx, y: hy}) => {
     ctx.fillStyle = '#2A3CD4';
     ctx.beginPath(); ctx.arc(hx, hy, HANDLE_R, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5;

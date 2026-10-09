@@ -41,7 +41,7 @@
   .dst-lorenz__chart .pro-chart-lorenz { max-width: 24rem; }
   .dst-lorenz__facts { flex: 1 1 11rem; display: flex; flex-direction: column; gap: 0.8rem; }
   .dst-callout { margin: 0; font-family: var(--pro-font-display); font-weight: 600; font-size: 1.15rem; line-height: 1.3; color: var(--pro-bleu); }
-  .dst-callout em { font-style: normal; color: var(--pro-carmin); }
+  .dst-callout em { font-style: normal; color: var(--pro-carmin); white-space: nowrap; }
   .dst-fact { border-top: 1px solid var(--pro-trait); padding-top: 0.5rem; }
   .dst-fact b { display: block; font-family: var(--pro-font-display); font-weight: 700; font-size: 1.35rem; line-height: 1.15; color: var(--pro-bleu); }
   .dst-fact b.dst-c { color: var(--pro-carmin); }
@@ -70,25 +70,30 @@
   .dst-split__a .pro-chart-vbars { gap: 0.3rem; }
   .dst-split .pro-chart-vbars__x { padding-left: calc(34px + 0.5rem); }
   .dst-split__a .pro-chart-vbars__x { padding-left: calc(34px + 0.3rem); }
+  .dst-split__b .pro-chart-vbars__xin span { overflow-wrap: normal; white-space: nowrap; max-width: none; min-width: 0; margin: 0; display: flex; justify-content: center; }
   .dst-scale { margin: 0.2rem 0 0; font-size: 0.68rem; color: var(--pro-texte-doux); }
 
   .dst-section-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
   .dst-head-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.5rem 1rem; margin-bottom: 0.5rem; }
   .dst-head-row .pro-card__title { margin-bottom: 0.2rem; }
 
-  .dst-titre { min-width: 13rem; max-width: 22rem; }
+  .dst-titre { min-width: 11rem; max-width: 20rem; }
+  .dst-au { min-width: 6.5rem; }
   .dst-meta { color: var(--pro-texte-doux); font-size: 0.76rem; }
   .dst-p4 { display: inline-flex; align-items: center; gap: 0.5rem; }
   .dst-p4 b { color: var(--pro-bleu); font-weight: 700; min-width: 1.6rem; text-align: right; }
-  .dst-piege { white-space: normal; display: inline-block; border-radius: 12px; min-width: 11rem; }
+  .dst-pg { min-width: 10rem; }
+  .dst-piege { white-space: normal; display: block; width: fit-content; max-width: 13rem; border-radius: 12px; line-height: 1.3; }
   #dst-head .pro-head__inner { gap: 0 1.25rem; }
   #dst-head .pro-tab { padding: 0 0.8rem; }
   .dst-meter { display: flex; height: 8px; background: #EFEBE2; margin-top: 0.7rem; }
   .dst-meter span { display: block; background: var(--pro-bleu); }
   .dst-hb .pro-chart-hbars { --lw-w: 13rem; --vw: 9rem; }
   .dst-row > .dst-full { flex-basis: 100%; }
-  #ex-table { min-width: 74rem; }
-  #dorm-table { min-width: 62rem; }
+  /* style.css impose table-layout:fixed à tout <table> : les largeurs minimales des colonnes seraient ignorées. */
+  .pro-table { table-layout: auto; }
+  #ex-table, #dorm-table { min-width: 58rem; }
+  #ex-table th, #ex-table td, #dorm-table th, #dorm-table td { padding-left: 0.55rem; padding-right: 0.55rem; }
   .dst-select { display: inline-block; width: auto; max-width: 100%; padding-right: 0.5rem; }
   .dst-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; margin-left: auto; }
   .dst-count { font-size: 0.78rem; color: var(--pro-texte-doux); white-space: nowrap; }
@@ -106,6 +111,7 @@
     .dst-lorenz__facts { flex-basis: 100%; }
     .dst-callout { font-size: 1.05rem; }
     .dst-hb .pro-chart-hbars { --lw-w: 7rem; --vw: 6rem; }
+    #dst-head .pro-tab { padding: 0 0.6rem; font-size: 0.8rem; }
   }
 </style>
 <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
@@ -422,7 +428,7 @@ function legend(items) {
 function vbarsShell(o) {
   const nt = charts.niceTicks(o.max, 5, false);
   let h = '<div class="pro-chart" role="img" aria-label="' + esc(o.aria) + '"><div class="pro-chart-vbars" style="--h:' + (o.height || 220) + 'px">';
-  h += '<div class="pro-chart-vbars__axis" aria-hidden="true">' + nt.ticks.map(t => '<span style="bottom:' + (t / nt.max * 100).toFixed(2) + '%">' + esc(fmtK(t)) + '</span>').join('') + '</div>';
+  h += '<div class="pro-chart-vbars__axis" aria-hidden="true">' + nt.ticks.map(t => '<span style="bottom:' + (t / nt.max * 100).toFixed(2) + '%">' + esc(t >= 1000 ? fn(t / 1000, t % 1000 ? 1 : 0) + ' k' : fn(t)) + '</span>').join('') + '</div>';
   h += '<div class="pro-chart-vbars__plot">' + nt.ticks.filter(t => t > 0).map(t => '<span class="pro-chart-vbars__grid" aria-hidden="true" style="bottom:' + (t / nt.max * 100).toFixed(2) + '%"></span>').join('');
   h += '<div class="pro-chart-vbars__cols">' + o.cols(nt.max) + '</div></div></div>';
   h += '<div class="pro-chart-vbars__x" aria-hidden="true"><div class="pro-chart-vbars__xin">' + o.xlabels + '</div></div></div>';
@@ -536,13 +542,13 @@ function renderOverview() {
   const lastItems = [];
   for (let y = LAST_MIN + 1; y <= REF; y++) {
     const n = a.last[y - LAST_MIN + 1] || 0;
-    lastItems.push({ label: narrow.matches ? '’' + String(y).slice(2) : String(y), value: n, color: y >= REF - 3 ? BLEU : BLEU_CLAIR, tip: y + '\n' + fn(n) + ' exemplaire' + (n > 1 ? 's' : '') + (y === REF ? ' (année en cours)' : '') });
+    lastItems.push({ label: (narrow.matches && y % 2) ? '' : String(y).slice(2), value: n, color: y >= REF - 3 ? BLEU : BLEU_CLAIR, tip: y + '\n' + fn(n) + ' exemplaire' + (n > 1 ? 's' : '') + (y === REF ? ' (année en cours)' : '') });
   }
   const old = a.last[1] || 0;
   h += '<div class="dst-split"><div class="dst-split__a">' +
     charts.bars([{ label: '2007 ou avant', value: old, color: GRIS, hatched: true, tip: '2007 ou avant\n' + fn(old) + ' exemplaires' }], { height: 200, valueFmt: fmtK, title: 'Dernier prêt en 2007 ou avant' }) +
     '<p class="dst-scale">échelle propre</p></div><div class="dst-split__b">' +
-    charts.bars(lastItems, { height: 200, valueFmt: fmtK, valueLabels: !narrow.matches, title: 'Exemplaires par année de dernier prêt' }) + '</div></div>';
+    charts.bars(lastItems, { height: 200, valueFmt: fmtK, valueLabels: !narrow.matches, title: 'Exemplaires par année de dernier prêt' }) + '<p class="dst-scale" style="text-align:center">Année du dernier prêt (20xx)</p></div></div>';
   h += '<p class="dst-note"><strong class="dst-c">2007 ou avant</strong> regroupe les exemplaires dont le dernier prêt précède la mise en service du SIGB : l\'année exacte n\'est pas connue (' + fn(old) + ' exemplaires, ' + fmt.pct(pctOf(old, a.count)) + ' du périmètre). ' +
     fn(a.last[0]) + ' autres n\'ont jamais été prêtés. Prêtés dans les 4 dernières années : <strong>' + fn(a.ever4) + '</strong> (' + fmt.pct(pctOf(a.ever4, a.count)) + ').</p></div>';
 
@@ -794,7 +800,7 @@ function buildExTable() {
       { label: 'Prêts 4 ans', sort: 'p4' }, { label: 'Cumulés', sort: 'cum', num: true }, { label: 'Dernier prêt', sort: 'dern' },
       { label: 'Résa. cumul.', sort: 'resa', num: true }, { label: 'Code-barre', sort: 'barcode' }
     ],
-    row: i => '<tr><td class="dst-titre">' + esc(TITRE[i]) + '</td><td>' + (esc(AUTEUR[i]) || '—') + '</td><td>' + (COTE[i] ? '<span class="pro-cote-cell">' + esc(COTE[i]) + '</span>' : '—') + '</td>' +
+    row: i => '<tr><td><div class="dst-titre">' + esc(TITRE[i]) + '</div></td><td><div class="dst-au">' + (esc(AUTEUR[i]) || '—') + '</div></td><td>' + (COTE[i] ? '<span class="pro-cote-cell">' + esc(COTE[i]) + '</span>' : '—') + '</td>' +
       '<td class="dst-meta">' + (esc(FONDS[FONDS_I[i]]) || '—') + '</td>' +
       '<td class="is-num dst-meta">' + fn(AN3[i]) + '</td><td class="is-num dst-meta">' + fn(AN2[i]) + '</td><td class="is-num dst-meta">' + fn(AN1[i]) + '</td><td class="is-num dst-meta">' + fn(AN[i]) + '</td>' +
       '<td>' + (P4[i] === 0 ? '<span class="dst-meta">0</span>' : '<span class="dst-p4">' + charts.miniBars([AN3[i], AN2[i], AN1[i], AN[i]], { labels: ys, title: 'Prêts par année', max: Math.max(1, AN3[i], AN2[i], AN1[i], AN[i]) }) + '<b>' + fn(P4[i]) + '</b></span>') + '</td>' +
@@ -824,9 +830,9 @@ function buildDormTable() {
     },
     extraSig: () => dormState.hist + dormState.piege,
     universe: () => agg(scope).dorm,
-    row: i => '<tr><td class="dst-titre">' + esc(TITRE[i]) + '</td><td>' + (esc(AUTEUR[i]) || '—') + '</td><td>' + (COTE[i] ? '<span class="pro-cote-cell">' + esc(COTE[i]) + '</span>' : '—') + '</td>' +
+    row: i => '<tr><td><div class="dst-titre">' + esc(TITRE[i]) + '</div></td><td><div class="dst-au">' + (esc(AUTEUR[i]) || '—') + '</div></td><td>' + (COTE[i] ? '<span class="pro-cote-cell">' + esc(COTE[i]) + '</span>' : '—') + '</td>' +
       '<td class="dst-meta">' + (esc(FONDS[FONDS_I[i]]) || '—') + '</td><td class="is-num dst-meta">' + fn(CUM[i]) + '</td><td class="dst-meta">' + lastLabel(DERN[i]) + '</td>' +
-      '<td>' + (PIEGE[i] ? '<span class="pro-pill pro-pill--pret dst-piege">' + esc(PIEGE[i]) + '</span>' : '—') + '</td><td class="pro-mono dst-meta">' + (esc(BC[i]) || '—') + '</td></tr>',
+      '<td><div class="dst-pg">' + (PIEGE[i] ? '<span class="pro-pill pro-pill--pret dst-piege">' + esc(PIEGE[i]) + '</span>' : '—') + '</div></td><td class="pro-mono dst-meta">' + (esc(BC[i]) || '—') + '</td></tr>',
     after: view => { $('dorm-export').textContent = '⬇ Exporter (.txt) · ' + fn(view.length); }
   });
   $('dorm-hist').addEventListener('click', e => {

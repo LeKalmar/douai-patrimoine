@@ -194,6 +194,9 @@ aujourd'hui — un navigateur ne télécharge que les faces réellement appelée
   `--color-accent`…), utilisé **uniquement** par `histoire-du-livre.html`
   (page d'exposition avec son propre habillage). Ne pas fusionner ces deux
   fichiers sans intention explicite — ils ne partagent aucune classe.
+- **`css/admin.css`** (2026-10-09) : kit commun des **pages de l'espace
+  pro**, chargé APRÈS `style.css` — voir « Kit commun des outils pro »
+  ci-dessous.
 - Beaucoup de CSS/JS reste inline dans des balises `<style>`/`<script>` en
   bas de page plutôt que dans des fichiers séparés (`admin.html`,
   `inventaire.html`, `generer_manifest.html`, `scan-docs.html`…). C'est

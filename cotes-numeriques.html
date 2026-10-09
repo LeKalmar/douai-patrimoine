@@ -293,7 +293,7 @@ let rowsLoaded = false;
 function renderStats() {
   if (!rowsLoaded || !latestReport) return;
   const s = latestReport.stats || {};
-  const date = latestReport.generatedAt ? rpUI.fmt.ago(latestReport.generatedAt) : '—';
+  const date = latestReport.generatedAt ? rpUI.fmt.date(latestReport.generatedAt) + ' <span class="pro-muted" style="font-family:var(--pro-font-body);font-size:.78rem;font-weight:400">· ' + rpUI.fmt.ago(latestReport.generatedAt) + '</span>' : '—';
   const etage2 = ROWS.filter(r => r.etage === '2e').length;
   const etage5 = ROWS.filter(r => r.etage === '5e').length;
   const total = (s.kept ?? 0);

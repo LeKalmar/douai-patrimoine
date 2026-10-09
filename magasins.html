@@ -143,7 +143,9 @@ function normalize(rec) {
 }
 
 const SORTERS = {
-  cote:    (a, b) => (a.coteNum - b.coteNum) || a.cote.localeCompare(b.cote),
+  // Un exemplaire sans cote (fréquent au 6e, cote non saisie dans Syracuse)
+  // part en fin de liste au lieu d'occuper toute la première page.
+  cote:    (a, b) => (!a.cote - !b.cote) || (a.coteNum - b.coteNum) || a.cote.localeCompare(b.cote),
   etage:   (a, b) => a.etage.localeCompare(b.etage) || (a.coteNum - b.coteNum),
   secteur: (a, b) => a.secteur.localeCompare(b.secteur),
   titre:   (a, b) => a.titre.localeCompare(b.titre),
@@ -262,7 +264,7 @@ let rowsLoaded = false;
 function renderStats() {
   if (!rowsLoaded || !latestReport) return;
   const s = latestReport.stats || {};
-  const date = latestReport.generatedAt ? rpUI.fmt.ago(latestReport.generatedAt) : '—';
+  const date = latestReport.generatedAt ? rpUI.fmt.date(latestReport.generatedAt) + ' <span class="pro-muted" style="font-family:var(--pro-font-body);font-size:.78rem;font-weight:400">· ' + rpUI.fmt.ago(latestReport.generatedAt) + '</span>' : '—';
   const etage2 = ROWS.filter(r => r.etage === '2e').length;
   const etage5 = ROWS.filter(r => r.etage === '5e').length;
   const etage6 = ROWS.filter(r => r.etage === '6e').length;

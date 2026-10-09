@@ -144,7 +144,7 @@
   .rb-nav__pos b { font-family: var(--pro-font-display); font-size: 1.5rem; color: var(--pro-bleu); }
   .rb-nav__sub { text-align: center; font-size: .72rem; color: var(--pro-texte-doux); margin: -.3rem 0 .6rem; }
   .rb-nav__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .rb-nav__btns .pro-btn { border: 1px solid var(--pro-trait-fort); background: #fff; }
+  .rb-nav__btns .pro-btn { border: 1px solid var(--pro-trait-fort); background: #fff; min-width: 0; padding: 0 .4rem; gap: .3rem; font-size: .8rem; }
   .rb-nav__btns .pro-btn:hover:not(:disabled) { background: var(--pro-bleu-pale); }
   .rb-nav__none { font-size: .75rem; color: var(--pro-texte-doux); margin: 0; }
   .rb-avis { margin-top: 1.1rem; padding: .85rem .95rem; background: var(--pro-papier); border: 1px solid var(--pro-carte-bord); border-left: 4px solid var(--pro-bleu); font-size: .82rem; }
@@ -182,7 +182,8 @@
   .rb-sec:first-child { margin-top: 0; }
   .rb-sec__title { margin: 0 0 .9rem; font-family: var(--pro-font-display); font-weight: 600; font-size: 1.4rem; color: var(--pro-bleu); }
   .rb-sec__sub { margin: -.5rem 0 .9rem; font-size: .8rem; color: var(--pro-texte-doux); }
-  .rb-kpis__ring { flex: 2 1 340px; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
+  #rb-kpis .pro-kpi { flex: 1 1 150px; padding: 1.1rem 1.2rem; }
+  .rb-kpis__ring { flex: 2 1 330px !important; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
   .rb-kpis__legend { flex: 1 1 180px; display: grid; gap: .35rem; font-size: .8rem; }
   .rb-kpis__legend div { display: flex; align-items: center; gap: .5rem; }
   .rb-kpis__legend strong { color: var(--pro-bleu); min-width: 2.2rem; }
@@ -192,6 +193,9 @@
   .rb-loans__rest { flex: 0 1 190px; border-left: 1px solid var(--pro-carte-bord); padding-left: 1.2rem; display: flex; flex-direction: column; justify-content: center; }
   .rb-loans__rest b { font-family: var(--pro-font-display); font-size: 2.2rem; line-height: 1.1; color: var(--pro-bleu); }
   .rb-loans__rest small { font-size: .7rem; color: var(--pro-texte-doux); line-height: 1.45; }
+  #rb-lastyear .pro-chart-vbars__xin span { overflow-wrap: normal; white-space: nowrap; overflow: visible; }
+  #rb-lastyear .pro-chart-vbars__x { padding-right: 14px; }
+  #rb-lastyear .pro-chart { overflow: hidden; }
   .rb-scatter .pro-chart-scatter__pt { cursor: pointer; }
   .rb-scatter .pro-chart-scatter__pt.is-hi { background: var(--c, var(--pro-bleu)); }
   .rb-ctrl { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
@@ -220,11 +224,18 @@
 
   /* Tableau de travail */
   .rb-tbl { overflow-x: auto; }
-  @media (min-width: 70rem) { .rb-tbl { overflow: visible; } }
-  .rb-tbl .pro-table th { padding: .5rem .5rem; }
-  .rb-tbl .pro-table td { padding: .45rem .5rem; }
-  .rb-tbl .pro-table { font-size: .8rem; }
-  .rb-tbl td:nth-child(3) { min-width: 200px; }
+  @media (min-width: 75rem) { .rb-tbl { overflow: visible; } }
+  .rb-tbl .pro-table th { padding: .5rem .4rem; }
+  .rb-tbl .pro-table td { padding: .4rem .4rem; }
+  .rb-tbl .pro-table { font-size: .78rem; }
+  .rb-tbl .pro-table { table-layout: fixed; min-width: 1000px; }
+  .rb-tbl th:nth-child(1) { width: 56px; } .rb-tbl th:nth-child(2) { width: 112px; }
+  .rb-tbl th:nth-child(4) { width: 66px; } .rb-tbl th:nth-child(5) { width: 86px; }
+  .rb-tbl th:nth-child(6) { width: 70px; } .rb-tbl th:nth-child(7) { width: 54px; }
+  .rb-tbl th:nth-child(8) { width: 88px; } .rb-tbl th:nth-child(9) { width: 70px; }
+  .rb-tbl th:nth-child(10) { width: 156px; }
+  .rb-tbl td:nth-child(2) { font-size: .7rem; overflow-wrap: anywhere; }
+  .rb-tbl td:nth-child(3) { overflow-wrap: anywhere; }
   .rb-ttl { display: inline; margin: 0; padding: 0; background: none; border: 0; border-radius: 0; font: 600 .82rem var(--pro-font-body); color: var(--pro-texte); text-align: left; cursor: pointer; }
   .rb-ttl:hover { color: var(--pro-bleu); text-decoration: underline; }
   .rb-aut { font-size: .7rem; color: var(--pro-texte-doux); }
@@ -232,8 +243,8 @@
   .rb-zero { color: var(--pro-carmin-fonce); font-weight: 600; }
   .rb-pos { color: var(--pro-ok); font-weight: 600; }
   .rb-tbl tr.is-treated td { color: var(--pro-texte-doux); }
-  .rb-dbtns { display: inline-flex; gap: 4px; white-space: nowrap; }
-  .rb-dbtn { width: 36px; height: 36px; margin: 0; padding: 0; border: 1.5px solid var(--pro-trait-fort); border-radius: 0; background: #fff; color: var(--pro-texte); font: 700 .8rem var(--pro-font-body); cursor: pointer; }
+  .rb-dbtns { display: inline-flex; gap: 3px; white-space: nowrap; }
+  .rb-dbtn { width: 34px; height: 36px; margin: 0; padding: 0; border: 1.5px solid var(--pro-trait-fort); border-radius: 0; background: #fff; color: var(--pro-texte); font: 700 .8rem var(--pro-font-body); cursor: pointer; }
   .rb-dbtn:hover { border-color: var(--pro-texte-faible); background: var(--pro-papier-ombre); }
   .rb-dbtn[aria-pressed="true"] { border-color: transparent; color: #fff; }
   .rb-dbtn--conserver[aria-pressed="true"] { background: var(--pro-dec-conserver); }
@@ -1723,7 +1734,7 @@ function renderLastYear(){
   const years = [...cnt.keys()];
   if(!years.length){ $('rb-lastyear').innerHTML = '<p class="rb-note" style="margin:0">Aucune année de dernier prêt connue pour ce rayon.</p>'; return; }
   const lo = Math.min(...years), hi = Math.max(Y, ...years);
-  const n = hi - lo + 1, step = n > 12 ? 2 : 1;
+  const n = hi - lo + 1, step = n > 12 ? (window.innerWidth < 640 ? 3 : 2) : 1;
   const items = [];
   for(let y = lo; y <= hi; y++){
     const v = cnt.get(y) || 0;
@@ -1816,11 +1827,11 @@ const RAYON_COLS = [
   { key:'cote',    label:'Cote' },
   { key:'titre',   label:'Titre' },
   { key:'parution',label:'Parution' },
-  { key:'saisie',  label:'Catalogué le' },
+  { key:'saisie',  label:'Catalogué' },
   { key:'spark',   label:'Prêts / an', nosort:true },
   { key:'an',      label:'Prêts AN', num:true },
   { key:'avant',   label:'Prêts avant', num:true },
-  { key:'dernier', label:'Dernier prêt', num:true },
+  { key:'dernier', label:'Dernier', num:true },
   { key:'statut',  label:'Décision' },
 ];
 function rayonSortValue(r, key){
@@ -1901,10 +1912,11 @@ function renderRayonTable(){
   if(!RAYON_CURRENT) return;
   const Y = REFERENCE_YEAR;
   $('rayon-thead').innerHTML = '<tr>' + RAYON_COLS.map(c => {
-    const lbl = c.key === 'an' ? `Prêts ${Y}` : c.key === 'avant' ? `Prêts avant ${Y}` : c.label;
-    if(c.nosort) return `<th scope="col">${lbl}</th>`;
+    const lbl = c.key === 'an' ? `${Y}` : c.key === 'avant' ? `Avant ${Y}` : c.label;
+    const hint = c.key === 'an' ? `Prêts en ${Y}` : c.key === 'avant' ? `Prêts avant ${Y} (toutes années précédentes)` : c.key === 'dernier' ? 'Année du dernier prêt' : c.key === 'saisie' ? 'Date de catalogage' : c.key === 'spark' ? `Prêts ${Y-3} à ${Y}` : '';
+    if(c.nosort) return `<th scope="col" title="${esc(hint)}">${lbl}</th>`;
     const sorted = rayonSort.key === c.key;
-    return `<th scope="col" data-sort="${c.key}" class="${c.num?'is-num':''}" aria-sort="${sorted ? (rayonSort.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" class="pro-sortbtn">${lbl}</button></th>`;
+    return `<th scope="col" title="${esc(hint)}" data-sort="${c.key}" class="${c.num?'is-num':''}" aria-sort="${sorted ? (rayonSort.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" class="pro-sortbtn">${lbl}</button></th>`;
   }).join('') + '</tr>';
 
   const rows = filteredRows();

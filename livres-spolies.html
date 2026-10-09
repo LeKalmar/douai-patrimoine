@@ -52,7 +52,7 @@
     .ls-sortbox select { height: 34px; border: 1px solid var(--pro-trait-fort); background: #fff; color: var(--pro-texte); font: 400 .8rem var(--pro-font-body); padding: 0 .4rem; border-radius: 0; }
     .ls-filter-info { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem 1rem; padding: .45rem 1rem; background: var(--pro-bleu-pale); border-bottom: 1px solid var(--pro-bleu-bord); font-size: .78rem; color: var(--pro-bleu); }
     .ls-filter-info[hidden] { display: none; }
-    .ls-tbl { table-layout: auto; }
+    .pro-table-wrap > .pro-table.ls-tbl { table-layout: auto; min-width: 0; }
     .ls-tbl th, .ls-tbl td { padding: .55rem .7rem; }
     .ls-tbl td { vertical-align: top; }
     .ls-tbl .c-caisse { width: 3.6rem; font-family: var(--pro-font-mono); color: var(--pro-texte-doux); white-space: nowrap; }
@@ -60,13 +60,15 @@
     .ls-tbl .c-auteur { width: 9.5rem; overflow-wrap: anywhere; }
     .ls-tbl .c-titre { min-width: 13rem; font-weight: 600; overflow-wrap: anywhere; }
     .ls-tbl .c-pub { width: 9.5rem; font-size: .76rem; color: var(--pro-texte-doux); overflow-wrap: anywhere; }
-    .ls-tbl .c-statut { width: 21.5rem; }
+    .ls-tbl .c-statut { width: 19rem; }
+    .ls-tbl thead th { font: 600 .68rem var(--pro-font-body); color: var(--pro-texte-doux); letter-spacing: .05em; text-transform: uppercase; }
+    .ls-tbl thead th[aria-sort="ascending"], .ls-tbl thead th[aria-sort="descending"] { color: var(--pro-bleu); }
     .ls-tbl .c-det { width: 7.5rem; text-align: right; }
     .ls-state { display: block; margin-top: .35rem; }
     .ls-state:empty { display: none; }
     .ls-state .pro-pill { font-weight: 600; }
     .ls-pill-cote { background: #FFF3CF; color: #6b4a00; border-color: #E8C560; }
-    .ls-flags { display: flex; flex-wrap: wrap; gap: .5rem .9rem; }
+    .ls-flags { display: flex; flex-wrap: wrap; gap: .5rem .7rem; }
     .ls-flag { display: flex; flex-direction: column; gap: .2rem; }
     .ls-flag .pro-label { margin: 0; }
 
@@ -93,7 +95,7 @@
     .ls-detbtn .ls-dot { display: inline-block; min-width: 1.15rem; padding: 0 .3rem; border-radius: 20px; background: var(--pro-bleu); color: #fff; font-size: .66rem; line-height: 1.35; text-align: center; }
 
     /* Tri-état agrandi : groupe segmenté « — / Oui / Non » */
-    .ls-seg button { min-height: 40px; min-width: 3.1rem; padding: 0 .75rem; color: var(--pro-texte-doux); font-weight: 600; font-size: .8rem; }
+    .ls-seg button { min-height: 40px; min-width: 2.6rem; padding: 0 .5rem; color: var(--pro-texte-doux); font-weight: 600; font-size: .8rem; }
     .ls-seg button[aria-pressed="true"][data-value=""] { background: #e3e4ec; color: var(--pro-texte); }
     .ls-seg button[aria-pressed="true"][data-value="1"] { background: var(--pro-ok); color: #fff; }
     .ls-seg button[aria-pressed="true"][data-value="0"] { background: var(--pro-pilon, #c62828); background: #c62828; color: #fff; }
@@ -109,7 +111,7 @@
       .ls-tbl, .ls-tbl tbody { display: block; }
       .ls-tbl thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
       .ls-tbl tr.ls-main { display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "caisse type det" "titre titre titre" "auteur auteur auteur" "pub pub pub" "statut statut statut"; gap: .25rem .75rem; padding: .8rem 1rem .9rem; border-bottom: 1px solid var(--pro-filet); position: relative; }
-      .ls-tbl tr.ls-main td { display: block; padding: 0; border: 0; width: auto !important; min-width: 0 !important; background: transparent !important; box-shadow: none !important; }
+      .ls-tbl tr.ls-main td { display: block; min-height: 0; padding: 0; border: 0; width: auto !important; min-width: 0 !important; background: transparent !important; box-shadow: none !important; }
       .ls-tbl tr.ls-main.is-found { background: #F0F8F1; box-shadow: inset 4px 0 0 var(--pro-ok); }
       .ls-tbl tr.ls-main.is-notfound { background: #FDF1F3; box-shadow: inset 4px 0 0 var(--pro-carmin); }
       .ls-tbl tr.ls-main.is-cote { background: #FFF9E6; box-shadow: inset 4px 0 0 var(--pro-dec-braderie); }

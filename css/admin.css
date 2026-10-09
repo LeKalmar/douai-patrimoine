@@ -388,7 +388,13 @@ textarea.pro-input { height: auto; min-height: 5.5rem; padding: 0.6rem 0.8rem; l
 }
 .pro-toolbar .pro-search { flex: 1 1 260px; max-width: 380px; }
 .pro-toolbar__filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; flex: 1 1 240px; }
+/* Un sélecteur posé directement dans une barre d'outils garde sa largeur
+   naturelle (sinon .pro-input, en width:100%, prend toute une ligne). */
+.pro-toolbar > select.pro-input, .pro-toolbar__filters > select.pro-input { width: auto; flex: 0 0 auto; max-width: 100%; }
 .pro-table-wrap { overflow: auto; max-height: 31rem; -webkit-overflow-scrolling: touch; }
+/* Sur téléphone, un tableau de données garde une largeur lisible et défile
+   horizontalement dans son cadre plutôt que d'écraser ses colonnes. */
+@media (max-width: 40rem) { .pro-table-wrap > .pro-table { min-width: 44rem; } }
 .pro-table-wrap--free { max-height: none; }
 .pro-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .pro-table th {
@@ -503,6 +509,7 @@ details.pro-help[open] .pro-help__chev { transform: rotate(180deg); }
 .pro-chart-vbars__x { display: flex; padding: 0.35rem 0 0 calc(38px + 0.5rem); }
 .pro-chart-vbars__xin { flex: 1; display: flex; justify-content: space-around; padding: 0 2%; }
 .pro-chart-vbars__xin span { flex: 1 1 0; max-width: 5.5rem; margin: 0 2%; text-align: center; font-size: 0.72rem; color: var(--pro-texte-doux); line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+.pro-chart-vbars__xin--dense span { white-space: nowrap; overflow: visible; overflow-wrap: normal; display: flex; justify-content: center; }
 .pro-chart-unit { font-size: 0.7rem; color: var(--pro-texte-doux); margin-bottom: 0.3rem; }
 
 /* barres horizontales classées */

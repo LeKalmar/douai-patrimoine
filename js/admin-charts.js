@@ -156,8 +156,16 @@
         '</div>';
     });
     h += '</div></div></div>';
-    h += '<div class="pro-chart-vbars__x" aria-hidden="true"' + (o.axis === false ? ' style="padding-left:0"' : '') + '><div class="pro-chart-vbars__xin">';
-    items.forEach(function (it) { h += '<span>' + esc(it.label) + '</span>'; });
+    // Beaucoup de colonnes (ex. une par année) : une étiquette sur `step`, sur
+    // une seule ligne — sinon « 2008 » se casse chiffre par chiffre. La
+    // première et la dernière restent toujours affichées.
+    var dense = items.length > 10;
+    var step = dense ? Math.ceil(items.length / 10) : 1;
+    h += '<div class="pro-chart-vbars__x" aria-hidden="true"' + (o.axis === false ? ' style="padding-left:0"' : '') + '><div class="pro-chart-vbars__xin' + (dense ? ' pro-chart-vbars__xin--dense' : '') + '">';
+    items.forEach(function (it, i) {
+      var show = !dense || i % step === 0 || i === items.length - 1;
+      h += '<span>' + (show ? esc(it.label) : '') + '</span>';
+    });
     h += '</div></div></div>';
     return h;
   }
