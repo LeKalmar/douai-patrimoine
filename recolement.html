@@ -3515,24 +3515,6 @@ function traveeGroupOf(travee){
   return 'reserve';
 }
 
-// Nombre total d'emplacements possibles (étagères) d'un groupe, d'après la
-// géométrie par défaut de js/reserve-shared.js (nbCols × defaultMaxEtageOf
-// par travée/meuble) — sert de dénominateur à computeShelfBreakdown() pour
-// afficher aussi la part JAMAIS traitée, pas seulement la répartition parmi
-// les emplacements déjà traités. Approximatif par nature (comme maxEtageOf()
-// de reserve.html) : une travée dont la colonne réelle dépasse le maxEt par
-// défaut compte quand même intégralement grâce au Math.max() dans
-// computeShelfBreakdown() ci-dessous.
-function totalSlotsForGroup(group){
-  // Rayons : nombre d'étagères saisi colonne par colonne à leur création.
-  if(group==='rayons') return TRAVEES_RAYONS.reduce((s,def)=>s + def.colEtages.reduce((a,b)=>a+b,0), 0);
-  const defs = group==='magasin-2e' ? TRAVEES_MAGASIN2
-    : group==='magasin-5e' ? TRAVEES_MAGASIN5
-    : group==='magasin-6e' ? TRAVEES_MAGASIN6
-    : [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_TIROIR];
-  return defs.reduce((s,def)=>s + def.nbCols * defaultMaxEtageOf(def), 0);
-}
-
 function computeShelfBreakdown(group){
   const contentKeys = new Set();
   Object.values(scans).forEach(r=>{
@@ -3554,13 +3536,16 @@ function computeShelfBreakdown(group){
   const treated = allKeys.size;
   // Au moins autant que le traité réel, au cas où les données dépassent la
   // géométrie par défaut (colonne réellement plus profonde que son maxEt).
-  const possible = Math.max(totalSlotsForGroup(group), treated);
+  // Dénominateur (pour afficher aussi la part JAMAIS traitée) : somme de la
+  // couverture par travée, qui tient compte des « dernières étagères »
+  // marquées (voir slotsOfTravee()).
+  const possible = Math.max(computeCoverage(group).reduce((s,r)=>s + r.possible, 0), treated);
   const nontraite = possible - treated;
   return { recoled, vide, nonrange, nontraite, treated, possible };
 }
 
 /* Emplacements d'un groupe de statistiques, travée par travée (même
-   géométrie que totalSlotsForGroup() ci-dessus) : sert à « Couverture par
+   géométrie que le plan, voir slotsOfTravee()) : sert à « Couverture par
    travée » du Tableau de bord. */
 function traveesOfStatsGroup(group){
   if(group==='rayons') return TRAVEES_RAYONS;
@@ -3569,9 +3554,32 @@ function traveesOfStatsGroup(group){
   if(group==='magasin-6e') return TRAVEES_MAGASIN6;
   return [...TRAVEES, ...TRAVEES_DOUAISIENNE, ...EMPLACEMENTS_ARMOIRE, ...EMPLACEMENTS_TIROIR];
 }
-function slotsOfTravee(def){
-  if(Array.isArray(def.colEtages)) return def.colEtages.reduce((a,b)=>a+b,0);
-  return def.nbCols * defaultMaxEtageOf(def);
+// Nombre d'emplacements réels d'une travée, colonne par colonne — même règle
+// que miniColsOf()/miniMaxEtageOf() (mini-plan) : une colonne s'arrête à sa
+// « dernière étagère » marquée (lastShelves) au lieu du maxEt par défaut, et
+// s'étend malgré tout jusqu'aux données réelles qui la dépasseraient.
+// `keys` : emplacements traités de cette travée, sous la forme "colonne|etage".
+// Sans ça, une colonne physiquement plus courte que le défaut (8 étagères en
+// réserve) laissait des étagères fantômes « jamais traitées » dans le total.
+function slotsOfTravee(def, keys){
+  const maxBy = {};
+  for(let i=1;i<=(def.nbCols||0);i++){
+    const c = String.fromCharCode(64+i);
+    maxBy[c] = defaultMaxEtageOf(def, c);
+  }
+  Object.keys(lastShelves).forEach(k=>{
+    const [t,c] = k.split('|');
+    if(t!==def.id) return;
+    const m = parseInt(lastShelves[k].etage,10);
+    if(!isNaN(m)) maxBy[c] = m;
+  });
+  (keys||[]).forEach(k=>{
+    const [c,e] = k.split('|');
+    const n = parseInt(e,10);
+    if(isNaN(n)) return;
+    if(!(c in maxBy) || n>maxBy[c]) maxBy[c] = n;
+  });
+  return Object.values(maxBy).reduce((a,b)=>a+b,0);
 }
 function coverageLabel(group, def){
   if(def.label) return def.label;
@@ -3605,7 +3613,7 @@ function computeCoverage(group){
     b.vi.forEach(k=>{ if(!b.content.has(k) && !b.nr.has(k)) vide++; });
     const treated = recoled + nonrange + vide;
     const def = b.def || { id:tid, nbCols:0 };
-    const possible = Math.max(b.def ? slotsOfTravee(def) : 0, treated);
+    const possible = Math.max(b.def ? slotsOfTravee(def, [...b.content, ...b.nr, ...b.vi]) : 0, treated);
     rows.push({ id:tid, label:coverageLabel(group, def), recoled, vide, nonrange, treated, possible });
   });
   return rows;
