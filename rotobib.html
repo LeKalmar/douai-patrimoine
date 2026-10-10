@@ -273,6 +273,38 @@
   .sel-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
   .sel-err { color: var(--pro-carmin-fonce); font-size: .8rem; font-weight: 600; margin-top: .5rem; }
 
+  /* Décision figée par le responsable */
+  .rb-lock { margin-top: .6rem; font-size: .76rem; line-height: 1.45; color: var(--pro-texte); }
+  .rb-dbig:disabled { cursor: not-allowed; filter: grayscale(.35); opacity: .55; }
+  .rb-dbig:disabled:hover { filter: grayscale(.35); }
+  .rb-dbig.active:disabled { opacity: 1; filter: none; }
+  .rb-dbtn:disabled { cursor: not-allowed; opacity: .45; }
+  .rb-dbtn[aria-pressed="true"]:disabled { opacity: 1; }
+  .avis-line.final { color: var(--pro-ok); }
+
+  /* ── Onglet Tri final ── */
+  .rb-tri { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+  .rb-tri__side { border-top: 3px solid var(--pro-bleu); }
+  .rb-trires { min-height: 260px; padding: 1.5rem 1.6rem; border: 1px solid var(--pro-carte-bord); background: #fff; display: flex; flex-direction: column; justify-content: center; gap: .6rem; }
+  .rb-trires--ok, .rb-trires--already { background: var(--c); border-color: var(--c); color: var(--ink, #fff); }
+  .rb-trires--pending { background: #FFF8E1; border-color: #F0DDA0; border-left: 6px solid var(--pro-dec-braderie); }
+  .rb-trires--none { background: var(--pro-ko-fond); border-left: 6px solid var(--pro-carmin); }
+  .rb-trires__state { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .9; }
+  .rb-trires__dest { display: flex; align-items: center; gap: 1rem; font-family: var(--pro-font-display); font-weight: 700; font-size: clamp(2.6rem, 7vw, 4.5rem); line-height: 1; text-transform: uppercase; letter-spacing: .02em; }
+  .rb-trires__t { font-family: var(--pro-font-display); font-weight: 600; font-size: 1.25rem; line-height: 1.25; overflow-wrap: anywhere; }
+  .rb-trires__m { font-size: .85rem; opacity: .92; }
+  .rb-trires__m .pro-cote { margin-right: .4rem; }
+  .rb-trires__msg { font-family: var(--pro-font-display); font-weight: 600; font-size: 1.5rem; line-height: 1.25; color: var(--pro-bleu); }
+  .rb-trires .pro-btn { align-self: flex-start; margin-top: .4rem; }
+  .rb-trik { display: grid; gap: .55rem; margin-top: .8rem; }
+  .rb-trik__row { display: grid; grid-template-columns: 10px 1fr auto; gap: .6rem; align-items: center; font-size: .84rem; }
+  .rb-trik__row i { width: 10px; height: 34px; background: var(--c); }
+  .rb-trik__row b { font-family: var(--pro-font-display); font-size: 1.35rem; color: var(--pro-bleu); }
+  .rb-trik__row small { display: block; font-size: .7rem; color: var(--pro-texte-doux); }
+  .rb-trik__tot { border-top: 1px solid var(--pro-carte-bord); padding-top: .7rem; margin-top: .3rem; font-size: .82rem; }
+  .rb-trik__tot strong { font-family: var(--pro-font-display); font-size: 1.15rem; color: var(--pro-bleu); }
+  @media (max-width: 60rem) { .rb-tri { grid-template-columns: minmax(0, 1fr); } }
+
   /* ── Onglet Journal & exports ── */
   .rb-exports { display: flex; flex-wrap: wrap; gap: .6rem; }
   .rb-log .pro-table td { padding: .45rem .7rem; }
@@ -311,6 +343,7 @@
     <div class="pro-tabs" role="tablist" aria-label="Sections de Rotobib" id="rb-tabs">
       <button type="button" class="pro-tab" role="tab" data-tab="decider" aria-selected="true">Décider</button>
       <button type="button" class="pro-tab" role="tab" data-tab="rayon" aria-selected="false">Rayon <span class="pro-tab__count" id="tab-rayon-count" hidden title="Livres restant à traiter dans le rayon"></span></button>
+      <button type="button" class="pro-tab" role="tab" data-tab="tri" aria-selected="false">Tri final <span class="pro-tab__count" id="tab-tri-count" hidden title="Livres tranchés par le responsable, pas encore triés"></span></button>
       <button type="button" class="pro-tab" role="tab" data-tab="journal" aria-selected="false">Journal &amp; exports</button>
     </div>
     <div class="pro-head__actions">
@@ -395,6 +428,7 @@
       <div class="pro-help__body">
         <p>Cet outil porte sur les magasins 2e/5e/6e étage, à partir des statistiques de prêt de <code>xml/bib.xml</code> (export complet de la bibliothèque). Scannez un code-barre : sa fiche (titre, auteur, cote, dates) et son historique de prêts sur les 4 dernières années s'affichent. Choisissez ensuite un traitement — les décisions sont partagées entre collègues (comme le récolement) et s'exportent en .txt pour ajout panier dans le SIGB. Pour une vue d'ensemble sur tout le catalogue, voir <a class="pro-link" href="desherbage-stats.html">Statistiques de prêt</a>.</p>
         <p><strong>Rayons en libre accès :</strong> importez un rayon créé dans le récolement (« Changer de rayon ») pour voir tous ses livres d'un coup et décider livre par livre. La liste se complète d'elle-même au fil du récolement ; un livre déjà traité y reste même s'il n'est plus scanné dans le rayon.</p>
+        <p><strong>Le responsable a le dernier mot :</strong> dès qu'il a validé une décision ou en a choisi une autre (<a class="pro-link" href="validation-desherbage.html">Validation du désherbage</a>), elle est figée — 🔒 — et ne se change plus ici. Il ne reste qu'à <strong>trier</strong> le livre : onglet « Tri final », rescannez chaque livre tranché, la page affiche en grand sa destination (Pilon, Braderie, Relocalisation, Conserver) et le marque <em>trié définitivement</em> — plus rien à faire dessus. <span class="pro-kbd">U</span> annule le dernier tri.</p>
         <p><strong>Raccourcis</strong> (fiche affichée, champ de scan vide) :
           <span class="pro-kbd">C</span> Conserver · <span class="pro-kbd">B</span> Braderie · <span class="pro-kbd">R</span> Relocalisation · <span class="pro-kbd">P</span> Pilon · <span class="pro-kbd">U</span> Annuler la décision · <span class="pro-kbd">←</span> <span class="pro-kbd">→</span> livre précédent / suivant (dans un rayon). Des lettres et jamais des chiffres : la scannette tape des chiffres.</p>
       </div>
@@ -534,6 +568,57 @@
       </div>
     </section>
 
+    <!-- ═════════ Tri final ═════════ -->
+    <section class="pro-tabpanel" id="panel-tri" data-tab="tri" style="margin-top:1.25rem" aria-label="Tri final" hidden>
+      <div class="rb-tri">
+        <div class="rb-tri__main">
+          <div id="tri-result" aria-live="polite"></div>
+          <div class="rb-dec__row" style="margin-top:.75rem">
+            <button type="button" class="pro-btn pro-btn--ghost" id="tri-undo" disabled aria-keyshortcuts="U"></button>
+            <span class="rb-note" style="margin:0">Scannez dans le champ « Scanner un livre » ci-dessus.</span>
+          </div>
+        </div>
+        <aside class="pro-card pro-card--pad rb-tri__side" aria-label="Avancement du tri">
+          <p class="pro-eyebrow">Avancement du tri</p>
+          <div id="tri-kpis"></div>
+        </aside>
+      </div>
+
+      <div class="rb-sec">
+        <div class="pro-section-head"><h2 class="pro-eyebrow">Restant à trier</h2><span class="pro-rule" aria-hidden="true"></span><span class="pro-section-note">tranchés par le responsable, pas encore rescannés</span></div>
+        <div class="pro-card">
+          <div class="pro-toolbar">
+            <label class="pro-search">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-5-5"/></svg>
+              <input type="search" class="pro-input" id="tri-search" placeholder="Filtrer (titre, cote, code-barre…)" autocomplete="off" aria-label="Filtrer les livres à trier">
+            </label>
+            <div class="pro-toolbar__filters" id="tri-filter" role="group" aria-label="Destination"></div>
+          </div>
+          <div class="pro-table-wrap pro-table-wrap--free">
+            <table class="pro-table">
+              <thead><tr><th scope="col">Destination</th><th scope="col">Cote</th><th scope="col">Titre</th><th scope="col">Emplacement</th><th scope="col">Code-barre</th></tr></thead>
+              <tbody id="tri-todo-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pro-table-foot" id="tri-todo-foot"></div>
+        </div>
+      </div>
+
+      <div class="rb-sec">
+        <div class="pro-section-head"><h2 class="pro-eyebrow">Triés</h2><span class="pro-rule" aria-hidden="true"></span><span class="pro-section-note">validés définitivement — un code-barre par ligne pour le SIGB</span></div>
+        <div class="rb-exports" id="tri-exports"></div>
+        <div class="pro-card" style="margin-top:.9rem">
+          <div class="pro-table-wrap pro-table-wrap--free">
+            <table class="pro-table">
+              <thead><tr><th scope="col">Destination</th><th scope="col">Titre</th><th scope="col">Code-barre</th><th scope="col">Trié le</th><th scope="col"><span class="pro-sr">Action</span></th></tr></thead>
+              <tbody id="tri-done-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pro-table-foot" id="tri-done-foot"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ═════════ Journal & exports ═════════ -->
     <section class="pro-tabpanel" id="panel-journal" data-tab="journal" style="margin-top:1.25rem" aria-label="Journal et exports" hidden>
       <div class="rb-sec">
@@ -624,6 +709,12 @@ let rayonSort = { key:'empl', dir:1 };
 let rayonFullDirty = false;      // rayon rechargé alors que l'onglet est masqué
 const rayonTouched = new Set();  // décisions changées alors que l'onglet est masqué
 let journalDirty = true;
+let triDirty = true;
+let TRI_SHOWN = null;    // { bc, kind } — dernier livre scanné dans l'onglet Tri final
+let triFilter = '';      // destination filtrée dans « Restant à trier » ('' = toutes)
+let triLimit = 200;
+const TRI_RECENT = new Map();   // code-barre → { final|null, at } (voir mergeIncoming)
+const TRI_RECENT_MS = 120000;
 let tblLimit = 300;
 let logLimit = 100;
 let lastRayonSig = '';
@@ -701,13 +792,26 @@ function updateSyncIndicator(){ syncQueue.updateIndicator(); }
 /* Fusion d'un état venu du serveur : ne retient que les décisions réellement
    changées (statut, avis, horodatage) pour ne mettre à jour que ce qui l'est —
    un sondage de 45 s qui ne ramène rien ne reconstruit plus rien. */
+/* Un tri (patch finalize/unfinalize) envoyé il y a moins de 2 min est
+   réappliqué par-dessus l'état serveur : /api/desherbage est mis en cache 20 s
+   par le CDN, une relecture juste après l'envoi renverrait l'état d'avant et
+   le compteur « à trier » ferait un aller-retour. */
 function mergeIncoming(serverState){
   const pendingBarcodes = new Set(syncQueue.items.map(p => p.record ? p.record.barcode : p.barcode));
   const changed = [];
+  const now = Date.now();
   Object.keys(serverState || {}).forEach(bc => {
     if(pendingBarcodes.has(bc)) return;
-    const a = TRAITEMENTS[bc], b = serverState[bc];
-    if(!a || a.statut !== b.statut || a.ts !== b.ts || JSON.stringify(a.validation || null) !== JSON.stringify(b.validation || null)) changed.push(bc);
+    const a = TRAITEMENTS[bc];
+    let b = serverState[bc];
+    const r = TRI_RECENT.get(bc);
+    if(r && now - r.at > TRI_RECENT_MS) TRI_RECENT.delete(bc);
+    else if(r && JSON.stringify(b.final || null) !== JSON.stringify(r.final)){
+      b = { ...b };
+      if(r.final) b.final = r.final; else delete b.final;
+    }
+    if(!a || a.statut !== b.statut || a.ts !== b.ts || JSON.stringify(a.validation || null) !== JSON.stringify(b.validation || null)
+      || JSON.stringify(a.final || null) !== JSON.stringify(b.final || null)) changed.push(bc);
     TRAITEMENTS[bc] = b;
   });
   if(!changed.length) return;
@@ -779,7 +883,7 @@ function auteurComplet(rec){
    ════════════════════════════════════════════════════════════ */
 function rayonCounts(){
   const counts = { conserver:0, braderie:0, relocalisation:0, pilon:0 };
-  RAYON_ROWS.forEach(r => { const t = TRAITEMENTS[r.bc]; if(t && counts[t.statut] !== undefined) counts[t.statut]++; });
+  RAYON_ROWS.forEach(r => { const s = statutOf(TRAITEMENTS[r.bc]); if(s && counts[s] !== undefined) counts[s]++; });
   const treated = STATUTS.reduce((s,k) => s + counts[k], 0);
   return { counts, treated, total: RAYON_ROWS.length };
 }
@@ -815,7 +919,8 @@ function renderStats(){
   let total = 0, magTreated = 0;
   Object.keys(TRAITEMENTS).forEach(bc => {
     const t = TRAITEMENTS[bc];
-    if(counts[t.statut] !== undefined){ counts[t.statut]++; total++; }
+    const s = statutOf(t);
+    if(counts[s] !== undefined){ counts[s]++; total++; }
     if(BY_BC.has(bc)) magTreated++;
   });
   const nKeys = Object.keys(TRAITEMENTS).length;
@@ -855,6 +960,12 @@ function showEmpty(){
 function handleScanLookup(raw){
   const bc = String(raw||'').trim();
   if(!bc) return;
+  if(activeTab === 'tri'){
+    handleTriScan(bc);
+    scanInput.value = '';
+    scanInput.focus();
+    return;
+  }
   const rec = BY_BC.get(bc) || RAYON_BY_BC.get(bc);
   $('roto-flash').classList.remove('show');
   showTab('decider');
@@ -974,37 +1085,51 @@ function bookChartsHtml(rec){
   return h;
 }
 
+/* Le responsable a le dernier mot (validation-desherbage.html, champ
+   `validation` de la décision) : dès qu'il a validé ou choisi une autre
+   décision, celle-ci est FIGÉE ici et devient la décision finale. Même calcul
+   que finalStatut() d'api/desherbage.mjs, qui ignore de son côté tout
+   `set`/`clear` sur ce livre. statutOf() = décision effective (finale si
+   tranchée, sinon celle de l'équipe) : c'est elle que comptent la
+   progression, les couleurs et les exports. */
+function finalStatut(t){
+  const v = t && t.validation;
+  if(!v || !v.avis) return null;
+  if(v.avis === 'valide') return STATUTS.includes(v.statutVu) ? v.statutVu : t.statut;
+  return STATUTS.includes(v.avis) ? v.avis : null;
+}
+const isLocked = t => !!finalStatut(t);
+const statutOf = t => t ? (finalStatut(t) || t.statut) : null;
 function avisState(t){
   const v = t && t.validation;
   if(!v) return null;
-  if(!v.avis) return v.commentaire ? 'comment' : null;
-  if(v.statutVu && v.statutVu !== t.statut) return 'stale';
-  return v.avis === 'valide' || v.avis === t.statut ? 'valide' : 'disagree';
+  const fs = finalStatut(t);
+  if(!fs) return v.commentaire ? 'comment' : null;
+  return fs === t.statut ? 'valide' : 'disagree';
 }
-/* Avis du collègue qui valide la campagne (validation-desherbage.html,
-   champ `validation` de la décision — voir api/desherbage.mjs). */
+function fmtDateTime(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? '' : rpUI.fmt.date(d) + ' à ' + rpUI.fmt.time(d);
+}
 function avisHtml(t, compact){
   const st = avisState(t);
   if(!st) return '';
-  const v = t.validation;
-  const label = {
-    valide: '✓ Validé',
-    disagree: `↪ Propose : ${STATUT_LABEL[v.avis]}`,
-    stale: `⚠ Avis donné sur « ${STATUT_LABEL[v.statutVu] || '?'} », décision changée depuis`,
-    comment: '💬 Commentaire',
-  }[st];
+  const v = t.validation, fs = finalStatut(t);
   if(compact){
-    return `<div class="avis-line ${st}" title="${esc(v.commentaire || '')}">${esc(label)}${v.commentaire && st !== 'comment' ? ' 💬' : ''}</div>`;
+    const label = t.final ? `✔ Trié · ${STATUT_LABEL[t.final.statut] || '—'}`
+      : { valide:'🔒 Validé · à trier', disagree:`🔒 Responsable : ${STATUT_LABEL[fs]} (au lieu de ${STATUT_LABEL[t.statut]})`, comment:'💬 Commentaire' }[st];
+    return `<div class="avis-line ${t.final ? 'final' : st}" title="${esc(v.commentaire || '')}">${esc(label)}${v.commentaire && st !== 'comment' ? ' 💬' : ''}</div>`;
   }
-  const pill = { valide:'pro-pill--valide', disagree:'pro-pill--contre', stale:'pro-pill--revoir', comment:'pro-pill--pret' }[st];
-  const ptxt = { valide:'Validé', disagree:'Contre-proposition', stale:'À revoir', comment:'Commentaire' }[st];
-  const adopt = st === 'disagree' && STATUT_LABEL[v.avis]
-    ? `<button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-adopt="${esc(v.avis)}">Adopter « ${esc(STATUT_LABEL[v.avis])} »</button>` : '';
-  const ctx = st === 'stale' ? `<div style="margin-top:.4rem">Avis donné sur « ${esc(STATUT_LABEL[v.statutVu] || '?')} », décision changée depuis.</div>`
-    : st === 'disagree' ? `<div style="margin-top:.4rem">Propose : ${decPill(v.avis)}</div>` : '';
-  return `<div class="rb-avis rb-avis--${st}"><div class="rb-avis__head"><strong>Avis du validateur</strong><span class="pro-pill ${pill}">${ptxt}</span></div>${ctx}` +
+  const pill = { valide:'pro-pill--valide', disagree:'pro-pill--contre', comment:'pro-pill--pret' }[st];
+  const ptxt = { valide:'Validé', disagree:'Décision changée', comment:'Commentaire' }[st];
+  const ctx = st === 'disagree'
+    ? `<div style="margin-top:.4rem">Décision finale : ${decPill(fs)} <span style="color:var(--pro-texte-doux)">(l'équipe proposait « ${esc(STATUT_LABEL[t.statut])} »)</span></div>` : '';
+  const after = t.final
+    ? `<div style="margin-top:.5rem;color:var(--pro-ok-encre);font-weight:600">✔ Trié le ${esc(fmtDateTime(t.final.ts))} : plus rien à faire.</div>`
+    : fs ? `<div class="rb-note" style="margin-top:.5rem">À trier : rescannez-le dans l'onglet « Tri final ».</div>` : '';
+  return `<div class="rb-avis rb-avis--${st}"><div class="rb-avis__head"><strong>Avis du responsable</strong><span class="pro-pill ${pill}">${ptxt}</span></div>${ctx}` +
     (v.commentaire ? `<p class="rb-avis__q">« ${esc(v.commentaire)} »</p>` : '') +
-    (v.par ? `<div class="rb-avis__by">${esc(v.par)}</div>` : '') + adopt + '</div>';
+    (v.par ? `<div class="rb-avis__by">${esc(v.par)}</div>` : '') + after + '</div>';
 }
 
 function showDetail(rec){
@@ -1067,18 +1192,22 @@ function buildDecisionButtons(){
   $('roto-prev').innerHTML = rpUI.icon('chevLeft', {size:16}) + 'Précédent <span class="pro-kbd">←</span>';
   $('roto-next').innerHTML = 'Suivant <span class="pro-kbd">→</span>' + rpUI.icon('chevRight', {size:16});
   $('rayon-refresh-btn').innerHTML = rpUI.icon('refresh', {size:18});
+  $('tri-undo').innerHTML = rpUI.icon('arrow', {size:16}).replace('M5 12h14 M13 6l6 6-6 6', 'M9 14L4 9l5-5 M4 9h10a6 6 0 010 12h-3') + 'Annuler ce tri <span class="pro-kbd">U</span>';
 }
 function highlightButtons(){
   if(!currentRecord) return;
   const t = TRAITEMENTS[currentRecord._barcode];
+  const locked = isLocked(t), eff = statutOf(t);
   document.querySelectorAll('.roto-btn').forEach(b => {
-    const on = !!t && b.dataset.statut === t.statut;
+    const on = !!t && b.dataset.statut === eff;
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.disabled = locked;
   });
-  $('roto-undo').disabled = !t;
-  $('rb-cur').innerHTML = `<span class="pro-label">Décision actuelle</span><div class="rb-cur__row">` +
-    (t ? decPill(t.statut) + `<span>${rpUI.fmt.date(t.ts)}, ${rpUI.fmt.time(t.ts)}</span>` : '<span class="pro-pill pro-pill--todo">Non traité</span>') + '</div>';
+  $('roto-undo').disabled = !t || locked;
+  $('rb-cur').innerHTML = `<span class="pro-label">${locked ? '🔒 Décision finale du responsable' : 'Décision actuelle'}</span><div class="rb-cur__row">` +
+    (t ? decPill(eff) + `<span>${rpUI.fmt.date(t.ts)}, ${rpUI.fmt.time(t.ts)}</span>` : '<span class="pro-pill pro-pill--todo">Non traité</span>') + '</div>' +
+    (locked ? `<p class="rb-lock">${t.final ? '✔ Livre trié : plus rien à faire.' : 'Tranchée par le responsable : elle ne se change plus ici. Reste à trier le livre (onglet « Tri final »).'}</p>` : '');
   const avisEl = $('roto-avis');
   const avis = avisHtml(t);
   avisEl.innerHTML = avis;
@@ -1088,7 +1217,11 @@ function highlightButtons(){
 /* ════════════════════════════════════════════════════════════
    TRAITEMENT (conserver / braderie / relocalisation / pilon)
    ════════════════════════════════════════════════════════════ */
+function lockedToast(){
+  rpUI.toast('Décision tranchée par le responsable : elle ne se change plus dans Rotobib.', { type:'warn', timeout:3500 });
+}
 function setTraitement(bc, statut){
+  if(isLocked(TRAITEMENTS[bc])){ lockedToast(); return false; }
   const record = { barcode: bc, statut, ts: new Date().toISOString() };
   // L'avis du validateur survit à un changement de décision — le serveur le
   // conserve aussi (patch `set`, api/desherbage.mjs).
@@ -1097,12 +1230,15 @@ function setTraitement(bc, statut){
   queuePatch({ type:'set', record: { barcode: bc, statut, ts: record.ts } });
   saveLocal();
   onDecisionsChanged([bc]);
+  return true;
 }
 function clearTraitement(bc){
+  if(isLocked(TRAITEMENTS[bc])){ lockedToast(); return false; }
   delete TRAITEMENTS[bc];
   saveLocal();
   queuePatch({ type:'clear', barcode: bc });
   onDecisionsChanged([bc]);
+  return true;
 }
 
 /* Une décision (locale ou venue d'un autre poste) ne met à jour que ce qui la
@@ -1114,6 +1250,9 @@ function onDecisionsChanged(bcs){
   if(currentRecord && bcs.includes(currentRecord._barcode)) highlightButtons();
   journalDirty = true;
   if(activeTab === 'journal') renderLog();
+  triDirty = true;
+  updateTriCount();
+  if(activeTab === 'tri') renderTri();
   if(RAYON_CURRENT){
     if(activeTab === 'rayon') applyTouched(bcs);
     else bcs.forEach(b => rayonTouched.add(b));
@@ -1129,7 +1268,7 @@ function applyTouched(bcs){
 function decide(statut){
   if(!currentRecord) return;
   const rec = currentRecord;
-  setTraitement(rec._barcode, statut);
+  if(!setTraitement(rec._barcode, statut)) return;
   if(NAV) navAfterDecision(rec, statut);
   else flashTreated(rec, statut);
   scanInput.focus({ preventScroll:true });
@@ -1139,10 +1278,6 @@ document.addEventListener('click', e => {
   if(b) decide(b.dataset.statut);
 });
 $('roto-undo').addEventListener('click', () => { if(currentRecord) clearTraitement(currentRecord._barcode); scanInput.focus({ preventScroll:true }); });
-$('roto-avis').addEventListener('click', e => {
-  const a = e.target.closest('[data-adopt]');
-  if(a && currentRecord) decide(a.dataset.adopt);
-});
 
 function flashTreated(rec, statut){
   showEmpty();
@@ -1234,7 +1369,7 @@ function renderUpcoming(){
     return `<button type="button" class="rb-next__card" data-next="${NAV.index + 1 + k}">
       <span class="pro-cote">${esc(row ? row.cote : bc)}</span>
       <span class="rb-next__t">${esc(row ? (row.titre || '(titre inconnu)') : bc)}</span>
-      ${t ? decPill(t.statut) : '<span class="pro-pill pro-pill--todo">Non traité</span>'}</button>`;
+      ${t ? decPill(statutOf(t)) : '<span class="pro-pill pro-pill--todo">Non traité</span>'}</button>`;
   }).join('');
 }
 $('rb-next-grid').addEventListener('click', e => {
@@ -1270,7 +1405,7 @@ document.addEventListener('keydown', e => {
   const statut = DECISION_KEYS[k];
   if(statut){
     e.preventDefault(); // sinon la lettre atterrit dans le champ de scan
-    document.querySelector(`.roto-btn[data-statut="${statut}"]`).click();
+    decide(statut);    // pas .click() : un bouton désactivé (décision tranchée) l'ignorerait sans rien dire
   }
 });
 
@@ -1342,9 +1477,9 @@ function renderLog(){
       <tr>
         <td class="pro-mono">${esc(t.barcode)}</td>
         <td>${rec ? `<button type="button" class="rb-ttl" data-open-log="${esc(t.barcode)}">${esc(titreComplet(rec))}</button>${rec.coteAffichee ? ` <span class="pro-cote">${esc(rec.coteAffichee)}</span>` : ''}` : '—'}</td>
-        <td>${STATUT_LABEL[t.statut] ? decPill(t.statut) : esc(t.statut)}</td>
+        <td>${STATUT_LABEL[statutOf(t)] ? decPill(statutOf(t)) : esc(t.statut)}${isLocked(t) ? ` <span title="Tranchée par le responsable">${t.final ? '✔' : '🔒'}</span>` : ''}</td>
         <td>${t.ts ? esc(new Date(t.ts).toLocaleString('fr-FR')) : ''}</td>
-        <td><button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" data-undo="${esc(t.barcode)}">Annuler</button></td>
+        <td>${isLocked(t) ? '' : `<button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" data-undo="${esc(t.barcode)}">Annuler</button>`}</td>
       </tr>`).join('');
   }
   $('log-foot').innerHTML = `<span class="pro-pager__info">${fmt(rows.length)} sur ${fmt(all.length)} traitement${all.length>1?'s':''}</span>` +
@@ -1374,10 +1509,191 @@ $('rb-exports').addEventListener('click', e => {
   const btn = e.target.closest('[data-export]');
   if(!btn) return;
   const statut = btn.dataset.export;
-  const barcodes = Object.values(TRAITEMENTS).filter(t => t.statut === statut).map(t => t.barcode);
+  const barcodes = Object.values(TRAITEMENTS).filter(t => statutOf(t) === statut).map(t => t.barcode);
   if(!barcodes.length){ rpUI.toast(`Aucun exemplaire marqué « ${STATUT_LABEL[statut]} » pour l'instant.`, { type:'warn' }); return; }
   const d = new Date(), pad = n => String(n).padStart(2,'0');
   downloadTxt(barcodes.join('\n') + '\n', `rotobib-${statut}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+});
+
+/* ════════════════════════════════════════════════════════════
+   TRI FINAL (onglet « Tri final »)
+   ────────────────────────────────────────────────────────────
+   Une fois la décision tranchée par le responsable (validation-desherbage
+   .html), l'équipe rescanne chaque livre pour le ranger avec sa destination
+   finale : le scan affiche en grand Pilon / Braderie / Relocalisation /
+   Conserver et pose `final` sur la décision (patch `finalize`,
+   api/desherbage.mjs, qui recalcule lui-même la destination) — le livre est
+   « validé définitivement », plus rien à faire dessus. Même champ de scan que
+   l'onglet Décider : dans cet onglet, un scan trie au lieu d'ouvrir la fiche.
+   ════════════════════════════════════════════════════════════ */
+function triLists(){
+  const todo = [], done = [];
+  let waiting = 0;   // décisions que le responsable n'a pas encore tranchées
+  Object.values(TRAITEMENTS).forEach(t => {
+    if(!t || !STATUTS.includes(t.statut)) return;
+    if(!isLocked(t)){ waiting++; return; }
+    (t.final ? done : todo).push(t);
+  });
+  return { todo, done, waiting };
+}
+function updateTriCount(){
+  const n = triLists().todo.length;
+  const el = $('tab-tri-count');
+  el.textContent = fmt(n);
+  el.hidden = n <= 0;
+}
+function setFinal(bc, final){
+  const t = TRAITEMENTS[bc];
+  if(!t) return;
+  if(final) t.final = final; else delete t.final;
+  TRI_RECENT.set(bc, { final: final || null, at: Date.now() });
+  saveLocal();
+  queuePatch(final ? { type:'finalize', barcode: bc, ts: final.ts } : { type:'unfinalize', barcode: bc });
+  onDecisionsChanged([bc]);
+}
+
+/* Emplacement d'un livre dans le récolement (dernier scan), pour aller le
+   chercher. Index reconstruit seulement quand le récolement est relu. */
+let LOC_CACHE = { src:null, map:null };
+function locOf(bc){
+  if(!RECOL) return '';
+  if(LOC_CACHE.src !== RECOL){
+    const m = new Map();
+    RECOL.scans.forEach(s => { const p = m.get(s.barcode); if(!p || String(s.ts || '') > String(p.ts || '')) m.set(s.barcode, s); });
+    LOC_CACHE = { src: RECOL, map: m };
+  }
+  const s = LOC_CACHE.map.get(bc);
+  if(!s) return '';
+  const where = isRayonTravee(s.travee)
+    ? ((RECOL.rayons.find(r => r.id === s.travee) || {}).label || String(s.travee).replace(/^RY-/, ''))
+    : selectionsDesherbage.traveeName(s.travee);
+  return [where, s.colonne != null && s.colonne !== '' ? 'col. ' + s.colonne : '', s.etage != null ? 'ét. ' + s.etage : ''].filter(Boolean).join(' · ');
+}
+
+function handleTriScan(bc){
+  const t = TRAITEMENTS[bc];
+  let kind = 'shown';
+  if(t && isLocked(t) && !t.final){
+    setFinal(bc, { statut: finalStatut(t), ts: new Date().toISOString(), par: '' });
+    kind = 'ok';
+  }
+  TRI_SHOWN = { bc, kind };
+  renderTri();
+}
+function undoTri(){
+  const bc = TRI_SHOWN && TRI_SHOWN.bc, t = bc && TRAITEMENTS[bc];
+  if(!t || !t.final) return;
+  setFinal(bc, null);
+  rpUI.toast('Tri annulé : le livre est de nouveau « à trier ».', { type:'info', timeout:3000 });
+}
+$('tri-undo').addEventListener('click', () => { undoTri(); scanInput.focus({ preventScroll:true }); });
+
+function triResultHtml(){
+  if(!TRI_SHOWN) return `<div class="rb-trires"><p class="rb-trires__msg">Scannez un livre tranché par le responsable.</p>
+    <p class="rb-note" style="margin:0">Sa destination s'affiche ici en grand et il est marqué « trié » : plus rien à faire dessus.</p></div>`;
+  const { bc, kind } = TRI_SHOWN;
+  const t = TRAITEMENTS[bc], rec = recordOf(bc);
+  const loc = locOf(bc);
+  const id = `<div class="rb-trires__t">${esc(rec ? titreComplet(rec) : '(titre inconnu)')}</div>
+    <div class="rb-trires__m">${rec && rec.coteAffichee ? `<span class="pro-cote">${esc(rec.coteAffichee)}</span>` : ''}<span class="pro-mono">${esc(bc)}</span>${loc ? ' · ' + esc(loc) : ''}</div>`;
+  if(!t){
+    return `<div class="rb-trires rb-trires--none"><span class="rb-trires__state">${rec ? 'Hors campagne' : 'Code-barre inconnu'}</span>
+      <p class="rb-trires__msg">Aucune décision pour ce livre</p>${rec ? id : ''}
+      <p class="rb-note" style="margin:0">${rec ? 'Il ne fait pas partie du désherbage (ou sa décision a été annulée) : à remettre en rayon.' : 'Introuvable dans l\'export de la bibliothèque.'}</p>
+      ${rec ? `<button type="button" class="pro-btn pro-btn--secondary" data-tri-open="${esc(bc)}">Ouvrir sa fiche (Décider)</button>` : ''}</div>`;
+  }
+  if(!isLocked(t)){
+    return `<div class="rb-trires rb-trires--pending"><span class="rb-trires__state">Pas encore tranché</span>
+      <p class="rb-trires__msg">Le responsable n'a pas encore validé ce livre</p>${id}
+      <p class="rb-note" style="margin:0">Proposition de l'équipe : ${decPill(t.statut)} — mettez-le de côté en attendant sa validation.</p></div>`;
+  }
+  const s = finalStatut(t);
+  if(!t.final){
+    return `<div class="rb-trires rb-trires--pending"><span class="rb-trires__state">Tri annulé</span>
+      <p class="rb-trires__msg">Destination : ${esc(STATUT_LABEL[s])}</p>${id}
+      <p class="rb-note" style="margin:0">Rescannez-le pour le trier à nouveau.</p></div>`;
+  }
+  const fs = t.final.statut;
+  const state = kind === 'ok' ? '✓ Trié — validé définitivement' : `Déjà trié le ${esc(fmtDateTime(t.final.ts))}`;
+  return `<div class="rb-trires rb-trires--${kind === 'ok' ? 'ok' : 'already'}" style="--c:${DEC[fs].color};--ink:${DEC[fs].ink}">
+    <span class="rb-trires__state">${state}</span>
+    <div class="rb-trires__dest">${decIcon(fs, 56, 2.4)}${esc(STATUT_LABEL[fs])}</div>${id}
+    <div class="rb-trires__m">${avisState(t) === 'disagree' ? `Décision du responsable (l'équipe proposait « ${esc(STATUT_LABEL[t.statut])} »). ` : ''}Plus rien à faire sur ce livre.</div></div>`;
+}
+
+function renderTri(){
+  if(activeTab !== 'tri'){ triDirty = true; return; }
+  triDirty = false;
+  const L = triLists();
+  $('tri-result').innerHTML = triResultHtml();
+  const shownT = TRI_SHOWN && TRAITEMENTS[TRI_SHOWN.bc];
+  $('tri-undo').disabled = !(shownT && shownT.final);
+
+  // Avancement par destination
+  const by = {};
+  STATUTS.forEach(s => { by[s] = { todo:0, done:0 }; });
+  L.todo.forEach(t => { by[finalStatut(t)].todo++; });
+  L.done.forEach(t => { if(by[t.final.statut]) by[t.final.statut].done++; });
+  $('tri-kpis').innerHTML = '<div class="rb-trik"><div class="rb-trik__row" style="--c:transparent"><i></i><span class="pro-label">Destination</span><span class="pro-label">à trier</span></div>' +
+    STATUTS.map(s => `<div class="rb-trik__row" style="--c:${DEC[s].color}"><i></i><span>${STATUT_LABEL[s]}<small>${fmt(by[s].done)} trié${by[s].done>1?'s':''}</small></span><b>${fmt(by[s].todo)}</b></div>`).join('') +
+    `<div class="rb-trik__tot"><strong>${fmt(L.todo.length)}</strong> à trier · <strong>${fmt(L.done.length)}</strong> trié${L.done.length>1?'s':''}` +
+    (L.waiting ? `<div class="rb-note">${fmt(L.waiting)} décision${L.waiting>1?'s':''} attend${L.waiting>1?'ent':''} encore le responsable.</div>` : '') + '</div></div>';
+
+  // Restant à trier
+  $('tri-filter').innerHTML = [['', 'Toutes']].concat(STATUTS.map(s => [s, STATUT_LABEL[s]])).map(([k, l]) =>
+    `<button type="button" class="rb-fbtn" data-tri-filter="${k}" aria-pressed="${triFilter === k}">${l}${k ? ' · ' + fmt(by[k].todo) : ''}</button>`).join('');
+  const q = ($('tri-search').value || '').toLowerCase().trim();
+  const rows = L.todo.map(t => ({ t, s: finalStatut(t), rec: recordOf(t.barcode) }))
+    .filter(x => !triFilter || x.s === triFilter)
+    .map(x => ({ ...x, cote: (x.rec && x.rec.coteAffichee) || '', titre: x.rec ? titreComplet(x.rec) : '(titre inconnu)' }))
+    .filter(x => !q || `${x.t.barcode} ${x.cote} ${x.titre}`.toLowerCase().includes(q))
+    .sort((a, b) => STATUTS.indexOf(a.s) - STATUTS.indexOf(b.s) || a.cote.localeCompare(b.cote, 'fr', { numeric:true }));
+  const shown = rows.slice(0, triLimit);
+  $('tri-todo-tbody').innerHTML = shown.length ? shown.map(x => `<tr>
+      <td>${decPill(x.s)}</td><td class="pro-mono">${esc(x.cote || '—')}</td>
+      <td><button type="button" class="rb-ttl" data-tri-open="${esc(x.t.barcode)}">${esc(x.titre)}</button></td>
+      <td>${esc(locOf(x.t.barcode) || '—')}</td><td class="pro-mono">${esc(x.t.barcode)}</td></tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--pro-texte-doux);padding:1.25rem">${L.todo.length ? 'Aucun livre ne correspond aux filtres.' : 'Rien à trier pour l\'instant.'}</td></tr>`;
+  $('tri-todo-foot').innerHTML = `<span class="pro-pager__info">${fmt(shown.length)} sur ${fmt(rows.length)} livre${rows.length>1?'s':''}</span>` +
+    (rows.length > shown.length ? `<button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="tri-more">Afficher ${Math.min(200, rows.length - shown.length)} de plus</button>` : '');
+
+  // Triés
+  $('tri-exports').innerHTML = STATUTS.map(s =>
+    `<button type="button" class="pro-btn pro-btn--secondary" data-tri-export="${s}">${rpUI.icon('download', {size:16})}Triés ${STATUT_LABEL[s]} (.txt) · ${fmt(by[s].done)}</button>`).join('');
+  const done = L.done.slice().sort((a, b) => String(b.final.ts || '').localeCompare(String(a.final.ts || ''))).slice(0, 100);
+  $('tri-done-tbody').innerHTML = done.length ? done.map(t => { const rec = recordOf(t.barcode); return `<tr>
+      <td>${decPill(t.final.statut)}</td>
+      <td><button type="button" class="rb-ttl" data-tri-open="${esc(t.barcode)}">${esc(rec ? titreComplet(rec) : '(titre inconnu)')}</button>${rec && rec.coteAffichee ? ` <span class="pro-cote">${esc(rec.coteAffichee)}</span>` : ''}</td>
+      <td class="pro-mono">${esc(t.barcode)}</td><td>${esc(fmtDateTime(t.final.ts))}</td>
+      <td><button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" data-unsort="${esc(t.barcode)}">Annuler le tri</button></td></tr>`; }).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--pro-texte-doux);padding:1.25rem">Aucun livre trié pour l\'instant.</td></tr>';
+  $('tri-done-foot').innerHTML = L.done.length > done.length ? `<span class="pro-pager__info">100 tris les plus récents sur ${fmt(L.done.length)} — l'export .txt les contient tous</span>` : '';
+}
+$('tri-search').addEventListener('input', () => { triLimit = 200; renderTri(); });
+$('panel-tri').addEventListener('click', e => {
+  const f = e.target.closest('[data-tri-filter]');
+  if(f){ triFilter = f.dataset.triFilter; triLimit = 200; renderTri(); return; }
+  if(e.target.closest('#tri-more')){ triLimit += 200; renderTri(); return; }
+  const u = e.target.closest('[data-unsort]');
+  if(u){ const bc = u.dataset.unsort; if(TRAITEMENTS[bc] && TRAITEMENTS[bc].final){ setFinal(bc, null); rpUI.toast('Tri annulé.', { type:'info', timeout:2500 }); } return; }
+  const o = e.target.closest('[data-tri-open]');
+  if(o){ openRecord(o.dataset.triOpen); return; }
+  const x = e.target.closest('[data-tri-export]');
+  if(x){
+    const s = x.dataset.triExport;
+    const barcodes = triLists().done.filter(t => t.final.statut === s).map(t => t.barcode);
+    if(!barcodes.length){ rpUI.toast(`Aucun livre trié en « ${STATUT_LABEL[s]} » pour l'instant.`, { type:'warn' }); return; }
+    const d = new Date(), pad = n => String(n).padStart(2,'0');
+    downloadTxt(barcodes.join('\n') + '\n', `rotobib-tries-${s}-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.txt`);
+  }
+});
+// U : annule le dernier tri (champ de scan vide, comme les raccourcis de Décider).
+document.addEventListener('keydown', e => {
+  if(activeTab !== 'tri' || e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  const t = e.target;
+  const typing = t && t.matches && t.matches('input:not([type=checkbox]),select,textarea');
+  if(typing && !(t === scanInput && !scanInput.value)) return;
+  if(String(e.key).toLowerCase() === 'u'){ e.preventDefault(); undoTri(); }
 });
 
 /* ════════════════════════════════════════════════════════════
@@ -1425,6 +1741,8 @@ async function loadRecolement(){
     rayonMsg.textContent = 'Impossible de lire le récolement partagé (/api/recolement) — vérifiez la connexion puis ↻.';
     return;
   }
+  triDirty = true;
+  if(activeTab === 'tri') renderTri();
   renderSourcesList(RAYON_CURRENT ? RAYON_CURRENT.id : (loadSavedRayon() || {}).id);
 }
 
@@ -1615,6 +1933,7 @@ function onTabShown(id){
   }
   if(id === 'journal' && journalDirty) renderLog();
   else if(id === 'journal') renderStats();
+  if(id === 'tri') renderTri();
 }
 
 function renderRayonKpis(){
@@ -1661,8 +1980,8 @@ function renderScatter(){
   const xOf = r => { const k = r.saisieKey; return +k.slice(0,4) + ((+k.slice(4,6) - 1) + (+k.slice(6,8) - 1) / 31) / 12; };
   const pts = SC_ROWS.map(r => {
     const t = TRAITEMENTS[r.bc];
-    return { x:xOf(r), y:r.cumules, color:colorOfStatut(t && t.statut),
-      tip:`${r.titre || '(titre inconnu)'}\n${r.cote}${r.saisie ? ' · catalogué le ' + r.saisie : ''}\n${plural(r.cumules, 'prêt')} cumulé${r.cumules>1?'s':''} · ${t ? STATUT_LABEL[t.statut] : 'non traité'}` };
+    return { x:xOf(r), y:r.cumules, color:colorOfStatut(statutOf(t)),
+      tip:`${r.titre || '(titre inconnu)'}\n${r.cote}${r.saisie ? ' · catalogué le ' + r.saisie : ''}\n${plural(r.cumules, 'prêt')} cumulé${r.cumules>1?'s':''} · ${t ? STATUT_LABEL[statutOf(t)] : 'non traité'}` };
   });
   const xs = pts.map(p => p.x);
   const x0 = Math.floor(Math.min(...xs)), x1 = Math.ceil(Math.max(...xs));
@@ -1683,7 +2002,7 @@ function updatePointColor(bc){
   const el = SC_PT_BY_BC.get(bc);
   if(!el) return;
   const t = TRAITEMENTS[bc];
-  el.style.setProperty('--c', colorOfStatut(t && t.statut));
+  el.style.setProperty('--c', colorOfStatut(statutOf(t)));
 }
 function markScatterCurrent(bc){
   if(scCurrent){ scCurrent.classList.remove('is-hi'); scCurrent = null; }
@@ -1841,7 +2160,7 @@ function rayonSortValue(r, key){
     case 'parution': return r.parutionYear;
     case 'saisie': return r.saisieKey;
     case 'dernier': return yearOf(r.dernier);
-    case 'statut': return TRAITEMENTS[r.bc] ? STATUTS.indexOf(TRAITEMENTS[r.bc].statut) : -1;
+    case 'statut': return TRAITEMENTS[r.bc] ? STATUTS.indexOf(statutOf(TRAITEMENTS[r.bc])) : -1;
     default: return r[key];
   }
 }
@@ -1879,9 +2198,11 @@ const numCell = v => v == null ? '<td class="is-num">—</td>' : `<td class="is-
 function rowHtml(r){
   const Y = REFERENCE_YEAR;
   const t = TRAITEMENTS[r.bc];
+  const locked = isLocked(t), eff = statutOf(t);
   const btns = STATUTS.map(s => {
-    const on = !!t && t.statut === s;
-    return `<button type="button" class="rb-dbtn rb-dbtn--${s}" data-statut="${s}" data-bc="${esc(r.bc)}" aria-pressed="${on}" aria-label="${STATUT_LABEL[s]}" title="${STATUT_LABEL[s]} (${STATUT_KEY[s]})${on ? ' — cliquer pour annuler' : ''}">${STATUT_KEY[s]}</button>`;
+    const on = !!t && eff === s;
+    const title = locked ? `${STATUT_LABEL[s]} — décision tranchée par le responsable` : `${STATUT_LABEL[s]} (${STATUT_KEY[s]})${on ? ' — cliquer pour annuler' : ''}`;
+    return `<button type="button" class="rb-dbtn rb-dbtn--${s}" data-statut="${s}" data-bc="${esc(r.bc)}" aria-pressed="${on}" aria-label="${STATUT_LABEL[s]}" title="${title}"${locked ? ' disabled' : ''}>${STATUT_KEY[s]}</button>`;
   }).join('');
   const cur = NAV && NAV.order[NAV.index] === r.bc;
   const p = r.prets;
@@ -2017,7 +2338,7 @@ $('rayon-export-csv').addEventListener('click', () => {
   const head = ['Code-barre','Colonne','Étagère','Cote','Dewey','Thème','Titre','Auteur','Parution','Catalogué le',`Prêts ${Y}`,`Prêts avant ${Y}`,'Prêts cumulés','Dernière année de prêt','Décision'];
   const lines = [...RAYON_ROWS].sort(compareRayonRows).map(r => [
     r.bc, r.colonne, r.etage, r.cote, dewey.deweyKey(r.dewey, 'precis') || '', dewey.deweyLabel(dewey.deweyKey(r.dewey, 'indice')), r.titre, r.auteur, r.parution, r.saisie,
-    r.an, r.avant, r.cumules, r.dernier, TRAITEMENTS[r.bc] ? STATUT_LABEL[TRAITEMENTS[r.bc].statut] : '',
+    r.an, r.avant, r.cumules, r.dernier, TRAITEMENTS[r.bc] ? STATUT_LABEL[statutOf(TRAITEMENTS[r.bc])] : '',
   ].map(q).join(';'));
   const label = $('rayon-title').textContent.replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'');
   // BOM : Excel ouvre ainsi le fichier en UTF-8 (accents).
@@ -2193,6 +2514,7 @@ updateSyncIndicator();
 syncFromServer();
 updateCtx();
 renderStats();
+updateTriCount();
 tabsCtl = rpUI.tabs($('rb-tabs'), { hashPrefix:'onglet-' });
 scanInput.focus();
 

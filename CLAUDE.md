@@ -140,6 +140,21 @@ nosniff` et `Referrer-Policy: strict-origin-when-cross-origin`.
   depuis `xml/bib.xml` également (migré le 2026-09-10, ce script lisait
   auparavant un export Syracuse dédié, distinct de `bib.xml` — voir
   « Rotobib » plus bas pour le détail de cette migration).
+- `npm run update:bib` (2026-10-10) — actualisation entre deux `bib.xml`
+  complets : déposer l'export Syracuse partiel « exemplaires modifiés
+  depuis » (GESMARC, mêmes champs que `bib.xml`) dans `data/xml/update/`,
+  puis lancer cette commande, qui enchaîne `build:magasins`,
+  `build:cotes-numeriques` et `build:desherbage`. **Ces trois builds
+  appliquent toujours tous les fichiers de `data/xml/update/`**
+  (`iterateGesmarcItemsWithUpdates()`, `scripts/lib/gesmarc.mjs`) : un
+  code-barre présent remplace l'exemplaire de `bib.xml`, un inconnu est
+  ajouté, rien n'est supprimé (les exemplaires morts arrivent piégés) ;
+  fichiers appliqués par ordre de nom, le plus récent l'emporte ; trace dans
+  `partialUpdates` des rapports de build. **Vider `data/xml/update/` dès
+  qu'un nouveau `bib.xml` complet est chargé**, sinon une ancienne mise à
+  jour réécraserait des données plus fraîches. Équivalent sur `main` du
+  `db:update:bib` de la branche `local-server` (Postgres). Premier passage :
+  export du 2026-10-09, 4 361 exemplaires (4 105 remplacés, 256 ajoutés).
 - Avant d'écraser `data/build-report.json`, `data/magasins-build-report.json`,
   `data/cotes-numeriques-build-report.json` ou `data/desherbage-build-report.json`,
   chaque script archive la version précédente dans un fichier `-previous.json`
@@ -203,6 +218,87 @@ aujourd'hui — un navigateur ne télécharge que les faces réellement appelée
   l'état actuel du projet, pas un bug — à garder en tête en cas de
   recherche de sélecteurs/fonctions : elles ne sont pas forcément dans
   `js/` ou `css/`.
+
+## Kit commun des outils pro (refonte du 2026-10-09)
+
+Les pages de l'espace pro (`admin.html`, `recolement.html`, `rotobib.html`,
+`validation-desherbage.html`, `desherbage-stats.html`, `magasins.html`,
+`cotes-numeriques.html`, `analyse-cotes.html`, `reliures.html`,
+`exemplarisation.html`, `transfert-magasins.html`, `livres-spolies.html`,
+`scan-docs.html`) partagent un kit, pour ne plus réinventer en-tête,
+boutons, tableaux et graphiques page par page. `reserve.html`,
+`generer_manifest.html` et les pages Voyageurs n'ont **pas** été migrées
+(le plan des magasins est volontairement gardé tel quel).
+
+- **`css/admin.css`** — classes préfixées **`pro-`** (jamais de collision
+  avec les classes locales historiques `.btn`, `.card`, `.tool-btn`…) :
+  en-tête d'outil `.pro-head` (fil d'Ariane, titre, onglets `.pro-tabs`,
+  synchro, déconnexion), boutons `.pro-btn` (`--primary/--secondary/--ghost/
+  --danger/--icon/--sm`), `.pro-seg`, champs `.pro-input`/`.pro-search`/
+  `.pro-stepper` (44 px), KPI `.pro-kpi` (`--hero`, `--alert`), pastilles
+  `.pro-pill` (statuts du plan, décisions, avis), `.pro-chip`, tableau
+  `.pro-table` + `.pro-toolbar` + `.pro-pager`, retours `.pro-toast`,
+  `.pro-confirm`, `details.pro-help`, `.pro-empty`, `.pro-skeleton`, et les
+  styles des graphiques `.pro-chart-*`. Palettes métier en variables
+  (`--pro-plan-*`, `--pro-dec-*`) : mêmes valeurs qu'avant (palette des
+  décisions validée daltonisme — ne pas la changer sans revalider). Lève le
+  plafond `html{max-width:1100px}` de `style.css` pour les pages `body.pro`
+  (bandeau pleine largeur, contenu à 1180 px).
+- **`js/admin-ui.js`** → `window.rpUI` : `toast()`, `confirmInline()`
+  (remplace `confirm()` : barre de confirmation dans la page, Promise),
+  `tabs()` (onglets accessibles, flèches, hash), `help()` (aide repliable
+  mémorisée), `fmt` (nombres/dates à la française), `esc()`, `icon()`.
+- **`js/admin-charts.js`** → `window.rpCharts` : fonctions PURES qui
+  renvoient du HTML (`bars`, `hbars`, `stacked`, `sparkline`, `miniBars`,
+  `ring`, `heatmapCalendar`, `scatter`, `lorenz`) + `attachTooltips(root)`
+  (une infobulle déléguée, positionnée en absolu dans le graphique). Zéro
+  dépendance, comme le reste du projet.
+- **Chargement** : `fonts.css`, `style.css`, `css/admin.css` ;
+  `<body class="pro">` ; `js/admin-ui.js` puis `js/admin-charts.js` en
+  scripts classiques **sans `defer`**, AVANT le script de la page (avec
+  `defer` ils s'exécuteraient après le script inline, qui les appelle).
+- **Iframe** : aucune unité `vh`, rien en `position:fixed` sous
+  `html.rp-embedded` (les toasts passent dans le flux sous l'en-tête,
+  l'en-tête collant redevient statique).
+- **`#sync-status`** : `js/sync-queue.js` réécrit le texte de cet élément ;
+  le point de couleur des pages est donc posé en CSS (`::before`), pas en
+  balise enfant.
+- Chaque page garde un peu de CSS local préfixé par la page (`rc-`, `rb-`,
+  `vd-`, `ac-`, `rl-`, `ex-`, `tr-`, `ls-`, `sd-`…) pour ce qui n'existe pas
+  dans le kit (cartes de retour de scan, entonnoir de validation, carte de
+  densité, sections numérotées de formulaire…). Si un même besoin revient
+  sur une 2ᵉ page, le remonter dans le kit plutôt que de le recopier.
+
+Structure des pages refaites (les sections plus bas qui parlent du « bas de
+la page » ou du « bloc Statistiques avancées » décrivent l'ancien rangement ;
+la logique et les identifiants contractuels sont, eux, inchangés) :
+- **`recolement.html`** : onglets **Saisie** (tout ce qui sert au pistolet
+  sans défiler : position, scan, grande carte de retour avec états distincts
+  enregistré / déjà scanné / **déplacé** / anomalie / inconnu, marquages de
+  l'étagère, mini-plan cliquable, scans récents), **Tableau de bord**
+  (avancement, courbe cumulée avec projection, calendrier d'activité, heures,
+  couverture par travée, cartes « À traiter »), **Anomalies** (les
+  catégories `ADV_CATS`, rendu paresseux conservé) et **Données** (exports,
+  sauvegardes, référence, journal complet, réinitialisation à confirmer en
+  tapant EFFACER). Hash `#saisie/#tableau/#anomalies/#donnees` géré à la
+  main. Les calculs du tableau de bord ne tournent que si son onglet est
+  visible (même principe que le calcul limité au groupe visible). La règle de
+  la *temporal dead zone* reste vraie : `activeTab`, `TAB_IDS`… sont
+  déclarés dans le bloc précoce.
+- **`rotobib.html`** : onglets **Décider** (fiche + phrase « verdict » +
+  graphique des prêts face à la médiane du rayon + colonne de décision,
+  touche **U** = annuler), **Rayon** (anneau d'avancement, nuage âge × prêts,
+  Dewey, dernière année de prêt, tableau de travail) et **Journal & exports**.
+  Une décision ne met à jour que la ligne, le point et les compteurs
+  concernés (plus de reconstruction complète du rayon à chaque décision).
+- **`validation-desherbage.html`** : vue campagne (entonnoir, taux d'accord,
+  matrice de désaccord), liste des rayons, **mode revue** livre par livre au
+  clavier (V, C/B/R/P, K, ←/→).
+- **`desherbage-stats.html`** : onglets Vue d'ensemble / Sections / Dormants
+  / Exemplaires, filtre de périmètre global, vraies années en en-têtes.
+- **`admin.html`** : bloc « Aujourd'hui » (activité du récolement et du
+  désherbage), progression du récolement **par local**, outils regroupés par
+  métier, champ « Aller à un outil… » (touche `/`).
 
 ## Publication en iframe sur le site du réseau
 
@@ -1903,6 +1999,26 @@ Un avis sur une décision annulée entre-temps est ignoré sans erreur : un 4xx
 bloquerait la file de `js/sync-queue.js`. Les avis envoyés depuis moins de
 2 min sont réappliqués localement (`RECENT`) : le CDN met `/api/desherbage`
 en cache 20 s, une relecture immédiate renverrait l'état d'avant.
+
+**Le responsable a le dernier mot (2026-10-10, demande explicite).** Plus de
+notion d'avis « à revoir » : dès qu'un avis tranché est posé (`valide` ou un
+autre statut), la décision est **figée** — `api/desherbage.mjs` ignore
+`set`/`clear` sur ce livre, Rotobib désactive ses boutons (🔒) et le bouton
+« Adopter » a disparu. La décision finale = `finalStatut()` (même fonction
+recopiée dans l'API et les deux pages) : l'avis s'il nomme un statut, sinon
+`statutVu` pour un `valide`. Rotobib compte, colore et exporte sur cette
+décision effective (`statutOf()`), pas sur `t.statut` brut.
+
+**Tri final (onglet « Tri final » de Rotobib).** L'équipe rescanne chaque
+livre tranché : le même champ de scan affiche alors en grand sa destination
+et pose `final: {statut, ts, par}` (patch `finalize`, la destination est
+recalculée côté serveur ; `unfinalize` pour annuler, touche **U**). Un livre
+trié est « validé définitivement » : plus rien à faire, et un `review` du
+responsable est lui aussi ignoré tant que le tri n'est pas annulé. Onglet :
+avancement par destination, liste « Restant à trier » (avec l'emplacement du
+dernier scan du récolement), liste des triés et exports .txt par
+destination. Les tris envoyés depuis moins de 2 min sont réappliqués sur
+l'état serveur (`TRI_RECENT`), pour la même raison de cache CDN.
 
 `desherbage-stats.html` (2026-08-26) est un outil **purement statistique**,
 volontairement séparé de `rotobib.html` : aucune décision n'y est prise ni

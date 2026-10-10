@@ -26,9 +26,8 @@
      css/admin.css. */
   :root{
     /* Palette des AVIS du validateur : volontairement distincte de celle des
-       décisions (vert / ambre / bleu / rouge). « À revoir » est hachuré carmin
-       pour ne jamais se confondre avec le rouge plein de Pilon. */
-    --vd-valide:#3E3E52; --vd-contre:#8E24AA; --vd-revoir:#B4213C; --vd-avalider:#E3DED4;
+       décisions (vert / ambre / bleu / rouge). */
+    --vd-valide:#3E3E52; --vd-contre:#8E24AA; --vd-avalider:#E3DED4;
   }
 
   /* ── En-tête : champ « Validé par », témoins ── */
@@ -53,7 +52,6 @@
   .vd-step__body{flex:1;min-width:0}
   .vd-step__track{height:44px;display:flex;align-items:center}
   .vd-step__block{display:block;height:100%;min-width:6px;background:var(--c)}
-  .vd-step__block--hatch{background:repeating-linear-gradient(45deg,var(--vd-revoir) 0 3px,#fff 3px 6px);box-shadow:inset 0 0 0 1px var(--vd-revoir)}
   .vd-step__n{font-family:var(--pro-font-display);font-weight:700;font-size:1.9rem;line-height:1;color:var(--pro-bleu);margin-top:.55rem}
   .vd-step__l{margin-top:.3rem;color:var(--pro-texte)}
   .vd-step__sub{font-size:.72rem;color:var(--pro-texte-doux);margin-top:.15rem;line-height:1.4}
@@ -96,7 +94,6 @@
   .vd-bar{display:flex;height:14px;background:var(--pro-dec-todo)}
   .vd-bar--val{background:var(--vd-avalider)}
   .vd-bar span{display:block;height:100%;background:var(--c)}
-  .vd-bar .is-hatch,.vd-sw-revoir{background:repeating-linear-gradient(45deg,var(--vd-revoir) 0 2px,#fff 2px 4px)}
   .vd-ray__todo{flex:0 0 104px;text-align:right;line-height:1.1}
   .vd-ray__todo b{display:block;font-family:var(--pro-font-display);font-weight:700;font-size:1.6rem;color:var(--pro-carmin)}
   .vd-ray__todo b.is-zero{color:var(--pro-ok)}
@@ -105,6 +102,7 @@
   .vd-sw-valide{background:var(--vd-valide)}
   .vd-sw-disagree{background:var(--vd-contre)}
   .vd-sw-todo{background:var(--vd-avalider);border-color:#C9C4B8}
+  .vd-sw-final{background:var(--pro-ok)}
 
   /* ── Revue d'un livre ── */
   .vd-rv-top{display:flex;align-items:center;justify-content:space-between;gap:.4rem 1rem;flex-wrap:wrap;padding:.5rem 1.375rem;border-bottom:1px solid var(--pro-carte-bord);background:#FBFAF7;font-size:.8rem}
@@ -130,7 +128,9 @@
   .vd-bigdec--pilon{background:var(--pro-dec-pilon);color:#fff}
   .vd-decision small{font-size:.78rem;line-height:1.4;color:var(--pro-texte)}
   .vd-decision small span{color:var(--pro-texte-doux)}
-  .vd-stale{background:var(--pro-ko-fond);border-left:3px solid var(--pro-carmin);color:#5c0f1e;font-size:.8rem;padding:.5rem .75rem;line-height:1.45}
+  .vd-final{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;font-size:.82rem;line-height:1.4}
+  .vd-final__arrow{color:var(--pro-texte-doux);display:inline-flex}
+  .vd-done{background:var(--pro-ok-fond);border-left:3px solid var(--pro-ok);color:var(--pro-ok-encre);font-size:.8rem;padding:.55rem .75rem;line-height:1.45}
   .vd-stats{display:flex;gap:1.2rem 2rem;flex-wrap:wrap;border-top:1px solid var(--pro-trait);padding-top:.9rem}
   .vd-stats__bars{flex:0 1 250px;min-width:0}
   .vd-stats__bars .pro-chart-vbars{padding-top:1.1rem;gap:0}
@@ -310,8 +310,9 @@
             <option value="todo">À valider</option>
             <option value="">Tous les livres</option>
             <option value="valide">Validés</option>
-            <option value="disagree">Contre-propositions</option>
-            <option value="stale">À revoir</option>
+            <option value="disagree">Décisions changées par le responsable</option>
+            <option value="final">Triés (plus rien à faire)</option>
+            <option value="tosort">Tranchés, à trier</option>
             <option value="comment">Avec commentaire</option>
           </select></label>
         <label class="pro-search">
@@ -351,8 +352,10 @@ document.getElementById('logout-btn').addEventListener('click', function() {
    ────────────────────────────────────────────────────────────
    Lecture en direct de deux états partagés (ETag/304, quasi gratuit à vide) :
    - /api/desherbage : les décisions prises dans rotobib.html, et l'avis du
-     validateur (champ `validation` de chaque décision — voir
-     api/desherbage.mjs) ;
+     responsable (champ `validation` de chaque décision — voir
+     api/desherbage.mjs). Le responsable a le dernier mot : une fois tranchée,
+     la décision est figée côté équipe, qui n'a plus qu'à trier le livre
+     (onglet « Tri final » de Rotobib, champ `final`) ;
    - /api/recolement : les rayons en libre accès et leurs scans, pour savoir
      dans quel rayon se trouve chaque livre décidé.
    Un livre décidé qui n'est scanné dans aucun rayon (scan direct d'un livre
@@ -382,7 +385,7 @@ const DC = rpCharts.DECISION;
 const STATUT_ORDER = { pilon:0, braderie:1, relocalisation:2, conserver:3 };
 const HORS_RAYON = '_hors';
 const PAGE_SIZE = 40;
-const AVIS_COLOR = { valide:'#3E3E52', disagree:'#8E24AA', stale:'#B4213C', todo:'#E3DED4' };
+const AVIS_COLOR = { valide:'#3E3E52', disagree:'#8E24AA', todo:'#E3DED4', final:'var(--pro-ok)' };
 const PRET_YEAR_KEYS = ['an','an1','an2','an3','an4','an5'];
 
 let TRAITEMENTS = {};          // état serveur + avis locaux non encore envoyés
@@ -538,13 +541,22 @@ function updateLive(){
 }
 
 /* ── Modèle : livres décidés, groupés par rayon ── */
-function reviewState(t){
-  const v = t.validation;
-  if(!v || !v.avis) return v && v.commentaire ? 'comment' : 'todo';
-  if(v.statutVu && v.statutVu !== t.statut) return 'stale';
-  return v.avis === 'valide' || v.avis === t.statut ? 'valide' : 'disagree';
+/* Le responsable a le dernier mot : dès qu'il a tranché, sa décision est la
+   décision finale et celle de l'équipe est figée (api/desherbage.mjs refuse
+   tout changement côté Rotobib). Même calcul que finalStatut() de l'API. */
+function finalStatut(t){
+  const v = t && t.validation;
+  if(!v || !v.avis) return null;
+  if(v.avis === 'valide') return STATUTS.includes(v.statutVu) ? v.statutVu : t.statut;
+  return STATUTS.includes(v.avis) ? v.avis : null;
 }
-const isActionable = st => st === 'todo' || st === 'comment' || st === 'stale';
+function reviewState(t){
+  const fs = finalStatut(t);
+  if(!fs) return t.validation && t.validation.commentaire ? 'comment' : 'todo';
+  return fs === t.statut ? 'valide' : 'disagree';
+}
+const isActionable = st => st === 'todo' || st === 'comment';
+const isSorted = t => !!(t && t.final);
 function decidedBooks(){
   return Object.values(TRAITEMENTS).filter(t => t && STATUTS.includes(t.statut));
 }
@@ -562,7 +574,8 @@ function groupLabel(id){
 function campaignStats(){
   const books = decidedBooks();
   const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
-  const rv = { todo:0, valide:0, disagree:0, stale:0, comment:0 };
+  const rv = { todo:0, valide:0, disagree:0, comment:0 };
+  let sorted = 0;
   const mx = {};
   STATUTS.forEach(s => { mx[s] = { conserver:0, pilon:0, braderie:0, relocalisation:0 }; });
   let hors = 0;
@@ -571,10 +584,11 @@ function campaignStats(){
     const st = reviewState(t);
     rv[st]++;
     if(!RAYON_OF.has(t.barcode)) hors++;
-    if(st === 'valide') mx[t.statut][t.statut]++;
-    else if(st === 'disagree' && mx[t.statut][t.validation.avis] != null) mx[t.statut][t.validation.avis]++;
+    if(isSorted(t)) sorted++;
+    const fs = finalStatut(t);
+    if(fs && mx[t.statut][fs] != null) mx[t.statut][fs]++;
   });
-  return { n: books.length, counts, rv, mx, hors, scanned: RAYON_OF.size + hors };
+  return { n: books.length, counts, rv, mx, hors, sorted, scanned: RAYON_OF.size + hors };
 }
 const pctText = (a, b) => b ? rpUI.fmt.pct(a / b) : '—';
 
@@ -584,12 +598,12 @@ function funnelHtml(S){
   const steps = [
     { n:S.scanned, l:'Scannés', c:'#C9CEF3', sub:`${fmtN(RAYON_OF.size)} dans les rayons` + (S.hors ? ` · ${fmtN(S.hors)} décidés hors rayon` : '') },
     { n:S.n, l:'Décidés', c:'#2A3CD4', sub:`${pctText(S.n, S.scanned)} des scannés` },
-    { n:S.rv.valide, l:'Validés', c:AVIS_COLOR.valide, sub:`${pctText(S.rv.valide, S.n)} des décidés` + (S.rv.disagree ? ` · + ${fmtN(S.rv.disagree)} contre-proposition${S.rv.disagree>1?'s':''}` : '') },
-    { n:S.rv.stale, l:'À revoir', hatch:true, sub:'décision changée depuis l\'avis' },
+    { n:S.rv.valide + S.rv.disagree, l:'Tranchés', c:AVIS_COLOR.valide, sub:`${pctText(S.rv.valide + S.rv.disagree, S.n)} des décidés` + (S.rv.disagree ? ` · dont ${fmtN(S.rv.disagree)} changé${S.rv.disagree>1?'s':''} par le responsable` : '') },
+    { n:S.sorted, l:'Triés', c:AVIS_COLOR.final, sub:'rescannés dans Rotobib : plus rien à faire' },
   ];
   return '<div class="vd-funnel">' + steps.map((s, i) =>
     `<div class="vd-step"><div class="vd-step__body">
-       <div class="vd-step__track" aria-hidden="true">${s.n ? `<span class="vd-step__block${s.hatch?' vd-step__block--hatch':''}" style="width:${w(s.n).toFixed(1)}%;--c:${s.c||'transparent'}"></span>` : ''}</div>
+       <div class="vd-step__track" aria-hidden="true">${s.n ? `<span class="vd-step__block" style="width:${w(s.n).toFixed(1)}%;--c:${s.c||'transparent'}"></span>` : ''}</div>
        <div class="vd-step__n">${fmtN(s.n)}</div>
        <div class="pro-label vd-step__l">${s.l}</div>
        <div class="vd-step__sub">${esc(s.sub)}</div>
@@ -602,13 +616,13 @@ function matrixHtml(S){
   rows.forEach(r => rows.forEach(c => { if(r === c) dMax = Math.max(dMax, S.mx[r][c]); else oMax = Math.max(oMax, S.mx[r][c]); }));
   const totalOf = r => rows.reduce((a, c) => a + S.mx[r][c], 0);
   let h = `<table class="vd-mx"><colgroup><col class="vd-mx__c0"><col><col><col><col></colgroup><thead>
-    <tr><th></th><th colspan="4">Proposition du validateur</th></tr>
+    <tr><th></th><th colspan="4">Décision finale du responsable</th></tr>
     <tr><th><span class="pro-sr">Décision de l'équipe</span></th>${rows.map(c => `<th scope="col" style="--c:${DC[c].color}">${STATUT_SHORT[c]}</th>`).join('')}</tr></thead><tbody>`;
   rows.forEach(r => {
-    h += `<tr><th scope="row" style="--c:${DC[r].color}">${STATUT_SHORT[r]}<small>${fmtN(totalOf(r))} avis</small></th>`;
+    h += `<tr><th scope="row" style="--c:${DC[r].color}">${STATUT_SHORT[r]}<small>${fmtN(totalOf(r))} tranché${totalOf(r)>1?'s':''}</small></th>`;
     rows.forEach(c => {
       const n = S.mx[r][c], diag = r === c, m = diag ? dMax : oMax;
-      const label = `Équipe : ${STATUT_LABEL[r]}, validateur : ${diag ? 'validé tel quel' : STATUT_LABEL[c]} — ${n} avis`;
+      const label = `Équipe : ${STATUT_LABEL[r]}, responsable : ${diag ? 'validé tel quel' : STATUT_LABEL[c]} — ${n} livre${n>1?'s':''}`;
       if(!n){ h += `<td class="is-zero" title="${esc(label)}" aria-label="${esc(label)}">0</td>`; return; }
       const a = 0.14 + 0.66 * (m ? n / m : 0);
       const bg = diag ? `rgba(42,60,212,${a.toFixed(2)})` : `rgba(180,33,60,${a.toFixed(2)})`;
@@ -617,7 +631,7 @@ function matrixHtml(S){
     h += '</tr>';
   });
   return h + `</tbody></table>
-    <div class="vd-key"><span><i style="background:rgba(42,60,212,.8)"></i>Diagonale : validé tel quel</span><span><i style="background:rgba(180,33,60,.5)"></i>Hors diagonale : contre-proposition</span></div>`;
+    <div class="vd-key"><span><i style="background:rgba(42,60,212,.8)"></i>Diagonale : validé tel quel</span><span><i style="background:rgba(180,33,60,.5)"></i>Hors diagonale : décision changée par le responsable</span></div>`;
 }
 
 function renderCampaign(){
@@ -632,18 +646,19 @@ function renderCampaign(){
   const avis = S.rv.valide + S.rv.disagree;
   const decSegs = DEC_ORDER.map(s => ({ label:DC[s].label, value:S.counts[s], color:DC[s].color, ink:DC[s].ink }));
   const note = `<span class="vd-note"><strong>${fmtN(S.n)}</strong> livre${S.n>1?'s':''} décidé${S.n>1?'s':''} sur ${fmtN(S.scanned)} scanné${S.scanned>1?'s':''}</span>`;
-  $('vd-camp-note').textContent = S.rv.stale ? `${fmtN(S.rv.stale)} avis à revoir (décision changée)` : '';
+  const toSort = S.rv.valide + S.rv.disagree - S.sorted;
+  $('vd-camp-note').textContent = toSort > 0 ? `${fmtN(toSort)} livre${toSort>1?'s':''} tranché${toSort>1?'s':''} à trier dans Rotobib` : '';
   const html = `<div class="vd-camp">
     <div class="vd-camp__main">
-      <div class="pro-card pro-card--pad"><div class="vd-card-head"><h3 class="pro-card__title">Avancement</h3><span class="vd-note">De l'inventaire en rayon à la validation de chaque décision.</span></div>${funnelHtml(S)}</div>
+      <div class="pro-card pro-card--pad"><div class="vd-card-head"><h3 class="pro-card__title">Avancement</h3><span class="vd-note">De l'inventaire en rayon au tri final de chaque livre.</span></div>${funnelHtml(S)}</div>
       <div class="pro-card pro-card--pad"><div class="vd-card-head"><h3 class="pro-card__title">Décisions de l'équipe</h3>${note}</div>
         ${S.n ? rpCharts.stacked(decSegs, { height:40, legend:true, title:'Décisions de l\'équipe' }) : '<p class="vd-note">Aucune décision.</p>'}</div>
     </div>
     <div class="vd-camp__side">
       <div class="vd-agree"><div><div class="pro-label">Taux d'accord</div><div class="vd-agree__big">${avis ? rpUI.fmt.pct(S.rv.valide / avis) : '—'}</div></div>
-        <p>${avis ? `${fmtN(S.rv.valide)} validation${S.rv.valide>1?'s':''} telle${S.rv.valide>1?'s':''} quelle${S.rv.valide>1?'s':''} sur ${fmtN(avis)} avis ; <em>${fmtN(S.rv.disagree)} contre-proposition${S.rv.disagree>1?'s':''}</em> du validateur.` : 'Aucun avis rendu pour l\'instant.'}${S.rv.stale ? ` ${fmtN(S.rv.stale)} avis à revoir non comptés.` : ''}</p></div>
+        <p>${avis ? `${fmtN(S.rv.valide)} décision${S.rv.valide>1?'s':''} de l'équipe validée${S.rv.valide>1?'s':''} telle${S.rv.valide>1?'s':''} quelle${S.rv.valide>1?'s':''} sur ${fmtN(avis)} tranchée${avis>1?'s':''} ; <em>${fmtN(S.rv.disagree)} changée${S.rv.disagree>1?'s':''}</em> par le responsable.` : 'Aucune décision tranchée pour l\'instant.'}</p></div>
       <div class="pro-card pro-card--pad" style="flex:1"><h3 class="pro-card__title" style="margin-bottom:.2rem">Où l'on n'est pas d'accord</h3>
-        <p class="vd-note" style="margin:0 0 .8rem">Avis rendus : décision de l'équipe en lignes, proposition du validateur en colonnes.</p>${matrixHtml(S)}</div>
+        <p class="vd-note" style="margin:0 0 .8rem">Décisions tranchées : proposition de l'équipe en lignes, décision finale du responsable en colonnes.</p>${matrixHtml(S)}</div>
     </div></div>`;
   setHtml(el, html);
 }
@@ -653,8 +668,8 @@ function legendHtml(){
   const dec = DEC_ORDER.map(s => `<span><i style="--c:${DC[s].color}"></i>${DC[s].label}</span>`).join('') +
     '<span><i style="--c:#E3E4EC;border:1px solid #C9CAD6"></i>Non traité</span>';
   return `<div class="vd-legend"><span class="pro-label">Décisions</span>${dec}<span class="vd-legend__sep"></span><span class="pro-label">Validation</span>
-    <span><i style="--c:${AVIS_COLOR.valide}"></i>Validé</span><span><i style="--c:${AVIS_COLOR.disagree}"></i>Contre-proposition</span>
-    <span><i class="vd-sw-revoir" style="border:1px solid var(--vd-revoir)"></i>À revoir</span><span><i style="--c:${AVIS_COLOR.todo}"></i>À valider</span></div>`;
+    <span><i style="--c:${AVIS_COLOR.valide}"></i>Validé</span><span><i style="--c:${AVIS_COLOR.disagree}"></i>Changé par le responsable</span>
+    <span><i style="--c:${AVIS_COLOR.todo}"></i>À valider</span></div>`;
 }
 function renderRayons(){
   // Seuls les rayons ayant au moins une décision dans Rotobib sont listés.
@@ -677,18 +692,19 @@ function renderRayons(){
   let totalTodo = 0;
   const rows = list.map(g => {
     const counts = { conserver:0, pilon:0, braderie:0, relocalisation:0 };
-    const rv = { todo:0, valide:0, disagree:0, stale:0, comment:0 };
-    g.books.forEach(t => { counts[t.statut]++; rv[reviewState(t)]++; });
+    const rv = { todo:0, valide:0, disagree:0, comment:0 };
+    let sorted = 0;
+    g.books.forEach(t => { counts[t.statut]++; rv[reviewState(t)]++; if(isSorted(t)) sorted++; });
     const n = g.books.length;
     const total = g.id === HORS_RAYON ? null : (scanned[g.id] || 0);
-    const todo = rv.todo + rv.comment + rv.stale;     // tout ce que le validateur doit encore traiter
+    const todo = rv.todo + rv.comment;     // tout ce que le responsable doit encore trancher
     totalTodo += todo;
     const denom = Math.max(total || 0, n) || 1;
     const decSegs = DEC_ORDER.filter(s => counts[s]).map(s => `<span style="width:${counts[s]/denom*100}%;--c:${DC[s].color}" title="${DC[s].label} : ${counts[s]}"></span>`).join('');
     const aval = rv.todo + rv.comment;
-    const valSegs = [['valide', rv.valide, 'Validés'], ['disagree', rv.disagree, 'Contre-propositions'], ['stale', rv.stale, 'À revoir'], ['todo', aval, 'À valider']]
-      .filter(x => x[1]).map(x => `<span${x[0]==='stale'?' class="is-hatch"':''} style="width:${x[1]/n*100}%;--c:${AVIS_COLOR[x[0]]}" title="${x[2]} : ${x[1]}"></span>`).join('');
-    const valText = [rv.valide ? `${rv.valide} validé${rv.valide>1?'s':''}` : '', rv.disagree ? `${rv.disagree} contre-proposition${rv.disagree>1?'s':''}` : '', rv.stale ? `${rv.stale} à revoir` : '']
+    const valSegs = [['valide', rv.valide, 'Validés'], ['disagree', rv.disagree, 'Changés par le responsable'], ['todo', aval, 'À valider']]
+      .filter(x => x[1]).map(x => `<span style="width:${x[1]/n*100}%;--c:${AVIS_COLOR[x[0]]}" title="${x[2]} : ${x[1]}"></span>`).join('');
+    const valText = [rv.valide ? `${rv.valide} validé${rv.valide>1?'s':''}` : '', rv.disagree ? `${rv.disagree} changé${rv.disagree>1?'s':''}` : '', sorted ? `${sorted} trié${sorted>1?'s':''}` : '']
       .filter(Boolean).join(' · ') || 'Aucun avis rendu';
     const decText = total ? `${n} décidé${n>1?'s':''} sur ${total}` : `${n} décidé${n>1?'s':''}`;
     const aria = `${groupLabel(g.id)} : ${decText}, ${todo} à valider`;
@@ -743,7 +759,8 @@ function filteredBooks(){
       if(f.avis === 'todo' && !isActionable(st)) return false;
       if(f.avis === 'valide' && st !== 'valide') return false;
       if(f.avis === 'disagree' && st !== 'disagree') return false;
-      if(f.avis === 'stale' && st !== 'stale') return false;
+      if(f.avis === 'final' && !isSorted(b.t)) return false;
+      if(f.avis === 'tosort' && (isActionable(st) || isSorted(b.t))) return false;
       if(f.avis === 'comment' && !(b.t.validation && b.t.validation.commentaire)) return false;
       if(f.q && !`${b.t.barcode} ${b.cote} ${b.titre} ${b.auteur}`.toLowerCase().includes(f.q)) return false;
       return true;
@@ -809,10 +826,11 @@ function decPill(t){
   return `<span class="pro-pill pro-pill--${t.statut}">${rpUI.icon(STATUT_ICON[t.statut], { size:12, stroke:3 })}${STATUT_LABEL[t.statut]}</span>`;
 }
 function avisPill(t){
-  const st = reviewState(t), v = t.validation || {};
-  const sw = k => `<span class="pro-pill__swatch ${k==='stale'?'vd-sw-revoir':'vd-sw-'+k}" style="--swb:${k==='stale'?'var(--vd-revoir)':'transparent'}"></span>`;
-  const label = st === 'valide' ? 'Validé' : st === 'disagree' ? 'Plutôt ' + (STATUT_LABEL[v.avis] || '—')
-    : st === 'stale' ? 'À revoir' : st === 'comment' ? 'À valider · note' : 'À valider';
+  const st = reviewState(t);
+  const sw = k => `<span class="pro-pill__swatch vd-sw-${k}"></span>`;
+  if(isSorted(t)) return `<span class="pro-pill pro-pill--plan">${sw('final')}Trié · ${esc(STATUT_LABEL[t.final.statut] || '—')}</span>`;
+  const label = st === 'valide' ? 'Validé' : st === 'disagree' ? '→ ' + (STATUT_LABEL[finalStatut(t)] || '—')
+    : st === 'comment' ? 'À valider · note' : 'À valider';
   return `<span class="pro-pill pro-pill--plan">${sw(st === 'comment' ? 'todo' : st)}${esc(label)}</span>`;
 }
 
@@ -830,16 +848,22 @@ function reviewHtml(b){
   const cover = b.imagette
     ? `<div class="vd-cover" id="vd-cover"><img src="${esc(b.imagette)}" alt="Couverture de « ${esc(b.titre)} »" onerror="this.parentNode.innerHTML='<div class=&quot;vd-cover__ph&quot;>Couverture indisponible</div>'"><div class="vd-cover__hint">Cliquer pour agrandir</div></div>`
     : `<div class="vd-cover" id="vd-cover"><div class="vd-cover__ph">${rpUI.icon('book', { size:28, stroke:1.6 })}Pas de couverture</div></div>`;
-  const stale = st === 'stale'
-    ? `<div class="vd-stale" role="status">⚠ L'équipe a changé sa décision depuis votre avis (vous aviez vu « ${esc(STATUT_LABEL[v.statutVu] || '—')} », votre avis : ${v.avis === 'valide' ? 'validé' : esc(STATUT_LABEL[v.avis] || '—')}).</div>` : '';
+  const fs = finalStatut(t), sorted = isSorted(t);
+  // Décision finale du responsable, affichée à côté de celle de l'équipe quand il l'a changée.
+  const finalLine = st === 'disagree'
+    ? `<div class="vd-final"><span class="vd-final__arrow">${rpUI.icon('arrow', { size:18, stroke:2.5 })}</span><span class="vd-bigdec vd-bigdec--${fs}">${rpUI.icon(STATUT_ICON[fs], { size:22, stroke:3 })}${STATUT_LABEL[fs]}</span>
+       <small><strong>Décision finale du responsable</strong><br><span>remplace celle de l'équipe</span></small></div>` : '';
+  const done = sorted
+    ? `<div class="vd-done" role="status">✔ Trié le ${esc(fmtDate(t.final.ts))}${t.final.par ? ' par ' + esc(t.final.par) : ''} : rangé en « ${esc(STATUT_LABEL[t.final.statut] || '—')} ». Plus rien à faire sur ce livre — pour revenir dessus, annulez d'abord le tri dans Rotobib.</div>` : '';
+  const lock = sorted ? ' disabled title="Livre déjà trié : annulez le tri dans Rotobib pour revenir dessus"' : '';
   const who = v && (v.avis || v.commentaire) ? `${v.par ? esc(v.par) + ' · ' : ''}${fmtDate(v.ts)}` : '';
   const hasComment = !!(v && v.commentaire);
   const commentOpen = hasComment || REVIEW.commentFor === t.barcode;
   const valPressed = st === 'valide';
   const alts = DEC_ORDER.map(s => {
     const own = s === t.statut;
-    const pressed = !own && v && v.avis === s && st !== 'stale';
-    return `<button type="button" class="vd-act vd-act--alt" data-act="${s}" style="--c:${DC[s].color};--ink:${DC[s].ink}" aria-pressed="${pressed}" aria-keyshortcuts="${STATUT_KEY[s]}" ${own ? 'disabled title="Décision actuelle de l\'équipe"' : ''}>
+    const pressed = !own && st === 'disagree' && fs === s;
+    return `<button type="button" class="vd-act vd-act--alt" data-act="${s}" style="--c:${DC[s].color};--ink:${DC[s].ink}" aria-pressed="${pressed}" aria-keyshortcuts="${STATUT_KEY[s]}" ${own ? 'disabled title="Décision proposée par l\'équipe"' : lock}>
       <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:${DC[s].textOnWhite}"><path d="${rpUI.icons[STATUT_ICON[s]]}"/></svg>${STATUT_SHORT[s]}</span><span class="pro-kbd">${STATUT_KEY[s]}</span></button>`;
   }).join('');
   return `<div class="vd-rv-body" data-bc="${esc(t.barcode)}">
@@ -850,26 +874,27 @@ function reviewHtml(b){
           <h3 class="vd-ttl">${esc(b.titre)}</h3>
           ${b.auteur ? `<div class="vd-auth">${esc(b.auteur)}</div>` : ''}
           <div class="vd-meta">${esc(metaLine)}</div></div>
-        ${stale}
         <div class="vd-decision"><span class="vd-bigdec vd-bigdec--${t.statut}">${rpUI.icon(STATUT_ICON[t.statut], { size:22, stroke:3 })}${STATUT_LABEL[t.statut]}</span>
-          <small>Décision de l'équipe<br><span>proposée le ${rpUI.fmt.date(t.ts)}</span></small>
+          <small>Proposition de l'équipe<br><span>le ${rpUI.fmt.date(t.ts)}</span></small>
           <span>${avisPill(t)}</span></div>
+        ${finalLine}
+        ${done}
         <div class="vd-stats">${loansHtml(b)}
           <div class="vd-stats__rest"><div><div class="pro-label">Dernier prêt</div><div class="vd-big">${esc(b.dernier || '—')}</div></div><div>${compareHtml(b)}</div></div></div>
       </div>
     </div>
     <aside class="vd-aside" aria-label="Actions">
-      <button type="button" class="vd-act vd-act--valide" data-act="valide" aria-pressed="${valPressed}" aria-keyshortcuts="V"><span>${rpUI.icon('check', { size:22, stroke:3 })}${valPressed ? 'Validé' : 'Valider'}</span><span class="pro-kbd">V</span></button>
-      <div class="pro-label" style="margin-top:.3rem">Ou contre-proposer</div>
+      <button type="button" class="vd-act vd-act--valide" data-act="valide" aria-pressed="${valPressed}" aria-keyshortcuts="V"${lock}><span>${rpUI.icon('check', { size:22, stroke:3 })}${valPressed ? 'Validé' : 'Valider'}</span><span class="pro-kbd">V</span></button>
+      <div class="pro-label" style="margin-top:.3rem">Ou décider autrement</div>
       <div class="vd-alts">${alts}</div>
-      <button type="button" class="vd-act vd-act--comment" data-act="comment" aria-expanded="${commentOpen}" aria-keyshortcuts="K"><span>${rpUI.icon('edit', { size:16 })}Commenter${hasComment ? ' (1)' : ''}</span><span class="pro-kbd">K</span></button>
+      <button type="button" class="vd-act vd-act--comment" data-act="comment" aria-expanded="${commentOpen}" aria-keyshortcuts="K"${lock}><span>${rpUI.icon('edit', { size:16 })}Commenter${hasComment ? ' (1)' : ''}</span><span class="pro-kbd">K</span></button>
       <div class="vd-cm" id="vd-cm" ${commentOpen ? '' : 'hidden'}>
-        <textarea id="vd-comment" maxlength="2000" aria-label="Commentaire pour l'équipe" placeholder="Commentaire pour l'équipe (facultatif)…">${esc(v ? v.commentaire : '')}</textarea>
+        <textarea id="vd-comment" maxlength="2000"${sorted ? ' readonly' : ''} aria-label="Commentaire pour l'équipe" placeholder="Commentaire pour l'équipe (facultatif)…">${esc(v ? v.commentaire : '')}</textarea>
         <div class="vd-cm__foot"><span class="vd-cm__state ${who ? 'saved' : ''}">${who ? 'Enregistré · ' + who : ''}</span>
-          <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-act="save">Enregistrer</button></div>
+          <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-act="save"${lock}>Enregistrer</button></div>
         <p class="vd-hint" style="margin-top:.4rem"><span class="pro-kbd">Ctrl</span> <span class="pro-kbd">Entrée</span> enregistre · <span class="pro-kbd">Échap</span> quitte le champ</p>
       </div>
-      <p class="vd-hint">Raccourcis : <span class="pro-kbd">V</span> valider · <span class="pro-kbd">C</span> <span class="pro-kbd">B</span> <span class="pro-kbd">R</span> <span class="pro-kbd">P</span> contre-proposer · <span class="pro-kbd">K</span> commenter · <span class="pro-kbd">←</span> <span class="pro-kbd">→</span> naviguer</p>
+      <p class="vd-hint">Votre décision est définitive : l'équipe ne peut plus la changer dans Rotobib, elle n'a plus qu'à trier le livre. Raccourcis : <span class="pro-kbd">V</span> valider · <span class="pro-kbd">C</span> <span class="pro-kbd">B</span> <span class="pro-kbd">R</span> <span class="pro-kbd">P</span> décider autrement · <span class="pro-kbd">K</span> commenter · <span class="pro-kbd">←</span> <span class="pro-kbd">→</span> naviguer</p>
     </aside>
   </div>
   <div class="vd-rv-nav">
@@ -905,7 +930,7 @@ function renderReview(force){
   }
   const b = bookInfo(t);
   const pos = posInOrder();
-  const sig = [t.barcode, t.statut, t.ts, t.validation ? t.validation.ts + '|' + t.validation.avis + '|' + t.validation.commentaire : '', pos, REVIEW.order.length, REVIEW.commentFor === t.barcode, REFERENCE_YEAR, b.rec ? 1 : 0, groupLoanStats().length].join('~');
+  const sig = [t.barcode, t.statut, t.ts, t.final ? t.final.ts : '', t.validation ? t.validation.ts + '|' + t.validation.avis + '|' + t.validation.commentaire : '', pos, REVIEW.order.length, REVIEW.commentFor === t.barcode, REFERENCE_YEAR, b.rec ? 1 : 0, groupLoanStats().length].join('~');
   if(!force && el.__sig === sig) return;
   el.__sig = sig;
   el.__html = null;
@@ -1087,32 +1112,33 @@ function sendReview(bc, validation){
 function decide(avis){
   const bc = currentBc(), t = bc && TRAITEMENTS[bc];
   if(!t) return;
+  if(isSorted(t)){ flash('Livre déjà trié : annulez le tri dans Rotobib pour revenir dessus.', { type:'warn', timeout:3500 }); return; }
   const c = commentBox();
   const st = reviewState(t), v = t.validation;
   const txt = c ? c.value.trim() : (v ? v.commentaire : '');
-  // Recliquer l'avis actif le retire (le commentaire reste).
-  const active = avis === 'valide' ? st === 'valide' : (v && v.avis === avis && st !== 'stale');
+  // Recliquer la décision active la retire (le commentaire reste).
+  const active = avis === 'valide' ? st === 'valide' : (st === 'disagree' && finalStatut(t) === avis);
   const next = active ? null : avis;
   sendReview(bc, makeValidation(t, next, txt));
   if(c) c.classList.remove('dirty');
   renderCampaign(); renderRayons(); renderQueue();
   const pos = posInOrder();
   if(next && autoNext.checked && pos < REVIEW.order.length - 1){
-    flash(`${next === 'valide' ? 'Validé' : 'Contre-proposition : ' + STATUT_LABEL[next]} · ${pos + 1} / ${REVIEW.order.length}`);
+    flash(`${next === 'valide' ? 'Validé' : 'Décision finale : ' + STATUT_LABEL[next]} · ${pos + 1} / ${REVIEW.order.length}`);
     goTo(REVIEW.order[pos + 1]);
   } else {
-    flash(next ? (next === 'valide' ? 'Décision validée.' : 'Contre-proposition : ' + STATUT_LABEL[next] + '.') + (pos >= REVIEW.order.length - 1 ? ' Dernier livre de la revue.' : '') : 'Avis retiré.');
+    flash(next ? (next === 'valide' ? 'Décision validée.' : 'Décision finale : ' + STATUT_LABEL[next] + '.') + (pos >= REVIEW.order.length - 1 ? ' Dernier livre de la revue.' : '') : 'Avis retiré.');
     renderReview(true);
   }
 }
 function saveComment(){
   const bc = currentBc(), t = bc && TRAITEMENTS[bc], c = commentBox();
-  if(!t || !c) return;
+  if(!t || !c || isSorted(t)) return;
   const txt = c.value.trim();
   const v = t.validation;
   if((v ? v.commentaire : '') === txt){ c.classList.remove('dirty'); return; }
-  // On garde l'avis existant, sauf s'il portait sur une ancienne décision.
-  const avis = v && v.avis && reviewState(t) !== 'stale' ? v.avis : null;
+  // On garde la décision déjà prise.
+  const avis = v && v.avis ? v.avis : null;
   sendReview(bc, makeValidation(t, avis, txt));
   c.classList.remove('dirty');
   renderCampaign(); renderRayons(); renderQueue();
@@ -1219,14 +1245,15 @@ $('vd-export').addEventListener('click', () => {
   if(!current) return;
   const Y = REFERENCE_YEAR;
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const head = ['Code-barre','Colonne','Étagère','Cote','Titre','Auteur','Parution',`Prêts ${Y}`,`Prêts avant ${Y}`,'Dernier prêt','Décision équipe','Avis','Proposition','Commentaire','Validé par','Date avis'];
+  const head = ['Code-barre','Colonne','Étagère','Cote','Titre','Auteur','Parution',`Prêts ${Y}`,`Prêts avant ${Y}`,'Dernier prêt','Proposition équipe','Avis','Décision finale','Commentaire','Validé par','Date avis','Trié le'];
   const rows = decidedBooks().filter(t => groupOf(t.barcode) === current).map(bookInfo)
     .sort((a, b) => a.cote.localeCompare(b.cote, 'fr', { numeric:true }))
     .map(b => {
       const v = b.t.validation || {}, st = reviewState(b.t);
-      const avis = { valide:'Validé', disagree:'Contre-proposition', stale:'À revoir (décision changée)', todo:'À valider', comment:'À valider' }[st];
+      const avis = { valide:'Validé', disagree:'Changé par le responsable', todo:'À valider', comment:'À valider' }[st];
+      const fs = finalStatut(b.t);
       return [b.t.barcode, b.scan.colonne, b.scan.etage, b.cote, b.titre, b.auteur, b.parution, b.an, b.avant, b.dernier,
-        STATUT_LABEL[b.t.statut], avis, st === 'disagree' ? STATUT_LABEL[v.avis] : '', v.commentaire || '', v.par || '', v.ts ? fmtDate(v.ts) : ''];
+        STATUT_LABEL[b.t.statut], avis, fs ? STATUT_LABEL[fs] : '', v.commentaire || '', v.par || '', v.ts ? fmtDate(v.ts) : '', b.t.final ? fmtDate(b.t.final.ts) : ''];
     });
   const csv = '﻿' + [head, ...rows].map(r => r.map(q).join(';')).join('\r\n');
   const a = document.createElement('a');

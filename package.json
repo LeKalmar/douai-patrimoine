@@ -14,6 +14,7 @@
     "build:magasins": "node scripts/build-magasins.mjs",
     "build:cotes-numeriques": "node scripts/build-cotes-numeriques.mjs",
     "build:desherbage": "node scripts/build-desherbage.mjs",
+    "update:bib": "node scripts/build-magasins.mjs && node scripts/build-cotes-numeriques.mjs && node scripts/build-desherbage.mjs",
     "build:non-catalogues": "node scripts/build-non-catalogues.mjs",
     "build:fonds-complementaires": "node scripts/build-fonds-complementaires.mjs",
     "build:manifest-presse": "node scripts/build-manifest-presse.mjs",

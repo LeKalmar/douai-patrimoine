@@ -65,7 +65,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { loadDotEnv } from './lib/dotenv.mjs';
 import { r2Get, r2Configured } from '../lib/r2.mjs';
-import { iterateGesmarcItemsFromFile, parseGesmarcItem } from './lib/gesmarc.mjs';
+import { iterateGesmarcItemsWithUpdates, logUpdateSummary, parseGesmarcItem } from './lib/gesmarc.mjs';
 import { loadColumnar } from './lib/load-columnar.mjs';
 import { magasinDigitRun, isPiegeEnReserve, isMagasin, fondsLabel } from './lib/magasin-classify.mjs';
 
@@ -105,7 +105,8 @@ async function buildItems(path) {
     bySection: {},
   };
 
-  for await (const itemXml of iterateGesmarcItemsFromFile(path)) {
+  const updates = {};
+  for await (const itemXml of iterateGesmarcItemsWithUpdates(path, undefined, updates)) {
     stats.totalItems++;
     if (stats.totalItems % 20000 === 0) {
       const mem = process.memoryUsage();
@@ -199,7 +200,7 @@ async function buildItems(path) {
     });
   }
 
-  return { items, stats };
+  return { items, stats, updates };
 }
 
 // ── Récupération du XML depuis R2 (même fichier local que build-magasins.mjs
@@ -237,7 +238,8 @@ async function main() {
   }
 
   console.log(`  · lecture (en flux) ${CONFIG.input}`);
-  const { items, stats } = await buildItems(CONFIG.input);
+  const { items, stats, updates } = await buildItems(CONFIG.input);
+  logUpdateSummary(updates);
   console.log(
     `     ${stats.totalItems} exemplaires scannés ・ ${stats.kept} gardés (bibliothèque Douai) ・ ` +
     `dont ${stats.keptMagasin} en magasin ・ ${stats.withLoanData} avec au moins un prêt annuel non nul`
@@ -271,6 +273,9 @@ async function main() {
 
   const report = {
     generatedAt: new Date().toISOString(),
+    // Exports partiels de data/xml/update/ superposés à bib.xml (voir
+    // iterateGesmarcItemsWithUpdates() dans scripts/lib/gesmarc.mjs).
+    partialUpdates: updates.files.length ? updates : undefined,
     durationMs: Date.now() - startedAt,
     stats: {
       totalItems: stats.totalItems,

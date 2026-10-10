@@ -14,7 +14,8 @@
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync, readdirSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { decodeXml } from './marc-xml.mjs';
 
 const ITEM_OPEN = '<item type="GESMARC">';
@@ -77,4 +78,85 @@ export function parseGesmarcItem(itemXml) {
     props[flat(decodeXml(m[1]))] = flat(decodeXml(m[2]));
   }
   return props;
+}
+
+// ── Exports partiels « exemplaires modifiés depuis » (data/xml/update/) ──────
+//
+// Entre deux bib.xml complets, l'équipe dépose dans data/xml/update/ un export
+// Syracuse partiel, au même format GESMARC et avec les mêmes champs que
+// bib.xml. iterateGesmarcItemsWithUpdates() le superpose à bib.xml pendant la
+// lecture : un code-barre présent dans une mise à jour remplace l'exemplaire
+// de bib.xml (cote, section, piège, prêts… — l'item entier), un code-barre
+// inconnu de bib.xml est ajouté en fin de lecture. Rien n'est jamais
+// supprimé : les exemplaires morts restent dans Syracuse, piégés (Pilon,
+// Perdu…), et arrivent avec leur nouveau piège comme toute autre
+// modification. Les fichiers sont appliqués par ordre de nom (le nom Syracuse
+// porte l'horodatage, ExportSyracuse_Exemplaire_AAAAMMJJ_HHMMSS.xml) : le plus
+// récent l'emporte. Ils deviennent obsolètes dès qu'un nouveau bib.xml
+// complet est chargé — vider alors le dossier, sinon une ancienne mise à jour
+// réécraserait des données plus fraîches.
+
+export const UPDATE_DIR = 'data/xml/update';
+
+const BARCODE_RE = /<property\s+name="Code-barres \(valeur\)"[^>]*\svalue="([^"]*)"/;
+
+function barcodeOfItem(itemXml) {
+  const m = BARCODE_RE.exec(itemXml);
+  return m ? decodeXml(m[1]).trim() : '';
+}
+
+export function listUpdateFiles(dir = UPDATE_DIR) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter(f => f.toLowerCase().endsWith('.xml'))
+    .sort()
+    .map(f => join(dir, f));
+}
+
+/**
+ * Comme iterateGesmarcItemsFromFile(basePath), avec les mises à jour de
+ * `updatePaths` superposées (voir ci-dessus). `summary` (facultatif) est
+ * rempli au fil de la lecture : fichiers appliqués, exemplaires remplacés,
+ * ajoutés — à recopier dans le rapport de build.
+ */
+export async function* iterateGesmarcItemsWithUpdates(basePath, updatePaths = listUpdateFiles(), summary = {}) {
+  const updates = new Map();
+  summary.files = [];
+  for (const path of updatePaths) {
+    let items = 0;
+    for await (const itemXml of iterateGesmarcItemsFromFile(path)) {
+      const bc = barcodeOfItem(itemXml);
+      if (!bc) continue;
+      updates.set(bc, flat(itemXml));
+      items++;
+    }
+    summary.files.push({ file: basename(path), items });
+  }
+  summary.replaced = 0;
+  summary.added = 0;
+
+  for await (const itemXml of iterateGesmarcItemsFromFile(basePath)) {
+    if (updates.size) {
+      const bc = barcodeOfItem(itemXml);
+      const fresh = bc && updates.get(bc);
+      if (fresh) {
+        updates.delete(bc);
+        summary.replaced++;
+        yield fresh;
+        continue;
+      }
+    }
+    yield itemXml;
+  }
+  for (const itemXml of updates.values()) {
+    summary.added++;
+    yield itemXml;
+  }
+}
+
+export function logUpdateSummary(summary) {
+  if (!summary.files?.length) return;
+  console.log(`  · mises à jour partielles appliquées (${UPDATE_DIR}) :`);
+  for (const f of summary.files) console.log(`      - ${f.file} (${f.items} exemplaires)`);
+  console.log(`    → ${summary.replaced} exemplaires de bib.xml remplacés, ${summary.added} ajoutés`);
 }
