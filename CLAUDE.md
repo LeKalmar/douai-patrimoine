@@ -226,9 +226,21 @@ Les pages de l'espace pro (`admin.html`, `recolement.html`, `rotobib.html`,
 `cotes-numeriques.html`, `analyse-cotes.html`, `reliures.html`,
 `exemplarisation.html`, `transfert-magasins.html`, `livres-spolies.html`,
 `scan-docs.html`) partagent un kit, pour ne plus réinventer en-tête,
-boutons, tableaux et graphiques page par page. `reserve.html`,
-`generer_manifest.html` et les pages Voyageurs n'ont **pas** été migrées
-(le plan des magasins est volontairement gardé tel quel).
+boutons, tableaux et graphiques page par page. `generer_manifest.html` et
+les pages Voyageurs n'ont **pas** été migrées. `reserve.html` l'a été le
+2026-10-10 (maquette « Plan des magasins — évolution douce ») : un onglet
+par local (Réserve / 2e / 5e / 6e / Rayons, hash `#reserve`…, mémorisé dans
+`rp_plan_local`), cartes d'avancement par local, **calques** Statut /
+Fraîcheur (dernier `ts` de l'emplacement) / Anomalies (scans `horsSection`,
+`coteApprox`, `barcodeAbime`) / Désherbage (lecture seule de
+`/api/desherbage`, même `finalStatut()` que Rotobib ; hauteur de la pile =
+part des livres décidés), vignettes `<canvas>` des autres calques, panneau
+de détail de la travée sélectionnée (répartition, étagère par étagère,
+« Reprendre le récolement ici » qui écrit `rp_recolement_loc` avant
+d'ouvrir `recolement.html`, « Voir les notices » de toute la travée — clé
+`T:<tid>` dans `showNotices()`). Les stats globales de l'ancienne page ont
+disparu au profit des cartes par local ; la section « Périodiques — non
+couvert » aussi.
 
 - **`css/admin.css`** — classes préfixées **`pro-`** (jamais de collision
   avec les classes locales historiques `.btn`, `.card`, `.tool-btn`…) :
