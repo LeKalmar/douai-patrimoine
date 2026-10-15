@@ -318,23 +318,40 @@ la logique et les identifiants contractuels sont, eux, inchangés) :
 Feuilles A4 **paysage**, pensées pour une impression **noir et blanc** (aucune
 information portée par la couleur : noir, gris, hachures). Une feuille = une
 travée seule, ou deux travées qui partagent une entrée, chacune avec une
-flèche pleine vers son côté. Regroupement par défaut : réserve patrimoniale =
-I seule puis II/III, IV/V… ; ailleurs une travée par feuille. Les boutons
+flèche pleine vers son côté. Regroupement par défaut (`defaultSheets()`) : la
+I seule, puis les travées numérotées par deux (II/III, IV/V…) ; Alpha/Bêta/
+Delta et les rayons restent seuls. **Le sens s'inverse hors de la réserve
+patrimoniale** : là, II est à gauche et III à droite ; dans la Réserve
+Douaisienne et les magasins, III à gauche et II à droite (constaté par
+l'équipe au 5e, 2026-10-15). Bouton « Regroupement par défaut » pour
+revenir à cette règle. Les boutons
 ⇄ (échanger gauche/droite), ✂ (séparer) et ＋ (réunir avec la suivante)
 modifient ce regroupement, **mémorisé dans le `localStorage` du poste**
 (`rp_signaletique_pairs`, par local) — pas dans R2.
 
 Contenu calculé à l'ouverture depuis `/api/recolement` (repli
-`data/recolement.json`) : plage de cotes de la travée et de chaque colonne
-(tri `compareCotes`, 2 % extrêmes écartés au-delà de 40 livres pour qu'un
-livre mal rangé ne fausse pas le panneau), documents récolés + estimation
-non catalogués. Pour la réserve (catalogue `data/inventaire.json`, chargé
+`data/recolement.json`) : plage de cotes de la travée (tri `compareCotes`,
+2 % extrêmes écartés au-delà de 40 livres pour qu'un livre mal rangé ne
+fausse pas le panneau), documents récolés + estimation non catalogués, et
+**carte de la travée** (`shelfMap()`/`mapHtml()`) : une case par étagère,
+étagère 1 en haut, mêmes statuts et même priorité que `slotState()` de
+`reserve.html` (récolé > exemplarisé rapide > non catalogué > à ranger >
+vide > pas encore récolé), même hauteur de colonne que `maxEtageOf()`,
+même dédoublonnage par cote hors magasins/rayons ; chaque statut a une
+trame noir et blanc (aplat noir, gris, hachures, quadrillage, blanc, gris
+pointillé), cases mixtes en bandes proportionnelles. **Encart « Fonds »** à
+côté du numéro : sous-fonds déduits du début de la cote (`SOUS_FONDS` —
+I-INC incunables, I-HOS hospice, I-d impressions douaisiennes, I-Bibles,
+I-16/I-17… siècle, LIVA livres d'artiste, I-Sit situationniste, RD,
+Berthoud, MDV…), masqué
+quand moins de la moitié des cotes correspond à un fonds connu (magasins).
+Ajouter un fonds = une ligne dans `SOUS_FONDS`. Pour la réserve (catalogue `data/inventaire.json`, chargé
 seulement pour ces locaux) : période d'édition, siècles, langues, plus
 ancien document — année tirée de 210$d, puis 100$a, puis de la cote.
 Magasins et rayons : colonnes/étagères à la place (pas d'enrichissement,
-`data/desherbage.json` est trop lourd). `fitSheets()` resserre le tableau,
-puis retire « Le plus ancien », puis les graphiques si une demi-feuille
-déborde. Impression : `@page { size: A4 landscape; margin: 0 }`, une
+`data/desherbage.json` est trop lourd). `fitSheets()` réduit le numéro pour
+qu'il tienne à côté de l'encart, puis retire « Le plus ancien », puis les
+graphiques si une demi-feuille déborde. Impression : `@page { size: A4 landscape; margin: 0 }`, une
 feuille par page, réglages masqués.
 
 ## Publication en iframe sur le site du réseau

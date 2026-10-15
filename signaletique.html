@@ -73,7 +73,7 @@
   .half { display: flex; flex-direction: column; min-height: 0; padding: 0 9mm; overflow: hidden; }
   /* Ajustement automatique quand le contenu déborde (fitSheets()) :
      tableau resserré, puis sans le plus ancien, puis sans graphiques. */
-  .half.fit-2 .tv-doyen, .half.fit-3 .tv-charts { display: none; }
+  .half.fit-1 .tv-doyen, .half.fit-2 .tv-charts { display: none; }
   .half:first-child { padding-left: 0; }
   .half:last-child { padding-right: 0; }
   .half + .half { border-left: 1.2pt solid var(--ink); }
@@ -81,11 +81,21 @@
   /* En-tête : flèche + numéro de travée. La flèche pointe vers la travée. */
   .tv-head { display: flex; align-items: center; gap: 6mm; min-height: 34mm; }
   .tv-head--right { flex-direction: row-reverse; text-align: right; }
+  .tv-name { overflow: hidden; }
+  /* Encart « fonds » à côté du numéro : sous-fonds d'après la cote. */
+  .tv-fonds { flex: none; width: 47mm; border: .7pt solid var(--ink); padding: 1.6mm 2.2mm 1.8mm; text-align: left; align-self: center; }
+  .sheet--single .tv-fonds { width: 62mm; }
+  .tv-fonds .tv-h { margin-bottom: 1mm; }
+  .tv-fonds__row { display: grid; grid-template-columns: 1fr auto; gap: 0 2mm; align-items: baseline; font-size: 8pt; line-height: 1.3; }
+  .tv-fonds__row b { font-weight: 700; }
+  .tv-fonds__row span:last-child { color: var(--mid); font-variant-numeric: tabular-nums; font-size: 7.5pt; }
+  .tv-fonds__bar { grid-column: 1 / -1; height: 1.1mm; background: var(--tint); margin: .3mm 0 .8mm; }
+  .tv-fonds__bar i { display: block; height: 100%; background: var(--ink); }
   .tv-arrow { flex: none; width: 27mm; height: 27mm; }
   .sheet--single .tv-head { min-height: 46mm; }
   .tv-arrow svg { width: 100%; height: 100%; display: block; }
   .tv-name { flex: 1; min-width: 0; line-height: .9; }
-  .tv-kicker { font-size: 10pt; letter-spacing: .32em; text-transform: uppercase; color: var(--mid); margin-bottom: 1.5mm; }
+  .tv-kicker { font-size: 10pt; line-height: 1.4; letter-spacing: .32em; text-transform: uppercase; color: var(--mid); margin-bottom: 1.5mm; }
   .tv-num { font-family: 'Moret', Georgia, serif; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
   .tv-num--long { white-space: normal; line-height: 1; }
 
@@ -110,18 +120,36 @@
   .sheet--single .tv-detail > * { flex: 1; min-width: 0; }
 
   .tv-h { font-size: 7.5pt; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; margin: 0 0 1.5mm; }
-  .tv-cols { width: 100%; border-collapse: collapse; font-size: 9pt; }
-  .tv-cols td { padding: .6mm 1.5mm; border-bottom: .4pt solid var(--rule); vertical-align: baseline; }
-  .tv-cols td:first-child {
-    width: 7mm; text-align: center; font-family: 'Moret', Georgia, serif; font-weight: 700; font-size: 11pt;
-    background: var(--tint); border-bottom-color: #fff;
+  /* Carte de la travée : une case par étagère (étagère 1 en haut, comme sur
+     le plan), une trame par statut — mêmes règles de priorité que
+     slotState() de reserve.html. Lisible en noir et blanc. */
+  .tv-map { flex: 1.25; min-height: 46mm; display: flex; flex-direction: column; min-width: 0; }
+  .map { flex: 1; display: grid; gap: .7mm; min-height: 0; }
+  .map__colh { text-align: center; font-family: 'Moret', Georgia, serif; font-weight: 700; font-size: 10.5pt; line-height: 1; padding-bottom: .4mm; }
+  .map__rowh { font-size: 6.5pt; color: var(--mid); display: flex; align-items: center; justify-content: flex-end; padding-right: .6mm; }
+  .map__foot { text-align: center; font-size: 6.5pt; color: var(--mid); line-height: 1; padding-top: .3mm; white-space: nowrap; }
+  .cell { position: relative; border: .5pt solid var(--ink); display: flex; overflow: hidden; min-height: 0; }
+  .cell__seg { height: 100%; }
+  .cell__n {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 7pt; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none;
   }
-  .tv-cols .c-range { font-family: 'DM Mono', 'Courier New', monospace; font-size: 8.4pt; white-space: nowrap; }
-  .tv-cols .c-range i { font-style: normal; color: var(--soft); padding: 0 1mm; }
-  .tv-cols .c-n { text-align: right; color: var(--mid); white-space: nowrap; font-size: 8pt; }
-  .tv-cols .c-empty { color: var(--soft); font-style: italic; font-size: 8pt; }
-  .tv-cols--compact td { padding: .45mm 1.5mm; font-size: 8pt; }
-  .tv-cols--compact .c-range { font-size: 7.6pt; }
+  .cell__n span { background: #fff; color: var(--ink); padding: 0 .7mm; line-height: 1.25; }
+  .cell--solid .cell__n span { background: none; color: #fff; }
+  .p-cat { background: #111; }
+  .p-manuel { background: #6d6d6d; }
+  .p-noncat { background: repeating-linear-gradient(45deg, #111 0 .4mm, #fff .4mm 1.25mm); }
+  .p-nonrange { background:
+      repeating-linear-gradient(45deg, transparent 0 .9mm, #111 .9mm 1.2mm),
+      repeating-linear-gradient(-45deg, #fff 0 .9mm, #111 .9mm 1.2mm); }
+  .p-vide { background: #fff; }
+  .p-unknown { background: #ececec; }
+  .cell.st-unknown { border: .5pt dashed #9a9a9a; }
+  .cell.st-vide .cell__n span { color: var(--mid); font-weight: 400; }
+  .map-legend { display: flex; flex-wrap: wrap; gap: 1mm 3.5mm; margin-top: 2mm; font-size: 7pt; color: var(--ink); }
+  .map-legend span { display: inline-flex; align-items: center; gap: 1.2mm; white-space: nowrap; }
+  .map-legend i { display: inline-block; width: 4.2mm; height: 3.2mm; border: .5pt solid var(--ink); }
+  .map-legend i.p-unknown { border-style: dashed; border-color: #9a9a9a; }
 
   .tv-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
   .sheet--single .tv-charts { grid-template-columns: 1fr; gap: 5mm; }
@@ -178,6 +206,7 @@
       </label>
       <span class="sg-status" id="sg-status" role="status" aria-live="polite">Chargement…</span>
       <span class="sg-spacer"></span>
+      <button type="button" class="pro-btn pro-btn--ghost" id="sg-reset" title="Revenir au regroupement par défaut de ce local">Regroupement par défaut</button>
       <button type="button" class="pro-btn pro-btn--secondary" id="sg-all">Tout cocher</button>
       <button type="button" class="pro-btn pro-btn--primary" id="sg-print">Imprimer les feuilles cochées</button>
     </div>
@@ -212,13 +241,29 @@ const LOCAL_KEY = 'rp_signaletique_local';
    Par défaut, réserve patrimoniale : la I seule, puis par deux (II/III,
    IV/V…). Ailleurs, une travée par feuille tant que l'équipe ne les a pas
    réunies. Le réglage est mémorisé par local : [[gauche, droite|null], …]. */
+/* Par défaut : la travée I seule, puis les travées numérotées par deux
+   (II/III, IV/V…). Les travées nommées (Alpha, Bêta, Delta) et les rayons
+   restent seuls. Sens : dans la réserve patrimoniale la plus petite est à
+   gauche (II ←  → III) ; dans tous les autres locaux c'est l'inverse
+   (III ←  → II), d'après l'équipe (2026-10-15). */
+function romanValue(s){
+  if(!/^[IVXLC]+$/.test(s)) return null;
+  const v = {I:1,V:5,X:10,L:50,C:100}; let n = 0;
+  for(let i=0;i<s.length;i++){ const a=v[s[i]], b=v[s[i+1]]||0; n += a<b ? -a : a; }
+  return n;
+}
 function defaultSheets(localId, ids){
-  if(localId === 'patrimoniale'){
-    const out = [[ids[0], null]];
-    for(let i=1;i<ids.length;i+=2) out.push([ids[i], ids[i+1] || null]);
-    return out;
+  if(localId === 'rayons') return ids.map(id => [id, null]);
+  const ltr = localId === 'patrimoniale';
+  const out = [];
+  for(let i=0;i<ids.length;i++){
+    const n = romanValue(displayName(ids[i])), next = ids[i+1];
+    if(n && n % 2 === 0 && next && romanValue(displayName(next)) === n+1){
+      out.push(ltr ? [ids[i], next] : [next, ids[i]]);
+      i++;
+    } else out.push([ids[i], null]);
   }
-  return ids.map(id => [id, null]);
+  return out;
 }
 function loadPairs(){ try { return JSON.parse(localStorage.getItem(PAIRS_KEY)) || {}; } catch(e){ return {}; } }
 function savePairs(p){ try { localStorage.setItem(PAIRS_KEY, JSON.stringify(p)); } catch(e){} }
@@ -299,8 +344,10 @@ function statsOf(tid){
   let lastTs = 0, maxEt = 0;
   const years = [], langs = {};
   let doyen = null;
+  const fonds = {};
   scans.forEach(s => {
     (byCol[s.colonne] = byCol[s.colonne] || []).push(s);
+    const sf = sousFondsOf(s.cote); fonds[sf] = (fonds[sf]||0)+1;
     lastTs = Math.max(lastTs, +s.ts || 0);
     maxEt = Math.max(maxEt, +s.etage || 0);
     const rec = isRes && INV ? INV.get(String(s.barcode)) : null;
@@ -313,6 +360,7 @@ function statsOf(tid){
     if(l && !/^Ind[ée]termin/.test(l)){ const main = l.split(',')[0].replace(/\s*\(.*\)$/,'').trim(); langs[main] = (langs[main]||0)+1; }
   });
   const nonCat = asList(REC.nonCatalogues).filter(n => n && n.travee === tid).reduce((s,n)=>s+(+n.count||0),0);
+  const map = shelfMap(tid, def, scans);
   const cols = colLetters(def).map(c => ({ c, n:(byCol[c]||[]).length, range: coteRange((byCol[c]||[]).map(s=>s.cote)) }));
   // Colonnes présentes dans les scans mais hors géométrie (rare) : ajoutées à la fin.
   Object.keys(byCol).filter(c => c && !cols.some(x=>x.c===c)).sort().forEach(c =>
@@ -321,9 +369,135 @@ function statsOf(tid){
   const cent = {};
   years.forEach(y => { const c = Math.floor((y-1)/100)+1; cent[c] = (cent[c]||0)+1; });
   return {
-    def, n: scans.length, nonCat, cols, lastTs, maxEt: Math.max(maxEt, def.maxEt || 0),
+    def, n: scans.length, nonCat, cols, map, fonds, lastTs, maxEt: Math.max(maxEt, def.maxEt || 0),
     range: coteRange(scans.map(s=>s.cote)), years, cent, langs, doyen, isRes,
   };
+}
+
+/* Sous-fonds d'après le début de la cote, pour l'encart à côté du numéro.
+   Testés dans l'ordre, le premier qui correspond gagne ; une cote qui ne
+   correspond à rien est affichée par son préfixe brut (ex. « I-S »).
+   Ajouter un fonds = ajouter une ligne. */
+const SOUS_FONDS = [
+  [/^I-?INC\b/,            () => 'Incunables'],
+  [/^I-?HOS\b/,            () => 'Hospice'],
+  [/^I(N)?-D\b/,           () => 'Impressions douaisiennes'],
+  [/^I-?BIBLES?\b/,        () => 'Bibles'],
+  [/^I-?BE[RT]H?[IO]UD\b/, () => 'Fonds Berthoud'],
+  [/^I-?MDV\b/,            () => 'Marceline Desbordes-Valmore'],
+  [/^I-?SIT\b/,            () => 'Situationniste'],
+  [/^I-(1[0-9]|2[01])\b/,  m => roman(+m[1]) + 'ᵉ siècle'],
+  [/^LIVAS?\b/,            () => "Livres d'artiste"],
+  [/^RD\b/,                () => 'Réserve Douaisienne'],
+  [/^ROBAUT/,              () => 'Robaut'],
+  [/^MIN\b/,               () => 'Mines'],
+  [/^D\s*-?\d/,            () => 'Douaisien'],
+  [/^L\s*-?\d/,            () => 'Littérature'],
+  [/^P\s*-?\d/,            () => 'Protestantisme'],
+];
+const KNOWN_FONDS = new Set();
+function sousFondsOf(cote){
+  const c = String(cote||'').trim().toUpperCase().replace(/\s+/g,' ');
+  if(!c) return 'Sans cote';
+  for(const [re, label] of SOUS_FONDS){ const m = c.match(re); if(m){ const l = label(m); KNOWN_FONDS.add(l); return l; } }
+  const p = c.match(/^[A-Z]+(-[A-Z]+)?/);
+  return p ? p[0] : c.slice(0, 8);
+}
+function fondsHtml(s, single){
+  if(!s.n) return '';
+  // Pas d'encart si la travée n'est pas rangée par fonds (magasins : cotes
+  // numériques ou Dewey) ; les petits préfixes inconnus vont dans « Autres ».
+  const all = Object.entries(s.fonds);
+  const known = all.filter(([l]) => KNOWN_FONDS.has(l));
+  if(known.reduce((t,[,v])=>t+v,0) < s.n/2) return '';
+  const e = all.filter(([l,v]) => KNOWN_FONDS.has(l) || v >= s.n*0.03).sort((a,b)=>b[1]-a[1]);
+  const droppedN = s.n - e.reduce((t,[,v])=>t+v,0);
+  const max = single ? 6 : 4;
+  const rows = e.slice(0, max);
+  const rest = e.slice(max).reduce((t,[,v])=>t+v,0) + droppedN;
+  if(rest) rows.push(['Autres', rest]);
+  return `<div class="tv-fonds"><p class="tv-h">Fonds</p>${rows.map(([l,v]) => `
+    <div class="tv-fonds__row"><b>${esc(l)}</b><span>${fmtN(v)}</span>
+    <span class="tv-fonds__bar"><i style="width:${(100*v/s.n).toFixed(1)}%"></i></span></div>`).join('')}</div>`;
+}
+
+/* État de chaque étagère de la travée, comme sur le plan (reserve.html) :
+   catalogué > exemplarisé rapide > non catalogué > à ranger > vide > pas
+   encore récolé. Dans la réserve, deux exemplaires de même cote sur la même
+   étagère ne comptent qu'une fois (même règle que parseRecolement()) ; dans
+   les magasins et rayons, la cote désigne un rayon et chaque code-barre compte. */
+function shelfMap(tid, def, scans){
+  const dedupe = !/^(M\d-|RY-)/.test(tid);
+  const cells = {};
+  const cell = (c,e) => cells[c+'|'+e] || (cells[c+'|'+e] = {cat:0, manuel:0, noncat:0, nonrange:false, vide:false, cotes:new Set()});
+  const seenEt = {};
+  const see = (c,e) => { e = +e; if(c && e > 0) seenEt[c] = Math.max(seenEt[c]||0, e); return !!c && e > 0; };
+  scans.forEach(s => {
+    if(!see(s.colonne, s.etage)) return;
+    const x = cell(s.colonne, +s.etage), cote = String(s.cote||'').trim();
+    if(dedupe && cote){ if(x.cotes.has(cote)) return; x.cotes.add(cote); }
+    s.manuel ? x.manuel++ : x.cat++;
+  });
+  const mine = list => asList(list).filter(r => r && r.travee === tid);
+  mine(REC.nonCatalogues).forEach(r => { if(see(r.colonne, r.etage)) cell(r.colonne, +r.etage).noncat += (+r.count||0); });
+  mine(REC.nonRangeShelves).forEach(r => { if(see(r.colonne, r.etage)) cell(r.colonne, +r.etage).nonrange = true; });
+  mine(REC.videShelves).forEach(r => { if(see(r.colonne, r.etage)) cell(r.colonne, +r.etage).vide = true; });
+  const last = {};
+  mine(REC.lastShelves).forEach(r => { if(r.colonne && +r.etage > 0) last[r.colonne] = +r.etage; });
+  const letters = colLetters(def);
+  Object.keys(seenEt).filter(c => !letters.includes(c)).sort().forEach(c => letters.push(c));
+  const cols = letters.map(c => {
+    // Même calcul que maxEtageOf() : dernière étagère marquée, sinon défaut
+    // de la travée, étendu jusqu'aux données réelles.
+    const m = Math.max(last[c] || defaultMaxEtageOf(def, c), seenEt[c] || 0);
+    let docs = 0;
+    const shelves = [];
+    for(let e=1; e<=m; e++){
+      const x = cells[c+'|'+e];
+      const st = !x ? 'unknown' : x.cat ? 'cat' : x.manuel ? 'manuel' : x.noncat ? 'noncat' : x.nonrange ? 'nonrange' : x.vide ? 'vide' : 'unknown';
+      if(x) docs += x.cat + x.manuel;
+      shelves.push({ e, st, cat: x ? x.cat : 0, manuel: x ? x.manuel : 0, noncat: x ? x.noncat : 0 });
+    }
+    return { c, shelves, docs };
+  });
+  const all = cols.flatMap(c => c.shelves);
+  return { cols, rows: Math.max(1, ...cols.map(c => c.shelves.length)),
+           total: all.length, done: all.filter(x => x.st !== 'unknown').length,
+           states: new Set(all.map(x => x.st)) };
+}
+
+const STATES = [
+  ['cat', 'Récolé'], ['manuel', 'Exemplarisé rapide'], ['noncat', 'Non catalogué'],
+  ['nonrange', 'À ranger'], ['vide', 'Vide'], ['unknown', 'Pas encore récolé'],
+];
+function mapHtml(m){
+  const n = m.cols.length;
+  const small = n > 9;
+  let h = `<div class="map" style="grid-template-columns:${small?'3mm':'4mm'} repeat(${n}, minmax(0,1fr));grid-template-rows:auto repeat(${m.rows}, minmax(0,1fr)) auto">`;
+  h += '<span></span>' + m.cols.map(c => `<span class="map__colh">${esc(c.c)}</span>`).join('');
+  for(let e=1; e<=m.rows; e++){
+    h += `<span class="map__rowh">${e}</span>`;
+    m.cols.forEach(c => {
+      const x = c.shelves[e-1];
+      if(!x){ h += '<span></span>'; return; }
+      // Plusieurs catégories sur la même étagère : bandes proportionnelles,
+      // comme gradientOf() sur le plan.
+      const segs = [['cat',x.cat],['manuel',x.manuel],['noncat',x.noncat]].filter(([,v]) => v > 0);
+      const tot = segs.reduce((t,[,v]) => t+v, 0);
+      const fill = segs.length > 1
+        ? segs.map(([k,v]) => `<span class="cell__seg p-${k}" style="width:${(100*v/tot).toFixed(1)}%"></span>`).join('')
+        : `<span class="cell__seg p-${x.st}" style="width:100%"></span>`;
+      const docs = x.cat + x.manuel;
+      const label = docs ? fmtN(docs) : x.noncat ? '~' + fmtN(x.noncat) : (x.st === 'vide' && !small) ? 'vide' : '';
+      const solid = segs.length === 1 && (x.st === 'cat' || x.st === 'manuel');
+      h += `<span class="cell st-${x.st}${solid?' cell--solid':''}">${fill}${label ? `<span class="cell__n"><span>${label}</span></span>` : ''}</span>`;
+    });
+  }
+  h += '<span></span>' + m.cols.map(c => `<span class="map__foot">${c.docs ? fmtN(c.docs) : ''}</span>`).join('');
+  h += '</div>';
+  const legend = STATES.filter(([k]) => m.states.has(k))
+    .map(([k,l]) => `<span><i class="p-${k}"></i>${l}</span>`).join('');
+  return `<div class="tv-map"><p class="tv-h">Carte de la travée — étagères récolées : ${m.done} / ${m.total}</p>${h}<div class="map-legend">${legend}<span style="color:var(--mid)">· chiffre = documents sur l'étagère</span></div></div>`;
 }
 
 /* ── Rendu ── */
@@ -357,6 +531,7 @@ function halfHtml(tid, side, single){
         <div class="tv-kicker">${isRayonTravee(tid) ? 'Rayon' : 'Travée'}</div>
         <div class="${ns.cls}" style="font-size:${ns.fs}pt">${esc(name)}</div>
       </div>
+      ${fondsHtml(s, single)}
     </div>`;
   const range = s.range
     ? `<div class="tv-range"><span>${esc(s.range[0])}</span><span>→</span><span>${esc(s.range[1])}</span></div>`
@@ -367,18 +542,10 @@ function halfHtml(tid, side, single){
   const kpis = `<div class="tv-kpis">
       <div class="tv-kpi"><div class="tv-kpi__v">${fmtN(s.n)}</div><div class="tv-kpi__l">documents récolés${s.nonCat ? ` · + ~${fmtN(s.nonCat)} non cat.` : ''}</div></div>
       <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? esc(period) : s.def.nbCols}</div><div class="tv-kpi__l">${s.isRes ? "période d'édition" : 'colonnes'}</div></div>
-      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? (nbLangs || '—') : (s.maxEt || '—')}</div><div class="tv-kpi__l">${s.isRes ? (nbLangs>1?'langues':'langue') : 'étagères'}</div></div>
+      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? (nbLangs || '—') : (s.map.total ? Math.round(100*s.map.done/s.map.total)+' %' : '—')}</div><div class="tv-kpi__l">${s.isRes ? (nbLangs>1?'langues':'langue') : 'étagères récolées'}</div></div>
     </div>`;
 
-  const compact = s.cols.length > 9;
-  const colsTable = `<div>
-      <p class="tv-h">Colonnes</p>
-      <table class="tv-cols ${compact?'tv-cols--compact':''}"><tbody>
-        ${s.cols.map(c => `<tr><td>${esc(c.c)}</td>${c.range
-          ? `<td class="c-range">${esc(c.range[0])}${c.range[1]!==c.range[0] ? `<i>→</i>${esc(c.range[1])}` : ''}</td><td class="c-n">${fmtN(c.n)}</td>`
-          : `<td class="c-empty" colspan="2">non récolée</td>`}</tr>`).join('')}
-      </tbody></table>
-    </div>`;
+  const colsTable = mapHtml(s.map);
 
   let charts = '';
   if(s.isRes && s.years.length){
@@ -391,13 +558,13 @@ function halfHtml(tid, side, single){
     const doyen = s.doyen ? `<div class="tv-doyen"><p class="tv-h">Le plus ancien</p>
         <em>${esc(String(s.doyen.titre||'Sans titre').slice(0, single?160:110))}</em>${s.doyen.auteur ? ` — ${esc(s.doyen.auteur)}` : ''},
         <b>${s.doyen.y}</b> <span style="color:var(--mid)">(${esc(shortCote(s.doyen.cote||''))})</span></div>` : '';
-    charts = `<div style="display:flex;flex-direction:column;gap:4mm">
+    charts = `<div style="display:flex;flex-direction:column;gap:4mm;flex:0 0 auto">
       <div class="tv-charts">
         <div><p class="tv-h">Siècle d'édition</p>${barsHtml(cRows.slice(single?-6:-4), Math.max(...cRows.map(r=>r.v)))}</div>
         <div><p class="tv-h">Langues</p>${barsHtml(lRows, Math.max(...lRows.map(r=>r.v),1))}</div>
       </div>${doyen}</div>`;
   } else if(!s.n){
-    charts = `<p class="tv-note">Les plages de cotes et les statistiques apparaîtront dès que cette travée aura été récolée.</p>`;
+    charts = `<p class="tv-note" style="flex:0 0 auto">Les plages de cotes et les statistiques apparaîtront dès que cette travée aura été récolée.</p>`;
   }
   return `<div class="half">${head}${range}${kpis}<div class="tv-detail">${colsTable}${charts}</div></div>`;
 }
@@ -412,7 +579,7 @@ function sheetHtml(sheet){
   return `<div class="sheet ${single?'sheet--single':''}">
     <div class="sheet__top"><span><b>${esc(local ? local.label : '')}</b></span><span>Bibliothèques de Douai</span></div>
     <div class="sheet__body">${single ? halfHtml(l, null, true) : halfHtml(l,'left',false) + halfHtml(r,'right',false)}</div>
-    <div class="sheet__foot"><span>Plages de cotes d'après le récolement — un document mal rangé peut sortir de sa plage.</span><span>État au ${when}${lastRec}</span></div>
+    <div class="sheet__foot"><span>Carte et plages de cotes d'après le récolement — un document mal rangé peut sortir de sa plage.</span><span>État au ${when}${lastRec}</span></div>
   </div>`;
 }
 
@@ -443,13 +610,15 @@ function renderPreview(){
   if(window.rpEmbed && rpEmbed.refresh) rpEmbed.refresh();
 }
 function fitSheets(){
+  // Le numéro rétrécit jusqu'à tenir entre la flèche et l'encart des fonds.
+  document.querySelectorAll('.sheet .tv-num:not(.tv-num--long)').forEach(n => {
+    const box = n.parentElement;
+    let fs = parseFloat(n.style.fontSize);
+    while(fs > 34 && n.scrollWidth > box.clientWidth + 1){ fs -= 3; n.style.fontSize = fs + 'pt'; }
+  });
   document.querySelectorAll('.sheet .half').forEach(h => {
-    h.classList.remove('fit-1','fit-2','fit-3');
-    const tbl = h.querySelector('.tv-cols');
-    for(let lvl=1; lvl<=3 && h.scrollHeight > h.clientHeight + 1; lvl++){
-      if(lvl===1 && tbl) tbl.classList.add('tv-cols--compact');
-      else h.classList.add('fit-'+lvl);
-    }
+    h.classList.remove('fit-1','fit-2');
+    for(let lvl=1; lvl<=2 && h.scrollHeight > h.clientHeight + 1; lvl++) h.classList.add('fit-'+lvl);
   });
 }
 function fitPreview(){
@@ -482,6 +651,10 @@ document.getElementById('sg-list').addEventListener('change', e => {
   const k = e.target.dataset.k; if(!k) return;
   e.target.checked ? checked.add(k) : checked.delete(k);
   renderPreview();
+});
+document.getElementById('sg-reset').addEventListener('click', () => {
+  const all = loadPairs(); delete all[currentLocal()]; savePairs(all);
+  selectLocal(currentLocal());
 });
 document.getElementById('sg-all').addEventListener('click', () => {
   const sheets = sheetsFor(currentLocal());
