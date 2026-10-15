@@ -181,6 +181,7 @@ nosniff` et `Referrer-Policy: strict-origin-when-cross-origin`.
 | `cotes-numeriques.html` | Repérage, dans l'export complet de la bibliothèque, des exemplaires à cote numérique 5/6 chiffres (recherche, tri, export .txt des codes-barres pour ajout panier SIGB), à partir de `data/cotes-numeriques.json` — voir « Cotes numériques » | **Protégé** |
 | `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement, photo — tout en un seul formulaire) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
 | `reliures.html` | Création manuelle de groupes de documents reliés ensemble (équivalent $481/$482) et détection des groupes dont les emplacements récolés ne concordent pas — voir « Récolement en cascade des documents reliés » | **Protégé** |
+| `signaletique.html` | Panneaux A4 paysage noir et blanc à afficher à l'entrée des travées (une travée seule ou deux travées adossées avec leurs flèches), avec plages de cotes par colonne et statistiques tirées du récolement — voir « Panneaux de travées » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `rotobib.html` | Désherbage assisté par les statistiques de prêt : scan d'un code-barre, fiche + histogramme de prêts sur 4 ans, décision (conserver/pilon/braderie/relocalisation), export .txt par traitement — voir « Rotobib » | **Protégé** |
 | `desherbage-stats.html` | Vue d'ensemble purement statistique (lecture seule) de l'export de désherbage : prêts totaux par année, répartition par prêts cumulés, liste triable des exemplaires — voir « Rotobib » | **Protégé** |
@@ -311,6 +312,30 @@ la logique et les identifiants contractuels sont, eux, inchangés) :
 - **`admin.html`** : bloc « Aujourd'hui » (activité du récolement et du
   désherbage), progression du récolement **par local**, outils regroupés par
   métier, champ « Aller à un outil… » (touche `/`).
+
+## Panneaux de travées (`signaletique.html`, 2026-10-15)
+
+Feuilles A4 **paysage**, pensées pour une impression **noir et blanc** (aucune
+information portée par la couleur : noir, gris, hachures). Une feuille = une
+travée seule, ou deux travées qui partagent une entrée, chacune avec une
+flèche pleine vers son côté. Regroupement par défaut : réserve patrimoniale =
+I seule puis II/III, IV/V… ; ailleurs une travée par feuille. Les boutons
+⇄ (échanger gauche/droite), ✂ (séparer) et ＋ (réunir avec la suivante)
+modifient ce regroupement, **mémorisé dans le `localStorage` du poste**
+(`rp_signaletique_pairs`, par local) — pas dans R2.
+
+Contenu calculé à l'ouverture depuis `/api/recolement` (repli
+`data/recolement.json`) : plage de cotes de la travée et de chaque colonne
+(tri `compareCotes`, 2 % extrêmes écartés au-delà de 40 livres pour qu'un
+livre mal rangé ne fausse pas le panneau), documents récolés + estimation
+non catalogués. Pour la réserve (catalogue `data/inventaire.json`, chargé
+seulement pour ces locaux) : période d'édition, siècles, langues, plus
+ancien document — année tirée de 210$d, puis 100$a, puis de la cote.
+Magasins et rayons : colonnes/étagères à la place (pas d'enrichissement,
+`data/desherbage.json` est trop lourd). `fitSheets()` resserre le tableau,
+puis retire « Le plus ancien », puis les graphiques si une demi-feuille
+déborde. Impression : `@page { size: A4 landscape; margin: 0 }`, une
+feuille par page, réglages masqués.
 
 ## Publication en iframe sur le site du réseau
 

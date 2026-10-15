@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<!-- Contrôle d'accès de l'espace pro (même gate localStorage que les autres
+     pages protégées — voir « Sécurité » dans CLAUDE.md). -->
+<script>
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+</script>
+<title>Panneaux de travées — Bibliothèques de Douai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/admin.css">
+<script src="js/reserve-shared.js"></script>
+<!-- Hauteur envoyée à la page hôte quand le site est affiché en iframe
+     (voir js/parent-page-height.js). -->
+<script src="js/parent-page-height.js"></script>
+<style>
+  /* Panneaux d'entrée de travée, imprimés en A4 paysage et en noir et blanc
+     (préfixe sg-). Une feuille = une travée seule, ou deux travées
+     adossées avec une flèche vers chacune. Tout est en noir, gris et
+     hachures : rien ne repose sur la couleur. */
+
+  /* ── Réglages (écran seulement) ── */
+  .sg-panel { padding-top: 1.5rem; }
+  .sg-controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; margin-bottom: 1rem; }
+  .sg-controls label { display: flex; flex-direction: column; gap: 4px; font-size: .75rem; color: var(--pro-texte-doux); }
+  .sg-spacer { flex: 1 1 auto; }
+  .sg-intro { margin: 0 0 1rem; font-size: .84rem; color: var(--pro-texte); max-width: 62rem; }
+  .sg-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 1.25rem; }
+  .sg-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; background: #fff;
+    border: 1px solid var(--pro-carte-bord); font-size: .8rem;
+  }
+  .sg-chip input { margin: 0; }
+  .sg-chip strong { font-family: var(--pro-font-display); font-size: .95rem; }
+  .sg-chip button { border: 0; background: var(--pro-papier-ombre); cursor: pointer; padding: 2px 7px; font: inherit; font-size: .75rem; }
+  .sg-chip button:hover { background: var(--pro-bleu-pale); }
+  .sg-chip .sg-sep { color: var(--pro-texte-doux); }
+  .sg-status { font-size: .8rem; color: var(--pro-texte-doux); }
+
+  /* Aperçu : la feuille à l'échelle, ombrée, comme posée sur la table. */
+  .sg-preview { display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 8px 0 40px; }
+  .sg-scale { width: 100%; max-width: 1123px; }
+  .sg-scale > .sheet { transform-origin: top left; box-shadow: 0 2px 14px rgba(20,24,63,.18); }
+
+  /* ── La feuille A4 paysage ── */
+  .sheet {
+    --ink: #111; --mid: #555; --soft: #8a8a8a; --rule: #bdbdbd; --tint: #ececec;
+    width: 297mm; height: 210mm; box-sizing: border-box; padding: 11mm 13mm 9mm;
+    background: #fff; color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif;
+    display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; position: relative;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .sheet__top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 2.2pt solid var(--ink); padding-bottom: 2.5mm; margin-bottom: 6mm;
+    font-size: 9pt; letter-spacing: .18em; text-transform: uppercase;
+  }
+  .sheet__top b { font-weight: 700; }
+  .sheet__body { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  .sheet--single .sheet__body { grid-template-columns: 1fr; }
+  .sheet__foot {
+    display: flex; justify-content: space-between; border-top: .6pt solid var(--rule);
+    padding-top: 2mm; margin-top: 4mm; font-size: 7.5pt; color: var(--mid);
+  }
+
+  .half { display: flex; flex-direction: column; min-height: 0; padding: 0 9mm; overflow: hidden; }
+  /* Ajustement automatique quand le contenu déborde (fitSheets()) :
+     tableau resserré, puis sans le plus ancien, puis sans graphiques. */
+  .half.fit-2 .tv-doyen, .half.fit-3 .tv-charts { display: none; }
+  .half:first-child { padding-left: 0; }
+  .half:last-child { padding-right: 0; }
+  .half + .half { border-left: 1.2pt solid var(--ink); }
+
+  /* En-tête : flèche + numéro de travée. La flèche pointe vers la travée. */
+  .tv-head { display: flex; align-items: center; gap: 6mm; min-height: 34mm; }
+  .tv-head--right { flex-direction: row-reverse; text-align: right; }
+  .tv-arrow { flex: none; width: 27mm; height: 27mm; }
+  .sheet--single .tv-head { min-height: 46mm; }
+  .tv-arrow svg { width: 100%; height: 100%; display: block; }
+  .tv-name { flex: 1; min-width: 0; line-height: .9; }
+  .tv-kicker { font-size: 10pt; letter-spacing: .32em; text-transform: uppercase; color: var(--mid); margin-bottom: 1.5mm; }
+  .tv-num { font-family: 'Moret', Georgia, serif; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+  .tv-num--long { white-space: normal; line-height: 1; }
+
+  .tv-range {
+    margin: 2mm 0 3mm; padding: 2mm 3.5mm; background: var(--ink); color: #fff;
+    font-family: 'DM Mono', 'Courier New', monospace; font-weight: 500; font-size: 13pt;
+    display: flex; justify-content: space-between; gap: 3mm; white-space: nowrap; overflow: hidden;
+  }
+  .tv-range span:nth-child(2) { opacity: .7; }
+  .tv-range--empty { background: var(--tint); color: var(--mid); font-family: inherit; font-size: 10.5pt; justify-content: center; }
+
+  .tv-kpis { display: grid; grid-template-columns: repeat(3, 1fr); border-top: .6pt solid var(--ink); border-bottom: .6pt solid var(--ink); margin-bottom: 3mm; }
+  .tv-kpi { padding: 2mm 2.5mm; }
+  .tv-kpi + .tv-kpi { border-left: .6pt solid var(--rule); }
+  .tv-kpi__v { font-family: 'Moret', Georgia, serif; font-weight: 700; font-size: 19pt; line-height: 1.05; }
+  .tv-kpi__l { font-size: 7pt; letter-spacing: .14em; text-transform: uppercase; color: var(--mid); margin-top: .8mm; }
+
+  /* Contenu détaillé : colonnes à gauche, statistiques à droite (feuille
+     simple) ou empilés (feuille double). */
+  .tv-detail { display: flex; flex-direction: column; gap: 3.5mm; min-height: 0; flex: 1; }
+  .sheet--single .tv-detail { flex-direction: row; gap: 10mm; }
+  .sheet--single .tv-detail > * { flex: 1; min-width: 0; }
+
+  .tv-h { font-size: 7.5pt; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; margin: 0 0 1.5mm; }
+  .tv-cols { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  .tv-cols td { padding: .6mm 1.5mm; border-bottom: .4pt solid var(--rule); vertical-align: baseline; }
+  .tv-cols td:first-child {
+    width: 7mm; text-align: center; font-family: 'Moret', Georgia, serif; font-weight: 700; font-size: 11pt;
+    background: var(--tint); border-bottom-color: #fff;
+  }
+  .tv-cols .c-range { font-family: 'DM Mono', 'Courier New', monospace; font-size: 8.4pt; white-space: nowrap; }
+  .tv-cols .c-range i { font-style: normal; color: var(--soft); padding: 0 1mm; }
+  .tv-cols .c-n { text-align: right; color: var(--mid); white-space: nowrap; font-size: 8pt; }
+  .tv-cols .c-empty { color: var(--soft); font-style: italic; font-size: 8pt; }
+  .tv-cols--compact td { padding: .45mm 1.5mm; font-size: 8pt; }
+  .tv-cols--compact .c-range { font-size: 7.6pt; }
+
+  .tv-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .sheet--single .tv-charts { grid-template-columns: 1fr; gap: 5mm; }
+  .bars { display: grid; grid-template-columns: auto 1fr auto; gap: 1mm 2mm; align-items: center; font-size: 8pt; }
+  .bars__l { white-space: nowrap; }
+  .bars__track { height: 3.2mm; background: repeating-linear-gradient(45deg, #fff 0 .6mm, var(--tint) .6mm 1.2mm); border: .3pt solid var(--rule); }
+  .bars__fill { height: 100%; background: var(--ink); }
+  .bars__v { text-align: right; color: var(--mid); font-variant-numeric: tabular-nums; }
+
+  .tv-doyen { border-left: 2.2pt solid var(--ink); padding: .5mm 0 .5mm 3mm; font-size: 8.6pt; line-height: 1.35; }
+  .tv-doyen em { font-style: italic; }
+  .tv-doyen .tv-h { margin-bottom: .8mm; }
+
+  .tv-note { font-size: 8pt; color: var(--mid); font-style: italic; }
+
+  /* ── Impression : seules les feuilles, une par page ── */
+  @page { size: A4 landscape; margin: 0; }
+  @media print {
+    html, body { background: #fff !important; max-width: none !important; margin: 0 !important; }
+    body > *:not(main), .sg-noprint, .pro-head { display: none !important; }
+    main, .pro-wrap, .sg-preview, .sg-scale { all: unset; display: block; }
+    .sg-scale { height: auto !important; }
+    .sg-scale > .sheet { transform: none !important; box-shadow: none; break-after: page; page-break-after: always; }
+    .sg-scale:last-child > .sheet { break-after: auto; page-break-after: auto; }
+  }
+</style>
+</head>
+<body class="pro">
+
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace pro</a> › Récolement</p>
+      <h1 class="pro-head__h1">Panneaux de travées</h1>
+    </div>
+    <div class="pro-head__actions">
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="logout-btn">Déconnexion</button>
+    </div>
+  </div>
+</header>
+
+<main id="contenu" class="pro-main">
+<div class="pro-wrap">
+  <section class="sg-panel sg-noprint" aria-label="Réglages">
+    <p class="sg-intro">Une feuille A4 paysage par entrée de travée, à imprimer en noir et blanc. Quand deux
+      travées partagent une entrée, elles sont réunies sur la même feuille, chacune avec sa flèche.
+      Les chiffres viennent du récolement en cours : regénérez les panneaux quand vous voulez les mettre à jour.</p>
+    <div class="sg-controls">
+      <label>Local
+        <select class="pro-input" id="sg-local"></select>
+      </label>
+      <span class="sg-status" id="sg-status" role="status" aria-live="polite">Chargement…</span>
+      <span class="sg-spacer"></span>
+      <button type="button" class="pro-btn pro-btn--secondary" id="sg-all">Tout cocher</button>
+      <button type="button" class="pro-btn pro-btn--primary" id="sg-print">Imprimer les feuilles cochées</button>
+    </div>
+    <p class="sg-intro" style="font-size:.78rem;color:var(--pro-texte-doux)">Feuilles : cochez celles à imprimer.
+      <strong>⇄</strong> échange la gauche et la droite, <strong>✂</strong> sépare deux travées,
+      <strong>＋</strong> réunit une travée seule avec la suivante. Ces regroupements sont mémorisés sur ce poste.</p>
+    <div class="sg-list" id="sg-list"></div>
+  </section>
+
+  <div class="sg-preview" id="sg-preview"></div>
+</div>
+</main>
+
+<script src="js/admin-ui.js"></script>
+<script>
+(function(){
+'use strict';
+
+document.getElementById('logout-btn').addEventListener('click', function(){
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtN = n => Number(n).toLocaleString('fr-FR');
+const LOCALS = RESERVES.filter(r => r.id !== 'horsreserve');
+const PAIRS_KEY = 'rp_signaletique_pairs';
+const LOCAL_KEY = 'rp_signaletique_local';
+
+/* ── Regroupement des travées en feuilles ──
+   Par défaut, réserve patrimoniale : la I seule, puis par deux (II/III,
+   IV/V…). Ailleurs, une travée par feuille tant que l'équipe ne les a pas
+   réunies. Le réglage est mémorisé par local : [[gauche, droite|null], …]. */
+function defaultSheets(localId, ids){
+  if(localId === 'patrimoniale'){
+    const out = [[ids[0], null]];
+    for(let i=1;i<ids.length;i+=2) out.push([ids[i], ids[i+1] || null]);
+    return out;
+  }
+  return ids.map(id => [id, null]);
+}
+function loadPairs(){ try { return JSON.parse(localStorage.getItem(PAIRS_KEY)) || {}; } catch(e){ return {}; } }
+function savePairs(p){ try { localStorage.setItem(PAIRS_KEY, JSON.stringify(p)); } catch(e){} }
+function sheetsFor(localId){
+  const ids = traveesOfReserve(localId).map(t=>t.id);
+  const saved = loadPairs()[localId];
+  if(Array.isArray(saved)){
+    // On ne garde un réglage mémorisé que s'il couvre exactement les travées
+    // actuelles (un rayon créé ou supprimé depuis le remet à zéro).
+    const flat = saved.flat().filter(Boolean);
+    if(flat.length === ids.length && ids.every(id => flat.includes(id))) return saved;
+  }
+  return defaultSheets(localId, ids);
+}
+
+/* ── Données ── */
+let REC = null;          // état du récolement
+let INV = null;          // code-barre → notice (réserve uniquement)
+let invPromise = null;
+const checked = new Set();
+
+function asList(x){ return Array.isArray(x) ? x : Object.values(x || {}); }
+
+async function loadRecolement(){
+  try {
+    const r = await fetch('/api/recolement', {cache:'no-cache'});
+    if(!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch(e){
+    const r = await fetch('data/recolement.json');
+    return await r.json();
+  }
+}
+function loadInventaire(){
+  if(!invPromise) invPromise = fetch('data/inventaire.json').then(r=>r.json()).then(rows=>{
+    const m = new Map();
+    rows.forEach(r => { const bc = r['995$f'] || r['915$b']; if(bc) m.set(String(bc), r); });
+    INV = m; return m;
+  }).catch(()=>{ INV = new Map(); return INV; });
+  return invPromise;
+}
+
+/* Année d'un document : 210$d, puis zone de date du 100$a, puis l'année
+   inscrite dans la cote (I-17-1664-…). */
+const THIS_YEAR = new Date().getFullYear();
+function yearOf(rec, cote){
+  let m = String(rec && rec['210$d'] || '').match(/(1[0-9]\d\d|20[0-2]\d)/);
+  let y = m ? +m[1] : null;
+  if(!y && rec && rec['100$a']){ const a = rec['100$a'].slice(9,13); if(/^\d{4}$/.test(a)) y = +a; }
+  if(!y){ m = String(cote||'').match(/-(1[4-9]\d\d)(?:[^\d]|$)/); if(m) y = +m[1]; }
+  return (y && y >= 1400 && y <= THIS_YEAR) ? y : null;
+}
+function roman(n){
+  const t=[[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let s=''; for(const [v,r] of t) while(n>=v){ s+=r; n-=v; } return s;
+}
+function displayName(id){
+  if(isRayonTravee(id)) return rayonLabelOf(id);
+  return id.replace(/^(RD|M2|M5|M6)-/, '').replace(/^ALPHA$/,'α').replace(/^BETA$/,'β').replace(/^DELTA$/,'δ');
+}
+function colLetters(def){ return Array.from({length:def.nbCols}, (_,i)=>String.fromCharCode(65+i)); }
+
+/* Plage de cotes robuste : tri naturel, et sur une colonne bien remplie on
+   écarte les 2 % extrêmes (un livre mal rangé ne doit pas fausser le panneau). */
+function coteRange(cotes){
+  const a = cotes.map(c=>String(c||'').trim()).filter(Boolean).sort(compareCotes);
+  if(!a.length) return null;
+  const k = a.length >= 40 ? Math.floor(a.length*0.02) : 0;
+  return [shortCote(a[k]), shortCote(a[a.length-1-k])];
+}
+function shortCote(c){ return c.toUpperCase().replace(/\s+/g,' ').slice(0, 22); }
+
+function statsOf(tid){
+  const def = LOCATIONS_ALL.find(t=>t.id===tid) || {id:tid, nbCols:0};
+  const isRes = catalogGroupOfReserve(currentLocal()) === 'reserve';
+  const scans = asList(REC.scans).filter(s => s && s.travee === tid);
+  const byCol = {};
+  let lastTs = 0, maxEt = 0;
+  const years = [], langs = {};
+  let doyen = null;
+  scans.forEach(s => {
+    (byCol[s.colonne] = byCol[s.colonne] || []).push(s);
+    lastTs = Math.max(lastTs, +s.ts || 0);
+    maxEt = Math.max(maxEt, +s.etage || 0);
+    const rec = isRes && INV ? INV.get(String(s.barcode)) : null;
+    const y = isRes ? yearOf(rec, s.cote) : null;
+    if(y){
+      years.push(y);
+      if(!doyen || y < doyen.y) doyen = { y, titre: (rec && rec['200$a']) || s.titre, auteur: (rec && rec['700$a']) || s.auteur, cote: s.cote };
+    }
+    const l = rec && rec._langue;
+    if(l && !/^Ind[ée]termin/.test(l)){ const main = l.split(',')[0].replace(/\s*\(.*\)$/,'').trim(); langs[main] = (langs[main]||0)+1; }
+  });
+  const nonCat = asList(REC.nonCatalogues).filter(n => n && n.travee === tid).reduce((s,n)=>s+(+n.count||0),0);
+  const cols = colLetters(def).map(c => ({ c, n:(byCol[c]||[]).length, range: coteRange((byCol[c]||[]).map(s=>s.cote)) }));
+  // Colonnes présentes dans les scans mais hors géométrie (rare) : ajoutées à la fin.
+  Object.keys(byCol).filter(c => c && !cols.some(x=>x.c===c)).sort().forEach(c =>
+    cols.push({ c, n:byCol[c].length, range: coteRange(byCol[c].map(s=>s.cote)) }));
+  years.sort((a,b)=>a-b);
+  const cent = {};
+  years.forEach(y => { const c = Math.floor((y-1)/100)+1; cent[c] = (cent[c]||0)+1; });
+  return {
+    def, n: scans.length, nonCat, cols, lastTs, maxEt: Math.max(maxEt, def.maxEt || 0),
+    range: coteRange(scans.map(s=>s.cote)), years, cent, langs, doyen, isRes,
+  };
+}
+
+/* ── Rendu ── */
+function arrowSvg(dir){
+  // Flèche pleine, épaisse : lisible de loin, identique en noir et blanc.
+  const p = 'M4 50 L44 12 L44 34 L96 34 L96 66 L44 66 L44 88 Z';
+  const t = dir === 'right' ? ' transform="rotate(180 50 50)"' : '';
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="${p}" fill="#111"${t}/></svg>`;
+}
+function numSize(name, single){
+  const L = name.length;
+  if(L > 6) return { cls:'tv-num tv-num--long', fs: single ? 44 : 34 };
+  const tbl = single ? [0,150,140,125,108,92,80] : [0,104,96,86,72,60,52];
+  return { cls:'tv-num', fs: tbl[L] };
+}
+function barsHtml(rows, max){
+  return `<div class="bars">${rows.map(r=>`
+    <span class="bars__l">${esc(r.l)}</span>
+    <span class="bars__track"><span class="bars__fill" style="width:${max? (100*r.v/max).toFixed(1):0}%;display:block"></span></span>
+    <span class="bars__v">${fmtN(r.v)}</span>`).join('')}</div>`;
+}
+
+function halfHtml(tid, side, single){
+  const s = statsOf(tid);
+  const name = displayName(tid);
+  const ns = numSize(name, single);
+  const head = `
+    <div class="tv-head ${side==='right'?'tv-head--right':''}">
+      ${side ? `<div class="tv-arrow">${arrowSvg(side)}</div>` : ''}
+      <div class="tv-name">
+        <div class="tv-kicker">${isRayonTravee(tid) ? 'Rayon' : 'Travée'}</div>
+        <div class="${ns.cls}" style="font-size:${ns.fs}pt">${esc(name)}</div>
+      </div>
+    </div>`;
+  const range = s.range
+    ? `<div class="tv-range"><span>${esc(s.range[0])}</span><span>→</span><span>${esc(s.range[1])}</span></div>`
+    : `<div class="tv-range tv-range--empty">Travée pas encore récolée</div>`;
+
+  const period = s.years.length ? `${s.years[0]}–${s.years[s.years.length-1]}` : '—';
+  const nbLangs = Object.keys(s.langs).length;
+  const kpis = `<div class="tv-kpis">
+      <div class="tv-kpi"><div class="tv-kpi__v">${fmtN(s.n)}</div><div class="tv-kpi__l">documents récolés${s.nonCat ? ` · + ~${fmtN(s.nonCat)} non cat.` : ''}</div></div>
+      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? esc(period) : s.def.nbCols}</div><div class="tv-kpi__l">${s.isRes ? "période d'édition" : 'colonnes'}</div></div>
+      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? (nbLangs || '—') : (s.maxEt || '—')}</div><div class="tv-kpi__l">${s.isRes ? (nbLangs>1?'langues':'langue') : 'étagères'}</div></div>
+    </div>`;
+
+  const compact = s.cols.length > 9;
+  const colsTable = `<div>
+      <p class="tv-h">Colonnes</p>
+      <table class="tv-cols ${compact?'tv-cols--compact':''}"><tbody>
+        ${s.cols.map(c => `<tr><td>${esc(c.c)}</td>${c.range
+          ? `<td class="c-range">${esc(c.range[0])}${c.range[1]!==c.range[0] ? `<i>→</i>${esc(c.range[1])}` : ''}</td><td class="c-n">${fmtN(c.n)}</td>`
+          : `<td class="c-empty" colspan="2">non récolée</td>`}</tr>`).join('')}
+      </tbody></table>
+    </div>`;
+
+  let charts = '';
+  if(s.isRes && s.years.length){
+    const cs = Object.keys(s.cent).map(Number).sort((a,b)=>a-b);
+    const cRows = []; for(let c=cs[0]; c<=cs[cs.length-1]; c++) cRows.push({ l: roman(c)+'ᵉ s.', v: s.cent[c]||0 });
+    const lEntries = Object.entries(s.langs).sort((a,b)=>b[1]-a[1]);
+    const lRows = lEntries.slice(0, single?5:3).map(([l,v])=>({l,v}));
+    const rest = lEntries.slice(single?5:3).reduce((t,[,v])=>t+v,0);
+    if(rest) lRows.push({ l:'Autres', v:rest });
+    const doyen = s.doyen ? `<div class="tv-doyen"><p class="tv-h">Le plus ancien</p>
+        <em>${esc(String(s.doyen.titre||'Sans titre').slice(0, single?160:110))}</em>${s.doyen.auteur ? ` — ${esc(s.doyen.auteur)}` : ''},
+        <b>${s.doyen.y}</b> <span style="color:var(--mid)">(${esc(shortCote(s.doyen.cote||''))})</span></div>` : '';
+    charts = `<div style="display:flex;flex-direction:column;gap:4mm">
+      <div class="tv-charts">
+        <div><p class="tv-h">Siècle d'édition</p>${barsHtml(cRows.slice(single?-6:-4), Math.max(...cRows.map(r=>r.v)))}</div>
+        <div><p class="tv-h">Langues</p>${barsHtml(lRows, Math.max(...lRows.map(r=>r.v),1))}</div>
+      </div>${doyen}</div>`;
+  } else if(!s.n){
+    charts = `<p class="tv-note">Les plages de cotes et les statistiques apparaîtront dès que cette travée aura été récolée.</p>`;
+  }
+  return `<div class="half">${head}${range}${kpis}<div class="tv-detail">${colsTable}${charts}</div></div>`;
+}
+
+function sheetHtml(sheet){
+  const [l, r] = sheet;
+  const single = !r;
+  const local = LOCALS.find(x=>x.id===currentLocal());
+  const ts = Math.max(...sheet.filter(Boolean).map(t => statsOf(t).lastTs));
+  const when = new Date().toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+  const lastRec = ts > 0 ? ` · dernier scan le ${new Date(ts).toLocaleDateString('fr-FR')}` : '';
+  return `<div class="sheet ${single?'sheet--single':''}">
+    <div class="sheet__top"><span><b>${esc(local ? local.label : '')}</b></span><span>Bibliothèques de Douai</span></div>
+    <div class="sheet__body">${single ? halfHtml(l, null, true) : halfHtml(l,'left',false) + halfHtml(r,'right',false)}</div>
+    <div class="sheet__foot"><span>Plages de cotes d'après le récolement — un document mal rangé peut sortir de sa plage.</span><span>État au ${when}${lastRec}</span></div>
+  </div>`;
+}
+
+/* ── Interface ── */
+function currentLocal(){ return document.getElementById('sg-local').value; }
+function sheetKey(sh){ return sh.filter(Boolean).join('+'); }
+
+function renderList(){
+  const sheets = sheetsFor(currentLocal());
+  const list = document.getElementById('sg-list');
+  list.innerHTML = sheets.map((sh,i) => {
+    const k = sheetKey(sh);
+    const label = sh[1] ? `<strong>${esc(displayName(sh[0]))}</strong><span class="sg-sep">←→</span><strong>${esc(displayName(sh[1]))}</strong>` : `<strong>${esc(displayName(sh[0]))}</strong>`;
+    const actions = sh[1]
+      ? `<button type="button" data-act="swap" data-i="${i}" title="Échanger gauche et droite">⇄</button><button type="button" data-act="split" data-i="${i}" title="Séparer">✂</button>`
+      : (i < sheets.length-1 && !sheets[i+1][1] ? `<button type="button" data-act="join" data-i="${i}" title="Réunir avec la suivante">＋</button>` : '');
+    return `<span class="sg-chip"><input type="checkbox" data-k="${esc(k)}" ${checked.has(k)?'checked':''} aria-label="Imprimer cette feuille">${label}${actions}</span>`;
+  }).join('');
+}
+function renderPreview(){
+  const sheets = sheetsFor(currentLocal()).filter(sh => checked.has(sheetKey(sh)));
+  const box = document.getElementById('sg-preview');
+  box.innerHTML = sheets.length
+    ? sheets.map(sh => `<div class="sg-scale">${sheetHtml(sh)}</div>`).join('')
+    : `<p class="pro-empty sg-noprint">Cochez au moins une feuille pour l'aperçu.</p>`;
+  fitSheets();
+  fitPreview();
+  if(window.rpEmbed && rpEmbed.refresh) rpEmbed.refresh();
+}
+function fitSheets(){
+  document.querySelectorAll('.sheet .half').forEach(h => {
+    h.classList.remove('fit-1','fit-2','fit-3');
+    const tbl = h.querySelector('.tv-cols');
+    for(let lvl=1; lvl<=3 && h.scrollHeight > h.clientHeight + 1; lvl++){
+      if(lvl===1 && tbl) tbl.classList.add('tv-cols--compact');
+      else h.classList.add('fit-'+lvl);
+    }
+  });
+}
+function fitPreview(){
+  document.querySelectorAll('.sg-scale').forEach(w => {
+    const sheet = w.firstElementChild;
+    const k = Math.min(1, w.clientWidth / sheet.offsetWidth);
+    sheet.style.transform = `scale(${k})`;
+    w.style.height = (sheet.offsetHeight * k) + 'px';
+  });
+}
+function mutate(fn){
+  const id = currentLocal();
+  const sheets = sheetsFor(id).map(s=>s.slice());
+  fn(sheets);
+  const all = loadPairs(); all[id] = sheets; savePairs(all);
+  checked.clear(); sheets.forEach(sh => checked.add(sheetKey(sh)));
+  renderList(); renderPreview();
+}
+
+document.getElementById('sg-list').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if(!b) return;
+  const i = +b.dataset.i;
+  mutate(sheets => {
+    if(b.dataset.act === 'swap') sheets[i] = [sheets[i][1], sheets[i][0]];
+    if(b.dataset.act === 'split') sheets.splice(i, 1, [sheets[i][0], null], [sheets[i][1], null]);
+    if(b.dataset.act === 'join') sheets.splice(i, 2, [sheets[i][0], sheets[i+1][0]]);
+  });
+});
+document.getElementById('sg-list').addEventListener('change', e => {
+  const k = e.target.dataset.k; if(!k) return;
+  e.target.checked ? checked.add(k) : checked.delete(k);
+  renderPreview();
+});
+document.getElementById('sg-all').addEventListener('click', () => {
+  const sheets = sheetsFor(currentLocal());
+  const all = sheets.every(sh => checked.has(sheetKey(sh)));
+  checked.clear(); if(!all) sheets.forEach(sh => checked.add(sheetKey(sh)));
+  renderList(); renderPreview();
+});
+document.getElementById('sg-print').addEventListener('click', () => {
+  // Pas de mise à l'échelle à l'impression : chaque feuille est déjà en mm.
+  window.print();
+});
+window.addEventListener('beforeprint', () => document.querySelectorAll('.sg-scale').forEach(w => { w.firstElementChild.style.transform = 'none'; }));
+window.addEventListener('afterprint', fitPreview);
+window.addEventListener('resize', fitPreview);
+
+async function selectLocal(id){
+  try { localStorage.setItem(LOCAL_KEY, id); } catch(e){}
+  const status = document.getElementById('sg-status');
+  if(catalogGroupOfReserve(id) === 'reserve' && !INV){
+    status.textContent = 'Chargement du catalogue (dates, langues)…';
+    await loadInventaire();
+  }
+  const ids = traveesOfReserve(id).map(t=>t.id);
+  const n = asList(REC.scans).filter(s => s && ids.includes(s.travee)).length;
+  status.textContent = `${ids.length} travée${ids.length>1?'s':''} · ${fmtN(n)} documents récolés`;
+  // Par défaut, ne cocher que les feuilles qui ont des données.
+  checked.clear();
+  sheetsFor(id).forEach(sh => { if(sh.some(t => t && asList(REC.scans).some(s => s && s.travee===t))) checked.add(sheetKey(sh)); });
+  renderList(); renderPreview();
+}
+
+(async function init(){
+  REC = await loadRecolement();
+  if(REC.rayons) applyRayonRecords(REC.rayons);
+  const sel = document.getElementById('sg-local');
+  sel.innerHTML = LOCALS.map(r => `<option value="${r.id}">${esc(r.label)}</option>`).join('');
+  let start = 'patrimoniale';
+  try { const s = localStorage.getItem(LOCAL_KEY); if(s && LOCALS.some(r=>r.id===s)) start = s; } catch(e){}
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if(LOCALS.some(r=>r.id===hash)) start = hash;
+  sel.value = start;
+  sel.addEventListener('change', () => selectLocal(sel.value));
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ fitSheets(); fitPreview(); });
+  selectLocal(start);
+})();
+})();
+</script>
+</body>
+</html>
