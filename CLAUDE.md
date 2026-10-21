@@ -181,11 +181,12 @@ nosniff` et `Referrer-Policy: strict-origin-when-cross-origin`.
 | `cotes-numeriques.html` | Repérage, dans l'export complet de la bibliothèque, des exemplaires à cote numérique 5/6 chiffres (recherche, tri, export .txt des codes-barres pour ajout panier SIGB), à partir de `data/cotes-numeriques.json` — voir « Cotes numériques » | **Protégé** |
 | `exemplarisation.html` | Création rapide d'exemplaires (titre, auteur, date, cote, code-barre, emplacement, photo — tout en un seul formulaire) sans notice bibliographique complète — voir « Exemplarisation rapide » | **Protégé** |
 | `reliures.html` | Création manuelle de groupes de documents reliés ensemble (équivalent $481/$482) et détection des groupes dont les emplacements récolés ne concordent pas — voir « Récolement en cascade des documents reliés » | **Protégé** |
-| `signaletique.html` | Panneaux A4 paysage noir et blanc à afficher à l'entrée des travées (une travée seule ou deux travées adossées avec leurs flèches), avec plages de cotes par colonne et statistiques tirées du récolement — voir « Panneaux de travées » | **Protégé** |
+| `signaletique.html` | Panneaux A4 paysage noir et blanc à afficher à l'entrée des travées, et fiches par armoire (bois / à tiroirs) (une travée seule ou deux travées adossées avec leurs flèches), avec plages de cotes par colonne et statistiques tirées du récolement — voir « Panneaux de travées » | **Protégé** |
 | `scan-docs.html` | Rognage et renommage par cote des images scannées avant intégration au fonds numérisé (zxing-wasm pour lire les codes-barres) | **Protégé** |
 | `rotobib.html` | Désherbage assisté par les statistiques de prêt : scan d'un code-barre, fiche + histogramme de prêts sur 4 ans, décision (conserver/pilon/braderie/relocalisation), export .txt par traitement — voir « Rotobib » | **Protégé** |
 | `desherbage-stats.html` | Vue d'ensemble purement statistique (lecture seule) de l'export de désherbage : prêts totaux par année, répartition par prêts cumulés, liste triable des exemplaires — voir « Rotobib » | **Protégé** |
 | `validation-desherbage.html` | Compte rendu en direct des décisions de Rotobib par rayon, pour le collègue qui valide la campagne : valider, contre-proposer un autre traitement, commenter — voir « Rotobib » | **Protégé** |
+| `presentoirs.html` | Suivi des présentoirs de presse adulte (3 travées) : numéro en façade à consulter sur place, dernier hors-série, alerte au retour de prêt — voir « Présentoirs de presse » | **Protégé** |
 | `voyageurs.html` | Exposition « Voyageurs douaisiens » : globe MapLibre 5, voyages animés jour par jour (`js/voyageurs.js`, données dans R2) — **en préparation**, non liée depuis le site public — voir « Exposition Voyageurs douaisiens » | **Protégé** (jusqu'à publication) |
 | `voyageurs-admin.html` | Éditeur de l'exposition « Voyageurs douaisiens » : fiches, tracé des voyages à la souris, étapes et récits | **Protégé** |
 | `generer_manifest.html` | Génère `js/manifest.json` à partir d'un CSV — outil ponctuel, non lié dans la navigation (accès direct par URL uniquement) | **Protégé** |
@@ -334,7 +335,9 @@ Contenu calculé à l'ouverture depuis `/api/recolement` (repli
 2 % extrêmes écartés au-delà de 40 livres pour qu'un livre mal rangé ne
 fausse pas le panneau), documents récolés + estimation non catalogués, et
 **carte de la travée** (`shelfMap()`/`mapHtml()`) : une case par étagère,
-étagère 1 en haut, mêmes statuts et même priorité que `slotState()` de
+étagère 1 en haut, sans numéro d'étagère ; chaque colonne occupe toute la
+hauteur (une colonne plus courte a des étagères plus hautes, comme sur le
+plan), donc toutes finissent sur la même ligne, mêmes statuts et même priorité que `slotState()` de
 `reserve.html` (récolé > exemplarisé rapide > non catalogué > à ranger >
 vide > pas encore récolé), même hauteur de colonne que `maxEtageOf()`,
 même dédoublonnage par cote hors magasins/rayons ; chaque statut a une
@@ -353,6 +356,153 @@ Magasins et rayons : colonnes/étagères à la place (pas d'enrichissement,
 qu'il tienne à côté de l'encart, puis retire « Le plus ancien », puis les
 graphiques si une demi-feuille déborde. Impression : `@page { size: A4 landscape; margin: 0 }`, une
 feuille par page, réglages masqués.
+
+## Présentoirs de presse (`presentoirs.html`, 2026-10-20)
+
+Presse **adulte** uniquement (salle de lecture publique, pas la réserve).
+Géométrie en dur dans `TRAVEES` : travée 1 = 6 colonnes × 3 étages, travée
+3 = 4 colonnes × 3 étages,
+travée 2 = 24 colonnes × 3 étages groupées 3 par 3 par des cloisons (blocs
+sans nom ni numéro — demande explicite), affichées **côte à côte** dans un
+seul défilement horizontal (`.pp-plan`, demande explicite : plus lisible
+qu'empilées). **Un étage = un titre** : façade
+pour le dernier numéro (consultation sur place), casier derrière pour les
+anciens (empruntables). Le dernier hors-série est sur le même étage et reste
+sur place jusqu'au HS suivant. Travée 3 : titres non bulletinés (sans
+code-barre), suivis par date de parution — case cochée par défaut à
+l'affectation.
+
+- **Catalogue** : `data/desherbage.json`, qui porte déjà `titreSerie` et
+  `titrePartie` (« 119 05/2018 », « 282 HS 04/2018 », « HS193 04/2018 »…)
+  de chaque fascicule de `bib.xml` — pas de script de build dédié. Filtre
+  `section` sans « jeun »/« ados », et `bibliotheque` = « Douai Marceline
+  Desbordes-Valmore » seulement (annexes et réserve écartées, 2026-10-21).
+  `parsePartie()` en tire numéro, date et
+  HS ; `compareIssues()` compare par date puis par numéro. Un numéro arrivé
+  après l'export est inconnu : saisie manuelle (code-barre prérempli).
+- **Fascicules bulletinés du jour (2026-10-21)** : au chargement de la page
+  (et **seulement** là — plus aucune relecture périodique de l'état ni de
+  Syracuse, demande explicite : on recharge la page), `POST
+  /api/transferts?store=presentoirs&syracuse=jour` (authentifié,
+  `lib/presentoirs-syracuse.mjs`) cherche dans le portail les notices
+  `TypeOfDocument_exact:"Numéro de revue"` du site MDV dont le `timestamp`
+  est postérieur à minuit (Paris), rapproche le titre (« Elle. 4212,
+  11/09/2026 ») d'un étage par titre exact, garde le numéro s'il est plus
+  récent que la façade (`compareIssues`, désormais dans
+  `lib/presentoirs-state.mjs` avec `parsePartie`), prend le code-barre par
+  `GetHoldings` et pose lui-même le patch `issue` (CAS) — l'ancien passe dans
+  `hist`. `timestamp` bouge aussi à chaque prêt/retour : les vieux numéros qui
+  remontent sont écartés par cette comparaison. Plancher de 2 min entre deux
+  imports (`state.syracuseJour`), 300 ms entre appels, ≤ 8 recherches et
+  ≤ 30 GetHoldings ; `maxDuration: 45` sur `api/transferts.mjs`. Essai sans
+  écriture : `importFasciculesDuJour({ dryRun: true, now })`.
+- **Mise en place** : un scan retrouve l'étage par le titre de série
+  (`normSerie`) ; titre pas encore placé → clic sur un étage libre (ou
+  étage libre déjà sélectionné). Un numéro plus ancien que la façade n'est
+  pas mis en place sans confirmation. **Retour de prêt** : alerte rouge si le
+  code-barre est un numéro en façade.
+- **Stockage** : clé R2 `presentoirs.json` (`lib/presentoirs-state.mjs`,
+  forme et patchs `assign`/`issue`/`undo`/`photo` décrits en tête), servie
+  par **`api/transferts.mjs?store=presentoirs`** — plafond de 12 fonctions.
+  La page importe ce même module (`<script type="module">`) : application
+  locale et serveur identiques. File `rp_presentoirs_pending_sync`.
+- **Couvertures** : photo prise à la mise en place (redimensionnée 800 px),
+  `POST /api/vignette` sous `vignette/presse_<aléatoire>.jpg`, relue par
+  `GET /api/vignette?barcode=…` (ajouté pour cela — premier usage en lecture
+  de ce préfixe). Repli sur `imagette` Syracuse quand elle existe.
+- **Couvertures par titre + numéro** (`state.covers`, clé
+  `presentoirCoverKey()` = « titre normalisé|n|325 » ou « …|hs|81 », dans
+  `lib/presentoirs-state.mjs`, partagée page/script) : une photo prise sur un
+  numéro y est aussi rangée, et `npm run import:couvertures -- <source>
+  [--apply] [--force]` (`scripts/import-couvertures.mjs`) importe celles
+  d'un site d'éditeur. Source `natgeo` (natgeomagazine.fr/tous-les-numeros,
+  16 derniers numéros + HS, importés le 2026-10-20) — à relancer chaque mois,
+  seules les nouvelles sont téléchargées. Ajouter un titre = une entrée de
+  `SOURCES` avec le « Titre de série » Syracuse exact. Pas d'import
+  générique : chaque site a sa structure, et elle change sans prévenir.
+  Une couverture peut aussi être une **adresse d'image collée** dans la
+  fiche (`covers[k].url`, https, affichée depuis le site d'origine — ex.
+  `content.cafeyn.co/Public/…`, qui répond sans contrôle de Referer).
+  Sans numéro, la clé prend la date : « …|d|20261020 ». Cafeyn n'a pas été
+  automatisé : ses pages titre sont une application JS sans contenu, les
+  identifiants de numéro ne sortent que de son interface interne.
+- **Couvertures automatiques (2026-10-21)** : juste après l'import des
+  fascicules du jour, `lib/presentoirs-covers.mjs` cherche la couverture de
+  chaque numéro en façade qui n'en a pas (photo, import ou adresse collée
+  priment toujours) et la range comme une adresse collée (`covers[k].url`,
+  `source: 'auto:…'`). Sources par titre dans `SOURCES_BY_SERIE` (« Titre de
+  série » Syracuse exact) : **API publique de Cafeyn** pour ~35 titres
+  (`/b2c/publications/<id numérique>/issues` = 10 derniers numéros avec
+  numéro, date, `coverHDUrl` — l'id numérique est obligatoire, le nom court ne
+  marche que pour `/lastIssue`), pages d'éditeur pour L'Express, Le Monde
+  diplomatique, Alternatives économiques et National Geographic. **Jamais
+  « le dernier paru » à l'aveugle** : même numéro, sinon date compatible
+  (`pickCandidate()` : ±3 jours, ou fenêtre « mois − 45 j … + 20 j » pour un
+  mensuel daté « 11/2026 » ou « 01/11/2026 ») — Le Point est arrêté depuis
+  juin sur Cafeyn, et le « Santé » de Cafeyn est un homonyme néerlandais
+  (contrôler `originCountryId` = 76 avant d'ajouter un titre). Essai noté
+  dans `state.coverTries` : pas de nouvelle requête avant 6 h pour un numéro
+  dont la couverture n'est pas encore publiée. Budget 12 s par import.
+  Rattrapage (façade + casier) : `npm run import:couvertures -- auto
+  [--apply]`. Non couverts (essayés le 2026-10-21) : liste en tête du module.
+- **Codes-barres marchands** (journaux non bulletinés, demande du
+  2026-10-20) : l'EAN-13 de la presse (977 + ISSN…, ou 3…) identifie le
+  TITRE, pas le numéro ; associé à l'étage (`slot.eans`, patch `ean`)
+  **sans question** si cet étage est sélectionné au premier scan (bouton
+  « Pas le bon titre… » pour défaire), puis chaque scan met un numéro en
+  façade daté du jour (corrigeable dans le message) — titres bulletinés
+  compris, aucun numéro demandé (demande du 2026-10-20, L'Équipe magazine).
+  Un complément envoyé par la douchette comme second scan (2 ou 5 chiffres
+  dans les 4 s, `joinAddon()`) est recollé au code précédent. Le code complémentaire de 2 ou 5 chiffres, s'il est lu par la
+  douchette (15/18 chiffres), distingue les numéros ; sans lui, le retour de
+  prêt ne peut que montrer la façade pour comparaison — jamais d'alerte
+  « sur place » sur un EAN nu. `parseEan()` vérifie la clé de contrôle ;
+  `findSlotByEan()` retrouve un 977 par son ISSN si le prix a changé.
+  Syracuse ne porte pas l'ISSN des fascicules (vérifié : 0 titre sur 510),
+  d'où l'association manuelle.
+- **Hors-séries mal saisis dans Syracuse** : National Geographic note
+  « 81 H 08/2026 », « 75H … », ou rien du tout (« 80 06/2026 » pour le HS 80).
+  `parsePartie()` reconnaît « H » ; `guessUnmarkedHs()` classe HS un numéro
+  au moins 2× plus petit (et de 20 de moins) qu'un numéro du même titre paru
+  à moins d'un an. Les dates de HS de Syracuse ne concordent pas avec celles
+  de l'éditeur (HS 81 : 08/2026 contre septembre) : on rapproche par numéro.
+
+## Registres Excel : documents sans code-barre placés sur le plan (2026-10-15)
+
+Trois classeurs de l'équipe, dans `excel/` (**gitignoré**), donnent
+l'emplacement de documents qui n'ont pas de code-barre et ne peuvent donc pas
+être scannés : `Récolement mss 0001-0930.xlsx` (manuscrits, réserve
+patrimoniale travées I à VI — colonne « I-A » = travée I colonne A),
+`Récolement Armoires en bois.xlsx` (« Armoire en bois N » = colonne N
+— A, B… — de la pseudo-travée `ARMOIRE`, étagère = niveau) et
+`Fonds CAR.xlsx` (cartes : seule la colonne « Boîte » de forme `A2T7` est
+un emplacement — armoire à tiroirs 2 = colonne B de `TIROIR`, tiroir 7 ;
+les boîtes numérotées 1 à 21 ne sont pas localisées).
+`npm run build:registres` (`scripts/build-registres.mjs`, lecteur xlsx
+maison sans dépendance `scripts/lib/xlsx.mjs`) produit
+`data/registres-localisation.json` — **à committer**, puisque les sources
+ne le sont pas. Un manuscrit = un document par cote et par étagère (ses
+unités textuelles « partie » sont regroupées) ; « 6 à 11 »/« 5 et 6 » le
+posent sur chaque étagère ; les étagères non numériques (« PSBC-1/2/P1/P2 »
+de II-E, « z ») et les manuscrits sans travée (détruits en 1944, perdus) ne
+sont pas devinés : listés dans `unplaced`/le rapport du script.
+
+Affichage, **sans rien écrire dans R2** : `reserve.html` (`loadRegistres()`/
+`applyRegistres()`) et `signaletique.html` ajoutent ces documents aux
+étagères — catégorie **« Registre (sans code-barre) »** (plan : sarcelle
+`#0f9d8a` rayée, entre « exemplarisé rapide » et « non catalogué » ;
+impression : trame de points) — et **retirent leur nombre de l'estimation
+« non catalogués » de la même étagère** (l'équipe les y avait comptés : ex.
+`TIROIR|B|7` = 39 = les 39 cartes de A2T7), comme le décrément
+d'`exemplarisation.html` mais calculé à l'affichage. Notices du plan :
+pastille « registre », sans code-barre.
+
+`signaletique.html` propose aussi deux locaux « Armoires en bois » et
+« Armoires à tiroirs » : **une fiche par colonne** (`ARMOIRE:A` = armoire 1,
+`TIROIR:B` = armoire à tiroirs B, « A2 » dans les registres), une ligne par
+niveau (N1…) ou tiroir (T1…) avec sa case de statut et son contenu
+(objets décrits, cartes avec plage de cotes Car+, documents scannés,
+estimation restante). Cotes `Ms …` et `Car+…` reconnues par `SOUS_FONDS`.
 
 ## Publication en iframe sur le site du réseau
 
@@ -2403,7 +2553,7 @@ pour plusieurs choses indépendantes :
 - **`vignette/<code-barre>.jpg`** : photos rognées attachées aux exemplaires
   créés via `exemplarisation.html` (import/rognage intégré à son formulaire)
   — voir « Exemplarisation rapide » plus haut. Contrairement aux deux
-  catégories ci-dessus, écriture seule (`api/vignette.mjs` n'expose aucun `GET`) : rien
+  catégories ci-dessus, écriture seule pour les exemplaires (`GET /api/vignette` n'existe que depuis les présentoirs de presse, 2026-10-20) : rien
   dans le site ne relit ces images pour l'instant.
 - **`syracuse-sync.json`** : surcouche de synchronisation incrémentale avec
   le portail public Syracuse (`bm-douai.fr`), alimentée par
@@ -2411,6 +2561,18 @@ pour plusieurs choses indépendantes :
   plus bas pour le détail. Cinquième usage indépendant du bucket R2, en
   plus de `xml/`, de la famille `recolement.json`/…/`desherbage-traitements.json`,
   de `recolement-backups/` et de `vignette/`.
+
+S'y ajoute `registres/` (2026-10-16) : photos des registres d'inventaire
+papier du 2e étage (numéro d'inventaire = cote, 100.000…), poussées par
+`npm run upload:registre -- <dossier> <registre-NN>` sous
+`registres/<id>/pages/` + `manifest.json`, pour une transcription OCR faite
+**sur une autre machine** (rien de l'OCR ne tourne sur ce poste ni sur
+Vercel ; résultats attendus dans `registres/<id>/ocr/`, format décrit dans
+`excel/registre/prompt-ocr-registres.md`, gitignoré). Le script réécrit
+l'étiquette EXIF Orientation à 6 sans réencoder : le téléphone, tenu à plat
+au-dessus du registre, notait 3 ou 8 sur plus de la moitié des photos alors
+que les pixels sont toujours « haut de page à gauche ». Vérité terrain :
+`registres/verite-terrain/transcription-manuelle-100000-100179.csv`.
 
 S'y ajoute `voyageurs.json` (exposition « Voyageurs douaisiens », via
 `api/voyageurs-admin.mjs` — lecture authentifiée, contrairement aux états
@@ -2862,8 +3024,26 @@ de chaque `catalogByGroup`) :
   (catégorie du bundle `recolement.json`, clé = cote normalisée — pas un
   emplacement, contrairement à `nonCat`/`videShelves`/`nonRangeShelves`,
   puisque plusieurs cotes distinctes peuvent coexister sur le même
-  emplacement) — aucun effet sur la progression/l'occupation, uniquement une
-  entrée dans la liste d'export.
+  emplacement) — pas compté comme récolé, mais depuis le 2026-10-20 (demande
+  explicite) **+1 sur l'estimation `nonCatalogues` de l'étagère courante**
+  (`adjustNonCatAt()`), donc rouge sur le plan comme un non catalogué. Même
+  cote ressaisie au même endroit : pas de double comptage ; à un autre
+  endroit : −1 sur l'ancienne étagère. Rien en mode « hors réserve ». Le +1
+  n'est posé (et retiré) que pour un record marqué `nonCat:true` — les cotes
+  saisies avant n'ont rien ajouté. Ces cotes figurent dans « Scans récents
+  ici » (📎) avec un bouton Annuler (`deleteNoBarcodeCote()` : patch
+  `noBarcode` à `null` + −1). Saisie accélérée (`submitNoBarcode()`) : champs
+  « Tomes de N à M » (enregistre `cote-N` … `cote-M`, 200 au plus, sans repli
+  approximatif par numéro, un seul récapitulatif) et bouton « ＋ Suivante »
+  (`nextCote()` : +1 sur le dernier groupe de chiffres de la dernière saisie,
+  zéros de tête conservés ; après une plage, la cote de base suivante).
+  Depuis le même jour, **le compteur manuel « Non catalogués » n'existe
+  plus dans `recolement.html`** : cette saisie de cotes le remplace (les
+  estimations déjà enregistrées restent dans `nonCatalogues` et sur le
+  plan ; `exemplarisation.html` continue de les décrémenter). Les boutons
+  Vide / Non rangé / Dernière étagère sont passés sous la mini-carte de la
+  travée ; la carte « Cette étagère » ne garde que l'emplacement et la
+  saisie des cotes sans code-barre.
 
 `noBarcodeList(group)` (utilisée par `ADV_CATS.nobarcode`, un panneau
 ajouté automatiquement à tous les groupes de "Statistiques avancées" via la

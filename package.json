@@ -16,6 +16,7 @@
     "build:desherbage": "node scripts/build-desherbage.mjs",
     "update:bib": "node scripts/build-magasins.mjs && node scripts/build-cotes-numeriques.mjs && node scripts/build-desherbage.mjs",
     "build:non-catalogues": "node scripts/build-non-catalogues.mjs",
+    "build:registres": "node scripts/build-registres.mjs",
     "build:fonds-complementaires": "node scripts/build-fonds-complementaires.mjs",
     "build:manifest-presse": "node scripts/build-manifest-presse.mjs",
     "build:natural-earth": "node scripts/build-natural-earth.mjs",
@@ -23,8 +24,10 @@
     "upload:xml": "node scripts/upload-xml-to-r2.mjs",
     "upload:desherbage": "node scripts/upload-desherbage-to-r2.mjs",
     "upload:bib": "node scripts/upload-bib-to-r2.mjs",
+    "upload:registre": "node scripts/upload-registre-to-r2.mjs",
     "test:r2": "node scripts/test-r2.mjs",
     "sync:syracuse": "node scripts/run-syracuse-sync.mjs",
-    "backfill:reliure": "node scripts/backfill-reliure.mjs"
+    "backfill:reliure": "node scripts/backfill-reliure.mjs",
+    "import:couvertures": "node scripts/import-couvertures.mjs"
   }
 }

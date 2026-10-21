@@ -12,7 +12,7 @@
  * dépendance npm de parsing multipart), et largement suffisant pour des
  * vignettes déjà redimensionnées/compressées côté client avant l'envoi.
  */
-import { r2Put, r2Configured } from '../lib/r2.mjs';
+import { r2Get, r2Put, r2Configured } from '../lib/r2.mjs';
 import { requireAuth } from '../lib/auth.mjs';
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 Mo décodés — large marge au-delà d'une vignette compressée côté client
@@ -37,8 +37,26 @@ export default async function handler(req, res) {
     res.status(503).json({ error: 'R2 non configuré côté serveur (variables R2_* manquantes sur Vercel).' });
     return;
   }
+  /* GET ?barcode=… : relit une vignette (bucket privé). Ajouté pour les
+     couvertures de presse de presentoirs.html — premier usage en lecture de
+     ce préfixe, public comme les autres lectures du projet. Côté présentoirs
+     chaque photo a un nom aléatoire, jamais réécrit : cache long sans risque. */
+  if (req.method === 'GET') {
+    const id = sanitizeBarcode(req.query && req.query.barcode);
+    if (!id) { res.status(400).json({ error: 'barcode invalide ou manquant.' }); return; }
+    try {
+      const obj = await r2Get(`vignette/${id}.jpg`, { raw: true });
+      if (!obj) { res.status(404).json({ error: 'Vignette absente.' }); return; }
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800');
+      res.status(200).end(obj.body);
+    } catch (err) {
+      res.status(500).json({ error: err.message || 'Erreur serveur.' });
+    }
+    return;
+  }
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'GET, POST');
     res.status(405).json({ error: 'Méthode non supportée.' });
     return;
   }

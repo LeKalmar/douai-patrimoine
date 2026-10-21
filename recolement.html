@@ -125,8 +125,6 @@
   @keyframes rcflash{0%{filter:brightness(1.35);transform:scale(1.012)}100%{filter:none;transform:none}}
   .feedback.flash{animation:rcflash .55s ease-out}
   @media (prefers-reduced-motion:reduce){.feedback.flash{animation:none}}
-  .rc-ncfb{display:none;font-size:.78rem;color:var(--pro-ok-encre);margin-top:.5rem}
-  .rc-ncfb.show{display:block}
 
   /* — Scans récents / journaux — */
   .rc-recent__head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.2rem 1rem;padding:.8rem 1.1rem;border-bottom:1px solid var(--pro-trait)}
@@ -150,11 +148,11 @@
   .rc-sub__row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem .9rem}
   .rc-sub__t{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--pro-texte)}
   .rc-sub__d{font-size:.76rem;color:var(--pro-texte-doux);margin-top:.1rem}
-  #stp-noncat-wrap .pro-btn--icon{border:0}
-  #noncat-input{width:64px;height:44px;text-align:center;border:0;border-left:1px solid var(--pro-carte-bord);border-right:1px solid var(--pro-carte-bord);font:700 1.5rem var(--pro-font-display);color:var(--plan-noncat);background:#fff;-moz-appearance:textfield;border-radius:0}
-  #noncat-input::-webkit-inner-spin-button,#noncat-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   .rc-inline{display:flex;margin-top:.4rem}
   .rc-inline .pro-input{flex:1;min-width:0;border-right:0}
+  .rc-nbc-tomes{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;margin-top:.45rem}
+  .rc-nbc-tomes .pro-input{width:4.5rem}
+  #nobarcode-next{margin-top:.5rem}
 
   /* Mini-plan */
   .mp-header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.1rem .7rem}
@@ -524,26 +522,6 @@
         <section class="pro-card rc-card rc-card--top" aria-label="Marquer cette étagère">
           <h2 class="rc-eyebrow" id="shelf-here-label">Cette étagère</h2>
           <p class="rc-readout" id="loc-readout">—</p>
-          <div class="pro-seg" id="vide-row" role="group" aria-label="Marquage de l'étagère">
-            <button type="button" id="btn-vide" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16v10H4z"/></svg><span class="rc-seg-label">Vide</span></button>
-            <button type="button" id="btn-nonrange" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4"/></svg><span class="rc-seg-label">Non rangé</span></button>
-            <button type="button" id="btn-lastshelf" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4M6 5h12l-3 4 3 4H6"/></svg><span class="rc-seg-label">Dernière étagère</span></button>
-          </div>
-
-          <div class="rc-sub" id="noncat-mode-zone">
-            <div class="rc-sub__row">
-              <div>
-                <div class="rc-sub__t" id="nc-label">Non catalogués</div>
-                <div class="rc-sub__d">Livres sans notice sur cette étagère</div>
-              </div>
-              <div class="pro-stepper" id="stp-noncat-wrap" role="group" aria-labelledby="nc-label">
-                <button type="button" class="pro-btn pro-btn--icon" id="noncat-minus" aria-label="Retirer un non catalogué"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
-                <input type="number" id="noncat-input" min="0" step="1" value="0" inputmode="numeric" aria-labelledby="nc-label">
-                <button type="button" class="pro-btn pro-btn--icon" id="noncat-plus" aria-label="Ajouter un non catalogué"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-              </div>
-            </div>
-            <div class="rc-ncfb" id="noncat-feedback" role="status"></div>
-          </div>
 
           <div class="rc-sub" id="nobarcode-row">
             <label class="rc-sub__t" for="nobarcode-input">Livre sans code-barre (cote)</label>
@@ -551,6 +529,13 @@
               <input type="text" class="pro-input" id="nobarcode-input" placeholder="Cote ou numéro seul, ex. 136854" autocomplete="off">
               <button type="button" class="pro-btn pro-btn--primary" id="nobarcode-save">Récoler</button>
             </div>
+            <div class="rc-nbc-tomes">
+              <span class="rc-sub__d">Tomes (facultatif) : cote-</span>
+              <input type="number" class="pro-input" id="nobarcode-tome-from" min="0" step="1" inputmode="numeric" placeholder="1" aria-label="Premier tome">
+              <span class="rc-sub__d">à -</span>
+              <input type="number" class="pro-input" id="nobarcode-tome-to" min="0" step="1" inputmode="numeric" placeholder="5" aria-label="Dernier tome">
+            </div>
+            <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" id="nobarcode-next" hidden></button>
           </div>
         </section>
 
@@ -573,6 +558,11 @@
           </div>
           <p class="mp-hint" id="mp-hint" style="display:none"></p>
           <p class="mp-hint" id="mp-click-hint">Un clic sur une case se rend à cette colonne / étagère.</p>
+          <div class="pro-seg" id="vide-row" role="group" aria-label="Marquage de cette étagère">
+            <button type="button" id="btn-vide" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16v10H4z"/></svg><span class="rc-seg-label">Vide</span></button>
+            <button type="button" id="btn-nonrange" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4"/></svg><span class="rc-seg-label">Non rangé</span></button>
+            <button type="button" id="btn-lastshelf" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4M6 5h12l-3 4 3 4H6"/></svg><span class="rc-seg-label">Dernière étagère</span></button>
+          </div>
         </section>
 
         <details class="pro-card rc-expected" id="expected-panel">
@@ -2067,7 +2057,6 @@ buildScopeBar();
    définies dans js/reserve-shared.js). */
 const scanInput = document.getElementById('scan-input');
 const damagedToggle = document.getElementById('damaged-toggle');
-const noncatInput = document.getElementById('noncat-input');
 const selReserve=document.getElementById('sel-reserve'), selLocType=document.getElementById('sel-loctype');
 const selRayon=document.getElementById('sel-rayon');
 
@@ -2145,7 +2134,6 @@ function applyReserveVisibility(){
   document.getElementById('stp-colonne-wrap').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('stp-etage-wrap').style.display = isHorsReserve ? 'none' : '';
   if(isHorsReserve) document.getElementById('stp-travee-wrap').style.display = 'none';
-  document.getElementById('noncat-mode-zone').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('nobarcode-row').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('expected-panel').style.display = isHorsReserve ? 'none' : '';
   document.getElementById('horsreserve-note').style.display = isHorsReserve ? '' : 'none';
@@ -2804,49 +2792,150 @@ function showFeedback(record, status, prev, reliureRecords){
    - la cote ne correspond à rien de connu (même approximativement) → pas de
      scan (rien à récoler, on ne connaît même pas le titre), juste un
      enregistrement dans noBarcodeCotes (clé = cote normalisée) pour la même
-     liste d'export — "et c'est tout", pas d'effet sur les statistiques de
-     progression. */
-function handleNoBarcodeCote(coteRaw){
+     liste d'export, et +1 sur l'estimation « non catalogués » de l'étagère
+     courante (rouge sur le plan) — pas compté comme récolé. */
+// opts.batch (saisie d'une plage de tomes, voir submitNoBarcode()) : pas de
+// bip ni de carte de retour par cote absente — un seul récapitulatif à la
+// fin — et pas de repli approximatif par numéro : « 13466-2 » désigne un tome
+// précis, le rattacher au seul exemplaire « 13466 » du catalogue serait faux.
+// Renvoie 'found' | 'approx' | 'absent'.
+function handleNoBarcodeCote(coteRaw, opts){
+  const batch = !!(opts && opts.batch);
   const cote = (coteRaw||'').trim();
-  if(!cote) return;
+  if(!cote) return null;
   const group = catalogGroupOfReserve(loc.reserve);
   const idx = catalogCoteIndexByGroup[group];
   const foundBarcode = idx ? idx[normalizeCote(cote)] : null;
 
   const digitRunIdx = catalogDigitRunIndexByGroup[group];
-  const digitRun = !foundBarcode ? extractCoteDigitRun(cote) : null;
+  const digitRun = (!foundBarcode && !batch) ? extractCoteDigitRun(cote) : null;
   const approxBarcode = (!foundBarcode && digitRun && digitRunIdx) ? digitRunIdx[digitRun] : null;
 
+  let status;
   if(foundBarcode){
     handleScan(foundBarcode, false, { sansCodeBarre:true });
+    status = 'found';
   } else if(approxBarcode){
     handleScan(approxBarcode, false, { sansCodeBarre:true, coteApprox:true });
+    status = 'approx';
   } else {
+    status = 'absent';
     const fields = locFieldsOf(loc);
+    const key = normalizeCote(cote);
+    const prev = noBarcodeCotes[key];
+    // Le livre est physiquement là sans être catalogué : il compte dans
+    // l'estimation « non catalogués » de l'étagère (rouge sur le plan).
+    // `nonCat:true` sur le record marque ce +1, pour ne le retirer qu'à bon
+    // escient (déplacement, suppression) — les cotes saisies avant cette
+    // règle n'ont rien ajouté. Même cote ressaisie au même endroit : pas de
+    // double comptage.
+    const counts = loc.reserve !== 'horsreserve';
+    const sameSlot = prev && prev.nonCat && nonCatKey(prev) === nonCatKey(fields);
     const record = { cote, travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() };
-    noBarcodeCotes[normalizeCote(cote)] = record;
+    if(counts) record.nonCat = true;
+    if(!sameSlot){
+      if(prev && prev.nonCat) adjustNonCatAt(prev, -1);
+      if(counts) adjustNonCatAt(fields, +1);
+      updateNonCatInput();
+      buildMiniPlan();
+    }
+    noBarcodeCotes[key] = record;
     saveNoBarcodeCotes();
-    queuePatch({ type:'noBarcode', key:normalizeCote(cote), record });
-    showNoBarcodeFeedback(record);
-    beepError();
-    updateStats();
+    queuePatch({ type:'noBarcode', key, record });
+    if(!batch){
+      showNoBarcodeFeedback(record);
+      renderHereLog();
+      beepError();
+      updateStats();
+    }
   }
-  document.getElementById('nobarcode-input').value = '';
-  document.getElementById('nobarcode-input').focus();
+  if(!batch){
+    document.getElementById('nobarcode-input').value = '';
+    document.getElementById('nobarcode-input').focus();
+  }
+  return status;
+}
+
+// Cote suivante : +1 sur le DERNIER groupe de chiffres, zéros de tête
+// conservés (« 13466 » → « 13467 », « 13466-2 » → « 13466-3 », « 0099 » →
+// « 0100 »). null si la cote ne contient aucun chiffre.
+function nextCote(cote){
+  const m = /^(.*?)(\d+)(\D*)$/.exec(cote || '');
+  if(!m) return null;
+  const n = String(BigInt(m[2]) + 1n).padStart(m[2].length, '0');
+  return m[1] + n + m[3];
+}
+
+// Bouton « Suivante » : propose la cote qui suit la dernière saisie (pour une
+// plage de tomes, la cote de base qui suit : 13466 -1 à -5 → 13467), à
+// enregistrer d'un clic sur l'étagère sélectionnée à ce moment-là.
+let nbcNext = null;
+function setNoBarcodeNext(lastCote){
+  const btn = document.getElementById('nobarcode-next');
+  nbcNext = nextCote(lastCote);
+  btn.hidden = !nbcNext;
+  if(nbcNext) btn.textContent = `＋ Suivante : ${nbcNext}`;
+}
+
+// Saisie du champ : une cote seule, ou une plage de tomes « cote-de … cote-à »
+// si les deux bornes sont remplies.
+function submitNoBarcode(coteRaw){
+  const input = document.getElementById('nobarcode-input');
+  const fromEl = document.getElementById('nobarcode-tome-from');
+  const toEl = document.getElementById('nobarcode-tome-to');
+  const base = (coteRaw||'').trim();
+  if(!base) return;
+  const from = parseInt(fromEl.value, 10), to = parseInt(toEl.value, 10);
+  if(isNaN(from) && isNaN(to)){
+    handleNoBarcodeCote(base);
+    setNoBarcodeNext(base);
+    return;
+  }
+  if(isNaN(from) || isNaN(to) || from < 0 || to < from || to - from >= 200){
+    rpUI.toast('Tomes : indiquez un premier et un dernier tome (200 au plus).', { type:'error' });
+    (isNaN(from) ? fromEl : toEl).focus();
+    return;
+  }
+  const res = { found:0, approx:0, absent:0 };
+  for(let t = from; t <= to; t++){
+    const s = handleNoBarcodeCote(`${base}-${t}`, { batch:true });
+    if(s) res[s]++;
+  }
+  const n = to - from + 1;
+  const fields = locFieldsOf(loc);
+  if(res.absent){
+    renderFeedbackCard(document.getElementById('feedback'), {
+      state:'unknown', verb:`${n} tome${n>1?'s':''} saisi${n>1?'s':''}`,
+      record:{ cote:`${base}-${from} à ${base}-${to}`, titre:'', travee:fields.travee, colonne:fields.colonne, etage:fields.etage, ts:Date.now() },
+      hideBarcode:true,
+      extra:`<div class="fb-note">${res.absent} absent${res.absent>1?'s':''} du catalogue : ajouté${res.absent>1?'s':''} à « Mauvais numéro / code-barre absent »${loc.reserve!=='horsreserve' ? ' et compté'+(res.absent>1?'s':'')+' comme non catalogué'+(res.absent>1?'s':'')+' sur cet emplacement' : ''}.${res.found ? ` ${res.found} trouvé${res.found>1?'s':''} au catalogue et récolé${res.found>1?'s':''}.` : ''}</div>`
+    });
+    beepError();
+  }
+  // (si tous ont été trouvés, handleScan() a déjà affiché et bipé le dernier)
+  renderHereLog(); updateStats(); buildMiniPlan(); updateNonCatInput();
+  input.value = ''; fromEl.value = ''; toEl.value = '';
+  input.focus();
+  setNoBarcodeNext(base);
 }
 function showNoBarcodeFeedback(record){
   const fb = document.getElementById('feedback');
   renderFeedbackCard(fb, {
     state:'unknown', verb:'Cote absente du catalogue',
     record:Object.assign({ titre:'', ts:record.ts }, record), hideBarcode:true,
-    extra:`<div class="fb-note">Ajouté à la liste « Mauvais numéro / code-barre absent » — pas compté comme récolé.</div>`
+    extra:`<div class="fb-note">Ajouté à la liste « Mauvais numéro / code-barre absent »${record.nonCat ? ' et compté comme livre non catalogué sur cet emplacement' : ''}.</div>`
   });
 }
 document.getElementById('nobarcode-save').addEventListener('click', ()=>{
-  handleNoBarcodeCote(document.getElementById('nobarcode-input').value);
+  submitNoBarcode(document.getElementById('nobarcode-input').value);
 });
-document.getElementById('nobarcode-input').addEventListener('keydown', e=>{
-  if(e.key==='Enter'){ e.preventDefault(); handleNoBarcodeCote(document.getElementById('nobarcode-input').value); }
+['nobarcode-input','nobarcode-tome-from','nobarcode-tome-to'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); submitNoBarcode(document.getElementById('nobarcode-input').value); }
+  });
+});
+document.getElementById('nobarcode-next').addEventListener('click', ()=>{
+  if(nbcNext) submitNoBarcode(nbcNext);
 });
 
 /* ════════════ SCAN "NON RANGÉ" (exemplaire retrouvé hors réserve) ════════════
@@ -2919,59 +3008,24 @@ function showHorsReserveFeedback(record, unknown){
 /* ════════════ NON CATALOGUÉS (mode "Catalogage") ════════════ */
 function nonCatKey(fields){ return `${fields.travee}|${fields.colonne}|${fields.etage}`; }
 
-function currentNonCatCount(){
-  const rec = nonCat[nonCatKey(locFieldsOf(loc))];
-  return rec ? rec.count : 0;
-}
-
-function updateNonCatInput(){
-  noncatInput.value = currentNonCatCount();
-}
-
-function saveNonCatCount(){
-  const fields = locFieldsOf(loc);
+// Ajoute delta à l'estimation « non catalogués » d'un emplacement (supprimée
+// si elle retombe à 0) et la synchronise — utilisé par les cotes sans
+// code-barre absentes du catalogue (handleNoBarcodeCote).
+function adjustNonCatAt(fields, delta){
   const key = nonCatKey(fields);
-  let count = parseInt(noncatInput.value, 10);
-  if(isNaN(count) || count < 0) count = 0;
-  noncatInput.value = count;
+  const count = Math.max(0, (nonCat[key] ? nonCat[key].count : 0) + delta);
   if(count === 0) delete nonCat[key];
   else nonCat[key] = { travee:fields.travee, colonne:fields.colonne, etage:fields.etage, count, ts:Date.now() };
-  beep(880, .3);
   saveNonCat();
-  showNonCatFeedback(count);
-  updateStats();
-  buildMiniPlan();
   queuePatch({type:'nonCat', key, record: nonCat[key] || null});
 }
 
-function showNonCatFeedback(count){
-  const fb = document.getElementById('noncat-feedback');
-  fb.className = 'rc-ncfb show';
-  fb.textContent = count > 0
-    ? `✓ Enregistré — ${count} livre${count>1?'s':''} non catalogué${count>1?'s':''} estimé${count>1?'s':''} sur cet emplacement.`
-    : '✓ Enregistré — emplacement marqué sans livre non catalogué.';
-}
-
-// Enregistrement automatique dès que la valeur change, avec un petit délai
-// pour ne pas envoyer une requête réseau à chaque clic quand on incrémente
-// plusieurs fois de suite (voir queuePatch/flushPendingSync plus haut).
-let noncatSaveTimer = null;
-function scheduleNonCatSave(){
-  clearTimeout(noncatSaveTimer);
-  noncatSaveTimer = setTimeout(saveNonCatCount, 600);
-}
-noncatInput.addEventListener('input', scheduleNonCatSave);
-noncatInput.addEventListener('keydown', e=>{
-  if(e.key==='Enter'){ e.preventDefault(); clearTimeout(noncatSaveTimer); saveNonCatCount(); }
-});
-document.getElementById('noncat-minus').addEventListener('click', ()=>{
-  noncatInput.value = Math.max(0, (parseInt(noncatInput.value,10)||0) - 1);
-  scheduleNonCatSave();
-});
-document.getElementById('noncat-plus').addEventListener('click', ()=>{
-  noncatInput.value = (parseInt(noncatInput.value,10)||0) + 1;
-  scheduleNonCatSave();
-});
+// Le compteur manuel « Non catalogués » a été retiré de la page le
+// 2026-10-20 (demande explicite) : remplacé par la saisie des cotes de
+// « Livre sans code-barre », qui ajoute +1 par cote (adjustNonCatAt()). Les
+// estimations déjà saisies restent dans nonCat et sur le plan. Fonction
+// gardée vide : elle est appelée à chaque changement d'emplacement/synchro.
+function updateNonCatInput(){}
 
 /* ════════════ ÉTAGÈRES VIDES / NON RANGÉES ════════════
    Deux marquages mutuellement exclusifs sur un même emplacement (même clé
@@ -3389,7 +3443,13 @@ function renderHereLog(){
   // détruire (le sondage de 45 s rappelle ce rendu).
   if(tbody.querySelector('.pro-confirm')) return;
   const fields = locFieldsOf(loc);
-  const allHere = Object.values(scans).filter(r=>r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage)
+  const atHere = r => r.travee===fields.travee && r.colonne===fields.colonne && r.etage===fields.etage;
+  // Les cotes « Livre sans code-barre » absentes du catalogue figurent aussi
+  // ici (pas de code-barre : marquées `_nbcKey`), pour pouvoir annuler une
+  // erreur de saisie.
+  const nbcHere = Object.entries(noBarcodeCotes).filter(([,r])=>atHere(r))
+    .map(([k,r])=>Object.assign({}, r, { _nbcKey:k }));
+  const allHere = Object.values(scans).filter(atHere).concat(nbcHere)
     .sort((a,b)=>b.ts-a.ts);
   const here = allHere.slice(0, HERE_LOG_LINES);
   document.getElementById('here-count').textContent = allHere.length
@@ -3399,7 +3459,14 @@ function renderHereLog(){
     tbody.innerHTML = '<tr><td class="log-empty" colspan="5">Aucun scan sur cet emplacement pour l\'instant.</td></tr>';
     return;
   }
-  tbody.innerHTML = here.map(r=>`
+  tbody.innerHTML = here.map(r=> r._nbcKey ? `
+    <tr>
+      <td class="pro-mono pro-muted">${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
+      <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
+      <td class="rc-ell pro-muted">(sans code-barre, absent du catalogue)</td>
+      <td class="pro-mono pro-muted">📎</td>
+      <td class="is-act"><button type="button" class="pro-btn pro-btn--secondary pro-btn--sm log-del-nbc" data-key="${esc(r._nbcKey)}" aria-label="Supprimer la cote ${esc(r.cote)}">Annuler</button></td>
+    </tr>` : `
     <tr>
       <td class="pro-mono pro-muted">${new Date(r.ts).toLocaleTimeString('fr-FR')}</td>
       <td class="pro-cote-cell">${esc(r.cote)||'—'}</td>
@@ -3453,7 +3520,33 @@ function confirmDeleteScan(btn){
 document.addEventListener('click', e=>{
   const b = e.target.closest('.log-del');
   if(b) confirmDeleteScan(b);
+  const n = e.target.closest('.log-del-nbc');
+  if(n) confirmDeleteNoBarcodeCote(n);
 });
+
+// Suppression d'une cote « Livre sans code-barre » absente du catalogue :
+// la retire de la liste « Mauvais numéro / code-barre absent » et rend le +1
+// qu'elle avait ajouté aux non catalogués de son étagère.
+function confirmDeleteNoBarcodeCote(btn){
+  const key = btn.dataset.key;
+  const r = noBarcodeCotes[key];
+  if(!r) return;
+  rpUI.confirmInline(btn.closest('tr'), `Supprimer la cote « ${r.cote} » ? Elle est retirée du récolement, pour tous les postes.`,
+    { okLabel:'Supprimer', danger:true }).then(ok=>{
+    if(ok) deleteNoBarcodeCote(key);
+    else if(activeTab==='saisie') scanInput.focus({preventScroll:true});
+  });
+}
+function deleteNoBarcodeCote(key){
+  const r = noBarcodeCotes[key];
+  if(!r) return;
+  delete noBarcodeCotes[key];
+  saveNoBarcodeCotes();
+  queuePatch({ type:'noBarcode', key, record:null });
+  if(r.nonCat) adjustNonCatAt(r, -1);
+  updateNonCatInput(); renderHereLog(); updateStats(); buildMiniPlan();
+  if(activeTab==='saisie') scanInput.focus({preventScroll:true});
+}
 
 function deleteScan(barcode){
   delete scans[barcode];

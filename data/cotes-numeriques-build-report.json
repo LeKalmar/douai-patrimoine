@@ -1,21 +1,21 @@
 {
-  "generatedAt": "2026-10-10T09:01:46.523Z",
+  "generatedAt": "2026-10-21T09:37:48.074Z",
   "partialUpdates": {
     "files": [
       {
-        "file": "ExportSyracuse_Exemplaire_20261009_151914.xml",
-        "items": 4361
+        "file": "ExportSyracuse_Exemplaire_20261021_113611.xml",
+        "items": 546
       }
     ],
-    "replaced": 4105,
-    "added": 256
+    "replaced": 174,
+    "added": 372
   },
-  "durationMs": 42940,
+  "durationMs": 32784,
   "stats": {
-    "totalItems": 291278,
-    "kept": 53700,
-    "excluded": 237578,
-    "douaisienneExcluded": 8789
+    "totalItems": 291394,
+    "kept": 53703,
+    "excluded": 237609,
+    "douaisienneExcluded": 8793
   },
   "excludedSample": [
     "010566 LE1",

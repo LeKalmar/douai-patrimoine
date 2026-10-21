@@ -232,6 +232,7 @@
     .notice-barcode { font-family: var(--pro-font-mono); font-size: .66rem; color: var(--pro-texte-faible); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
     .notice-live { font-size: .62rem; padding: 1px 5px; background: var(--pro-bleu-pale); color: var(--pro-bleu); white-space: nowrap; align-self: flex-start; margin-top: 2px; flex-shrink: 0; }
     .notice-manuel { color: #8a5f00; font-weight: 700; }
+    .notice-reg { font-size: .6rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #0b6e61; border: 1px solid #0f9d8a; padding: 0 4px; margin-right: 4px; }
     .notice-more { font-size: .75rem; color: var(--pro-texte-faible); text-align: center; padding: .5rem; font-style: italic; }
     .placeholder-msg { font-size: .85rem; color: var(--pro-texte-doux); padding: .5rem 0; font-style: italic; }
 
@@ -433,6 +434,9 @@ document.getElementById('logout-btn').addEventListener('click', function(){
 
 /* ════════════ ÉTAT ════════════ */
 let CNT={}, CNT_MANUEL={}, DET={}, VIDE={}, NONCAT={}, NONRANGE={}, LASTSHELF={};
+// CNT_REG : documents sans code-barre placés d'après les registres Excel
+// (manuscrits, armoires en bois, cartes en tiroirs) — voir loadRegistres().
+let CNT_REG={}, REGISTRES=null, LAST_REC_DATA=null;
 // SLOT_TS : dernier passage du récolement sur un emplacement (scan, comptage
 // de non-catalogués, marquage vide/non rangé) — calque « Fraîcheur ».
 // ANOM : scans signalés à vérifier sur un emplacement — calque « Anomalies ».
@@ -488,16 +492,19 @@ let activeLayer=(function(){ const s=lsGet('rp_plan_layer'); return LAYERS[s] ? 
 // Palette du plan : mêmes valeurs que --pro-plan-* (css/admin.css, validée
 // daltonisme). En hexadécimal ici car les vignettes sont dessinées sur
 // <canvas>, qui ne lit pas les variables CSS.
-const PLAN={cat:'#1A1E99', manuel:'#F9A825', noncat:'#c62828', nonrange:'#8E24AA',
+const PLAN={cat:'#1A1E99', manuel:'#F9A825', registre:'#0f9d8a', noncat:'#c62828', nonrange:'#8E24AA',
             vide:'#c8e6c9', videBrd:'#388e3c', unknown:'#e0e0e0', unknownBrd:'#bdbdbd'};
-const STATE_ORDER=['cat','manuel','noncat','nonrange','vide','unknown'];
-const STATE_LABEL={cat:'Catalogué', manuel:'Exemplarisé rapide', noncat:'Non catalogué (estimé)',
+const STATE_ORDER=['cat','manuel','registre','noncat','nonrange','vide','unknown'];
+const STATE_LABEL={cat:'Catalogué', manuel:'Exemplarisé rapide', registre:'Registre (sans code-barre)', noncat:'Non catalogué (estimé)',
                    nonrange:'Non rangé', vide:'Vide confirmé', unknown:'Non inventorié'};
 // Non catalogué et non rangé portent en plus un motif (point, hachures) :
 // le statut ne repose pas sur la seule teinte.
 const STATUT_PAINT={
   cat:{bg:PLAN.cat, flat:PLAN.cat},
   manuel:{bg:PLAN.manuel, flat:PLAN.manuel},
+  // Registre : sarcelle (paire validée avec le bleu, voir rotobib.html) et
+  // fines rayures verticales, pour ne pas reposer sur la seule teinte.
+  registre:{bg:`repeating-linear-gradient(90deg,${PLAN.registre} 0 3px,#3fb7a6 3px 4px)`, flat:PLAN.registre},
   noncat:{bg:`radial-gradient(circle at center,rgba(255,255,255,.9) 1.4px,transparent 1.9px),${PLAN.noncat}`, flat:PLAN.noncat},
   nonrange:{bg:`repeating-linear-gradient(135deg,${PLAN.nonrange} 0 2px,#B168C4 2px 4px)`, flat:PLAN.nonrange},
   vide:{bg:PLAN.vide, shadow:`inset 0 0 0 1px ${PLAN.videBrd}`, flat:PLAN.vide, border:PLAN.videBrd},
@@ -554,6 +561,7 @@ function fmtTime(ts){ const d=new Date(ts); return `${pad2(d.getHours())}:${pad2
    Les anciens exports (simple tableau de scans, ou sans lastShelves) restent
    lisibles. */
 function applyRecolementData(data){
+  LAST_REC_DATA=data;
   const rows = Array.isArray(data) ? data : (data.scans||[]);
   const videRows = Array.isArray(data) ? [] : (data.videShelves||[]);
   const nonCatRows = Array.isArray(data) ? [] : (data.nonCatalogues||[]);
@@ -693,12 +701,45 @@ function parseRecolement(rows){
       DET[key].push(n);
     }
   });
+  applyRegistres();
   csvLoaded=true;
   document.getElementById('csv-loader').style.display='none';
   // refreshPlan() plutôt que buildPlan() : au premier appel le plan n'existe
   // pas encore et il bascule de lui-même sur une construction complète ;
   // aux sondages suivants (toutes les 45 s) il se contente de repeindre.
   refreshPlan();
+}
+
+/* ════════════ REGISTRES (documents sans code-barre) ════════════
+   data/registres-localisation.json (npm run build:registres, depuis les
+   classeurs Excel de excel/) : manuscrits, contenu des armoires en bois,
+   cartes en armoire à tiroirs, avec leur emplacement relevé à la main. Ils
+   n'ont pas de code-barre, donc jamais de scan : on les ajoute ici aux
+   notices de chaque étagère, et on les retire de l'estimation « non
+   catalogués » de la même étagère (l'équipe les y avait comptés avant de
+   pouvoir les identifier) — même logique que le décrément fait par
+   exemplarisation.html, mais calculée à l'affichage, sans toucher à R2. */
+const REG_FONDS={mss:'Manuscrits', armoire:'Objets (armoire)', carte:'Cartes'};
+function loadRegistres(){
+  fetch('data/registres-localisation.json')
+    .then(r=>{ if(!r.ok) throw new Error('missing'); return r.json(); })
+    .then(data=>{ REGISTRES=(data&&data.items)||[]; if(LAST_REC_DATA) applyRecolementData(LAST_REC_DATA); })
+    .catch(()=>{ REGISTRES=[]; });
+}
+function applyRegistres(){
+  CNT_REG={};
+  (REGISTRES||[]).forEach(it=>{
+    if(!it.t || !it.c || !it.e) return;
+    const key=`${it.t}|${it.c}|${it.e}`;
+    (DET[key] || (DET[key]=[])).push({c:it.cote||'', t:it.titre||'', a:it.auteur||'', f:REG_FONDS[it.s]||'Registre',
+      e:[it.date, it.info||it.desc].filter(Boolean).join(' · ').slice(0,160), b:'', r:it.s, ts:0});
+    CNT_REG[key]=(CNT_REG[key]||0)+1;
+  });
+  for(const key in CNT_REG){
+    if(!NONCAT[key]) continue;
+    const left=NONCAT[key]-CNT_REG[key];
+    if(left>0) NONCAT[key]=left; else delete NONCAT[key];
+  }
 }
 
 /* ════════════ DÉCISIONS DE DÉSHERBAGE (calque) ════════════
@@ -739,6 +780,7 @@ function deshOfSlot(key){
 /* ════════════ HELPERS ════════════ */
 function cnt(t,c,e){ return CNT[`${t}|${c}|${e}`]||0; }
 function cntManuel(t,c,e){ return CNT_MANUEL[`${t}|${c}|${e}`]||0; }
+function cntReg(t,c,e){ return CNT_REG[`${t}|${c}|${e}`]||0; }
 function nc(t,c,e){ return NONCAT[`${t}|${c}|${e}`]||0; }
 /* GEO_COLS ne contient une travée que si au moins une donnée l'a mentionnée
    (voir rebuildGeometryIndex) — c'est exactement la question que posait
@@ -758,6 +800,7 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function slotState(t,c,e){
   if(cnt(t,c,e)>0) return 'cat';
   if(cntManuel(t,c,e)>0) return 'manuel';
+  if(cntReg(t,c,e)>0) return 'registre';
   if(nc(t,c,e)>0) return 'noncat';
   if(NONRANGE[`${t}|${c}|${e}`]) return 'nonrange';
   if(VIDE[`${t}|${c}|${e}`]) return 'vide';
@@ -817,10 +860,11 @@ function slotPaint(layer,tid,col,e){
     stops.push(`${DEC_TODO} ${top}%`,`${DEC_TODO} 100%`);
     return {bg:`linear-gradient(to top,${stops.join(',')})`, flat:DEC_TODO, stack};
   }
-  if(state==='cat' || state==='manuel'){
+  if(state==='cat' || state==='manuel' || state==='registre'){
     const g = gradientOf([
       {color:PLAN.cat, count:cnt(tid,col,e)},
       {color:PLAN.manuel, count:cntManuel(tid,col,e)},
+      {color:PLAN.registre, count:cntReg(tid,col,e)},
       {color:PLAN.noncat, count:nc(tid,col,e)},
     ]);
     if(g) return {bg:g, flat:PLAN[state]};
@@ -828,7 +872,7 @@ function slotPaint(layer,tid,col,e){
   return STATUT_PAINT[state];
 }
 function filterOpacity(state){
-  if(filter==='occ'&&!(state==='cat'||state==='noncat'||state==='nonrange')) return '.15';
+  if(filter==='occ'&&!(state==='cat'||state==='registre'||state==='noncat'||state==='nonrange')) return '.15';
   if(filter==='free'&&state!=='vide') return '.15';
   return '1';
 }
@@ -839,6 +883,7 @@ function swatch(paint,size){
 function stateLabel(state){
   if(state==='cat') return 'catalogué';
   if(state==='manuel') return 'exemplarisé rapide (non catalogué)';
+  if(state==='registre') return 'registre (sans code-barre)';
   if(state==='noncat') return 'non catalogué (estimé)';
   if(state==='nonrange') return 'non rangé';
   if(state==='vide') return 'vide (confirmé)';
@@ -848,12 +893,13 @@ function stateLabel(state){
    identifier un emplacement sans avoir à cliquer dessus. */
 function slotTitle(tid,col,e){
   const state=slotState(tid,col,e);
-  const n=cnt(tid,col,e), mCount=cntManuel(tid,col,e), ncCount=nc(tid,col,e);
+  const n=cnt(tid,col,e), mCount=cntManuel(tid,col,e), rCount=cntReg(tid,col,e), ncCount=nc(tid,col,e);
   let detail;
-  if(state==='cat' || state==='manuel'){
+  if(state==='cat' || state==='manuel' || state==='registre'){
     const parts=[];
     if(n>0) parts.push(`${n} catalogué(s)`);
     if(mCount>0) parts.push(`${mCount} exemplarisé(s) rapidement`);
+    if(rCount>0) parts.push(`${rCount} au registre (sans code-barre)`);
     if(ncCount>0) parts.push(`${ncCount} non catalogué(s)`);
     detail = parts.join(' + ');
   }
@@ -873,7 +919,7 @@ function traveeOccupancy(tid,cols){
     for(let e=1;e<=maxE;e++){
       total++;
       const state=slotState(tid,col,String(e));
-      if(state==='cat'||state==='manuel'||state==='noncat'||state==='nonrange') filled++;
+      if(state==='cat'||state==='manuel'||state==='registre'||state==='noncat'||state==='nonrange') filled++;
     }
   });
   return total ? Math.round(filled/total*100) : 0;
@@ -884,7 +930,7 @@ function traveeOccupancy(tid,cols){
    par local, aux vignettes des calques et au panneau de détail. */
 function statsOf(defs){
   const s={total:0, treated:0, books:0, notices:0, anomCells:0, fresh:0, decided:0, lastTs:0,
-           counts:{cat:0,manuel:0,noncat:0,nonrange:0,vide:0,unknown:0}};
+           counts:{cat:0,manuel:0,registre:0,noncat:0,nonrange:0,vide:0,unknown:0}};
   const now=Date.now();
   defs.forEach(d=>{
     colsOf(d).forEach(col=>{
@@ -949,7 +995,7 @@ function rebuildGeometryIndex(){
       if(!(k in GEO_MAXET) || n > GEO_MAXET[k]) GEO_MAXET[k] = n;
     }
   };
-  [CNT, CNT_MANUEL, VIDE, NONCAT, NONRANGE].forEach(dict=>{
+  [CNT, CNT_MANUEL, CNT_REG, VIDE, NONCAT, NONRANGE].forEach(dict=>{
     for(const k in dict){ const [t,c,e] = k.split('|'); note(t,c,e); }
   });
   // LASTSHELF est keyé "tid|colonne" (propriété de la colonne, pas d'un
@@ -1735,7 +1781,7 @@ function noticeRows(notices,sort){
     return `
     <div class="notice-row${n.b&&n.b===hlBarcode?' hl':''}">
       <span class="notice-cote">${esc(n.c)}</span>
-      <span class="notice-titre">${n.m?`<span class="notice-manuel" title="Exemplarisé rapidement, pas encore catalogué dans Syracuse">⚡</span> `:''}${esc(n.t)}${n._loc?`<span class="notice-loc">${esc(n._loc)}</span>`:''}${n.e?`<br><span class="notice-etat">${esc(n.e)}</span>`:''}</span>
+      <span class="notice-titre">${n.r?`<span class="notice-reg" title="Document sans code-barre, placé d'après le registre Excel de l'équipe">registre</span>`:''}${n.m?`<span class="notice-manuel" title="Exemplarisé rapidement, pas encore catalogué dans Syracuse">⚡</span> `:''}${esc(n.t)}${n._loc?`<span class="notice-loc">${esc(n._loc)}</span>`:''}${n.e?`<br><span class="notice-etat">${esc(n.e)}</span>`:''}</span>
       <span class="notice-auteur" title="${esc(n.a)}">${esc(n.a)}</span>
       <span class="notice-barcode">${esc(n.b)}</span>
       <span class="notice-fonds">${esc(n.f)}</span>
@@ -1890,6 +1936,7 @@ renderTabs();
 renderLayerButtons();
 renderLegends();
 renderDetail();
+loadRegistres();
 loadRecolement();
 loadDesherbage();
 loadSyracuseOverlay();

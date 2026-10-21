@@ -126,7 +126,10 @@
   .tv-map { flex: 1.25; min-height: 46mm; display: flex; flex-direction: column; min-width: 0; }
   .map { flex: 1; display: grid; gap: .7mm; min-height: 0; }
   .map__colh { text-align: center; font-family: 'Moret', Georgia, serif; font-weight: 700; font-size: 10.5pt; line-height: 1; padding-bottom: .4mm; }
-  .map__rowh { font-size: 6.5pt; color: var(--mid); display: flex; align-items: center; justify-content: flex-end; padding-right: .6mm; }
+  /* Chaque colonne remplit toute la hauteur : une colonne plus courte a des
+     étagères plus hautes, comme sur le plan (reserve.html). */
+  .map__col { display: flex; flex-direction: column; gap: .7mm; min-height: 0; }
+  .map__col .cell { flex: 1 1 0; }
   .map__foot { text-align: center; font-size: 6.5pt; color: var(--mid); line-height: 1; padding-top: .3mm; white-space: nowrap; }
   .cell { position: relative; border: .5pt solid var(--ink); display: flex; overflow: hidden; min-height: 0; }
   .cell__seg { height: 100%; }
@@ -143,6 +146,8 @@
       repeating-linear-gradient(45deg, transparent 0 .9mm, #111 .9mm 1.2mm),
       repeating-linear-gradient(-45deg, #fff 0 .9mm, #111 .9mm 1.2mm); }
   .p-vide { background: #fff; }
+  /* Registre (documents sans code-barre placés d'après les classeurs Excel) : points. */
+  .p-registre { background: radial-gradient(circle, #111 .32mm, transparent .38mm) 0 0 / 1.15mm 1.15mm, #fff; }
   .p-unknown { background: #ececec; }
   .cell.st-unknown { border: .5pt dashed #9a9a9a; }
   .cell.st-vide .cell__n span { color: var(--mid); font-weight: 400; }
@@ -164,6 +169,28 @@
   .tv-doyen .tv-h { margin-bottom: .8mm; }
 
   .tv-note { font-size: 8pt; color: var(--mid); font-style: italic; }
+
+  /* ── Fiche d'un meuble (armoire en bois, colonne d'armoire à tiroirs) ──
+     Une ligne par niveau/tiroir : la case de statut (même trame que la carte
+     des travées) puis ce qu'il contient. */
+  .mb { padding: 0 !important; }
+  .mb-head { display: flex; align-items: center; gap: 9mm; margin-bottom: 4mm; }
+  .mb-name { flex: none; line-height: .9; }
+  .mb-name .tv-num { font-size: 104pt; }
+  .mb-sub { font-size: 8.5pt; color: var(--mid); margin-top: 1.5mm; letter-spacing: .04em; }
+  .mb-kpis { flex: 1; display: flex; border-top: .6pt solid var(--ink); border-bottom: .6pt solid var(--ink); align-self: center; }
+  .mb-kpis .tv-kpi { flex: 1; }
+  .mb-head .tv-fonds { width: 62mm; }
+  .mb-grid { flex: 1; display: grid; gap: 0 8mm; min-height: 0; }
+  .mb-col { display: flex; flex-direction: column; min-height: 0; border-top: 1.2pt solid var(--ink); }
+  .mb-row { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: 12mm 1fr auto; gap: 0 3mm; align-items: center;
+            border-bottom: .4pt solid var(--rule); overflow: hidden; padding: .4mm 0; }
+  .mb-row .cell { height: 100%; max-height: 14mm; }
+  .mb-row .cell__n { font-size: 8pt; }
+  .mb-txt { font-size: 7.6pt; line-height: 1.28; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--clamp, 2); }
+  .mb-txt i { color: var(--mid); }
+  .mb-txt .muted { color: var(--soft); font-style: italic; }
+  .mb-n { font-size: 8pt; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   /* ── Impression : seules les feuilles, une par page ── */
   @page { size: A4 landscape; margin: 0; }
@@ -233,7 +260,22 @@ document.getElementById('logout-btn').addEventListener('click', function(){
 
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtN = n => Number(n).toLocaleString('fr-FR');
-const LOCALS = RESERVES.filter(r => r.id !== 'horsreserve');
+/* Les armoires sont des pseudo-travées du récolement (une colonne = un
+   meuble) : une feuille par colonne, identifiée « ARMOIRE:A », « TIROIR:B ». */
+const MEUBLES = {
+  armoires: { base:'ARMOIRE', label:'Armoires en bois', def:EMPLACEMENTS_ARMOIRE[0] },
+  tiroirs:  { base:'TIROIR',  label:'Armoires à tiroirs', def:EMPLACEMENTS_TIROIR[0] },
+};
+const LOCALS = [
+  ...RESERVES.filter(r => r.id !== 'horsreserve'),
+  ...Object.entries(MEUBLES).map(([id, m]) => ({ id, label: m.label, meuble: m })),
+];
+const isMeubleId = id => typeof id === 'string' && id.includes(':');
+function idsOf(localId){
+  const m = MEUBLES[localId];
+  if(m) return colLetters(m.def).map(c => m.base + ':' + c);
+  return traveesOfReserve(localId).map(t => t.id);
+}
 const PAIRS_KEY = 'rp_signaletique_pairs';
 const LOCAL_KEY = 'rp_signaletique_local';
 
@@ -253,7 +295,7 @@ function romanValue(s){
   return n;
 }
 function defaultSheets(localId, ids){
-  if(localId === 'rayons') return ids.map(id => [id, null]);
+  if(localId === 'rayons' || MEUBLES[localId]) return ids.map(id => [id, null]);
   const ltr = localId === 'patrimoniale';
   const out = [];
   for(let i=0;i<ids.length;i++){
@@ -268,7 +310,7 @@ function defaultSheets(localId, ids){
 function loadPairs(){ try { return JSON.parse(localStorage.getItem(PAIRS_KEY)) || {}; } catch(e){ return {}; } }
 function savePairs(p){ try { localStorage.setItem(PAIRS_KEY, JSON.stringify(p)); } catch(e){} }
 function sheetsFor(localId){
-  const ids = traveesOfReserve(localId).map(t=>t.id);
+  const ids = idsOf(localId);
   const saved = loadPairs()[localId];
   if(Array.isArray(saved)){
     // On ne garde un réglage mémorisé que s'il couvre exactement les travées
@@ -280,6 +322,7 @@ function sheetsFor(localId){
 }
 
 /* ── Données ── */
+let REG = [];            // documents sans code-barre placés d'après les registres Excel
 let REC = null;          // état du récolement
 let INV = null;          // code-barre → notice (réserve uniquement)
 let invPromise = null;
@@ -297,6 +340,22 @@ async function loadRecolement(){
     return await r.json();
   }
 }
+/* data/registres-localisation.json (npm run build:registres) : manuscrits,
+   contenu des armoires en bois, cartes en tiroirs. Absent = rien à ajouter. */
+async function loadRegistres(){
+  try { const r = await fetch('data/registres-localisation.json'); if(r.ok) REG = ((await r.json()).items) || []; } catch(e){}
+}
+const regOf = (tid, col) => REG.filter(it => it.t === tid && (col == null || it.c === col));
+/* Date d'un document du registre : année (1249, 1815) ou siècle (« XIVe »). */
+function regDate(d){
+  const s = String(d||'');
+  let m = s.match(/\b(1[0-9]\d\d|20[0-2]\d|[5-9]\d\d)\b/);
+  if(m) return { k: +m[1], label: m[1] };
+  m = s.match(/^\s*([IVXL]+)\s*e\b/i);
+  if(m){ const c = romanValue(m[1].toUpperCase()); if(c) return { k: (c-1)*100 + 50, label: roman(c) + 'ᵉ s.' }; }
+  return null;
+}
+
 function loadInventaire(){
   if(!invPromise) invPromise = fetch('data/inventaire.json').then(r=>r.json()).then(rows=>{
     const m = new Map();
@@ -321,6 +380,12 @@ function roman(n){
   let s=''; for(const [v,r] of t) while(n>=v){ s+=r; n-=v; } return s;
 }
 function displayName(id){
+  if(isMeubleId(id)){
+    // Armoires en bois numérotées 1, 2… (colonne A du récolement = armoire 1) ;
+    // armoires à tiroirs désignées par leur lettre.
+    const [base, col] = id.split(':');
+    return base === 'ARMOIRE' ? String(col.charCodeAt(0) - 64) : col;
+  }
   if(isRayonTravee(id)) return rayonLabelOf(id);
   return id.replace(/^(RD|M2|M5|M6)-/, '').replace(/^ALPHA$/,'α').replace(/^BETA$/,'β').replace(/^DELTA$/,'δ');
 }
@@ -329,7 +394,7 @@ function colLetters(def){ return Array.from({length:def.nbCols}, (_,i)=>String.f
 /* Plage de cotes robuste : tri naturel, et sur une colonne bien remplie on
    écarte les 2 % extrêmes (un livre mal rangé ne doit pas fausser le panneau). */
 function coteRange(cotes){
-  const a = cotes.map(c=>String(c||'').trim()).filter(Boolean).sort(compareCotes);
+  const a = cotes.map(c=>String(c||'').trim()).filter(c => c && !/^\[/.test(c)).sort(compareCotes);
   if(!a.length) return null;
   const k = a.length >= 40 ? Math.floor(a.length*0.02) : 0;
   return [shortCote(a[k]), shortCote(a[a.length-1-k])];
@@ -354,23 +419,39 @@ function statsOf(tid){
     const y = isRes ? yearOf(rec, s.cote) : null;
     if(y){
       years.push(y);
-      if(!doyen || y < doyen.y) doyen = { y, titre: (rec && rec['200$a']) || s.titre, auteur: (rec && rec['700$a']) || s.auteur, cote: s.cote };
+      if(!doyen || y < (doyen.k ?? doyen.y)) doyen = { y, k: y, titre: (rec && rec['200$a']) || s.titre, auteur: (rec && rec['700$a']) || s.auteur, cote: s.cote };
     }
     const l = rec && rec._langue;
     if(l && !/^Ind[ée]termin/.test(l)){ const main = l.split(',')[0].replace(/\s*\(.*\)$/,'').trim(); langs[main] = (langs[main]||0)+1; }
   });
-  const nonCat = asList(REC.nonCatalogues).filter(n => n && n.travee === tid).reduce((s,n)=>s+(+n.count||0),0);
+  // Documents des registres : comptés une fois par cote (un manuscrit posé
+  // sur deux étagères reste un manuscrit), datés au siècle s'il le faut.
+  const reg = regOf(tid);
+  const regCotes = new Map();
+  reg.forEach(it => { if(!regCotes.has(it.cote)) regCotes.set(it.cote, it); });
+  const dates = years.map(y => ({ k: y, label: String(y) }));
+  regCotes.forEach(it => {
+    const sf = sousFondsOf(it.cote); fonds[sf] = (fonds[sf]||0)+1;
+    const d = regDate(it.date);
+    if(d){
+      dates.push(d);
+      if(!doyen || d.k < doyen.k) doyen = { k: d.k, y: d.label, titre: it.titre, auteur: it.auteur, cote: it.cote };
+    }
+  });
+  if(doyen && doyen.k == null) doyen.k = +doyen.y;
   const map = shelfMap(tid, def, scans);
+  const nonCat = map.noncat;
   const cols = colLetters(def).map(c => ({ c, n:(byCol[c]||[]).length, range: coteRange((byCol[c]||[]).map(s=>s.cote)) }));
   // Colonnes présentes dans les scans mais hors géométrie (rare) : ajoutées à la fin.
   Object.keys(byCol).filter(c => c && !cols.some(x=>x.c===c)).sort().forEach(c =>
     cols.push({ c, n:byCol[c].length, range: coteRange(byCol[c].map(s=>s.cote)) }));
   years.sort((a,b)=>a-b);
+  dates.sort((a,b)=>a.k-b.k);
   const cent = {};
-  years.forEach(y => { const c = Math.floor((y-1)/100)+1; cent[c] = (cent[c]||0)+1; });
+  dates.forEach(d => { const c = Math.floor((d.k-1)/100)+1; cent[c] = (cent[c]||0)+1; });
   return {
-    def, n: scans.length, nonCat, cols, map, fonds, lastTs, maxEt: Math.max(maxEt, def.maxEt || 0),
-    range: coteRange(scans.map(s=>s.cote)), years, cent, langs, doyen, isRes,
+    def, n: scans.length + regCotes.size, nReg: regCotes.size, nonCat, cols, map, fonds, lastTs, maxEt: Math.max(maxEt, def.maxEt || 0),
+    range: coteRange([...scans.map(s=>s.cote), ...regCotes.keys()]), years, dates, cent, langs, doyen, isRes,
   };
 }
 
@@ -379,6 +460,8 @@ function statsOf(tid){
    correspond à rien est affichée par son préfixe brut (ex. « I-S »).
    Ajouter un fonds = ajouter une ligne. */
 const SOUS_FONDS = [
+  [/^MS\b/,                () => 'Manuscrits'],
+  [/^CAR\+?\s*\d/,          () => 'Cartes'],
   [/^I-?INC\b/,            () => 'Incunables'],
   [/^I-?HOS\b/,            () => 'Hospice'],
   [/^I(N)?-D\b/,           () => 'Impressions douaisiennes'],
@@ -403,20 +486,20 @@ function sousFondsOf(cote){
   const p = c.match(/^[A-Z]+(-[A-Z]+)?/);
   return p ? p[0] : c.slice(0, 8);
 }
-function fondsHtml(s, single){
+function fondsHtml(s, single, title){
   if(!s.n) return '';
   // Pas d'encart si la travée n'est pas rangée par fonds (magasins : cotes
   // numériques ou Dewey) ; les petits préfixes inconnus vont dans « Autres ».
   const all = Object.entries(s.fonds);
   const known = all.filter(([l]) => KNOWN_FONDS.has(l));
-  if(known.reduce((t,[,v])=>t+v,0) < s.n/2) return '';
-  const e = all.filter(([l,v]) => KNOWN_FONDS.has(l) || v >= s.n*0.03).sort((a,b)=>b[1]-a[1]);
+  if(!title && known.reduce((t,[,v])=>t+v,0) < s.n/2) return '';
+  const e = all.filter(([l,v]) => title || KNOWN_FONDS.has(l) || v >= s.n*0.03).sort((a,b)=>b[1]-a[1]);
   const droppedN = s.n - e.reduce((t,[,v])=>t+v,0);
   const max = single ? 6 : 4;
   const rows = e.slice(0, max);
   const rest = e.slice(max).reduce((t,[,v])=>t+v,0) + droppedN;
   if(rest) rows.push(['Autres', rest]);
-  return `<div class="tv-fonds"><p class="tv-h">Fonds</p>${rows.map(([l,v]) => `
+  return `<div class="tv-fonds"><p class="tv-h">${title || 'Fonds'}</p>${rows.map(([l,v]) => `
     <div class="tv-fonds__row"><b>${esc(l)}</b><span>${fmtN(v)}</span>
     <span class="tv-fonds__bar"><i style="width:${(100*v/s.n).toFixed(1)}%"></i></span></div>`).join('')}</div>`;
 }
@@ -429,7 +512,7 @@ function fondsHtml(s, single){
 function shelfMap(tid, def, scans){
   const dedupe = !/^(M\d-|RY-)/.test(tid);
   const cells = {};
-  const cell = (c,e) => cells[c+'|'+e] || (cells[c+'|'+e] = {cat:0, manuel:0, noncat:0, nonrange:false, vide:false, cotes:new Set()});
+  const cell = (c,e) => cells[c+'|'+e] || (cells[c+'|'+e] = {cat:0, manuel:0, reg:0, noncat:0, nonrange:false, vide:false, cotes:new Set()});
   const seenEt = {};
   const see = (c,e) => { e = +e; if(c && e > 0) seenEt[c] = Math.max(seenEt[c]||0, e); return !!c && e > 0; };
   scans.forEach(s => {
@@ -442,6 +525,11 @@ function shelfMap(tid, def, scans){
   mine(REC.nonCatalogues).forEach(r => { if(see(r.colonne, r.etage)) cell(r.colonne, +r.etage).noncat += (+r.count||0); });
   mine(REC.nonRangeShelves).forEach(r => { if(see(r.colonne, r.etage)) cell(r.colonne, +r.etage).nonrange = true; });
   mine(REC.videShelves).forEach(r => { if(see(r.colonne, r.etage)) cell(r.colonne, +r.etage).vide = true; });
+  // Registres : documents identifiés sans code-barre. L'équipe les avait
+  // comptés dans l'estimation « non catalogués » de l'étagère : on les en
+  // retire (même logique que reserve.html, rien n'est modifié dans R2).
+  regOf(tid).forEach(it => { if(see(it.c, it.e)) cell(it.c, +it.e).reg++; });
+  Object.values(cells).forEach(x => { if(x.reg) x.noncat = Math.max(0, x.noncat - x.reg); });
   const last = {};
   mine(REC.lastShelves).forEach(r => { if(r.colonne && +r.etage > 0) last[r.colonne] = +r.etage; });
   const letters = colLetters(def);
@@ -454,46 +542,60 @@ function shelfMap(tid, def, scans){
     const shelves = [];
     for(let e=1; e<=m; e++){
       const x = cells[c+'|'+e];
-      const st = !x ? 'unknown' : x.cat ? 'cat' : x.manuel ? 'manuel' : x.noncat ? 'noncat' : x.nonrange ? 'nonrange' : x.vide ? 'vide' : 'unknown';
-      if(x) docs += x.cat + x.manuel;
-      shelves.push({ e, st, cat: x ? x.cat : 0, manuel: x ? x.manuel : 0, noncat: x ? x.noncat : 0 });
+      const st = slotStateOf(x);
+      if(x) docs += x.cat + x.manuel + x.reg;
+      shelves.push({ e, st, cat: x ? x.cat : 0, manuel: x ? x.manuel : 0, reg: x ? x.reg : 0, noncat: x ? x.noncat : 0 });
     }
     return { c, shelves, docs };
   });
   const all = cols.flatMap(c => c.shelves);
   return { cols, rows: Math.max(1, ...cols.map(c => c.shelves.length)),
+           noncat: all.reduce((t,x) => t + x.noncat, 0),
            total: all.length, done: all.filter(x => x.st !== 'unknown').length,
-           states: new Set(all.map(x => x.st)) };
+           states: statesOf(all) };
 }
 
+/* Catégories visibles sur un ensemble de cases (la légende doit aussi
+   montrer une trame présente seulement en bande minoritaire). */
+function statesOf(cells){
+  const st = new Set(cells.map(x => x.st));
+  cells.forEach(x => { if(x.cat) st.add('cat'); if(x.manuel) st.add('manuel'); if(x.reg) st.add('registre'); if(x.noncat) st.add('noncat'); });
+  return st;
+}
+function slotStateOf(x){
+  return !x ? 'unknown' : x.cat ? 'cat' : x.manuel ? 'manuel' : x.reg ? 'registre' : x.noncat ? 'noncat'
+    : x.nonrange ? 'nonrange' : x.vide ? 'vide' : 'unknown';
+}
+/* Case de statut (carte des travées et fiches des meubles) : bandes
+   proportionnelles quand plusieurs catégories partagent l'étagère. */
+function cellHtml(x, label){
+  const segs = [['cat',x.cat],['manuel',x.manuel],['registre',x.reg],['noncat',x.noncat]].filter(([,v]) => v > 0);
+  const tot = segs.reduce((t,[,v]) => t+v, 0);
+  const fill = segs.length > 1
+    ? segs.map(([k,v]) => `<span class="cell__seg p-${k}" style="width:${(100*v/tot).toFixed(1)}%"></span>`).join('')
+    : `<span class="cell__seg p-${x.st}" style="width:100%"></span>`;
+  const solid = segs.length === 1 && (x.st === 'cat' || x.st === 'manuel');
+  return `<span class="cell st-${x.st}${solid?' cell--solid':''}">${fill}${label ? `<span class="cell__n"><span>${label}</span></span>` : ''}</span>`;
+}
 const STATES = [
-  ['cat', 'Récolé'], ['manuel', 'Exemplarisé rapide'], ['noncat', 'Non catalogué'],
+  ['cat', 'Récolé'], ['manuel', 'Exemplarisé rapide'], ['registre', 'Registre (sans code-barre)'], ['noncat', 'Non catalogué'],
   ['nonrange', 'À ranger'], ['vide', 'Vide'], ['unknown', 'Pas encore récolé'],
 ];
 function mapHtml(m){
   const n = m.cols.length;
   const small = n > 9;
-  let h = `<div class="map" style="grid-template-columns:${small?'3mm':'4mm'} repeat(${n}, minmax(0,1fr));grid-template-rows:auto repeat(${m.rows}, minmax(0,1fr)) auto">`;
-  h += '<span></span>' + m.cols.map(c => `<span class="map__colh">${esc(c.c)}</span>`).join('');
-  for(let e=1; e<=m.rows; e++){
-    h += `<span class="map__rowh">${e}</span>`;
-    m.cols.forEach(c => {
-      const x = c.shelves[e-1];
-      if(!x){ h += '<span></span>'; return; }
-      // Plusieurs catégories sur la même étagère : bandes proportionnelles,
-      // comme gradientOf() sur le plan.
-      const segs = [['cat',x.cat],['manuel',x.manuel],['noncat',x.noncat]].filter(([,v]) => v > 0);
-      const tot = segs.reduce((t,[,v]) => t+v, 0);
-      const fill = segs.length > 1
-        ? segs.map(([k,v]) => `<span class="cell__seg p-${k}" style="width:${(100*v/tot).toFixed(1)}%"></span>`).join('')
-        : `<span class="cell__seg p-${x.st}" style="width:100%"></span>`;
-      const docs = x.cat + x.manuel;
+  let h = `<div class="map" style="grid-template-columns:repeat(${n}, minmax(0,1fr));grid-template-rows:auto minmax(0,1fr) auto">`;
+  h += m.cols.map(c => `<span class="map__colh">${esc(c.c)}</span>`).join('');
+  m.cols.forEach(c => {
+    h += '<span class="map__col">';
+    c.shelves.forEach(x => {
+      const docs = x.cat + x.manuel + x.reg;
       const label = docs ? fmtN(docs) : x.noncat ? '~' + fmtN(x.noncat) : (x.st === 'vide' && !small) ? 'vide' : '';
-      const solid = segs.length === 1 && (x.st === 'cat' || x.st === 'manuel');
-      h += `<span class="cell st-${x.st}${solid?' cell--solid':''}">${fill}${label ? `<span class="cell__n"><span>${label}</span></span>` : ''}</span>`;
+      h += cellHtml(x, label);
     });
-  }
-  h += '<span></span>' + m.cols.map(c => `<span class="map__foot">${c.docs ? fmtN(c.docs) : ''}</span>`).join('');
+    h += '</span>';
+  });
+  h += m.cols.map(c => `<span class="map__foot">${c.docs ? fmtN(c.docs) : ''}</span>`).join('');
   h += '</div>';
   const legend = STATES.filter(([k]) => m.states.has(k))
     .map(([k,l]) => `<span><i class="p-${k}"></i>${l}</span>`).join('');
@@ -537,18 +639,19 @@ function halfHtml(tid, side, single){
     ? `<div class="tv-range"><span>${esc(s.range[0])}</span><span>→</span><span>${esc(s.range[1])}</span></div>`
     : `<div class="tv-range tv-range--empty">Travée pas encore récolée</div>`;
 
-  const period = s.years.length ? `${s.years[0]}–${s.years[s.years.length-1]}` : '—';
+  const period = s.dates.length ? (s.dates[0].label === s.dates[s.dates.length-1].label ? s.dates[0].label
+    : `${s.dates[0].label}–${s.dates[s.dates.length-1].label}`) : '—';
   const nbLangs = Object.keys(s.langs).length;
   const kpis = `<div class="tv-kpis">
-      <div class="tv-kpi"><div class="tv-kpi__v">${fmtN(s.n)}</div><div class="tv-kpi__l">documents récolés${s.nonCat ? ` · + ~${fmtN(s.nonCat)} non cat.` : ''}</div></div>
-      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? esc(period) : s.def.nbCols}</div><div class="tv-kpi__l">${s.isRes ? "période d'édition" : 'colonnes'}</div></div>
-      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? (nbLangs || '—') : (s.map.total ? Math.round(100*s.map.done/s.map.total)+' %' : '—')}</div><div class="tv-kpi__l">${s.isRes ? (nbLangs>1?'langues':'langue') : 'étagères récolées'}</div></div>
+      <div class="tv-kpi"><div class="tv-kpi__v">${fmtN(s.n)}</div><div class="tv-kpi__l">documents ${s.nReg ? 'localisés' : 'récolés'}${s.nonCat ? ` · + ~${fmtN(s.nonCat)} non cat.` : ''}</div></div>
+      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes ? esc(period) : s.def.nbCols}</div><div class="tv-kpi__l">${s.isRes ? (s.nReg ? 'période' : "période d'édition") : 'colonnes'}</div></div>
+      <div class="tv-kpi"><div class="tv-kpi__v">${s.isRes && nbLangs ? nbLangs : (s.map.total ? Math.round(100*s.map.done/s.map.total)+' %' : '—')}</div><div class="tv-kpi__l">${s.isRes && nbLangs ? (nbLangs>1?'langues':'langue') : 'étagères récolées'}</div></div>
     </div>`;
 
   const colsTable = mapHtml(s.map);
 
   let charts = '';
-  if(s.isRes && s.years.length){
+  if(s.isRes && s.dates.length){
     const cs = Object.keys(s.cent).map(Number).sort((a,b)=>a-b);
     const cRows = []; for(let c=cs[0]; c<=cs[cs.length-1]; c++) cRows.push({ l: roman(c)+'ᵉ s.', v: s.cent[c]||0 });
     const lEntries = Object.entries(s.langs).sort((a,b)=>b[1]-a[1]);
@@ -560,8 +663,8 @@ function halfHtml(tid, side, single){
         <b>${s.doyen.y}</b> <span style="color:var(--mid)">(${esc(shortCote(s.doyen.cote||''))})</span></div>` : '';
     charts = `<div style="display:flex;flex-direction:column;gap:4mm;flex:0 0 auto">
       <div class="tv-charts">
-        <div><p class="tv-h">Siècle d'édition</p>${barsHtml(cRows.slice(single?-6:-4), Math.max(...cRows.map(r=>r.v)))}</div>
-        <div><p class="tv-h">Langues</p>${barsHtml(lRows, Math.max(...lRows.map(r=>r.v),1))}</div>
+        <div><p class="tv-h">${s.nReg ? 'Siècle' : "Siècle d'édition"}</p>${barsHtml(cRows.slice(single?-6:-4), Math.max(...cRows.map(r=>r.v)))}</div>
+        ${lRows.length ? `<div><p class="tv-h">Langues</p>${barsHtml(lRows, Math.max(...lRows.map(r=>r.v),1))}</div>` : ''}
       </div>${doyen}</div>`;
   } else if(!s.n){
     charts = `<p class="tv-note" style="flex:0 0 auto">Les plages de cotes et les statistiques apparaîtront dès que cette travée aura été récolée.</p>`;
@@ -569,8 +672,82 @@ function halfHtml(tid, side, single){
   return `<div class="half">${head}${range}${kpis}<div class="tv-detail">${colsTable}${charts}</div></div>`;
 }
 
+function meubleHtml(id){
+  const [base, col] = id.split(':');
+  const m = MEUBLES[base === 'ARMOIRE' ? 'armoires' : 'tiroirs'];
+  const isArm = base === 'ARMOIRE';
+  const word = isArm ? 'N' : 'T';
+  const scans = asList(REC.scans).filter(x => x && x.travee === base && x.colonne === col);
+  const sm = shelfMap(base, { ...m.def, nbCols: col.charCodeAt(0) - 64 }, scans).cols.find(c => c.c === col);
+  const reg = regOf(base, col);
+  const noLevel = reg.filter(it => !it.e);
+  const levels = sm ? sm.shelves : [];
+  const done = levels.filter(x => x.st !== 'unknown').length;
+  const used = levels.filter(x => ['cat','manuel','registre','noncat','nonrange'].includes(x.st)).length;
+  const nDocs = scans.length + reg.length;
+  const states = statesOf(levels);
+
+  // Contenu d'un niveau, du plus précis au plus vague.
+  const contentOf = x => {
+    const parts = [];
+    const r = reg.filter(it => it.e === String(x.e));
+    const objets = r.filter(it => it.s === 'armoire');
+    objets.forEach(it => parts.push(`<b>${esc(it.titre)}</b>${it.desc && it.desc !== it.titre ? ' — ' + esc(it.desc.slice(0, 260)) : ''}${it.note ? ` <i>(${esc(it.note)})</i>` : ''}`));
+    const autres = r.filter(it => it.s !== 'armoire');
+    if(autres.length){
+      const nature = autres.every(it => it.s === 'carte') ? 'carte' : autres.every(it => it.s === 'mss') ? 'manuscrit' : 'document';
+      const rg = coteRange(autres.map(it => it.cote));
+      const types = [...new Set(autres.map(it => (it.info||'').split(' · ')[0].trim().toLowerCase()).filter(t => t && !/^non applicable$/.test(t)))].slice(0, 4);
+      parts.push(`<b>${fmtN(autres.length)} ${nature}${autres.length>1?'s':''}</b>${rg ? ` ${esc(rg[0])}${rg[1]!==rg[0] ? ' → ' + esc(rg[1]) : ''}` : ''}${types.length ? ' · ' + esc(types.join(', ')) : ''}
+        — <i>${autres.slice(0, 3).map(it => esc(it.titre.slice(0, 70))).join(' ; ')}${autres.length > 3 ? '…' : ''}</i>`);
+    }
+    const sc = scans.filter(s2 => String(s2.etage) === String(x.e));
+    if(sc.length){
+      const rg = coteRange(sc.map(s2 => s2.cote));
+      parts.push(`<b>${fmtN(sc.length)} document${sc.length>1?'s':''} catalogué${sc.length>1?'s':''}</b>${rg ? ` ${esc(rg[0])}${rg[1]!==rg[0] ? ' → ' + esc(rg[1]) : ''}` : ''}
+        — <i>${sc.slice(0, 3).map(s2 => esc(String(s2.titre||'').slice(0, 60))).join(' ; ')}</i>`);
+    }
+    if(x.noncat) parts.push(`~${fmtN(x.noncat)} non catalogué${x.noncat>1?'s':''}`);
+    if(!parts.length) parts.push(`<span class="muted">${x.st === 'vide' ? 'Vide' : x.st === 'nonrange' ? 'À ranger' : 'Pas encore récolé'}</span>`);
+    return parts.join(' · ');
+  };
+
+  const nCols = levels.length > 12 ? 2 : 1;
+  const per = Math.ceil(levels.length / nCols);
+  const clamp = Math.max(1, Math.min(5, Math.floor((nCols === 2 ? 4.3 : 7) * 12 / Math.max(per, 1) / 2.2)));
+  let grid = '';
+  for(let c = 0; c < nCols; c++){
+    grid += '<div class="mb-col">' + levels.slice(c*per, (c+1)*per).map(x => {
+      const n = x.cat + x.manuel + x.reg;
+      return `<div class="mb-row">${cellHtml(x, word + x.e)}<span class="mb-txt" style="--clamp:${clamp}">${contentOf(x)}</span><span class="mb-n">${n ? fmtN(n) : ''}</span></div>`;
+    }).join('') + '</div>';
+  }
+  const types = {};
+  reg.forEach(it => { const k = it.s === 'armoire' ? (it.titre || 'Objets') : it.s === 'carte' ? 'Cartes' : 'Manuscrits'; types[k] = (types[k]||0)+1; });
+  scans.forEach(() => { types['Documents catalogués'] = (types['Documents catalogués']||0)+1; });
+  const fonds = nDocs ? fondsHtml({ n: nDocs, fonds: types }, true, 'Contenu') : '';
+  const legend = STATES.filter(([k]) => states.has(k)).map(([k,l]) => `<span><i class="p-${k}"></i>${l}</span>`).join('');
+  const sub = isArm ? `colonne ${col} du récolement` : `« A${col.charCodeAt(0)-64} » dans les registres · tiroirs T1 à T${levels.length}`;
+  return `<div class="half mb">
+    <div class="mb-head">
+      <div class="mb-name"><div class="tv-kicker">${isArm ? 'Armoire en bois' : 'Armoire à tiroirs'}</div>
+        <div class="tv-num">${esc(displayName(id))}</div><div class="mb-sub">${esc(sub)}</div></div>
+      <div class="mb-kpis">
+        <div class="tv-kpi"><div class="tv-kpi__v">${fmtN(nDocs)}</div><div class="tv-kpi__l">${isArm ? 'lots et objets' : 'documents'}${sm && sm.shelves.some(x=>x.noncat) ? ' · + non cat.' : ''}</div></div>
+        <div class="tv-kpi"><div class="tv-kpi__v">${used} / ${levels.length}</div><div class="tv-kpi__l">${isArm ? 'niveaux occupés' : 'tiroirs occupés'}</div></div>
+        <div class="tv-kpi"><div class="tv-kpi__v">${levels.length ? Math.round(100*done/levels.length) : 0} %</div><div class="tv-kpi__l">${isArm ? 'niveaux récolés' : 'tiroirs récolés'}</div></div>
+      </div>
+      ${fonds}
+    </div>
+    <div class="mb-grid" style="grid-template-columns:repeat(${nCols}, minmax(0,1fr))">${grid}</div>
+    ${noLevel.length ? `<p class="tv-note" style="margin-top:1.5mm">Sans niveau précisé : ${noLevel.map(it => esc(it.titre)).join(' ; ')}</p>` : ''}
+    <div class="map-legend">${legend}<span style="color:var(--mid)">· chiffre = documents ou lots identifiés</span></div>
+  </div>`;
+}
+
 function sheetHtml(sheet){
   const [l, r] = sheet;
+  if(isMeubleId(l)) return meubleSheetHtml(l);
   const single = !r;
   const local = LOCALS.find(x=>x.id===currentLocal());
   const ts = Math.max(...sheet.filter(Boolean).map(t => statsOf(t).lastTs));
@@ -580,6 +757,17 @@ function sheetHtml(sheet){
     <div class="sheet__top"><span><b>${esc(local ? local.label : '')}</b></span><span>Bibliothèques de Douai</span></div>
     <div class="sheet__body">${single ? halfHtml(l, null, true) : halfHtml(l,'left',false) + halfHtml(r,'right',false)}</div>
     <div class="sheet__foot"><span>Carte et plages de cotes d'après le récolement — un document mal rangé peut sortir de sa plage.</span><span>État au ${when}${lastRec}</span></div>
+  </div>`;
+}
+
+function meubleSheetHtml(id){
+  const [base, col] = id.split(':');
+  const ts = Math.max(0, ...asList(REC.scans).filter(x => x && x.travee === base && x.colonne === col).map(x => +x.ts || 0));
+  const when = new Date().toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+  return `<div class="sheet sheet--single">
+    <div class="sheet__top"><span><b>Réserve patrimoniale</b> · ${esc(MEUBLES[base === 'ARMOIRE' ? 'armoires' : 'tiroirs'].label)}</span><span>Bibliothèques de Douai</span></div>
+    <div class="sheet__body">${meubleHtml(id)}</div>
+    <div class="sheet__foot"><span>D'après le récolement et les registres de l'équipe (manuscrits, armoires, cartes).</span><span>État au ${when}${ts ? ` · dernier scan le ${new Date(ts).toLocaleDateString('fr-FR')}` : ''}</span></div>
   </div>`;
 }
 
@@ -593,7 +781,7 @@ function renderList(){
   list.innerHTML = sheets.map((sh,i) => {
     const k = sheetKey(sh);
     const label = sh[1] ? `<strong>${esc(displayName(sh[0]))}</strong><span class="sg-sep">←→</span><strong>${esc(displayName(sh[1]))}</strong>` : `<strong>${esc(displayName(sh[0]))}</strong>`;
-    const actions = sh[1]
+    const actions = MEUBLES[currentLocal()] ? '' : sh[1]
       ? `<button type="button" data-act="swap" data-i="${i}" title="Échanger gauche et droite">⇄</button><button type="button" data-act="split" data-i="${i}" title="Séparer">✂</button>`
       : (i < sheets.length-1 && !sheets[i+1][1] ? `<button type="button" data-act="join" data-i="${i}" title="Réunir avec la suivante">＋</button>` : '');
     return `<span class="sg-chip"><input type="checkbox" data-k="${esc(k)}" ${checked.has(k)?'checked':''} aria-label="Imprimer cette feuille">${label}${actions}</span>`;
@@ -673,21 +861,29 @@ window.addEventListener('resize', fitPreview);
 async function selectLocal(id){
   try { localStorage.setItem(LOCAL_KEY, id); } catch(e){}
   const status = document.getElementById('sg-status');
-  if(catalogGroupOfReserve(id) === 'reserve' && !INV){
+  if(!MEUBLES[id] && catalogGroupOfReserve(id) === 'reserve' && !INV){
     status.textContent = 'Chargement du catalogue (dates, langues)…';
     await loadInventaire();
   }
-  const ids = traveesOfReserve(id).map(t=>t.id);
-  const n = asList(REC.scans).filter(s => s && ids.includes(s.travee)).length;
-  status.textContent = `${ids.length} travée${ids.length>1?'s':''} · ${fmtN(n)} documents récolés`;
+  const ids = idsOf(id);
+  const where = t => isMeubleId(t) ? t.split(':') : [t, null];
+  const hasData = t => {
+    const [tv, col] = where(t);
+    const mineOf = list => asList(list).some(x => x && x.travee === tv && (col == null || x.colonne === col));
+    return mineOf(REC.scans) || mineOf(REC.nonCatalogues) || regOf(tv, col).length > 0;
+  };
+  const n = ids.reduce((t, x) => { const [tv, col] = where(x);
+    return t + asList(REC.scans).filter(s => s && s.travee === tv && (col == null || s.colonne === col)).length + regOf(tv, col).length; }, 0);
+  const unit = MEUBLES[id] ? (id === 'armoires' ? ['armoire','armoires'] : ['armoire à tiroirs','armoires à tiroirs']) : ['travée','travées'];
+  status.textContent = `${ids.length} ${unit[ids.length>1?1:0]} · ${fmtN(n)} documents localisés`;
   // Par défaut, ne cocher que les feuilles qui ont des données.
   checked.clear();
-  sheetsFor(id).forEach(sh => { if(sh.some(t => t && asList(REC.scans).some(s => s && s.travee===t))) checked.add(sheetKey(sh)); });
+  sheetsFor(id).forEach(sh => { if(sh.some(t => t && hasData(t))) checked.add(sheetKey(sh)); });
   renderList(); renderPreview();
 }
 
 (async function init(){
-  REC = await loadRecolement();
+  [REC] = await Promise.all([loadRecolement(), loadRegistres()]);
   if(REC.rayons) applyRayonRecords(REC.rayons);
   const sel = document.getElementById('sg-local');
   sel.innerHTML = LOCALS.map(r => `<option value="${r.id}">${esc(r.label)}</option>`).join('');

@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<!-- Contrôle d'accès de l'espace pro (gate localStorage — voir « Sécurité » dans
+     CLAUDE.md). En tête de <head> pour rediriger avant tout rendu. -->
+<script>
+  if (localStorage.getItem('rp_admin_auth') !== '1') window.location.replace('index.html');
+</script>
+<title>Présentoirs de presse — Réserve patrimoniale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/admin.css">
+<script src="js/sync-queue.js"></script>
+<script src="js/columnar.js"></script>
+<style>
+  /* CSS propre à la page (préfixe pp-) : carte de retour de scan, plan des
+     bacs (une case par étage = un titre), panneau de détail. */
+  .pp-main { padding-top: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+  /* ── Scan ── */
+  .pp-scan { display: grid; gap: 1rem; }
+  .pp-scan__row { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: center; }
+  .pp-scan__input { flex: 1 1 260px; font-size: 1.35rem; min-height: 54px; font-family: var(--pro-font-mono); }
+  .pp-fb { display: none; gap: 1rem; align-items: flex-start; padding: 1rem 1.25rem; border: 1px solid var(--pro-trait); border-left-width: 6px; background: #fff; }
+  .pp-fb.is-on { display: flex; }
+  .pp-fb--ok { border-left-color: var(--pro-ok); background: var(--pro-ok-fond); }
+  .pp-fb--warn { border-left-color: var(--pro-ambre); background: #FFF8E6; }
+  .pp-fb--info { border-left-color: var(--pro-bleu); background: var(--pro-bleu-pale); }
+  .pp-fb--alert { border-left-color: var(--pro-carmin); background: var(--pro-ko-fond); }
+  .pp-fb--alert .pp-fb__title { color: var(--pro-carmin-fonce); font-size: 1.5rem; }
+  .pp-fb__cover { flex: none; width: 72px; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid var(--pro-trait); background: #fff; }
+  .pp-fb__body { min-width: 0; flex: 1; }
+  .pp-fb__title { margin: 0 0 0.3rem; font-family: var(--pro-font-display); font-weight: 700; font-size: 1.2rem; line-height: 1.2; color: var(--pro-texte); }
+  .pp-fb__text { margin: 0; color: var(--pro-texte); }
+  .pp-fb__text + .pp-fb__text { margin-top: 0.25rem; }
+  .pp-fb__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+
+  /* ── Mise en page plan + détail ── */
+  .pp-layout { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  @media (min-width: 70rem) { .pp-layout { grid-template-columns: minmax(0, 1fr) 360px; } }
+  .pp-aside { position: sticky; top: 1rem; }
+  html.rp-embedded .pp-aside { position: static; }
+
+  .pp-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center; margin-bottom: 1rem; }
+  .pp-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.78rem; color: var(--pro-texte-doux); }
+  .pp-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .pp-legend i { width: 14px; height: 14px; display: inline-block; border: 1px solid var(--pro-trait-fort); }
+
+  /* Travées côte à côte, dans l'ordre de la salle : un seul défilement horizontal pour tout le plan. */
+  .pp-plan { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding-bottom: 0.4rem; }
+  .pp-travee { flex: none; }
+  .pp-travee + .pp-travee { margin-left: 1.5rem; padding-left: 1.5rem; border-left: 2px dashed var(--pro-trait-fort); }
+  .pp-travee__head { display: flex; align-items: baseline; gap: 0.75rem; margin: 0 0 0.75rem; white-space: nowrap; }
+  .pp-travee__title { margin: 0; font-family: var(--pro-font-display); font-weight: 600; font-size: 1.1rem; color: var(--pro-bleu); }
+  .pp-travee__meta { font-size: 0.78rem; color: var(--pro-texte-doux); }
+  .pp-rack { display: flex; gap: 0.9rem; width: max-content; align-items: stretch; }
+  .pp-rail { display: grid; grid-template-rows: repeat(var(--et), var(--pp-cell-h)); gap: 6px; padding-top: 0; font-size: 0.68rem; color: var(--pro-texte-faible); }
+  .pp-rail span { display: flex; align-items: center; justify-content: center; width: 1.2rem; writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: 0.08em; text-transform: uppercase; }
+  /* Un bloc = colonnes séparées des voisines par une cloison (travée 2 : 3 par 3). */
+  .pp-bloc { display: flex; gap: 6px; padding: 6px; background: #EFEAE0; border: 2px solid #CFC7B6; }
+  .pp-col { display: grid; grid-template-rows: repeat(var(--et), var(--pp-cell-h)); gap: 6px; }
+  .pp-rack { --pp-cell-w: 104px; --pp-cell-h: 168px; }
+
+  .pp-cell { position: relative; display: flex; flex-direction: column; width: var(--pp-cell-w); height: var(--pp-cell-h); padding: 0; border: 1px solid var(--pro-trait-fort); background: #fff; cursor: pointer; text-align: left; font: inherit; color: var(--pro-texte); overflow: hidden; }
+  .pp-cell:hover { border-color: var(--pro-bleu); }
+  .pp-cell:focus-visible { outline: 3px solid var(--pro-bleu); outline-offset: 1px; }
+  .pp-cell.is-selected { outline: 3px solid var(--pro-carmin); outline-offset: 1px; z-index: 1; }
+  .pp-cell.is-empty { background: repeating-linear-gradient(135deg, #fff 0 8px, #F4F1EA 8px 16px); border-style: dashed; color: var(--pro-texte-faible); align-items: center; justify-content: center; font-size: 0.75rem; }
+  .pp-cell.is-target { border: 2px solid var(--pro-carmin); background: #FFF1EF; color: var(--pro-carmin-fonce); font-weight: 600; }
+  .pp-cell.is-dim { opacity: 0.28; }
+  .pp-cell.is-pick { border: 2px solid var(--pro-carmin); }
+  .pp-cell.is-match { box-shadow: 0 0 0 3px var(--pro-ambre); }
+  .pp-cell.is-flash { animation: pp-flash 1.2s ease-out 2; }
+  @keyframes pp-flash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 40% { box-shadow: 0 0 0 6px var(--pro-carmin); } }
+  .pp-cell__face { flex: 1; min-height: 0; position: relative; background: var(--pro-bleu-pale); display: flex; align-items: center; justify-content: center; }
+  .pp-cell__face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pp-cell__title { padding: 0.45rem; font-family: var(--pro-font-display); font-weight: 700; font-size: 0.82rem; line-height: 1.15; color: var(--pro-bleu); text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; word-break: break-word; }
+  /* Le numéro occupe la case ; le hors-série est posé devant, en bas à
+     droite, comme sur la façade. */
+  .pp-duo { position: relative; display: block; width: 100%; height: 100%; }
+  .pp-duo__item { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--pro-bleu-pale); overflow: hidden; }
+  .pp-duo__item + .pp-duo__item { inset: auto 0 0 auto; width: 60%; height: 60%; border: 2px solid #fff; box-shadow: -2px -2px 6px rgba(0,0,0,0.35); }
+  .pp-duo__item .pp-cell__title { font-size: 0.62rem; -webkit-line-clamp: 4; padding: 0.25rem; }
+  .pp-duo__item:first-child .pp-duo__tag { right: auto; bottom: auto; top: 0; padding: 1px 5px; }
+  .pp-duo__tag { position: absolute; left: 0; right: 0; bottom: 0; padding: 1px 2px; background: rgba(255,255,255,0.92); font-size: 0.6rem; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-duo__tag--hs { background: var(--pro-texte); color: #fff; }
+  .pp-cell__caption { flex: none; padding: 0.3rem 0.4rem; border-top: 1px solid var(--pro-trait); background: #fff; font-size: 0.7rem; line-height: 1.25; }
+  .pp-cell__serie { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-cell__num { display: block; color: var(--pro-texte-doux); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-cell__none { color: var(--pro-carmin); }
+  .pp-cell__hs { position: absolute; top: 4px; right: 4px; padding: 1px 5px; background: var(--pro-texte); color: #fff; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em; }
+  .pp-cell__nb { position: absolute; top: 4px; left: 4px; padding: 1px 5px; background: #fff; border: 1px solid var(--pro-trait-fort); font-size: 0.6rem; color: var(--pro-texte-doux); }
+
+  /* ── Détail ── */
+  .pp-detail__loc { margin: 0 0 0.2rem; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pro-carmin); }
+  .pp-detail__serie { margin: 0 0 0.6rem; font-family: var(--pro-font-display); font-weight: 700; font-size: 1.3rem; line-height: 1.2; color: var(--pro-bleu); }
+  .pp-sec { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--pro-trait); }
+  .pp-sec__title { margin: 0 0 0.6rem; font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pro-texte-doux); }
+  .pp-issue { display: flex; gap: 0.8rem; align-items: flex-start; }
+  .pp-issue__cover { flex: none; width: 76px; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid var(--pro-trait); background: var(--pro-bleu-pale); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: var(--pro-texte-faible); text-align: center; }
+  .pp-issue__label { margin: 0; font-weight: 700; font-size: 1.02rem; }
+  .pp-issue__meta { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--pro-texte-doux); }
+  .pp-issue__actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.55rem; }
+  .pp-form { display: grid; gap: 0.6rem; }
+  .pp-form__row { display: grid; gap: 0.6rem; grid-template-columns: 1fr 1fr; }
+  .pp-form label { display: grid; gap: 0.25rem; font-size: 0.78rem; color: var(--pro-texte-doux); }
+  .pp-form .pp-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--pro-texte); }
+  .pp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; font-size: 0.85rem; }
+  .pp-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .pp-list small { color: var(--pro-texte-doux); }
+  .pp-muted { color: var(--pro-texte-doux); font-size: 0.85rem; }
+</style>
+  <!-- Publication en iframe : envoie la hauteur du contenu au site hôte pour
+       qu'il redimensionne l'iframe. Chargé sans « defer ». Voir
+       js/parent-page-height.js. -->
+  <script src="js/parent-page-height.js"></script>
+</head>
+<body class="pro">
+
+<a class="pro-sr" href="#contenu">Aller au contenu</a>
+
+<header class="pro-head">
+  <div class="pro-head__inner">
+    <div class="pro-head__title">
+      <p class="pro-crumb"><a href="admin.html">Espace pro</a> › Presse</p>
+      <h1 class="pro-head__h1">Présentoirs de presse</h1>
+    </div>
+    <div class="pro-head__actions">
+      <span class="pro-sync" id="sync-status" role="status" title="Synchronisation avec les autres postes (via R2)">Synchronisation…</span>
+      <a class="pro-btn pro-btn--ghost" href="admin.html">← Espace pro</a>
+      <button type="button" class="pro-btn pro-btn--ghost" id="logout-btn">Déconnexion</button>
+    </div>
+  </div>
+</header>
+
+<main id="contenu" class="pro-main">
+  <div class="pro-wrap pp-main">
+
+    <details class="pro-help" id="pp-help" open>
+      <summary>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 11v5 M12 8h.01"/></svg>
+        <span>Comment ça marche</span>
+        <svg class="pro-help__chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="pro-help__body">
+        <p><strong>Mise en place</strong> : scannez le numéro que vous posez en façade. L'outil retrouve le titre et son étage ; le numéro précédent devient empruntable (au casier). Un hors-série ne remplace que le hors-série précédent. Un titre pas encore placé : scannez-le, puis cliquez sur l'étage libre où il se trouve.</p>
+        <p><strong>Retour de prêt</strong> : scannez le magazine rapporté. S'il s'agit du numéro à consulter sur place, une alerte rouge s'affiche.</p>
+        <p><strong>Numéros bulletinés dans Syracuse</strong> : à chaque chargement de la page, les fascicules bulletinés aujourd'hui sont lus dans Syracuse et mis en façade à la place de l'ancien numéro (seulement s'ils sont plus récents, et pour les titres déjà placés). Rechargez la page après avoir bulletiné.</p>
+        <p>Les titres <strong>non bulletinés</strong> (sans code-barre) se suivent par leur date de parution : cliquez sur l'étage, puis « Mettre en façade ». Un numéro trop récent pour l'export Syracuse se saisit de la même façon (le code-barre scanné est prérempli). Bouton « Photo » : la couverture remplace le titre sur le plan.</p>
+      </div>
+    </details>
+
+    <div class="pro-kpis" id="pp-kpis"></div>
+
+    <section class="pro-card pro-card--pad pp-scan" aria-label="Scan">
+      <div class="pp-scan__row">
+        <div class="pro-seg" role="group" aria-label="Mode de scan" id="pp-mode">
+          <button type="button" class="pro-seg__btn" data-mode="place" aria-pressed="true">Mise en place</button>
+          <button type="button" class="pro-seg__btn" data-mode="retour" aria-pressed="false">Retour de prêt</button>
+        </div>
+        <input type="text" class="pro-input pp-scan__input" id="pp-scan" inputmode="numeric" autocomplete="off" placeholder="Scanner un code-barre…" aria-label="Code-barre">
+      </div>
+      <div class="pp-fb" id="pp-fb" role="status" aria-live="polite"></div>
+      <p class="pp-muted" id="pp-catalog-status">Chargement de l'export Syracuse…</p>
+      <p class="pp-muted" id="pp-syracuse-status"></p>
+    </section>
+
+    <div class="pp-layout">
+      <section class="pro-card pro-card--pad" aria-label="Plan des bacs">
+        <div class="pp-toolbar">
+          <input type="search" class="pro-input" id="pp-search" style="flex:1 1 220px;width:auto" placeholder="Trouver un titre…" aria-label="Trouver un titre">
+          <div class="pp-legend">
+            <span><i style="background:var(--pro-bleu-pale)"></i>Titre placé</span>
+            <span><i style="background:repeating-linear-gradient(135deg,#fff 0 4px,#F4F1EA 4px 8px)"></i>Étage libre</span>
+            <span><i style="background:var(--pro-texte)"></i>HS en place</span>
+          </div>
+        </div>
+        <div id="pp-plan" class="pp-plan"></div>
+      </section>
+      <aside class="pro-card pro-card--pad pp-aside" id="pp-detail" aria-live="polite">
+        <p class="pp-muted">Cliquez sur un étage du plan pour voir le numéro en façade, son historique et le modifier.</p>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<input type="file" id="pp-photo-input" accept="image/*" capture="environment" hidden>
+
+<script src="js/admin-ui.js"></script>
+<script src="js/admin-charts.js"></script>
+<script type="module">
+/* Même fonction de fusion que le serveur (api/transferts.mjs ?store=presentoirs) :
+   la page applique chaque patch localement à l'identique, sans copie à tenir
+   synchronisée. */
+import { applyPresentoirsPatch, emptyPresentoirsState, normSerie, presentoirCoverKey, parsePartie, compareIssues, numVal } from './lib/presentoirs-state.mjs';
+
+document.getElementById('logout-btn').addEventListener('click', function () {
+  localStorage.removeItem('rp_admin_auth');
+  localStorage.removeItem('rp_admin_token');
+  window.location.href = 'index.html';
+});
+rpUI.help(document.getElementById('pp-help'), 'presentoirs');
+
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+const $ = id => document.getElementById(id);
+
+/* ════════════════════════════════════════════════════════════
+   GÉOMÉTRIE — un étage = un titre (façade pour le dernier numéro,
+   casier derrière pour les anciens). Étage 1 en haut.
+   Travée 2 : 24 colonnes, groupées 3 par 3 par des cloisons.
+   ════════════════════════════════════════════════════════════ */
+const TRAVEES = [
+  { id: 'T1', label: 'Travée 1', cols: 6, et: 3, bloc: 6 },
+  { id: 'T2', label: 'Travée 2', cols: 24, et: 3, bloc: 3 },
+  { id: 'T3', label: 'Travée 3', cols: 4, et: 3, bloc: 4, nonBulletineParDefaut: true },
+];
+const colLetter = i => String.fromCharCode(65 + i);
+const slotKey = (t, ci, e) => `${t.id}|${colLetter(ci)}|${e}`;
+function locLabel(key) {
+  const [tid, col, et] = key.split('|');
+  const t = TRAVEES.find(x => x.id === tid);
+  const ci = col.charCodeAt(0) - 64;
+  return `${t ? t.label : tid} · colonne ${ci} · étage ${et}${et === '1' ? ' (haut)' : ''}`;
+}
+const ALL_KEYS = TRAVEES.flatMap(t => Array.from({ length: t.cols }, (_, ci) => Array.from({ length: t.et }, (_, e) => slotKey(t, ci, e + 1))).flat());
+
+/* ════════════════════════════════════════════════════════════
+   NUMÉROS — « Titre de partie et N° de partie » de bib.xml :
+   « 119 05/2018 », « 282 HS 04/2018 », « HS193 04/2018 »,
+   « 2026 24/07/2023 », « 9999 cah. 2 12/10/2026 »…
+   ════════════════════════════════════════════════════════════ */
+const pad2 = n => String(n).padStart(2, '0');
+function parseUserDate(txt) {
+  const s = String(txt || '').trim();
+  if (!s) return null;
+  if (/^\d{4}(-\d{2}){0,2}$/.test(s)) return s;
+  const m = s.match(/^(?:(\d{1,2})\/)?(\d{1,2})\/(\d{4})$/);
+  if (m) return m[1] ? `${m[3]}-${pad2(m[2])}-${pad2(m[1])}` : `${m[3]}-${pad2(m[2])}`;
+  return undefined; // illisible
+}
+const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+function fmtIssueDate(d) {
+  if (!d) return '';
+  const [y, m, j] = d.split('-');
+  if (j) return `${j}/${m}/${y}`;
+  if (m) return `${MOIS[parseInt(m, 10) - 1] || m} ${y}`;
+  return y;
+}
+function issueLabel(it) {
+  if (!it) return '';
+  const parts = [];
+  if (it.numero) parts.push((it.hs ? 'HS ' : 'N° ') + it.numero);
+  else if (it.hs) parts.push('Hors-série');
+  if (it.date) parts.push(fmtIssueDate(it.date));
+  // Code marchand : sans numéro, seul le complément distingue deux numéros
+  // mis en façade le même jour.
+  if (!it.numero && it.label) parts.push(it.label);
+  return parts.join(' · ') || '(sans numéro)';
+}
+
+/* ════════════════════════════════════════════════════════════
+   CATALOGUE — data/desherbage.json (bib.xml complet, colonnaire) porte déjà
+   titreSerie/titrePartie de chaque fascicule. Presse adulte seulement.
+   ════════════════════════════════════════════════════════════ */
+const CAT = new Map();     // code-barre → { serie, partie, etat, imagette }
+const SERIES = new Map();  // normSerie → { serie, bcs:[] } — périodiques (numéros datés)
+let EXPORT_DATE = null;
+const isJeunesse = section => /jeun|ados/i.test(section || '');
+// Les présentoirs sont à Marceline Desbordes-Valmore : les fascicules des
+// annexes (Cœur de Bellain, La Péniche…) et de la réserve sont écartés.
+const isMDV = bib => /^Douai Marceline Desbordes-Valmore$/i.test((bib || '').trim());
+
+async function loadCatalog() {
+  try {
+    const [data, report] = await Promise.all([
+      fetch('data/desherbage.json').then(r => r.json()),
+      fetch('data/desherbage-build-report.json').then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    EXPORT_DATE = report && report.generatedAt ? new Date(report.generatedAt) : null;
+    columnar.forEachRow(data, r => {
+      if (!r.titreSerie || isJeunesse(r.section) || !isMDV(r.bibliotheque)) return;
+      const bc = r['915$b'];
+      if (!bc) return;
+      CAT.set(bc, { serie: r.titreSerie, partie: r.titrePartie || '', etat: r.etat || '', imagette: r.imagette || null });
+      if (/\d{1,2}\/\d{4}/.test(r.titrePartie || '')) {
+        const k = normSerie(r.titreSerie);
+        let s = SERIES.get(k);
+        if (!s) SERIES.set(k, s = { serie: r.titreSerie, bcs: [] });
+        s.bcs.push(bc);
+      }
+    });
+    guessUnmarkedHs();
+    $('pp-catalog-status').textContent = `Export Syracuse${EXPORT_DATE ? ' du ' + rpUI.fmt.date(EXPORT_DATE) : ''} : ${rpUI.fmt.n(CAT.size)} fascicules de presse adulte, ${SERIES.size} titres. Un numéro arrivé depuis est inconnu : saisissez-le à la main.`;
+  } catch (e) {
+    $('pp-catalog-status').textContent = 'Export Syracuse indisponible : seule la saisie manuelle fonctionne.';
+  }
+  renderDetail();
+}
+/* Hors-séries saisis sans mention dans Syracuse (National Geographic :
+   « 80 06/2026 » pour le HS 80, à côté de « 322 07/2026 »). Un numéro au
+   moins deux fois plus petit (et de 20 de moins) qu'un numéro du même titre
+   paru à moins d'un an d'écart ne peut pas être de la même série : c'est un
+   hors-série. */
+const HS_GUESS = new Set();
+const monthIndex = d => d ? parseInt(d.slice(0, 4), 10) * 12 + (parseInt(d.slice(5, 7), 10) || 6) : NaN;
+function guessUnmarkedHs() {
+  HS_GUESS.clear();
+  for (const s of SERIES.values()) {
+    if (s.bcs.length > 5000) continue;
+    const items = s.bcs.map(bc => { const p = parsePartie(CAT.get(bc).partie); return { bc, n: numVal(p.numero), m: monthIndex(p.date), hs: p.hs }; })
+      .filter(x => !x.hs && !isNaN(x.n) && !isNaN(x.m));
+    for (const x of items) {
+      if (items.some(y => Math.abs(y.m - x.m) <= 12 && y.n > 2 * x.n && y.n - x.n >= 20)) HS_GUESS.add(x.bc);
+    }
+  }
+}
+function issueFromCatalog(bc) {
+  const rec = CAT.get(bc);
+  if (!rec) return null;
+  const p = parsePartie(rec.partie);
+  return { barcode: bc, numero: p.numero, date: p.date, hs: p.hs || HS_GUESS.has(bc), label: rec.partie || null, ts: Date.now(), photo: null };
+}
+function latestKnown(serie, n) {
+  const s = SERIES.get(normSerie(serie));
+  if (!s) return [];
+  return s.bcs.map(issueFromCatalog).sort((a, b) => compareIssues(b, a)).slice(0, n);
+}
+
+/* ════════════════════════════════════════════════════════════
+   ÉTAT PARTAGÉ — localStorage fait foi localement, chaque patch part
+   en arrière-plan vers R2 (js/sync-queue.js).
+   ════════════════════════════════════════════════════════════ */
+const LS_KEY = 'rp_presentoirs';
+const ENDPOINT = '/api/transferts?store=presentoirs';
+let STATE = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || emptyPresentoirsState(); } catch (e) { return emptyPresentoirsState(); } })();
+if (!STATE.slots) STATE = emptyPresentoirsState();
+const TOUCHED = {}; // clé → horodatage local ; le CDN met l'état en cache 20 s
+const syncQueue = createSyncQueue({ storageKey: 'rp_presentoirs_pending_sync', endpoint: ENDPOINT });
+syncQueue.updateIndicator();
+
+function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) { /* quota */ } }
+const slotOf = key => STATE.slots[key] || null;
+
+const touchKey = p => p.type === 'cover' ? 'cover:' + p.coverKey : p.key;
+function apply(patch) {
+  patch.ts = patch.ts || Date.now();
+  try { STATE = applyPresentoirsPatch(STATE, patch); }
+  catch (e) { rpUI.toast(e.message, { type: 'error' }); return false; }
+  TOUCHED[touchKey(patch)] = Date.now();
+  saveLocal();
+  syncQueue.queue(patch);
+  renderAll();
+  return true;
+}
+
+async function syncFromServer() {
+  try {
+    const res = await fetch(ENDPOINT);
+    if (!res.ok) return;
+    mergeServerState(await res.json());
+  } catch (e) { /* hors ligne : on reste sur le cache local */ }
+}
+function mergeServerState(server) {
+    const pending = syncQueue.pendingKeys(touchKey);
+    const now = Date.now();
+    const keep = k => pending.has(k) || (TOUCHED[k] && now - TOUCHED[k] < 90000);
+    const slots = {};
+    Object.entries(server.slots || {}).forEach(([k, v]) => { if (!keep(k)) slots[k] = v; });
+    Object.entries(STATE.slots).forEach(([k, v]) => { if (keep(k)) slots[k] = v; });
+    const covers = { ...(server.covers || {}) };
+    Object.entries(STATE.covers || {}).forEach(([k, v]) => { if (keep('cover:' + k)) covers[k] = v; });
+    STATE = { ...server, slots, covers };
+    saveLocal();
+    renderAll();
+}
+
+/* ════════════════════════════════════════════════════════════
+   SYRACUSE — fascicules bulletinés AUJOURD'HUI, lus une seule fois au
+   chargement de la page (pas de boucle : on recharge la page pour relire).
+   Le serveur (lib/presentoirs-syracuse.mjs) met lui-même en façade chaque
+   numéro plus récent que celui en place, l'ancien passe au casier.
+   ════════════════════════════════════════════════════════════ */
+async function importSyracuseDuJour() {
+  const status = $('pp-syracuse-status');
+  status.textContent = 'Syracuse : recherche des fascicules bulletinés aujourd’hui…';
+  let r;
+  try {
+    const res = await fetch(ENDPOINT + '&syracuse=jour', { method: 'POST', headers: syncAuthHeaders() });
+    r = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(r.error || `HTTP ${res.status}`);
+  } catch (e) {
+    status.textContent = `Syracuse indisponible (${e.message}) : rechargez la page plus tard, ou scannez les numéros.`;
+    return;
+  }
+  // L'état renvoyé est celui que le serveur vient d'écrire : la relecture
+  // classique peut, elle, venir du cache CDN (20 s) et être d'avant l'import.
+  if (r.state) mergeServerState(r.state);
+  // Codes-barres des numéros du jour, absents de l'export : reconnus au scan.
+  const serieOf = new Map(Object.values(STATE.slots).filter(s => s && s.serie).map(s => [normSerie(s.serie), s.serie]));
+  (r.fascicules || []).forEach(f => {
+    if (!CAT.has(f.barcode) && serieOf.has(f.serieKey)) CAT.set(f.barcode, { serie: serieOf.get(f.serieKey), partie: f.partie, etat: '', imagette: null });
+  });
+  const placed = r.placed || [];
+  const quand = r.ts ? new Date(r.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+  status.textContent = `Syracuse (lu à ${quand}) : ${placed.length ? placed.length + ' numéro(s) bulletiné(s) aujourd’hui mis en façade' : 'aucun nouveau numéro bulletiné aujourd’hui pour les titres placés'}${r.truncated ? ' — liste partielle, rechargez la page pour la suite' : ''}${r.covers && r.covers.found && r.covers.found.length ? ` · ${r.covers.found.length} couverture(s) retrouvée(s) automatiquement` : ''}. Rechargez la page pour relire Syracuse.`;
+  if (placed.length) {
+    feedback('ok', `${placed.length} numéro(s) bulletiné(s) aujourd'hui dans Syracuse mis en façade`, placed.map(p => {
+      const it = parsePartie(p.label);
+      return `<strong>${esc(p.serie)} — ${esc(issueLabel({ ...it, hs: p.kind === 'hs' }))}</strong> · ${esc(locLabel(p.key))}${p.prev ? ` · l'ancien (${esc(issueLabel(p.prev))}) passe au casier` : ''}`;
+    }));
+  }
+}
+
+function findSlotBySerie(serie) {
+  const k = normSerie(serie);
+  for (const key of ALL_KEYS) {
+    const s = STATE.slots[key];
+    if (s && normSerie(s.serie) === k) return key;
+  }
+  return null;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PHOTOS DE COUVERTURE — /api/vignette (R2 vignette/presse_….jpg)
+   ════════════════════════════════════════════════════════════ */
+const PHOTO_LOCAL = {}; // id → dataURL, affichage immédiat avant relecture
+const vignetteUrl = id => PHOTO_LOCAL[id] || `/api/vignette?barcode=${encodeURIComponent(id)}`;
+/* Ordre : photo prise sur ce numéro, puis couverture du même titre + numéro
+   (importée d'un site d'éditeur, ou photographiée sur un autre exemplaire),
+   puis imagette Syracuse. */
+function coverSrc(it, serie) {
+  if (!it) return null;
+  if (it.photo) return vignetteUrl(it.photo);
+  const rec = it.barcode && CAT.get(it.barcode);
+  const ck = presentoirCoverKey(serie || (rec && rec.serie), it.hs, it.numero, it.date);
+  const c = ck && STATE.covers && STATE.covers[ck];
+  if (c) return c.url || vignetteUrl(c.photo);
+  return rec && rec.imagette ? rec.imagette : null;
+}
+let photoTarget = null;
+function askPhoto(key, kind) { photoTarget = { key, kind }; $('pp-photo-input').value = ''; $('pp-photo-input').click(); }
+function resizeToJpeg(file, max) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible.')); };
+    img.src = url;
+  });
+}
+$('pp-photo-input').addEventListener('change', async e => {
+  const file = e.target.files && e.target.files[0];
+  const target = photoTarget;
+  if (!file || !target) return;
+  try {
+    const dataUrl = await resizeToJpeg(file, 800);
+    const id = 'presse_' + Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('');
+    PHOTO_LOCAL[id] = dataUrl;
+    const res = await fetch('/api/vignette', { method: 'POST', headers: syncAuthHeaders(), body: JSON.stringify({ barcode: id, imageBase64: dataUrl }) });
+    if (!res.ok) throw new Error(res.status === 401 ? 'non authentifié — reconnectez-vous' : `erreur serveur (${res.status})`);
+    apply({ type: 'photo', key: target.key, kind: target.kind, photo: id });
+    const shot = slotOf(target.key) && slotOf(target.key)[target.kind];
+    const ck = shot && presentoirCoverKey(slotOf(target.key).serie, shot.hs, shot.numero, shot.date);
+    if (ck) apply({ type: 'cover', coverKey: ck, photo: id, source: 'photo' });
+    rpUI.toast('Couverture enregistrée.', { type: 'ok' });
+  } catch (err) {
+    rpUI.toast({ title: 'Photo non enregistrée :', text: err.message }, { type: 'error' });
+  }
+});
+
+/* ════════════════════════════════════════════════════════════
+   SCAN
+   ════════════════════════════════════════════════════════════ */
+let MODE = 'place';
+let SELECTED = null;
+let PENDING_PLACE = null; // { serie, issue } : titre scanné, en attente d'un étage
+let MANUAL_PREFILL = null; // { key, barcode } : numéro trop récent pour l'export
+let PENDING_EAN = null;    // code marchand scanné, en attente de l'étage de son titre
+
+/* Code-barre marchand de la presse : un EAN-13 (977 + ISSN…, ou 3…) propre au
+   TITRE, identique d'un numéro à l'autre, parfois suivi d'un code
+   complémentaire de 2 ou 5 chiffres qui, lui, change à chaque parution — la
+   douchette le colle à la suite (15 ou 18 chiffres) si elle sait le lire.
+   Les codes-barres Syracuse (6-7 chiffres) ne peuvent pas être confondus. */
+function eanValid(ean) {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += (+ean[i]) * (i % 2 ? 3 : 1);
+  return (10 - (sum % 10)) % 10 === +ean[12];
+}
+function parseEan(code) {
+  const s = String(code || '').trim();
+  if (!/^\d{13}(\d{2}|\d{5})?$/.test(s)) return null;
+  const ean = s.slice(0, 13);
+  return eanValid(ean) ? { ean, addon: s.slice(13) || null, full: s } : null;
+}
+/* Un même titre peut changer de code (prix…) : pour un 977, l'ISSN (chiffres
+   4 à 10) suffit à le retrouver. */
+function findSlotByEan(ean) {
+  const issn = ean.startsWith('977') ? ean.slice(3, 10) : null;
+  let byIssn = null;
+  for (const key of ALL_KEYS) {
+    const eans = (STATE.slots[key] && STATE.slots[key].eans) || [];
+    if (eans.includes(ean)) return key;
+    if (issn && !byIssn && eans.some(e => e.startsWith('977') && e.slice(3, 10) === issn)) byIssn = key;
+  }
+  return byIssn;
+}
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const isBareEan = bc => { const p = !CAT.has(bc) && parseEan(bc); return !!(p && !p.addon); };
+
+function associateEan(key, p) {
+  const other = findSlotByEan(p.ean);
+  if (other && other !== key && (slotOf(other).eans || []).includes(p.ean)) {
+    rpUI.toast(`Ce code est déjà associé à « ${slotOf(other).serie} » (${locLabel(other)}).`, { type: 'warn' });
+    return false;
+  }
+  return apply({ type: 'ean', key, ean: p.ean });
+}
+
+let LAST_EAN = null; // { p, key, t } : dernier code marchand mis en place (complément envoyé à part)
+
+function handlePlaceEan(p) {
+  let key = findSlotByEan(p.ean);
+  let associated = false;
+  if (!key) {
+    // Étage sélectionné : on associe et on met en façade d'un coup, sans
+    // question — « Pas le bon titre… » dans le message si ce n'était pas le bon.
+    if (!(SELECTED && slotOf(SELECTED))) { askEanSlot(p); return; }
+    if (!associateEan(SELECTED, p)) return;
+    key = SELECTED;
+    associated = true;
+  }
+  const slot = slotOf(key);
+  if (!(slot.eans || []).includes(p.ean)) apply({ type: 'ean', key, ean: p.ean }); // même ISSN, nouveau prix
+  select(key, { flash: true });
+  const cur = slot.normal;
+  const curEan = cur && cur.barcode && parseEan(cur.barcode);
+  if (curEan && p.addon && cur.barcode === p.full) {
+    feedback('ok', `Déjà en façade : ${slot.serie} — ${issueLabel(cur)}`, [esc(locLabel(key))], { cover: coverSrc(cur, slot.serie) });
+    return;
+  }
+  if (curEan && !p.addon && curEan.ean === p.ean && cur.date === todayIso()) {
+    feedback('ok', `Déjà mis en façade aujourd'hui : ${slot.serie} — ${issueLabel(cur)}`, [esc(locLabel(key))], {
+      cover: coverSrc(cur, slot.serie),
+      actions: [{ label: 'C\'est un autre numéro', onClick: () => placeEanIssue(key, p, todayIso()) }],
+    });
+    return;
+  }
+  placeEanIssue(key, p, todayIso(), associated);
+}
+
+/* Code marchand → numéro en façade daté du jour (un journal arrive le jour de
+   sa parution), corrigeable aussitôt dans le message. Vaut aussi pour un
+   titre bulletiné : on ne demande pas de numéro, la date suffit à s'y
+   retrouver. */
+function placeEanIssue(key, p, date, associated) {
+  placeIssue(key, 'normal', { barcode: p.full, numero: null, date, hs: false, label: p.addon ? `complément ${p.addon}` : null, ts: Date.now(), photo: null });
+  LAST_EAN = { p, key, t: Date.now() };
+  const fb = $('pp-fb');
+  const host = fb.querySelector('.pp-fb__actions');
+  if (!host) return;
+  const note = document.createElement('p');
+  note.className = 'pp-fb__text';
+  note.innerHTML = `Code-barre lu : <span style="font-family:var(--pro-font-mono)">${esc(p.full)}</span>${p.addon ? '' : ' (sans code complémentaire)'}${associated ? ' — <strong>associé à ce titre</strong> pour les prochains numéros.' : ''}`;
+  host.parentNode.insertBefore(note, host);
+  const wrap = document.createElement('span');
+  wrap.style.cssText = 'display:inline-flex;gap:0.4rem;align-items:center;flex-wrap:wrap';
+  wrap.innerHTML = `<label class="pp-muted" style="display:inline-flex;gap:0.4rem;align-items:center">Parution du <input type="date" class="pro-input" style="min-height:34px;width:auto" value="${esc(date)}"></label>`;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pro-btn pro-btn--sm pro-btn--secondary';
+  btn.textContent = 'Corriger la date';
+  btn.addEventListener('click', () => {
+    const d = wrap.querySelector('input').value;
+    if (!d) return;
+    apply({ type: 'undo', key, kind: 'normal' });
+    placeEanIssue(key, p, d, associated);
+    $('pp-scan').focus();
+  });
+  wrap.appendChild(btn);
+  host.prepend(wrap);
+  if (associated) {
+    const other = document.createElement('button');
+    other.type = 'button';
+    other.className = 'pro-btn pro-btn--sm pro-btn--ghost';
+    other.textContent = 'Pas le bon titre…';
+    other.addEventListener('click', () => {
+      apply({ type: 'undo', key, kind: 'normal' });
+      apply({ type: 'ean', key, ean: p.ean, remove: true });
+      askEanSlot(p);
+    });
+    host.appendChild(other);
+  }
+}
+
+/* Certaines douchettes envoient le code complémentaire (2 ou 5 chiffres)
+   comme un second scan, juste après le code principal : on le recolle. */
+function joinAddon(bc) {
+  if (!/^(\d{2}|\d{5})$/.test(bc) || !LAST_EAN || Date.now() - LAST_EAN.t > 4000 || LAST_EAN.p.addon) return null;
+  return parseEan(LAST_EAN.p.ean + bc);
+}
+
+function askEanSlot(p) {
+  PENDING_EAN = p;
+  PENDING_PLACE = null;
+  renderPlan();
+  feedback('info', `Code-barre marchand ${p.ean} : à quel titre est-il ?`, [
+    '<strong>Cliquez sur l\'étage du titre</strong> dans le plan : le code y sera associé une fois pour toutes, les prochains numéros se mettront en façade d\'un scan.'],
+    { actions: [{ label: 'Annuler', onClick: () => { PENDING_EAN = null; hideFeedback(); renderPlan(); } }] });
+}
+
+document.querySelectorAll('#pp-mode [data-mode]').forEach(b => b.addEventListener('click', () => {
+  MODE = b.dataset.mode;
+  document.querySelectorAll('#pp-mode [data-mode]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  PENDING_PLACE = null;
+  PENDING_EAN = null;
+  hideFeedback();
+  renderPlan();
+  $('pp-scan').focus();
+}));
+$('pp-scan').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const bc = $('pp-scan').value.trim();
+  $('pp-scan').value = '';
+  if (!bc) return;
+  if (MODE === 'place') handlePlace(bc); else handleRetour(bc);
+});
+
+function feedback(kind, title, lines, opts = {}) {
+  const el = $('pp-fb');
+  el.className = `pp-fb pp-fb--${kind} is-on`;
+  const cover = opts.cover ? `<img class="pp-fb__cover" src="${esc(opts.cover)}" alt="">` : '';
+  el.innerHTML = `${cover}<div class="pp-fb__body"><p class="pp-fb__title">${esc(title)}</p>${(lines || []).filter(Boolean).map(l => `<p class="pp-fb__text">${l}</p>`).join('')}<div class="pp-fb__actions"></div></div>`;
+  const host = el.querySelector('.pp-fb__actions');
+  (opts.actions || []).forEach(a => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `pro-btn pro-btn--sm ${a.primary ? 'pro-btn--primary' : 'pro-btn--secondary'}`;
+    b.textContent = a.label;
+    b.addEventListener('click', () => { a.onClick(); $('pp-scan').focus(); });
+    host.appendChild(b);
+  });
+  if (!host.children.length) host.remove();
+}
+function hideFeedback() { $('pp-fb').className = 'pp-fb'; $('pp-fb').innerHTML = ''; }
+
+function placeIssue(key, kind, issue) {
+  const prev = slotOf(key) && slotOf(key)[kind];
+  if (!apply({ type: 'issue', key, kind, issue })) return;
+  select(key, { flash: true });
+  const slot = slotOf(key);
+  feedback('ok', `En façade : ${slot.serie} — ${issueLabel(issue)}`, [
+    `<strong>À consulter sur place.</strong> ${esc(locLabel(key))}.`,
+    prev ? `L'ancien ${kind === 'hs' ? 'hors-série' : 'numéro'} (${esc(issueLabel(prev))}) devient <strong>empruntable</strong> : au casier.` : '',
+  ], { cover: coverSrc(issue, slot.serie), actions: [{ label: 'Annuler', onClick: () => { apply({ type: 'undo', key, kind }); feedback('info', 'Mise en place annulée.', [prev ? `De nouveau en façade : ${esc(issueLabel(prev))}.` : '']); } }] });
+}
+
+function assignAndPlace(key, serie, issue) {
+  if (!apply({ type: 'assign', key, serie, nonBulletine: false })) return;
+  PENDING_PLACE = null;
+  placeIssue(key, issue.hs ? 'hs' : 'normal', issue);
+}
+
+function handlePlace(bc) {
+  PENDING_EAN = null;
+  const joined = !CAT.has(bc) && joinAddon(bc);
+  if (joined) {
+    // Le complément arrive après coup : on remplace le numéro posé à l'instant
+    // par le même, avec son code complet.
+    const { key } = LAST_EAN;
+    const date = slotOf(key) && slotOf(key).normal ? slotOf(key).normal.date : todayIso();
+    apply({ type: 'undo', key, kind: 'normal' });
+    placeEanIssue(key, joined, date);
+    return;
+  }
+  const issue = issueFromCatalog(bc);
+  const ean = !issue && parseEan(bc);
+  if (ean) { handlePlaceEan(ean); return; }
+  if (!issue) {
+    const s = SELECTED && slotOf(SELECTED);
+    if (s && !s.nonBulletine) {
+      MANUAL_PREFILL = { key: SELECTED, barcode: bc };
+      renderDetail();
+      feedback('warn', 'Code-barre absent de l\'export Syracuse', [
+        `Numéro sans doute arrivé après l'export${EXPORT_DATE ? ' du ' + esc(rpUI.fmt.date(EXPORT_DATE)) : ''}. Complétez le numéro dans le panneau de droite pour <strong>${esc(s.serie)}</strong>.`]);
+      const f = document.querySelector('#pp-detail [name=numero]'); if (f) f.focus();
+    } else {
+      feedback('warn', `Code-barre ${bc} inconnu de l'export Syracuse`, [
+        'Cliquez d\'abord sur l\'étage du titre dans le plan, puis rescannez : vous pourrez saisir le numéro à la main.']);
+    }
+    return;
+  }
+  const rec = CAT.get(bc);
+  const key = findSlotBySerie(rec.serie);
+  if (!key) {
+    if (SELECTED && !slotOf(SELECTED)) { assignAndPlace(SELECTED, rec.serie, issue); return; }
+    PENDING_PLACE = { serie: rec.serie, issue };
+    renderPlan();
+    feedback('info', `« ${rec.serie} » n'a pas encore d'étage`, [
+      `${esc(issueLabel(issue))}. <strong>Cliquez sur l'étage où il se trouve</strong> dans le plan (les étages libres sont encadrés en rouge).`],
+      { actions: [{ label: 'Annuler', onClick: () => { PENDING_PLACE = null; hideFeedback(); renderPlan(); } }] });
+    return;
+  }
+  const kind = issue.hs ? 'hs' : 'normal';
+  const cur = slotOf(key)[kind];
+  select(key, { flash: true });
+  if (cur && cur.barcode === bc) {
+    feedback('ok', `Déjà en façade : ${rec.serie} — ${issueLabel(cur)}`, [esc(locLabel(key))], { cover: coverSrc(cur, rec.serie) });
+  } else if (cur && compareIssues(issue, cur) < 0) {
+    feedback('warn', `Plus ancien que le numéro en façade`, [
+      `${esc(rec.serie)} — ${esc(issueLabel(issue))}, alors que la façade a déjà le ${esc(issueLabel(cur))}.`,
+      'Celui-ci est <strong>empruntable</strong> : à ranger au casier.'],
+      { actions: [{ label: 'Le mettre en façade quand même', onClick: () => placeIssue(key, kind, issue) }] });
+  } else {
+    placeIssue(key, kind, issue);
+  }
+}
+
+function handleRetour(bc) {
+  const joined = !CAT.has(bc) && joinAddon(bc);
+  if (joined) { LAST_EAN = null; handleRetour(joined.full); return; }
+  const issue = issueFromCatalog(bc);
+  // Un code marchand sans complément est le même pour tous les numéros : il
+  // ne prouve pas que ce soit celui en façade (voir plus bas).
+  const onSite = !isBareEan(bc) && ALL_KEYS.find(k => { const s = STATE.slots[k]; return s && ((s.normal && s.normal.barcode === bc) || (s.hs && s.hs.barcode === bc)); });
+  if (onSite) {
+    const s = slotOf(onSite);
+    const it = s.normal && s.normal.barcode === bc ? s.normal : s.hs;
+    select(onSite, { flash: true });
+    feedback('alert', 'À CONSULTER SUR PLACE — ne pas prêter', [
+      `<strong>${esc(s.serie)} — ${esc(issueLabel(it))}</strong> est le ${it.hs ? 'hors-série' : 'numéro'} en façade.`,
+      `À remettre au présentoir : ${esc(locLabel(onSite))}.`], { cover: coverSrc(it, s.serie) });
+    return;
+  }
+  const ean = !issue && parseEan(bc);
+  if (ean) {
+    const key = findSlotByEan(ean.ean);
+    if (!key) { feedback('info', `Code-barre marchand ${ean.ean}`, ['Associé à aucun titre des présentoirs.']); return; }
+    const s = slotOf(key);
+    const cur = s.normal;
+    select(key, { flash: true });
+    if (!ean.addon) LAST_EAN = { p: ean, key, t: Date.now() }; // complément peut-être en second scan
+    if (!ean.addon) {
+      feedback('warn', `${s.serie} — vérifiez la date`, [
+        `Le code marchand est le même pour tous les numéros. <strong>En façade : ${esc(cur ? issueLabel(cur) : 'aucun numéro')}.</strong>`,
+        `Si c'est ce numéro, il est à consulter sur place : ${esc(locLabel(key))}. Sinon, empruntable (casier).`], { cover: coverSrc(cur, s.serie) });
+    } else {
+      feedback('ok', `Empruntable : ${s.serie} — ancien numéro`, [
+        cur ? `En façade : ${esc(issueLabel(cur))}.` : '', `À ranger au casier : ${esc(locLabel(key))}.`]);
+    }
+    return;
+  }
+  if (!issue) {
+    feedback('warn', `Code-barre ${bc} inconnu de l'export Syracuse`, ['Comparez la couverture avec le plan : un numéro arrivé après l\'export peut être celui en façade.']);
+    return;
+  }
+  const rec = CAT.get(bc);
+  const key = findSlotBySerie(rec.serie);
+  if (!key) {
+    feedback('info', `${rec.serie} — ${issueLabel(issue)}`, ['Ce titre n\'est pas suivi sur les présentoirs.']);
+    return;
+  }
+  select(key, { flash: true });
+  const cur = slotOf(key)[issue.hs ? 'hs' : 'normal'];
+  if (cur && !cur.barcode && compareIssues(issue, cur) === 0 && (cur.numero || '') === (issue.numero || '')) {
+    feedback('alert', 'Même numéro que celui en façade', [
+      `${esc(rec.serie)} — ${esc(issueLabel(issue))} : c'est le numéro à consulter sur place (saisi sans code-barre).`,
+      `À remettre au présentoir : ${esc(locLabel(key))}.`], { cover: coverSrc(cur, rec.serie) });
+    return;
+  }
+  feedback('ok', `Empruntable : ${rec.serie} — ${issueLabel(issue)}`, [
+    cur ? `Ancien ${issue.hs ? 'hors-série' : 'numéro'} (en façade : ${esc(issueLabel(cur))}).` : '',
+    `À ranger au casier : ${esc(locLabel(key))}.`], { cover: coverSrc(issue, rec.serie) });
+}
+
+/* ════════════════════════════════════════════════════════════
+   RENDU — plan
+   ════════════════════════════════════════════════════════════ */
+let SEARCH = '';
+$('pp-search').addEventListener('input', e => { SEARCH = normSerie(e.target.value); renderPlan(); });
+
+function cellHtml(key) {
+  const s = STATE.slots[key];
+  const sel = key === SELECTED ? ' is-selected' : '';
+  const label = locLabel(key);
+  if (!s) {
+    const target = PENDING_PLACE ? ' is-target' : '';
+    const dim = SEARCH ? ' is-dim' : '';
+    return `<button type="button" class="pp-cell is-empty${target}${sel}${dim}" data-key="${key}" aria-label="${esc(label)} : libre">${PENDING_PLACE ? 'Placer ici' : 'Libre'}</button>`;
+  }
+  const match = (SEARCH ? (normSerie(s.serie).includes(SEARCH) ? ' is-match' : ' is-dim') : '') + (PENDING_EAN ? ' is-pick' : '');
+  /* Numéro et hors-série sont en façade ensemble (ex. National Geographic) :
+     les deux couvertures côte à côte, chacune avec son numéro. */
+  const faceOf = it => {
+    const c = coverSrc(it, s.serie);
+    return c ? `<img src="${esc(c)}" alt="" loading="lazy">` : `<span class="pp-cell__title">${esc(s.serie)}</span>`;
+  };
+  const short = it => it.numero ? (it.hs ? 'HS ' : 'N° ') + it.numero : issueLabel(it);
+  const both = s.normal && s.hs;
+  const face = both
+    ? `<span class="pp-duo"><span class="pp-duo__item">${faceOf(s.normal)}<span class="pp-duo__tag">${esc(short(s.normal))}</span></span><span class="pp-duo__item">${faceOf(s.hs)}<span class="pp-duo__tag pp-duo__tag--hs">${esc(short(s.hs))}</span></span></span>`
+    : faceOf(s.normal || s.hs);
+  const shown = s.normal || s.hs;
+  const num = both
+    ? `<span class="pp-cell__num">${esc(s.normal.date ? fmtIssueDate(s.normal.date) : '')} · + hors-série</span>`
+    : shown ? `<span class="pp-cell__num">${esc(issueLabel(shown))}</span>` : `<span class="pp-cell__num pp-cell__none">Aucun numéro</span>`;
+  const hs = s.hs && !both ? `<span class="pp-cell__hs" title="Hors-série en place : ${esc(issueLabel(s.hs))}">HS</span>` : '';
+  const nb = s.nonBulletine ? '<span class="pp-cell__nb" title="Non bulletiné">date</span>' : '';
+  const aria = `${label} : ${s.serie}, ${s.normal ? issueLabel(s.normal) : 'aucun numéro'}${s.hs ? ', hors-série ' + issueLabel(s.hs) : ''}`;
+  return `<button type="button" class="pp-cell${sel}${match}" data-key="${key}" aria-label="${esc(aria)}"><span class="pp-cell__face">${face}${hs}${nb}</span><span class="pp-cell__caption"><span class="pp-cell__serie">${esc(s.serie)}</span>${num}</span></button>`;
+}
+
+function renderPlan() {
+  $('pp-plan').innerHTML = TRAVEES.map(t => {
+    const blocs = [];
+    for (let b = 0; b < t.cols; b += t.bloc) {
+      const cols = [];
+      for (let ci = b; ci < Math.min(t.cols, b + t.bloc); ci++) {
+        cols.push(`<div class="pp-col">${Array.from({ length: t.et }, (_, e) => cellHtml(slotKey(t, ci, e + 1))).join('')}</div>`);
+      }
+      blocs.push(`<div class="pp-bloc">${cols.join('')}</div>`);
+    }
+    const keys = ALL_KEYS.filter(k => k.startsWith(t.id + '|'));
+    const used = keys.filter(k => STATE.slots[k]).length;
+    const rail = `<div class="pp-rail" aria-hidden="true">${Array.from({ length: t.et }, (_, e) => `<span>Étage ${e + 1}</span>`).join('')}</div>`;
+    return `<div class="pp-travee"><div class="pp-travee__head"><h2 class="pp-travee__title">${t.label}</h2><span class="pp-travee__meta">${used} / ${keys.length} étages occupés${t.nonBulletineParDefaut ? ' · titres non bulletinés' : ''}</span></div>
+      <div class="pp-rack" style="--et:${t.et}">${rail}${blocs.join('')}</div></div>`;
+  }).join('');
+  if (window.rpEmbed && rpEmbed.refresh) rpEmbed.refresh();
+}
+
+$('pp-plan').addEventListener('click', async e => {
+  const cell = e.target.closest('.pp-cell');
+  if (!cell) return;
+  const key = cell.dataset.key;
+  if (PENDING_EAN) {
+    const p = PENDING_EAN;
+    if (!slotOf(key)) {
+      select(key);
+      feedback('info', 'Cet étage est libre', ['Donnez-lui d\'abord un titre (panneau de droite), puis rescannez le journal.']);
+      PENDING_EAN = null;
+      return;
+    }
+    PENDING_EAN = null;
+    if (associateEan(key, p)) handlePlaceEan(p); else renderPlan();
+    return;
+  }
+  if (PENDING_PLACE) {
+    const s = slotOf(key);
+    if (s) {
+      const ok = await rpUI.confirmInline($('pp-fb'), `Remplacer « ${s.serie} » par « ${PENDING_PLACE.serie} » sur cet étage ?`, { okLabel: 'Remplacer' });
+      if (!ok) return;
+    }
+    assignAndPlace(key, PENDING_PLACE.serie, PENDING_PLACE.issue);
+    return;
+  }
+  select(key);
+  const aside = $('pp-detail');
+  const r = aside.getBoundingClientRect();
+  if (r.top > window.innerHeight || r.bottom < 0) aside.scrollIntoView({ block: 'start', behavior: 'smooth' });
+});
+
+function select(key, opts = {}) {
+  if (SELECTED !== key) MANUAL_PREFILL = MANUAL_PREFILL && MANUAL_PREFILL.key === key ? MANUAL_PREFILL : null;
+  SELECTED = key;
+  renderPlan();
+  renderDetail();
+  const cell = document.querySelector(`.pp-cell[data-key="${CSS.escape(key)}"]`);
+  if (cell && opts.flash) {
+    cell.classList.add('is-flash');
+    cell.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   RENDU — panneau de détail
+   ════════════════════════════════════════════════════════════ */
+function issueBlock(key, slot, kind) {
+  const it = slot[kind];
+  const title = kind === 'hs' ? 'Hors-série en place — sur place jusqu\'au suivant' : 'En façade — à consulter sur place';
+  if (!it) {
+    if (kind === 'hs') return '';
+    return `<div class="pp-sec"><p class="pp-sec__title">${title}</p><p class="pp-muted">Aucun numéro enregistré. Scannez-le, ou saisissez-le ci-dessous.</p></div>`;
+  }
+  const cover = coverSrc(it, slot.serie);
+  const coverHtml = cover ? `<img class="pp-issue__cover" src="${esc(cover)}" alt="Couverture">` : '<span class="pp-issue__cover">pas de photo</span>';
+  const canUndo = (slot.hist || []).some(h => !!h.hs === (kind === 'hs'));
+  return `<div class="pp-sec"><p class="pp-sec__title">${title}</p>
+    <div class="pp-issue">${coverHtml}<div>
+      <p class="pp-issue__label">${esc(issueLabel(it))}</p>
+      <p class="pp-issue__meta">${it.barcode ? 'Code-barre ' + esc(it.barcode) : 'Sans code-barre'} · en façade ${esc(rpUI.fmt.ago(it.ts))}</p>
+      <div class="pp-issue__actions">
+        <button type="button" class="pro-btn pro-btn--secondary pro-btn--sm" data-act="photo" data-kind="${kind}">${it.photo ? 'Reprendre la photo' : 'Photo de couverture'}</button>
+        ${canUndo || kind === 'hs' ? `<button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" data-act="undo" data-kind="${kind}">${canUndo ? '↶ Rétablir le précédent' : 'Retirer'}</button>` : ''}
+      </div>
+      ${presentoirCoverKey(slot.serie, it.hs, it.numero, it.date) ? `<details style="margin-top:0.5rem"><summary class="pp-muted" style="cursor:pointer">Couverture depuis une adresse d'image</summary>
+        <form class="pp-form" data-form="cover-url" data-kind="${kind}" style="margin-top:0.4rem">
+          <input type="url" class="pro-input" name="url" placeholder="https://…/couverture.jpg" autocomplete="off" aria-label="Adresse de l'image de couverture">
+          <p class="pp-muted" style="margin:0;font-size:0.75rem">Sur le site de l'éditeur ou d'un kiosque : clic droit sur la couverture › « Copier l'adresse de l'image ».</p>
+          <button type="submit" class="pro-btn pro-btn--secondary pro-btn--sm">Utiliser cette image</button>
+        </form></details>` : ''}
+      </div></div></div>`;
+}
+
+function manualForm(key, slot) {
+  const pre = MANUAL_PREFILL && MANUAL_PREFILL.key === key ? MANUAL_PREFILL : null;
+  if (slot.nonBulletine) {
+    return `<div class="pp-sec"><p class="pp-sec__title">Nouveau numéro en façade</p>
+      <form class="pp-form" data-form="manual">
+        <div class="pp-form__row">
+          <label>Date de parution<input type="date" class="pro-input" name="date" required></label>
+          <label>Numéro (facultatif)<input type="text" class="pro-input" name="numero" autocomplete="off"></label>
+        </div>
+        <label class="pp-check"><input type="checkbox" name="hs"> Hors-série</label>
+        <button type="submit" class="pro-btn pro-btn--primary">Mettre en façade</button>
+      </form></div>`;
+  }
+  const next = slot.normal && !isNaN(numVal(slot.normal.numero)) ? String(numVal(slot.normal.numero) + 1) : '';
+  return `<div class="pp-sec"><p class="pp-sec__title">${pre ? 'Numéro scanné, absent de l\'export' : 'Saisir un numéro à la main'}</p>
+    <form class="pp-form" data-form="manual">
+      <div class="pp-form__row">
+        <label>Numéro<input type="text" class="pro-input" name="numero" value="${esc(pre ? next : '')}" placeholder="${esc(next)}" autocomplete="off"></label>
+        <label>Date<input type="text" class="pro-input" name="date" placeholder="JJ/MM/AAAA ou MM/AAAA" autocomplete="off"></label>
+      </div>
+      <div class="pp-form__row">
+        <label>Code-barre<input type="text" class="pro-input" name="barcode" value="${esc(pre ? pre.barcode : '')}" inputmode="numeric" autocomplete="off"></label>
+        <label class="pp-check" style="align-self:end"><input type="checkbox" name="hs"> Hors-série</label>
+      </div>
+      <button type="submit" class="pro-btn pro-btn--primary">Mettre en façade</button>
+    </form></div>`;
+}
+
+function seriesDatalist() {
+  return `<datalist id="pp-series">${[...SERIES.values()].map(s => s.serie).sort((a, b) => a.localeCompare(b, 'fr')).map(s => `<option value="${esc(s)}">`).join('')}</datalist>`;
+}
+function assignForm(key, slot) {
+  const t = TRAVEES.find(x => key.startsWith(x.id + '|'));
+  const nb = slot ? slot.nonBulletine : !!(t && t.nonBulletineParDefaut);
+  return `<form class="pp-form" data-form="assign">
+      <label>Titre${seriesDatalist()}<input type="text" class="pro-input" name="serie" list="pp-series" value="${esc(slot ? slot.serie : '')}" required autocomplete="off" placeholder="Ex. Philosophie magazine"></label>
+      <label class="pp-check"><input type="checkbox" name="nonBulletine"${nb ? ' checked' : ''}> Non bulletiné (suivi par la date de parution)</label>
+      <div class="pp-issue__actions">
+        <button type="submit" class="pro-btn pro-btn--primary pro-btn--sm">${slot ? 'Enregistrer' : 'Placer ce titre ici'}</button>
+        ${slot ? '<button type="button" class="pro-btn pro-btn--danger pro-btn--sm" data-act="free">Libérer l\'étage</button>' : ''}
+      </div>
+    </form>`;
+}
+
+function renderDetail() {
+  const host = $('pp-detail');
+  if (!SELECTED) {
+    host.innerHTML = '<p class="pp-muted">Cliquez sur un étage du plan pour voir le numéro en façade, son historique et le modifier.</p>';
+    return;
+  }
+  const key = SELECTED;
+  const slot = slotOf(key);
+  if (!slot) {
+    host.innerHTML = `<p class="pp-detail__loc">${esc(locLabel(key))}</p><h2 class="pp-detail__serie">Étage libre</h2>
+      <p class="pp-muted">Scannez un numéro du titre (il viendra se placer ici), ou indiquez son nom :</p>${assignForm(key, null)}`;
+    bindDetail(key);
+    return;
+  }
+  const known = slot.nonBulletine ? [] : latestKnown(slot.serie, 5);
+  const knownHtml = known.length ? `<div class="pp-sec"><p class="pp-sec__title">Derniers numéros de l'export Syracuse</p><ul class="pp-list">${known.map(it => {
+    const cur = slot[it.hs ? 'hs' : 'normal'];
+    const isCur = cur && cur.barcode === it.barcode;
+    return `<li><span>${esc(issueLabel(it))} <small>${esc(it.barcode)}</small></span>${isCur ? '<span class="pro-pill pro-pill--valide">en façade</span>' : `<button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" data-act="known" data-bc="${esc(it.barcode)}">En façade</button>`}</li>`;
+  }).join('')}</ul></div>` : '';
+  const hist = slot.hist || [];
+  const histHtml = hist.length ? `<div class="pp-sec"><p class="pp-sec__title">Remplacés — empruntables (casier)</p><ul class="pp-list">${hist.map(it => `<li><span>${esc(issueLabel(it))}${it.barcode ? ` <small>${esc(it.barcode)}</small>` : ''}</span><small>retiré ${esc(rpUI.fmt.date(new Date(it.ts)))}</small></li>`).join('')}</ul></div>` : '';
+  host.innerHTML = `<p class="pp-detail__loc">${esc(locLabel(key))}</p>
+    <h2 class="pp-detail__serie">${esc(slot.serie)}</h2>
+    ${slot.nonBulletine ? '<span class="pro-pill pro-pill--pret">Non bulletiné · suivi par date</span>' : ''}
+    ${issueBlock(key, slot, 'normal')}
+    ${issueBlock(key, slot, 'hs')}
+    ${manualForm(key, slot)}
+    ${knownHtml}
+    ${histHtml}
+    <div class="pp-sec"><p class="pp-sec__title">Codes-barres marchands</p>
+      ${(slot.eans || []).length ? `<ul class="pp-list">${slot.eans.map(e => `<li><span style="font-family:var(--pro-font-mono)">${esc(e)}</span><button type="button" class="pro-btn pro-btn--ghost pro-btn--sm" data-act="ean-remove" data-ean="${esc(e)}">Retirer</button></li>`).join('')}</ul>` : '<p class="pp-muted">Aucun. Scannez le code du journal ici pour l\'associer à ce titre.</p>'}
+      <form class="pp-form" data-form="ean" style="margin-top:0.5rem"><div class="pp-form__row" style="grid-template-columns:1fr auto">
+        <input type="text" class="pro-input" name="ean" inputmode="numeric" autocomplete="off" placeholder="Code à 13 chiffres" aria-label="Code-barre marchand">
+        <button type="submit" class="pro-btn pro-btn--secondary pro-btn--sm">Associer</button>
+      </div></form></div>
+    <details class="pp-sec"><summary class="pp-sec__title" style="cursor:pointer">Modifier l'étage</summary>${assignForm(key, slot)}</details>`;
+  bindDetail(key);
+}
+
+function bindDetail(key) {
+  const host = $('pp-detail');
+  host.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', async () => {
+    const act = b.dataset.act;
+    const slot = slotOf(key);
+    if (act === 'photo') askPhoto(key, b.dataset.kind);
+    else if (act === 'undo') apply({ type: 'undo', key, kind: b.dataset.kind });
+    else if (act === 'ean-remove') apply({ type: 'ean', key, ean: b.dataset.ean, remove: true });
+    else if (act === 'known') { const it = issueFromCatalog(b.dataset.bc); if (it) placeIssue(key, it.hs ? 'hs' : 'normal', it); }
+    else if (act === 'free') {
+      const ok = await rpUI.confirmInline(b, `Libérer cet étage ? « ${slot.serie} » et son historique seront retirés.`, { okLabel: 'Libérer', danger: true });
+      if (ok) apply({ type: 'assign', key, serie: null });
+    }
+  }));
+  const af = host.querySelector('[data-form=assign]');
+  if (af) af.addEventListener('submit', e => {
+    e.preventDefault();
+    const serie = af.serie.value.trim();
+    if (!serie) return;
+    const other = findSlotBySerie(serie);
+    if (other && other !== key) { rpUI.toast(`« ${serie} » est déjà placé : ${locLabel(other)}.`, { type: 'warn' }); return; }
+    const known = SERIES.get(normSerie(serie));
+    apply({ type: 'assign', key, serie: known ? known.serie : serie, nonBulletine: af.nonBulletine.checked });
+    rpUI.toast('Étage enregistré.', { type: 'ok' });
+  });
+  host.querySelectorAll('[data-form=cover-url]').forEach(cf => cf.addEventListener('submit', e => {
+    e.preventDefault();
+    const url = cf.url.value.trim();
+    const it = slotOf(key) && slotOf(key)[cf.dataset.kind];
+    const ck = it && presentoirCoverKey(slotOf(key).serie, it.hs, it.numero, it.date);
+    if (!ck) return;
+    if (!/^https:\/\//.test(url)) { rpUI.toast('Adresse https://… attendue.', { type: 'warn' }); return; }
+    // L'image s'affiche depuis le site d'origine : on vérifie qu'elle charge.
+    const probe = new Image();
+    probe.onload = () => { if (apply({ type: 'cover', coverKey: ck, url, source: 'url' })) rpUI.toast('Couverture enregistrée.', { type: 'ok' }); };
+    probe.onerror = () => rpUI.toast('Cette adresse ne donne pas d\'image affichable.', { type: 'warn' });
+    probe.src = url;
+  }));
+  const ef = host.querySelector('[data-form=ean]');
+  if (ef) ef.addEventListener('submit', e => {
+    e.preventDefault();
+    const p = parseEan(ef.ean.value);
+    if (!p) { rpUI.toast('Code marchand illisible : 13 chiffres (clé de contrôle comprise).', { type: 'warn' }); return; }
+    if (associateEan(key, p)) rpUI.toast('Code-barre marchand associé.', { type: 'ok' });
+  });
+  const mf = host.querySelector('[data-form=manual]');
+  if (mf) mf.addEventListener('submit', e => {
+    e.preventDefault();
+    const numero = mf.numero.value.trim() || null;
+    const date = parseUserDate(mf.date.value);
+    if (date === undefined) { rpUI.toast('Date illisible : JJ/MM/AAAA ou MM/AAAA.', { type: 'warn' }); return; }
+    if (!numero && !date) { rpUI.toast('Indiquez au moins un numéro ou une date.', { type: 'warn' }); return; }
+    const hs = mf.hs.checked;
+    const barcode = mf.barcode ? (mf.barcode.value.trim() || null) : null;
+    MANUAL_PREFILL = null;
+    placeIssue(key, hs ? 'hs' : 'normal', { barcode, numero, date, hs, label: null, ts: Date.now(), photo: null });
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   INDICATEURS
+   ════════════════════════════════════════════════════════════ */
+function renderKpis() {
+  const slots = Object.values(STATE.slots);
+  const withIssue = slots.filter(s => s.normal).length;
+  const hs = slots.filter(s => s.hs).length;
+  const photos = slots.filter(s => s.normal && s.normal.photo).length;
+  const kpi = (label, value, note) => `<div class="pro-kpi"><p class="pro-kpi__label">${label}</p><div class="pro-kpi__row"><span class="pro-kpi__value">${value}</span></div>${note ? `<p class="pro-kpi__note">${note}</p>` : ''}</div>`;
+  $('pp-kpis').innerHTML =
+    kpi('Étages occupés', `${slots.length} <span class="pro-kpi__unit">/ ${ALL_KEYS.length}</span>`, `${ALL_KEYS.length - slots.length} libres`) +
+    kpi('Numéros en façade', withIssue, slots.length - withIssue ? `${slots.length - withIssue} titre(s) sans numéro enregistré` : 'tous les titres placés') +
+    kpi('Hors-séries en place', hs, '') +
+    kpi('Couvertures photographiées', photos, withIssue ? `sur ${withIssue} numéros en façade` : '');
+}
+
+function renderAll() { renderKpis(); renderPlan(); renderDetail(); }
+
+renderAll();
+/* Pas de relecture périodique (demande du 2026-10-21) : l'état partagé et
+   Syracuse ne sont relus qu'au chargement de la page. */
+Promise.all([loadCatalog(), syncFromServer()]).then(importSyracuseDuJour);
+$('pp-scan').focus();
+</script>
+</body>
+</html>
